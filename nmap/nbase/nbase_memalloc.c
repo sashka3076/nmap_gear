@@ -100,7 +100,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_memalloc.c,v 1.6 2004/08/29 09:12:04 fyodor Exp $ */
+/* $Id: nbase_memalloc.c,v 1.7 2004/10/12 09:34:12 fyodor Exp $ */
 
 #include "nbase.h"
 #include <stdio.h>

@@ -1,5 +1,5 @@
 Name: nmap
-Version: 3.70
+Version: 3.75
 Release: alt1
 Serial: 20020501
 
@@ -21,8 +21,8 @@ Patch4: nmap-3.70-alt-drop_priv.patch
 
 PreReq: libpcap >= 2:0.7.2-alt2, chrooted-resolv
 
-# Automatically added by buildreq on Sat Jan 10 2004
-BuildRequires: XFree86-devel gcc-c++ glib-devel gtk+-devel libcap-devel libpcap-devel libpcre-devel libssl-devel libstdc++-devel
+# Automatically added by buildreq on Tue Oct 19 2004
+BuildRequires: gcc-c++ glib-devel gtk+-devel libcap-devel libpcap-devel libpcre-devel libssl-devel libstdc++-devel xorg-x11-libs
 
 %package frontend
 Summary: Gtk+ frontend for %name
@@ -104,6 +104,11 @@ bzip2 -9fk CHANGELOG
 %_iconsdir/*
 
 %changelog
+* Tue Oct 19 2004 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 20020501:3.75-alt1
+- 3.75
+- Updated autoheader.patch
+- Updated BuildRequires
+
 * Wed Sep 01 2004 Aleksandr Blokhin 'Sass' <sass@altlinux.ru> 20020501:3.70-alt1
 - 3.70
 - Updated drop_priv.patch & autoheader.patch

@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.h,v 1.106 2004/08/29 09:12:03 fyodor Exp $ */
+/* $Id: nmap.h,v 1.107 2004/10/18 16:59:37 fyodor Exp $ */
 
 #ifndef NMAP_H
 #define NMAP_H
@@ -305,6 +305,15 @@ void *realloc();
 #ifndef MAX_RTT_TIMEOUT
 #define MAX_RTT_TIMEOUT 10000 /* Never allow more than 10 secs for packet round
 				 trip */
+#endif
+
+/* Default maximum send delay between probes to the same host */
+#ifndef MAX_TCP_SCAN_DELAY
+#define MAX_TCP_SCAN_DELAY 1000
+#endif
+
+#ifndef MAX_UDP_SCAN_DELAY
+#define MAX_UDP_SCAN_DELAY 1000
 #endif
 
 /* We wait at least 100 ms for a response by default - while that

@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: service_scan.h,v 1.17 2004/08/29 09:12:03 fyodor Exp $ */
+/* $Id: service_scan.h,v 1.18 2004/10/12 09:34:12 fyodor Exp $ */
 
 #ifndef SERVICE_SCAN_H
 #define SERVICE_SCAN_H
@@ -242,7 +242,7 @@ class ServiceProbe {
   void setProbeProtocol(u8 protocol) { probeprotocol = protocol; }
 
   // Takes a string as given in the 'ports '/'sslports ' line of
-  // nmap-services-probes.  Pass in the list from the appropriate
+  // nmap-service-probes.  Pass in the list from the appropriate
   // line.  For 'sslports', tunnel should be specified as
   // SERVICE_TUNNEL_SSL.  Otherwise use SERVICE_TUNNEL_NONE.  The line
   // number is requested because this function will bail with an error

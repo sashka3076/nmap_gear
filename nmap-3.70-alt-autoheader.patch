@@ -1,6 +1,6 @@
 --- nmap-3.55/configure.ac.orig	2004-07-04 10:30:31 +0400
 +++ nmap-3.55/configure.ac	2004-07-16 18:38:09 +0400
-@@ -80,75 +80,75 @@
+@@ -80,78 +80,78 @@
  
  case "$host" in
    *alpha-dec-osf*)
@@ -28,6 +28,10 @@
      if test -z "$GCC"; then
        sgi_cc=yes
      fi
+     ;;
+   *-hpux*)
+-    AC_DEFINE(HPUX)
++    AC_DEFINE(HPUX, 1, [Define to 1 for HPUX])
      ;;
    *-solaris2.0*)  
 -    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)

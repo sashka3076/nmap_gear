@@ -2,7 +2,7 @@ dnl # -*- mode: fundamental; -*-
 dnl # Autoconf configuration file for Nbase
 dnl #
 dnl # Process this file with autoconf to produce a configure script.
-dnl # $Id: configure.ac,v 1.14 2004/08/26 00:30:18 fyodor Exp $
+dnl # $Id: configure.ac,v 1.15 2004/10/12 09:34:12 fyodor Exp $
 
 # Require autoconf 2.13
 AC_PREREQ(2.13)
@@ -73,6 +73,9 @@ case "$host" in
     if test -z "$GCC"; then
       sgi_cc=yes
     fi
+    ;;
+  *-hpux*)
+    AC_DEFINE(HPUX)
     ;;
   *-solaris2.0*)  
     AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)

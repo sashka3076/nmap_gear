@@ -96,7 +96,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_winunix.h,v 1.11 2004/08/29 09:12:04 fyodor Exp $ */
+/* $Id: nbase_winunix.h,v 1.12 2004/10/12 09:34:12 fyodor Exp $ */
 
 #ifndef NBASE_WINUNIX_H
 #define NBASE_WINUNIX_H

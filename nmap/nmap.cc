@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.cc,v 1.53 2004/08/31 03:46:19 fyodor Exp $ */
+/* $Id: nmap.cc,v 1.55 2004/10/18 16:59:36 fyodor Exp $ */
 
 #include "nmap.h"
 #include "osscan.h"
@@ -253,6 +253,7 @@ int nmap_main(int argc, char *argv[]) {
       {"scanflags", required_argument, 0, 0},
       {"host_timeout", required_argument, 0, 0},
       {"scan_delay", required_argument, 0, 0},
+      {"max_scan_delay", required_argument, 0, 0},
       {"oA", required_argument, 0, 0},  
       {"oN", required_argument, 0, 0},
       {"oM", required_argument, 0, 0},  
@@ -396,8 +397,17 @@ int nmap_main(int argc, char *argv[]) {
 	o.scan_delay = atoi(optarg);
 	if (o.scan_delay <= 0) {
 	  fatal("scan_delay must be greater than 0");
-	}   
+	}
+	if (o.scan_delay > o.maxTCPScanDelay()) o.setMaxTCPScanDelay(o.scan_delay);
+	if (o.scan_delay > o.maxUDPScanDelay()) o.setMaxUDPScanDelay(o.scan_delay);
 	o.max_parallelism = 1;
+      } else if (strcmp(long_options[option_index].name, "max_scan_delay") == 0) {
+	unsigned int scand = atoi(optarg);
+	if (scand < 0) {
+	  fatal("max_scan_delay must be greater than 0");
+	}
+	o.setMaxTCPScanDelay(scand);
+	o.setMaxUDPScanDelay(scand);
       } else if (strcmp(long_options[option_index].name, "randomize_hosts") == 0
 		 || strcmp(long_options[option_index].name, "rH") == 0) {
 	o.randomize_hosts = 1;
@@ -702,12 +712,14 @@ int nmap_main(int argc, char *argv[]) {
 	o.setMinRttTimeout(100);
 	o.setMaxRttTimeout(1250);
 	o.setInitialRttTimeout(500);
+        o.setMaxTCPScanDelay(10);
       } else if (*optarg == '5' || (strcasecmp(optarg, "Insane") == 0)) {
 	o.timing_level = 5;
 	o.setMinRttTimeout(50);
 	o.setMaxRttTimeout(300);
 	o.setInitialRttTimeout(250);
 	o.host_timeout = 900000;
+        o.setMaxTCPScanDelay(5);
       } else {
 	fatal("Unknown timing mode (-T argment).  Use either \"Paranoid\", \"Sneaky\", \"Polite\", \"Normal\", \"Aggressive\", \"Insane\" or a number from 0 (Paranoid) to 5 (Insane)");
       }
@@ -1940,7 +1952,7 @@ int nmap_fetchfile(char *filename_returned, int bufferlen, char *file) {
     }
   }
 
-  if ((dirptr = getenv("NMAPDIR"))) {
+  if (!foundsomething && (dirptr = getenv("NMAPDIR"))) {
     res = snprintf(filename_returned, bufferlen, "%s/%s", dirptr, file);
     if (res > 0 && res < bufferlen) {
       if (fileexistsandisreadable(filename_returned))
@@ -1960,7 +1972,7 @@ int nmap_fetchfile(char *filename_returned, int bufferlen, char *file) {
     if (!foundsomething && getuid() != geteuid()) {
       pw = getpwuid(geteuid());
       if (pw) {
-	res = snprintf(filename_returned, bufferlen, "%s/nmap/%s", pw->pw_dir, file);
+	res = snprintf(filename_returned, bufferlen, "%s/.nmap/%s", pw->pw_dir, file);
 	if (res > 0 && res < bufferlen) {
 	  if (fileexistsandisreadable(filename_returned))
 	    foundsomething = 1;
@@ -1997,11 +2009,11 @@ int nmap_fetchfile(char *filename_returned, int bufferlen, char *file) {
     if (res > 0 && res < bufferlen) {
       if (fileexistsandisreadable(dot_buffer)) {
 #ifdef WIN32
-	if (warningcount++ < 5 && o.debugging)
+	if (warningcount++ < 1 && o.debugging)
 #else
-	if(warningcount++ < 5)
+	if(warningcount++ < 1)
 #endif
-	  error("WARNING!  The following files exist and are readable: %s and %s.  I am choosing %s for security reasons.  set NMAPDIR=. to give priority to files in your local directory", filename_returned, dot_buffer, filename_returned);
+	  error("Warning: File %s exists, but Nmap is using %s for security and consistency reasons.  set NMAPDIR=. to give priority to files in your local directory (may affect the other data files too).", dot_buffer, filename_returned);
       }
     }
   }

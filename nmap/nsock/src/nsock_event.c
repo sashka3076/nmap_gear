@@ -56,7 +56,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_event.c,v 1.13 2004/08/29 09:12:05 fyodor Exp $ */
+/* $Id: nsock_event.c,v 1.14 2004/10/18 16:59:37 fyodor Exp $ */
 
 #include "nsock_internal.h"
 #include "gh_list.h"
@@ -251,9 +251,10 @@ nsock_event_id get_new_event_id(mspool *ms, enum nse_type type) {
   int type_code = (int) type;
   unsigned long serial = ms->next_event_serial++;
   unsigned long max_serial_allowed;
-  int shiftbits = sizeof(nsock_event_id) * 8 - TYPE_CODE_NUM_BITS;
+  int shiftbits;
   assert(type <= 3);
-  
+ 
+  shiftbits = sizeof(nsock_event_id) * 8 - TYPE_CODE_NUM_BITS;
   max_serial_allowed = ( 1 << shiftbits ) - 1;
   if (serial == max_serial_allowed ) {
     /* then the next serial will be one because 0 is forbidden */

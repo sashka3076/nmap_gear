@@ -99,7 +99,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_config.h.in,v 1.19 2004/08/29 09:12:04 fyodor Exp $ */
+/* $Id: nbase_config.h.in,v 1.20 2004/10/12 09:34:12 fyodor Exp $ */
 #ifndef NBASE_CONFIG_H
 #define NBASE_CONFIG_H
 
@@ -228,6 +228,7 @@
 #undef SUNOS
 #undef BSDI
 #undef IRIX
+#undef HPUX
 #undef NETBSD
 
 #undef HAVE_OPENSSL

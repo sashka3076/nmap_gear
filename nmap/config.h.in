@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: config.h.in,v 1.28 2004/08/29 09:12:03 fyodor Exp $ */
+/* $Id: config.h.in,v 1.29 2004/10/12 09:34:11 fyodor Exp $ */
 
 #ifndef CONFIG_H
 #define CONFIG_H
@@ -197,6 +197,7 @@ extern "C" int gethostname (char *, unsigned int);
 #undef SUNOS
 #undef BSDI
 #undef IRIX
+#undef HPUX
 #undef NETBSD
 #undef MACOSX
 

@@ -1,4 +1,3 @@
-
 /***************************************************************************
  * nsock_core.c -- This contains the core engine routines for the nsock    *
  * parallel socket event library.                                          *
@@ -54,7 +53,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_core.c,v 1.21 2004/08/29 09:12:05 fyodor Exp $ */
+/* $Id: nsock_core.c,v 1.22 2004/10/12 09:34:12 fyodor Exp $ */
 
 #include "nsock_internal.h"
 #include "gh_list.h"
@@ -96,6 +95,7 @@ static int wait_for_events(mspool *ms, int msec_timeout) {
   int event_msecs; /* Msecs before an event goes off */
   int combined_msecs;
   int sock_err = 0;
+  int socketno = 0;
   struct timeval select_tv;
   struct timeval *select_tv_p;
 
@@ -131,16 +131,37 @@ static int wait_for_events(mspool *ms, int msec_timeout) {
       select_tv_p = NULL;
     }
     
-    
-    /* Set up the descriptors for select */
-    ms->mioi.fds_results_r = ms->mioi.fds_master_r;
-    ms->mioi.fds_results_w = ms->mioi.fds_master_w;
-    ms->mioi.fds_results_x = ms->mioi.fds_master_x;
-    
-    ms->mioi.results_left = select(ms->mioi.max_sd + 1, &ms->mioi.fds_results_r, &ms->mioi.fds_results_w, &ms->mioi.fds_results_x, select_tv_p);
-    gettimeofday(&nsock_tod, NULL); /* Who knows how long select sat around for */
+    /* Figure out whether there are any FDs in the sets, as @$@!$#
+       Windows returns WSAINVAL (10022) if you call a select() with no
+       FDs, even though the Linux man page says that doing so is a
+       good, reasonably portable way to sleep with subsecond
+       precision.  Sigh */
+    for(socketno = ms->mioi.max_sd; socketno >= 0; socketno--) {
+      if(FD_ISSET(socketno, &ms->mioi.fds_master_r) ||
+	 FD_ISSET(socketno, &ms->mioi.fds_master_w) ||
+	 FD_ISSET(socketno, &ms->mioi.fds_master_x))
+	break;
+      else ms->mioi.max_sd--;
+    }
 
-  } while (ms->mioi.results_left == -1 && (sock_err = socket_errno()) == EINTR);
+    if (ms->mioi.max_sd < 0) {
+      ms->mioi.results_left = 0;
+      if (combined_msecs > 0)
+	usleep(combined_msecs * 1000);
+    } else {
+
+      /* Set up the descriptors for select */
+      ms->mioi.fds_results_r = ms->mioi.fds_master_r;
+      ms->mioi.fds_results_w = ms->mioi.fds_master_w;
+      ms->mioi.fds_results_x = ms->mioi.fds_master_x;
+      
+      ms->mioi.results_left = select(ms->mioi.max_sd + 1, &ms->mioi.fds_results_r, &ms->mioi.fds_results_w, &ms->mioi.fds_results_x, select_tv_p);
+      if (ms->mioi.results_left == -1)
+	sock_err = socket_errno();
+    }
+
+    gettimeofday(&nsock_tod, NULL); /* Due to usleep or select delay */
+  } while (ms->mioi.results_left == -1 && sock_err == EINTR);
   
   if (ms->mioi.results_left == -1 && sock_err != EINTR) {
     ms->errnum = sock_err;

@@ -55,7 +55,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_internal.h,v 1.18 2004/08/29 09:12:05 fyodor Exp $ */
+/* $Id: nsock_internal.h,v 1.19 2004/10/12 09:34:12 fyodor Exp $ */
 
 #ifndef NSOCK_INTERNAL_H
 #define NSOCK_INTERNAL_H
@@ -114,9 +114,12 @@ struct nsock_io_info {
   /* For keeping track of the select results */
   fd_set fds_results_r, fds_results_w, fds_results_x;
 
-  int max_sd; /* The highest sd we have set in any of our fd_set's (max_sd + 1 is used in select() calls) */
+/* The highest sd we have set in any of our fd_set's (max_sd + 1 is
+   used in select() calls).  Note that it can be -1, when there are no
+   valid sockets */
+  int max_sd; 
   int results_left; /* The number of descriptors contained in the sets that
-		       we have not yet dealt with. Not currently used. */
+		       we have not yet dealt with. */
 };
 
 struct event_lists {

@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: tcpip.cc,v 1.45 2004/08/31 03:46:19 fyodor Exp $ */
+/* $Id: tcpip.cc,v 1.47 2004/10/18 16:59:37 fyodor Exp $ */
 
 
 #include "tcpip.h"
@@ -1726,7 +1726,7 @@ void set_pcap_filter(Target *target,
 		     pcap_t *pd, PFILTERFN filter, char *bpf, ...)
 {
   va_list ap;
-  char buf[1024];
+  char buf[3072];
   struct bpf_program fcode;
 #ifndef __amigaos__
   unsigned int localnet, netmask;
@@ -2423,7 +2423,7 @@ int IPProbe::storePacket(u8 *ippacket, u32 len) {
   ipv4 = (struct ip *) packetbuf;
   assert(ipv4->ip_v == 4);
   assert(len >= 20);
-  assert(len == BSDUFIX(ipv4->ip_len));
+  assert(len == (u32) BSDUFIX(ipv4->ip_len));
   if (ipv4->ip_p == IPPROTO_TCP) {
     if (len >= (unsigned) ipv4->ip_hl * 4 + 20)
       tcp = (struct tcphdr *) ((u8 *) ipv4 + ipv4->ip_hl * 4);
