@@ -1,6 +1,6 @@
 Name: nmap
-Version: 3.50
-Release: alt1
+Version: 3.51
+Release: alt0.1
 Serial: 20020501
 
 Summary: Network exploration tool and security scanner
@@ -10,7 +10,7 @@ Url: http://www.insecure.org/%name
 Packager: Nmap Development Team <nmap@packages.altlinux.org>
 Summary(ru_RU.CP1251): Инструмент для исследования сети и сетевой безопасности.
 
-Source: %url/dist/%name-%version.tar.bz2
+Source: %url/dist/%name-%version-TEST2.tar.bz2
 Source1: nmapfe.menu
 Source2: nmapfe.xpm
 
@@ -29,6 +29,7 @@ Summary: Gtk+ frontend for %name
 Summary(ru_RU.CP1251): Графический интерфейс пользователя для %name
 Group: Monitoring
 Requires: %name = %serial:%version-%release
+Provides: nmapfe
 
 %description
 Nmap is designed to allow system administrators and curious individuals
@@ -56,7 +57,7 @@ This package includes nmapfe, a Gtk+ frontend for %name.
 Этот пакет содержит nmapfe, Gtk+ интерфейс для nmap.
 
 %prep
-%setup -q -n %name-%version
+%setup -q -n %name-%version-TEST2
 %patch1 -p1
 %patch2 -p1
 %patch3 -p1
@@ -102,6 +103,10 @@ export ac_cv_header_libiberty_h=no
 %_iconsdir/*
 
 %changelog
+* Tue Mar 09 2004 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 20020501:3.51-alt0.1
+- 3.51-TEST2
+- added Provides
+
 * Wed Jan 21 2004 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 20020501:3.50-alt1
 - 3.50
 

@@ -1,7 +1,6 @@
-diff -urk.orig nmap-3.40PVT17.orig/configure.ac nmap-3.40PVT17/configure.ac
---- nmap-3.40PVT17.orig/configure.ac	2003-09-12 11:50:34 +0400
-+++ nmap-3.40PVT17/configure.ac	2003-09-15 01:47:01 +0400
-@@ -57,16 +57,16 @@
+--- nmap-3.40PVT17.orig/configure.ac.orig	2004-03-04 04:13:24 +0200
++++ nmap-3.40PVT17.orig/configure.ac	2004-03-09 10:17:20 +0200
+@@ -75,75 +75,75 @@
  
  case "$host" in
    *alpha-dec-osf*)
@@ -22,7 +21,12 @@ diff -urk.orig nmap-3.40PVT17.orig/configure.ac nmap-3.40PVT17/configure.ac
      if test -z "$GCC"; then
        sgi_cc=yes
      fi
-@@ -78,8 +78,8 @@
+     ;;
+   *-sgi-irix6*)
+-    AC_DEFINE(IRIX)
++    AC_DEFINE(IRIX, 1, [Define to 1 for IRIX])
+     if test -z "$GCC"; then
+       sgi_cc=yes
      fi
      ;;
    *-solaris2.0*)  
@@ -32,9 +36,42 @@ diff -urk.orig nmap-3.40PVT17.orig/configure.ac nmap-3.40PVT17/configure.ac
 +    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
      ;;
    *-solaris2.[1-9][0-9]*)
-     AC_DEFINE(SOLARIS)
-@@ -108,24 +108,24 @@
-     AC_DEFINE(SOLARIS)
+-    AC_DEFINE(SOLARIS)
++    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+     ;;
+   *-solaris2.1*)
+-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+-    AC_DEFINE(SOLARIS)
++    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG, 1, [Define to 1 for Solaris checksum bug])
++    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+     ;;
+   *-solaris2.2*)
+-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+-    AC_DEFINE(SOLARIS)
++    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG, 1, [Define to 1 for Solaris checksum bug])
++    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+     ;;
+   *-solaris2.3*)
+-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+-    AC_DEFINE(SOLARIS)
++    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG, 1, [Define to 1 for Solaris checksum bug])
++    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+     ;;
+   *-solaris2.4*)
+-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+-    AC_DEFINE(SOLARIS)
++    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG, 1, [Define to 1 for Solaris checksum bug])
++    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+     ;;
+   *-solaris2.5.1)
+-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+-    AC_DEFINE(SOLARIS)
++    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG, 1, [Define to 1 for Solaris checksum bug])
++    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+     ;;
+   *-solaris*)
+-    AC_DEFINE(SOLARIS)
++    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
      ;;
    *-sunos4*)
 -    AC_DEFINE(SUNOS)
@@ -66,16 +103,16 @@ diff -urk.orig nmap-3.40PVT17.orig/configure.ac nmap-3.40PVT17/configure.ac
      needs_cpp_precomp=yes
      ;;
  esac
-@@ -234,7 +234,7 @@
- fi
+@@ -265,7 +265,7 @@
  
+ OPENSSL_LIBS=
  if test "$use_openssl" = "yes"; then
 -  AC_DEFINE(HAVE_OPENSSL)
 +  AC_DEFINE(HAVE_OPENSSL, 1, [Define to 1 for OpenSSL support])
-   LIBS="$LIBS -lssl -lcrypto"
+   OPENSSL_LIBS="-lssl -lcrypto"
  fi
  
-@@ -321,7 +321,7 @@
+@@ -361,7 +361,7 @@
    PCAP_DEPENDS=""
    PCAP_CLEAN=""
    PCAP_DIST_CLEAN=""
@@ -84,7 +121,7 @@ diff -urk.orig nmap-3.40PVT17.orig/configure.ac nmap-3.40PVT17/configure.ac
  else
    if test "${LIBPCAP_INC+set}" = "set"; then
      LDFLAGS="-L$libpcapdir $_ldflags"
-@@ -419,7 +419,7 @@
+@@ -445,7 +445,7 @@
                 [AC_MSG_RESULT(no); bsd_networking=no]);
  if test $bsd_networking = yes; then
  
@@ -93,7 +130,7 @@ diff -urk.orig nmap-3.40PVT17.orig/configure.ac nmap-3.40PVT17/configure.ac
    AC_MSG_CHECKING([ip_v in struct ip])
    AC_TRY_COMPILE([#include <sys/types.h>
  #include <netinet/in.h>
-@@ -467,7 +467,7 @@
+@@ -493,7 +493,7 @@
          ac_cv_sockaddr_has_sa_len=yes,
          ac_cv_sockaddr_has_sa_len=no))
  if test $ac_cv_sockaddr_has_sa_len = yes ; then
@@ -102,7 +139,7 @@ diff -urk.orig nmap-3.40PVT17.orig/configure.ac nmap-3.40PVT17/configure.ac
  fi
  
  dnl check endedness
-@@ -476,7 +476,7 @@
+@@ -502,7 +502,7 @@
  AC_MSG_CHECKING([if struct in_addr is a wacky huge structure (some Sun boxes)])
  
  AC_TRY_COMPILE([#include <netinet/in.h>], struct in_addr i; i._S_un._S_addr;, \
@@ -111,7 +148,7 @@ diff -urk.orig nmap-3.40PVT17.orig/configure.ac nmap-3.40PVT17/configure.ac
                AC_MSG_RESULT(yes) , \
                AC_TRY_COMPILE([#include <sys/types.h>
  #include <netinet/in.h>], struct in_addr i; i.S_un.S_addr;, \
-@@ -499,7 +499,7 @@
+@@ -525,7 +525,7 @@
          ac_cv_struct_icmp_exists=yes,
          ac_cv_struct_icmp_exists=no))
  if test $ac_cv_struct_icmp_exists = yes ; then
@@ -120,7 +157,7 @@ diff -urk.orig nmap-3.40PVT17.orig/configure.ac nmap-3.40PVT17/configure.ac
  fi
  
  AC_CACHE_CHECK(if struct ip exists, ac_cv_struct_ip_exists,
-@@ -516,7 +516,7 @@
+@@ -542,7 +542,7 @@
          ac_cv_struct_ip_exists=yes,
          ac_cv_struct_ip_exists=no))
  if test $ac_cv_struct_ip_exists = yes ; then
@@ -129,7 +166,7 @@ diff -urk.orig nmap-3.40PVT17.orig/configure.ac nmap-3.40PVT17/configure.ac
  fi
  
  AC_CACHE_CHECK(if struct ip has ip_sum member, ac_cv_ip_has_ip_sum,
-@@ -534,7 +534,7 @@
+@@ -560,7 +560,7 @@
          ac_cv_ip_has_ip_sum=yes,
          ac_cv_ip_has_ip_sum=no))
  if test $ac_cv_ip_has_ip_sum = yes ; then
@@ -138,7 +175,7 @@ diff -urk.orig nmap-3.40PVT17.orig/configure.ac nmap-3.40PVT17/configure.ac
  fi
  
  
-@@ -555,7 +555,7 @@
+@@ -581,7 +581,7 @@
  extern "C" int usleep (unsigned int);],[
  usleep (200);],[
    AC_MSG_RESULT(yes)
@@ -147,7 +184,7 @@ diff -urk.orig nmap-3.40PVT17.orig/configure.ac nmap-3.40PVT17/configure.ac
    AC_MSG_RESULT(not found))])
  AC_LANG_POP(C++)
  
-@@ -573,7 +573,7 @@
+@@ -599,7 +599,7 @@
  char buffer[200];
  gethostname (buffer, 200);],[
    AC_MSG_RESULT(yes)
