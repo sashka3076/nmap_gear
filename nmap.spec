@@ -1,6 +1,6 @@
 Name: nmap
 Version: 3.51
-Release: alt0.1
+Release: alt0.3
 Serial: 20020501
 
 Summary: Network exploration tool and security scanner
@@ -10,14 +10,14 @@ Url: http://www.insecure.org/%name
 Packager: Nmap Development Team <nmap@packages.altlinux.org>
 Summary(ru_RU.CP1251): »нструмент дл€ исследовани€ сети и сетевой безопасности.
 
-Source: %url/dist/%name-%version-TEST2.tar.bz2
+Source: %url/dist/%name-%version-TEST3.tar.bz2
 Source1: nmapfe.menu
 Source2: nmapfe.xpm
 
 Patch1: nmap-3.40PVT17-alt-glibc.patch
 Patch2: nmap-3.40PVT17-alt-autoheader.patch
 Patch3: nmap-3.40PVT17-alt-owl-libpcap.patch
-Patch4: nmap-3.46-alt-drop_priv.patch
+Patch4: nmap-3.51-TEST3-alt-drop_priv.patch
 
 PreReq: libpcap >= 0.7.2-alt2, chrooted >= 0.2, net-tools, /var/resolv
 
@@ -57,7 +57,7 @@ This package includes nmapfe, a Gtk+ frontend for %name.
 Ётот пакет содержит nmapfe, Gtk+ интерфейс дл€ nmap.
 
 %prep
-%setup -q -n %name-%version-TEST2
+%setup -q -n %name-%version-TEST3
 %patch1 -p1
 %patch2 -p1
 %patch3 -p1
@@ -103,6 +103,11 @@ export ac_cv_header_libiberty_h=no
 %_iconsdir/*
 
 %changelog
+* Tue Apr 20 2004 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 20020501:3.51-alt0.3
+- 3.51-TEST3
+- Updated alt-drop_priv.patch
+- Added MAC address printing
+
 * Tue Mar 09 2004 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 20020501:3.51-alt0.1
 - 3.51-TEST2
 - added Provides
