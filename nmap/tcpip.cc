@@ -1,52 +1,53 @@
 
-/***********************************************************************/
-/* tcpip.c -- Various functions relating to low level TCP/IP handling, */
-/* including sending raw packets, routing, printing packets, reading   */
-/* from libpcap, etc.                                                  */
-/*                                                                     */
-/***********************************************************************/
-/*  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  */
-/*  program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published  */
-/*  by the Free Software Foundation; Version 2.  This guarantees your  */
-/*  right to use, modify, and redistribute this software under certain */
-/*  conditions.  If this license is unacceptable to you, we may be     */
-/*  willing to sell alternative licenses (contact sales@insecure.com). */
-/*                                                                     */
-/*  If you received these files with a written license agreement       */
-/*  stating terms other than the (GPL) terms above, then that          */
-/*  alternative license agreement takes precendence over this comment. */
-/*                                                                     */
-/*  Source is provided to this software because we believe users have  */
-/*  a right to know exactly what a program is going to do before they  */
-/*  run it.  This also allows you to audit the software for security   */
-/*  holes (none have been found so far).                               */
-/*                                                                     */
-/*  Source code also allows you to port Nmap to new platforms, fix     */
-/*  bugs, and add new features.  You are highly encouraged to send     */
-/*  your changes to fyodor@insecure.org for possible incorporation     */
-/*  into the main distribution.  By sending these changes to Fyodor or */
-/*  one the insecure.org development mailing lists, it is assumed that */
-/*  you are offering Fyodor the unlimited, non-exclusive right to      */
-/*  reuse, modify, and relicense the code.  This is important because  */
-/*  the inability to relicense code has caused devastating problems    */
-/*  for other Free Software projects (such as KDE and NASM).  Nmap     */
-/*  will always be available Open Source.  If you wish to specify      */
-/*  special license conditions of your contributions, just say so      */
-/*  when you send them.                                                */
-/*                                                                     */
-/*  This program is distributed in the hope that it will be useful,    */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of     */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  */
-/*  General Public License for more details (                          */
-/*  http://www.gnu.org/copyleft/gpl.html ).                            */
-/*                                                                     */
-/***********************************************************************/
+/***********************************************************************
+ * tcpip.cc -- Various functions relating to low level TCP/IP handling,*
+ * including sending raw packets, routing, printing packets, reading   *
+ * from libpcap, etc.                                                  *
+ *                                                                     *
+ ***********************************************************************
+ *  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  *
+ *  program is free software; you can redistribute it and/or modify    *
+ *  it under the terms of the GNU General Public License as published  *
+ *  by the Free Software Foundation; Version 2.  This guarantees your  *
+ *  right to use, modify, and redistribute this software under certain *
+ *  conditions.  If this license is unacceptable to you, we may be     *
+ *  willing to sell alternative licenses (contact sales@insecure.com). *
+ *                                                                     *
+ *  If you received these files with a written license agreement       *
+ *  stating terms other than the (GPL) terms above, then that          *
+ *  alternative license agreement takes precendence over this comment. *
+ *                                                                     *
+ *  Source is provided to this software because we believe users have  *
+ *  a right to know exactly what a program is going to do before they  *
+ *  run it.  This also allows you to audit the software for security   *
+ *  holes (none have been found so far).                               *
+ *                                                                     *
+ *  Source code also allows you to port Nmap to new platforms, fix     *
+ *  bugs, and add new features.  You are highly encouraged to send     *
+ *  your changes to fyodor@insecure.org for possible incorporation     *
+ *  into the main distribution.  By sending these changes to Fyodor or *
+ *  one the insecure.org development mailing lists, it is assumed that *
+ *  you are offering Fyodor the unlimited, non-exclusive right to      *
+ *  reuse, modify, and relicense the code.  This is important because  *
+ *  the inability to relicense code has caused devastating problems    *
+ *  for other Free Software projects (such as KDE and NASM).  Nmap     *
+ *  will always be available Open Source.  If you wish to specify      *
+ *  special license conditions of your contributions, just say so      *
+ *  when you send them.                                                *
+ *                                                                     *
+ *  This program is distributed in the hope that it will be useful,    *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of     *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  *
+ *  General Public License for more details (                          *
+ *  http://www.gnu.org/copyleft/gpl.html ).                            *
+ *                                                                     *
+ ***********************************************************************/
 
-/* $Id: tcpip.c,v 1.76 2002/04/02 06:57:12 fyodor Exp $ */
+/* $Id: tcpip.cc,v 1.11 2002/12/25 04:08:15 fyodor Exp $ */
 
 
 #include "tcpip.h"
+#include "NmapOps.h"
 
 #if HAVE_SYS_TIME_H
 #include <sys/time.h>
@@ -61,7 +62,7 @@
 #include <unistd.h>
 #endif
 
-extern struct ops o;
+extern NmapOps o;
 
 /*  predefined filters -- I need to kill these globals at some pont. */
 extern unsigned long flt_dsthost, flt_srchost;
@@ -76,11 +77,259 @@ setsockopt(sd, IPPROTO_IP, IP_HDRINCL, (const char *) &one, sizeof(one));
 }
 #endif /* WIN32 */
 
+  /* Takes an IP PACKET and prints it if packet tracing is enabled.
+     'packet' must point to the IPv4 header. The direction must be
+     PacketTrace::SENT or PacketTrace::RCVD .  Optional 'now' argument
+     makes this function slightly more efficient by avoiding a gettimeofday()
+     call. */
+void PacketTrace::trace(pdirection pdir, const u8 *packet, u32 len,
+			struct timeval *now) {
+  struct timeval tv;
+
+  if (!o.packetTrace()) return;
+
+  if (now)
+    tv = *now;
+  else gettimeofday(&tv, NULL);
+
+  if (len < 20) {
+    error("Packet tracer: tiny packet encountered");
+    return;
+  }
+
+  log_write(LOG_STDOUT|LOG_NORMAL, "%s (%.4fs) %s\n", (pdir == SENT)? "SENT" : "RCVD",  o.TimeSinceStartMS(&tv) / 1000.0, ippackethdrinfo(packet, len));
+
+  return;
+}
+
+/* Converts an IP address given in a sockaddr_storage to an IPv4 or
+   IPv6 IP address string.  Since a static buffer is returned, this is
+   not thread-safe and can only be used once in calls like printf() 
+*/
+const char *inet_socktop(struct sockaddr_storage *ss) {
+  static char buf[INET6_ADDRSTRLEN];
+  struct sockaddr_in *sin = (struct sockaddr_in *) ss;
+#if HAVE_IPV6
+  struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) ss;
+#endif
+
+  if (inet_ntop(sin->sin_family, (sin->sin_family == AF_INET)? 
+                (char *) &sin->sin_addr : 
+#if HAVE_IPV6
+				(char *) &sin6->sin6_addr, 
+#else
+                (char *) NULL,
+#endif /* HAVE_IPV6 */
+                buf, sizeof(buf)) == NULL) {
+    fatal("Failed to convert target address to presentation format in inet_socktop!?!  Error: %s", strerror(errno));
+  }
+  return buf;
+}
+
+/* Tries to resolve the given name (or literal IP) into a sockaddr
+   structure.  The af should be PF_INET (for IPv4) or PF_INET6.  Returns 0
+   if hostname cannot be resolved.  It is OK to pass in a sockaddr_in or 
+   sockaddr_in6 casted to a sockaddr_storage as long as you use the matching 
+   pf.*/
+int resolve(char *hostname, struct sockaddr_storage *ss, size_t *sslen,
+	    int pf) {
+
+  struct addrinfo hints;
+  struct addrinfo *result;
+  int rc;
+
+  assert(ss);
+  assert(sslen);
+  bzero(&hints, sizeof(hints));
+  hints.ai_family = pf;
+  rc = getaddrinfo(hostname, NULL, &hints, &result);
+  if (rc != 0)
+    return 0;
+  assert(result->ai_addrlen > 0 && result->ai_addrlen <= (int) sizeof(struct sockaddr_storage));
+  *sslen = result->ai_addrlen;
+  memcpy(ss, result->ai_addr, *sslen);
+  freeaddrinfo(result);
+  return 1;
+}
+
+/* Returns a buffer of ASCII information about a packet that may look
+   like "TCP 127.0.0.1:50923 > 127.0.0.1:3 S ttl=61 id=39516 iplen=40
+   seq=625950769" or "ICMP PING (0/1) ttl=61 id=39516 iplen=40".
+   Since this is a static buffer, don't use threads or call twice
+   within (say) printf().  And certainly don't try to free() it!  The
+   returned buffer is NUL-terminated */
+const char *ippackethdrinfo(const u8 *packet, u32 len) {
+  static char protoinfo[256];
+  struct ip *ip = (struct ip *) packet;
+  struct tcphdr *tcp;
+  udphdr_bsd *udp;
+  char ipinfo[64];
+  char srchost[INET6_ADDRSTRLEN], dsthost[INET6_ADDRSTRLEN];
+  char *p;
+  struct in_addr saddr, daddr;
+  int frag_off = 0;
+  char fragnfo[64] = "";
+  char tflags[10];
+  if (ip->ip_v != 4)
+    return "BOGUS!  IP Version in packet is not 4";
+
+  if (len < sizeof(struct ip))
+    return "BOGUS!  Packet too short.";
+
+  saddr.s_addr = ip->ip_src.s_addr;
+  daddr.s_addr = ip->ip_dst.s_addr;
+
+  inet_ntop(AF_INET, &saddr, srchost, sizeof(srchost));
+  inet_ntop(AF_INET, &daddr, dsthost, sizeof(dsthost));
+
+  frag_off = BSDFIX(ntohs(ip->ip_off) & 8191 /* 2^13 - 1 */);
+  if (frag_off) {
+    snprintf(fragnfo, sizeof(fragnfo), " frag offset=%d)", frag_off);
+  }
+
+  snprintf(ipinfo, sizeof(ipinfo), "ttl=%d id=%d iplen=%d%s", 
+	   ip->ip_ttl, ntohs(ip->ip_id), BSDUFIX(ip->ip_len), fragnfo);
+
+  if (ip->ip_p == IPPROTO_TCP) {
+    char tcpinfo[64] = "";
+    char buf[32];
+    tcp = (struct tcphdr *)  (packet + ip->ip_hl * 4);
+    if ((len < ip->ip_hl * 4 + 20) || len < (ip->ip_hl + tcp->th_off) * 4)
+      Strncpy(protoinfo, "TCP header incomplete", sizeof(protoinfo));
+    else {
+
+      snprintf(tcpinfo, sizeof(tcpinfo), "seq=%lu win=%hi", 
+	       (unsigned long) ntohl(tcp->th_seq),
+	       ntohs(tcp->th_win));
+      p = tflags;
+      /* These are basically in tcpdump order */
+      if (tcp->th_flags & TH_SYN) *p++ = 'S';
+      if (tcp->th_flags & TH_FIN) *p++ = 'F';
+      if (tcp->th_flags & TH_RST) *p++ = 'R';
+      if (tcp->th_flags & TH_PUSH) *p++ = 'P';
+      if (tcp->th_flags & TH_ACK) {
+	*p++ = 'A';
+	snprintf(buf, sizeof(buf), " ack=%lu", 
+		 (unsigned long) ntohl(tcp->th_seq));
+	strncat(tcpinfo, buf, sizeof(tcpinfo));
+      }
+      if (tcp->th_flags & TH_URG) *p++ = 'U';
+      *p++ = '\0';
+
+      snprintf(protoinfo, sizeof(protoinfo), "TCP %s:%d > %s:%d %s %s %s",
+	       srchost, ntohs(tcp->th_sport), dsthost, ntohs(tcp->th_dport),
+	       tflags, ipinfo, tcpinfo);
+    }
+  } else if (ip->ip_p == IPPROTO_UDP) {
+    udp =  (udphdr_bsd *) (packet + sizeof(struct ip));
+
+    snprintf(protoinfo, sizeof(protoinfo), "UDP %s:%d > %s:%d %s",
+	     srchost, ntohs(udp->uh_sport), dsthost, ntohs(udp->uh_dport),
+	     ipinfo);
+  } else if (ip->ip_p == IPPROTO_ICMP) {
+    char icmptype[128];
+    struct ppkt {
+      unsigned char type;
+      unsigned char code;
+      unsigned short checksum;
+      unsigned short id;
+      unsigned short seq;
+    } *ping;
+    ping = (struct ppkt *) ((ip->ip_hl * 4) + (char *) ip);
+    switch(ping->type) {
+    case 0:
+      strcpy(icmptype, "Echo reply"); break;
+    case 3:
+      if (ping->code == 0)
+	strcpy(icmptype, "network unreachable");
+      else if (ping->code == 1)
+	strcpy(icmptype, "host unreachable");
+      else if (ping->code == 2)
+	strcpy(icmptype, "protocol unreachable");
+      else if (ping->code == 3)
+	strcpy(icmptype, "port unreachable");
+      else if (ping->code == 4)
+	strcpy(icmptype, "fragmentation required");
+      else if (ping->code == 5)
+	strcpy(icmptype, "source route failed");
+      else if (ping->code == 6)
+	strcpy(icmptype, "destination network unknown");
+      else if (ping->code == 7)
+	strcpy(icmptype, "destination host unknown");
+      else if (ping->code == 8)
+	strcpy(icmptype, "source host isolated");
+      else if (ping->code == 9)
+	strcpy(icmptype, "destination network administratively prohibited");
+      else if (ping->code == 10)
+	strcpy(icmptype, "destination host administratively prohibited");
+      else if (ping->code == 11)
+	strcpy(icmptype, "network unreachable for TOS");
+      else if (ping->code == 12)
+	strcpy(icmptype, "host unreachable for TOS");
+      else if (ping->code == 13)
+	strcpy(icmptype, "communication administratively prohibited by filtering");
+      else if (ping->code == 14)
+	strcpy(icmptype, "host precedence violation");
+      else if (ping->code == 15)
+	strcpy(icmptype, "precedence cutoff in effect");
+      else
+	strcpy(icmptype, "unknown unreachable code");
+      break;
+    case 4:
+      strcpy(icmptype, "source quench"); break;
+    case 5:
+      if (ping->code == 0)
+	strcpy(icmptype, "network redirect");
+      else if (ping->code == 1)
+	strcpy(icmptype, "host redirect");
+      else strcpy(icmptype, "unknown redirect");
+      break;
+    case 8:
+      strcpy(icmptype, "Echo request"); break;
+    case 11:
+      if (ping->code == 0)
+	strcpy(icmptype, "TTL=0 during transit");
+      else if (ping->code == 1)
+	strcpy(icmptype, "TTL=0 during reassembly");
+      else strcpy(icmptype, "TTL exceeded (unknown code)");
+      break;
+    case 12:
+      if (ping->code == 0)
+	strcpy(icmptype, "IP header bad");
+      else 
+	strcpy(icmptype, "Misc. parameter problem");
+      break;
+    case 13: 
+      strcpy(icmptype, "Timestamp request"); break;
+    case 14: 
+      strcpy(icmptype, "Timestamp reply"); break;
+    case 15:
+      strcpy(icmptype, "Information request"); break;
+    case 16: 
+      strcpy(icmptype, "Information reply"); break;
+    case 17:
+      strcpy(icmptype, "Address mask request"); break;
+    case 18: 
+      strcpy(icmptype, "Address mask reply"); break;
+    default:
+      strcpy(icmptype, "Unknown type"); break;
+      break;
+    }
+    snprintf(protoinfo, sizeof(protoinfo), "ICMP %s > %s %s (type=%d/code=%d) %s",
+	     srchost, dsthost, icmptype, ping->type, ping->code, ipinfo);
+  } else {
+    snprintf(protoinfo, sizeof(protoinfo), "Unknown protocol: %s", ipinfo);
+  }    
+
+  return protoinfo;
+}
+
+
 /* Tests whether a packet sent to  IP is LIKELY to route 
  through the kernel localhost interface */
 #ifndef WIN32 /* This next group of functions are already defined in 
                  wintcpip.c for now */
-int islocalhost(struct in_addr *addr) {
+int islocalhost(const struct in_addr * const addr) {
 char dev[128];
   /* If it is 0.0.0.0 or starts with 127.0.0.1 then it is 
      probably localhost */
@@ -153,10 +402,8 @@ answer = ~sum;          /* ones-complement, then truncate to 16 bits */
 return(answer);
 }
 
-
-
-
-/* Tries to resolve given hostname and stores
+/* LEGACY resolve() function that only supports IPv4 -- see IPv6 version
+   above.  Tries to resolve given hostname and stores
    result in ip .  returns 0 if hostname cannot
    be resolved */
 int resolve(char *hostname, struct in_addr *ip) {
@@ -174,9 +421,9 @@ int resolve(char *hostname, struct in_addr *ip) {
   return 0;
 }
 
-int send_tcp_raw_decoys( int sd, struct in_addr *victim, u16 sport, 
+int send_tcp_raw_decoys( int sd, const struct in_addr *victim, u16 sport, 
 			 u16 dport, u32 seq, u32 ack, u8 flags, u16 window, 
-                         u8 *options, int optlen, u8 *data, u16 datalen) 
+                         u8 *options, int optlen, char *data, u16 datalen) 
 {
   int decoy;
 
@@ -189,7 +436,8 @@ int send_tcp_raw_decoys( int sd, struct in_addr *victim, u16 sport,
 }
 
 
-int send_tcp_raw( int sd, struct in_addr *source, struct in_addr *victim, 
+int send_tcp_raw( int sd, const struct in_addr *source, 
+		  const struct in_addr *victim, 
 		  u16 sport, u16 dport, u32 seq, u32 ack, u8 flags,
 		  u16 window, u8 *options, int optlen, char *data, 
 		  u16 datalen) 
@@ -244,7 +492,7 @@ if (!source) {
   if (gethostname(myname, MAXHOSTNAMELEN) || 
       !(myhostent = gethostbyname(myname)))
        fatal("Cannot get hostname!  Try using -S <my_IP_address> or -e <interface to scan through>\n");
-  memcpy(source, myhostent->h_addr_list[0], sizeof(struct in_addr));
+  memcpy( (void *) source, myhostent->h_addr_list[0], sizeof(struct in_addr));
 #if ( TCPIP_DEBUGGING )
     printf("We skillfully deduced that your address is %s\n", 
 	   inet_ntoa(*source));
@@ -324,7 +572,7 @@ if (TCPIP_DEBUGGING > 1) {
 res = Sendto("send_tcp_raw", sd, packet, BSDUFIX(ip->ip_len), 0,
 	     (struct sockaddr *)&sock,  (int)sizeof(struct sockaddr_in));
 
-if (source_malloced) free(source);
+if (source_malloced) free((void *) source);
 free(packet);
 return res;
 }
@@ -356,19 +604,37 @@ do {
   retries++;
 } while( res == -1);
 
+ PacketTrace::trace(PacketTrace::SENT, packet, len); 
+
 if (TCPIP_DEBUGGING > 1)
   log_write(LOG_STDOUT, "successfully sent %d bytes of raw_tcp!\n", res);
 
 return res;
 }
 
+
+
+void readippacket(const u8 *packet, int readdata) {
+  struct ip *ip = (struct ip *) packet;
+  switch(ip->ip_p) {
+  case IPPROTO_UDP:
+    readudppacket(packet, readdata);
+    break;
+    /* Should add ICMP here at some point */
+  default:
+    readtcppacket(packet, readdata);
+    break;
+  }
+
+}
+
 /* A simple function I wrote to help in debugging, shows the important fields
    of a TCP packet*/
-int readtcppacket(unsigned char *packet, int readdata) {
+int readtcppacket(const u8 *packet, int readdata) {
 
 struct ip *ip = (struct ip *) packet;
 struct tcphdr *tcp = (struct tcphdr *) (packet + sizeof(struct ip));
-unsigned char *data = packet +  sizeof(struct ip) + sizeof(struct tcphdr);
+const unsigned char *data = packet +  sizeof(struct ip) + sizeof(struct tcphdr);
 int tot_len;
 struct in_addr bullshit, bullshit2;
 char sourcehost[16];
@@ -412,20 +678,23 @@ if (ip->ip_p== IPPROTO_TCP) {
   }
 }
 if (readdata && i < tot_len) {
-printf("Data portion:\n");
-while(i < tot_len)  printf("%2X%c", data[i], (++i%16)? ' ' : '\n');
-printf("\n");
+  printf("Data portion:\n");
+  while(i < tot_len)  {
+    printf("%2X%c", data[i], ((i+1) %16)? ' ' : '\n');
+    i++;
+  }
+  printf("\n");
 }
 return 0;
 }
 
 /* A simple function I wrote to help in debugging, shows the important fields
    of a UDP packet*/
-int readudppacket(unsigned char *packet, int readdata) {
+int readudppacket(const u8 *packet, int readdata) {
 
 struct ip *ip = (struct ip *) packet;
 udphdr_bsd *udp = (udphdr_bsd *) (packet + sizeof(struct ip));
-unsigned char *data = packet +  sizeof(struct ip) + sizeof(udphdr_bsd);
+const unsigned char *data = packet +  sizeof(struct ip) + sizeof(udphdr_bsd);
 int tot_len;
 struct in_addr bullshit, bullshit2;
 char sourcehost[16];
@@ -456,14 +725,17 @@ if (ip->ip_p== IPPROTO_UDP) {
 }
  if (readdata && i < tot_len) {
    printf("Data portion:\n");
-   while(i < tot_len)  printf("%2X%c", data[i], (++i%16)? ' ' : '\n');
+   while(i < tot_len)  {
+     printf("%2X%c", data[i], ((i+1)%16)? ' ' : '\n');
+     i++;
+   }
    printf("\n");
  }
  return 0;
 }
 
-int send_udp_raw_decoys( int sd, struct in_addr *victim, u16 sport, 
-			 u16 dport, u8 *data, u16 datalen) {
+int send_udp_raw_decoys( int sd, const struct in_addr *victim, u16 sport, 
+			 u16 dport, char *data, u16 datalen) {
   int decoy;
   
   for(decoy = 0; decoy < o.numdecoys; decoy++) 
@@ -476,8 +748,8 @@ int send_udp_raw_decoys( int sd, struct in_addr *victim, u16 sport,
 
 
 
-int send_udp_raw( int sd, struct in_addr *source, struct in_addr *victim, 
-		  u16 sport, u16 dport, u8 *data, u16 datalen) 
+int send_udp_raw( int sd, struct in_addr *source, const struct in_addr *victim,
+ 		  u16 sport, u16 dport, char *data, u16 datalen) 
 {
 
 unsigned char *packet = (unsigned char *) safe_malloc(sizeof(struct ip) + sizeof(udphdr_bsd) + datalen);
@@ -559,7 +831,7 @@ udp->uh_sum = in_cksum((unsigned short *)pseudo, 20 /* pseudo + UDP headers */ +
 #endif
 
 /* Goodbye, pseudo header! */
-bzero(pseudo, 12);
+bzero(pseudo, sizeof(*pseudo));
 
 /* Now for the ip header */
 ip->ip_v = 4;
@@ -587,7 +859,7 @@ free(packet);
 return res;
 }
 
-int send_small_fragz_decoys(int sd, struct in_addr *victim, u32 seq, 
+int send_small_fragz_decoys(int sd, const struct in_addr *victim, u32 seq, 
 			    u16 sport, u16 dport, int flags) {
   int decoy;
 
@@ -602,8 +874,9 @@ int send_small_fragz_decoys(int sd, struct in_addr *victim, u32 seq,
 
 /* Much of this is swiped from my send_tcp_raw function above, which 
    doesn't support fragmentation */
-int send_small_fragz(int sd, struct in_addr *source, struct in_addr *victim,
-		     u32 seq, u16 sport, u16 dport, int flags)
+int send_small_fragz(int sd, struct in_addr *source, 
+		     const struct in_addr *victim, u32 seq, u16 sport, 
+		     u16 dport, int flags)
  {
 
 struct pseudo_header { 
@@ -732,8 +1005,8 @@ if ((res = sendto(sd, (const char *)ip2,sizeof(struct ip) + 4 , 0,
 return 1;
 }
 
-int send_ip_raw_decoys( int sd, struct in_addr *victim, u8 proto,
-			u8 *data, u16 datalen) {
+int send_ip_raw_decoys( int sd, const struct in_addr *victim, u8 proto,
+			char *data, u16 datalen) {
 
   int decoy;
 
@@ -747,8 +1020,8 @@ int send_ip_raw_decoys( int sd, struct in_addr *victim, u8 proto,
 
 }
 
-int send_ip_raw( int sd, struct in_addr *source, struct in_addr *victim, 
-		 u8 proto, u8 *data, u16 datalen) 
+int send_ip_raw( int sd, struct in_addr *source, const struct in_addr *victim, 
+		 u8 proto, char *data, u16 datalen) 
 {
 
 unsigned char *packet = (unsigned char *) safe_malloc(sizeof(struct ip) + datalen);
@@ -932,7 +1205,7 @@ return NULL;
 #endif /* 0 */
 #endif /* WIN32 */
 
-int getsourceip(struct in_addr *src, struct in_addr *dst) {
+int getsourceip(struct in_addr *src, const struct in_addr * const dst) {
   int sd;
   struct sockaddr_in sock;
   NET_SIZE_T socklen = sizeof(struct sockaddr_in);
@@ -951,7 +1224,7 @@ int getsourceip(struct in_addr *src, struct in_addr *dst) {
     close(sd);
     return 0;
     }
-  bzero(&sock, sizeof(struct sockaddr_in));
+  bzero(&sock, sizeof(sock));
   if (getsockname(sd, (SA *)&sock, &socklen) == -1) {
     perror("getsockname");
     close(sd);
@@ -1026,13 +1299,23 @@ int datalink;
 int timedout = 0;
 struct timeval tv_start, tv_end;
 static char *alignedbuf = NULL;
-static int alignedbufsz=0;
+static unsigned int alignedbufsz=0;
+static int warning = 0;
 
 if (!pd) fatal("NULL packet device passed to readip_pcap");
+
+ if (to_usec < 0) {
+   if (!warning) {
+     warning = 1;
+     error("WARNING: Negative timeout value (%l) passed to readip_pcap() -- using 0", to_usec);
+   }
+   to_usec = 0;
+ }
 
 /* New packet capture device, need to recompute offset */
  if ( (datalink = pcap_datalink(pd)) < 0)
    fatal("Cannot obtain datalink information: %s", pcap_geterr(pd));
+
  switch(datalink) {
  case DLT_EN10MB: offset = 14; break;
  case DLT_IEEE802: offset = 22; break;
@@ -1044,7 +1327,7 @@ if (!pd) fatal("NULL packet device passed to readip_pcap");
 #ifdef DLT_SLIP_BSDOS
  case DLT_SLIP_BSDOS:
 #endif
-#if (FREEBSD || OPENBSD || NETBSD || BSDI)
+#if (FREEBSD || OPENBSD || NETBSD || BSDI || MACOSX)
    offset = 16;
 #else
    offset = 24; /* Anyone use this??? */
@@ -1060,7 +1343,7 @@ if (!pd) fatal("NULL packet device passed to readip_pcap");
 #ifdef DLT_PPP_ETHER
  case DLT_PPP_ETHER:
 #endif
-#if (FREEBSD || OPENBSD || NETBSD || BSDI)
+#if (FREEBSD || OPENBSD || NETBSD || BSDI || MACOSX)
    offset = 4;
 #else
 #ifdef SOLARIS
@@ -1119,18 +1402,19 @@ if (!pd) fatal("NULL packet device passed to readip_pcap");
  }
  *len = head.caplen - offset;
  if (*len > alignedbufsz) {
-   alignedbuf = realloc(alignedbuf, *len);
+   alignedbuf = (char *) realloc(alignedbuf, *len);
    if (!alignedbuf) {
      fatal("Unable to realloc %d bytes of mem", *len);
    }
    alignedbufsz = *len;
  }
  memcpy(alignedbuf, p, *len);
+ PacketTrace::trace(PacketTrace::RCVD, (u8 *) alignedbuf, *len);
  return alignedbuf;
 }
 
 /* Set a pcap filter */
-void set_pcap_filter(struct hoststruct *target,
+void set_pcap_filter(Target *target,
 		     pcap_t *pd, PFILTERFN filter, char *bpf, ...)
 {
   va_list ap;
@@ -1147,10 +1431,10 @@ void set_pcap_filter(struct hoststruct *target,
   va_end(ap);
   
   if (o.debugging)
-    log_write(LOG_STDOUT, "Packet capture filter: %s\n", buf);
+    log_write(LOG_STDOUT, "Packet capture filter (device %s): %s\n", target->device, buf);
   
   /* Due to apparent bug in libpcap */
-  if (islocalhost(&(target->host)))
+  if (islocalhost(target->v4hostip()))
     buf[0] = '\0';
   
   if (pcap_compile(pd, &fcode, buf, 0, netmask) < 0)
@@ -1165,7 +1449,7 @@ void set_pcap_filter(struct hoststruct *target,
 unsigned long flt_dsthost, flt_srchost;	/* _net_ order */
 unsigned short flt_baseport;	/*	_host_ order */
 
-int flt_icmptcp(const char *packet, int len)
+int flt_icmptcp(const char *packet, unsigned int len)
 {
   struct ip* ip = (struct ip*)packet;
   if(ip->ip_dst.s_addr != flt_dsthost) return 0;
@@ -1175,7 +1459,7 @@ int flt_icmptcp(const char *packet, int len)
   return 0;
 }
 
-int flt_icmptcp_2port(const char *packet, int len)
+int flt_icmptcp_2port(const char *packet, unsigned int len)
 {
   unsigned short dport;
   struct ip* ip = (struct ip*)packet;
@@ -1185,7 +1469,7 @@ int flt_icmptcp_2port(const char *packet, int len)
   if(ip->ip_p == IPPROTO_TCP)
     {
       struct tcphdr* tcp = (struct tcphdr *) (((char *) ip) + 4 * ip->ip_hl);
-      if(len < 4 * ip->ip_hl + 4) return 0;
+      if(len < (unsigned int) 4 * ip->ip_hl + 4) return 0;
 	  dport = ntohs(tcp->th_dport);
       if(dport == flt_baseport || dport == flt_baseport + 1)
 	return 1;
@@ -1194,7 +1478,7 @@ int flt_icmptcp_2port(const char *packet, int len)
   return 0;
 }
 
-int flt_icmptcp_5port(const char *packet, int len)
+int flt_icmptcp_5port(const char *packet, unsigned int len)
 {
   unsigned short dport;
   struct ip* ip = (struct ip*)packet;
@@ -1203,7 +1487,7 @@ int flt_icmptcp_5port(const char *packet, int len)
   if(ip->ip_p == IPPROTO_TCP)
     {
       struct tcphdr* tcp = (struct tcphdr *) (((char *) ip) + 4 * ip->ip_hl);
-      if(len < 4 * ip->ip_hl + 4) return 0;
+      if(len < (unsigned int) 4 * ip->ip_hl + 4) return 0;
       dport = ntohs(tcp->th_dport);
       if(dport >= flt_baseport && dport <= flt_baseport + 4) return 1;
     }
@@ -1215,7 +1499,7 @@ int flt_icmptcp_5port(const char *packet, int len)
 #ifndef WIN32 /* Currently the Windows code for next few functions is 
                  in wintcpip.c -- should probably be merged at some
 				 point */
-int ipaddr2devname( char *dev, struct in_addr *addr ) {
+int ipaddr2devname( char *dev, const struct in_addr *addr ) {
 struct interface_info *mydevs;
 int numdevs;
 int i;
@@ -1347,7 +1631,7 @@ struct interface_info *getinterfaces(int *howmany) {
                  should probably be merged at some point */
 
 #define ROUTETHROUGH_MAXROUTES 1024
-char *routethrough(struct in_addr *dest, struct in_addr *source) {
+char *routethrough(const struct in_addr * const dest, struct in_addr *source) {
   static int initialized = 0;
   int i;
   struct in_addr addy;
@@ -1365,7 +1649,7 @@ char *routethrough(struct in_addr *dest, struct in_addr *source) {
   static int numroutes = 0;
   FILE *routez;
 
-  if (!dest) fatal("ipaddr2devname passed a NULL dest address");
+  if (!dest) fatal("routethrough passed a NULL dest address");
 
   if (!initialized) {  
     /* Dummy socket for ioctl */
@@ -1523,9 +1807,7 @@ int max_sd() {
     if (setrlimit(RLIMIT_NOFILE, &r))
       if (o.debugging) perror("setrlimit RLIMIT_NOFILE failed");
     if (!getrlimit(RLIMIT_NOFILE, &r)) {
-      maxfds =  MIN(r.rlim_cur, MAX_SOCKETS_ALLOWED);
-      /* I do not feel comfortable going over 255 for now .. */
-      maxfds = MIN(maxfds, 250);
+      maxfds = r.rlim_cur;
       return maxfds;
     } else return 0;
   }
@@ -1536,9 +1818,7 @@ int max_sd() {
     if (setrlimit(RLIMIT_OFILE, &r))
       if (o.debugging) perror("setrlimit RLIMIT_OFILE failed");
     if (!getrlimit(RLIMIT_OFILE, &r)) {
-      maxfds =  MIN(r.rlim_cur, MAX_SOCKETS_ALLOWED);
-      /* I do not feel comfortable going over 255 for now .. */
-      maxfds = MIN(maxfds, 250);
+      maxfds = r.rlim_cur;
       return maxfds;
     }
     else return 0;

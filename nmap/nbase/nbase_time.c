@@ -8,7 +8,7 @@
  *  functions written by others.  License conditions for those files   *
  *  may vary and is generally included at the top of the files.   Be   *
  *  sure to read that information before you redistribute or           *
- *  contents of those files.                                           *
+ *  incorporate parts of those files into your software.               *
  *                                                                     *   
  *  Source is provided to this software because we believe users have  *
  *  a right to know exactly what a program is going to do before they  *
@@ -34,7 +34,7 @@
  *                                                                     *
  ***********************************************************************/
 
-/* $Id: nbase_time.c,v 1.4 2000/12/07 04:13:17 fyodor Exp $ */
+/* $Id: nbase_time.c,v 1.5 2002/04/21 00:28:09 fyodor Exp $ */
 
 #include "nbase.h"
 #if HAVE_UNISTD_H

@@ -1,49 +1,49 @@
-/***********************************************************************/
-/* nmap.h -- Currently handles the bulk of Nmap's port scanning        */
-/* features as well as the command line user interface.  At some point */
-/* I hope to move the port scanning & related support functions to     */
-/* another file.                                                       */
-/*                                                                     */
-/***********************************************************************/
-/*  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  */
-/*  program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published  */
-/*  by the Free Software Foundation; Version 2.  This guarantees your  */
-/*  right to use, modify, and redistribute this software under certain */
-/*  conditions.  If this license is unacceptable to you, we may be     */
-/*  willing to sell alternative licenses (contact sales@insecure.com). */
-/*                                                                     */
-/*  If you received these files with a written license agreement       */
-/*  stating terms other than the (GPL) terms above, then that          */
-/*  alternative license agreement takes precendence over this comment. */
-/*                                                                     */
-/*  Source is provided to this software because we believe users have  */
-/*  a right to know exactly what a program is going to do before they  */
-/*  run it.  This also allows you to audit the software for security   */
-/*  holes (none have been found so far).                               */
-/*                                                                     */
-/*  Source code also allows you to port Nmap to new platforms, fix     */
-/*  bugs, and add new features.  You are highly encouraged to send     */
-/*  your changes to fyodor@insecure.org for possible incorporation     */
-/*  into the main distribution.  By sending these changes to Fyodor or */
-/*  one the insecure.org development mailing lists, it is assumed that */
-/*  you are offering Fyodor the unlimited, non-exclusive right to      */
-/*  reuse, modify, and relicense the code.  This is important because  */
-/*  the inability to relicense code has caused devastating problems    */
-/*  for other Free Software projects (such as KDE and NASM).  Nmap     */
-/*  will always be available Open Source.  If you wish to specify      */
-/*  special license conditions of your contributions, just say so      */
-/*  when you send them.                                                */
-/*                                                                     */
-/*  This program is distributed in the hope that it will be useful,    */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of     */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  */
-/*  General Public License for more details (                          */
-/*  http://www.gnu.org/copyleft/gpl.html ).                            */
-/*                                                                     */
-/***********************************************************************/
 
-/* $Id: nmap.h,v 1.77 2002/02/15 07:03:03 fyodor Exp $ */
+/***********************************************************************
+ * nmap.h -- Currently handles some of Nmap's port scanning            *
+ * features as well as the command line user interface.  Note that the *
+ * actual main() function is in main.c                                 *
+ *                                                                     *
+ ***********************************************************************
+ *  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  *
+ *  program is free software; you can redistribute it and/or modify    *
+ *  it under the terms of the GNU General Public License as published  *
+ *  by the Free Software Foundation; Version 2.  This guarantees your  *
+ *  right to use, modify, and redistribute this software under certain *
+ *  conditions.  If this license is unacceptable to you, we may be     *
+ *  willing to sell alternative licenses (contact sales@insecure.com). *
+ *                                                                     *
+ *  If you received these files with a written license agreement       *
+ *  stating terms other than the (GPL) terms above, then that          *
+ *  alternative license agreement takes precendence over this comment. *
+ *                                                                     *
+ *  Source is provided to this software because we believe users have  *
+ *  a right to know exactly what a program is going to do before they  *
+ *  run it.  This also allows you to audit the software for security   *
+ *  holes (none have been found so far).                               *
+ *                                                                     *
+ *  Source code also allows you to port Nmap to new platforms, fix     *
+ *  bugs, and add new features.  You are highly encouraged to send     *
+ *  your changes to fyodor@insecure.org for possible incorporation     *
+ *  into the main distribution.  By sending these changes to Fyodor or *
+ *  one the insecure.org development mailing lists, it is assumed that *
+ *  you are offering Fyodor the unlimited, non-exclusive right to      *
+ *  reuse, modify, and relicense the code.  This is important because  *
+ *  the inability to relicense code has caused devastating problems    *
+ *  for other Free Software projects (such as KDE and NASM).  Nmap     *
+ *  will always be available Open Source.  If you wish to specify      *
+ *  special license conditions of your contributions, just say so      *
+ *  when you send them.                                                *
+ *                                                                     *
+ *  This program is distributed in the hope that it will be useful,    *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of     *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  *
+ *  General Public License for more details (                          *
+ *  http://www.gnu.org/copyleft/gpl.html ).                            *
+ *                                                                     *
+ ***********************************************************************/
+
+/* $Id: nmap.h,v 1.89 2002/12/25 04:08:15 fyodor Exp $ */
 
 #ifndef NMAP_H
 #define NMAP_H
@@ -92,7 +92,7 @@ void *realloc();
 #include <ctype.h>
 #include <sys/types.h>
 
-#ifndef WIN32	//	from nmapNT -- seems to work
+#ifndef WIN32	/* from nmapNT -- seems to work */
 #include <sys/wait.h>
 #endif /* !WIN32 */
 
@@ -208,14 +208,13 @@ void *realloc();
 #ifndef DEBUGGING
 #define DEBUGGING 0
 #endif
+#define MAX_PROBE_PORTS 10     /* How many TCP probe ports are allowed ? */
 /* Default number of ports in parallel.  Doesn't always involve actual 
    sockets.  Can also adjust with the -M command line option.  */
 #define MAX_SOCKETS 36 
-/* As an optimisation we limit the maximum value of MAX_SOCKETS to a very
-   high value (avoids dynamic memmory allocation */
-#define MAX_SOCKETS_ALLOWED 1025
-/* How many hosts do we ping in parallel to see if they are up? */
-#define LOOKAHEAD 25
+/* How many hosts do we ping in parallel to see if they are up? Note that this is
+   divided by the num probes per host */
+#define LOOKAHEAD 30
 /* If reads of a UDP port keep returning EAGAIN (errno 13), do we want to 
    count the port as valid? */
 #define RISKY_UDP_SCAN 0
@@ -265,9 +264,7 @@ void *realloc();
 /* DO NOT change stuff after this point */
 #define UC(b)   (((int)b)&0xff)
 #define SA    struct sockaddr  /*Ubertechnique from R. Stevens */
-/*#define fatal(x) { fprintf(stderr, "%s\n", x); exit(-1); }
-  #define error(x) fprintf(stderr, "%s\n", x);*/
-/* hoststruct->flags stuff */
+
 #define HOST_UP 1
 #define HOST_DOWN 2 
 #define HOST_FIREWALLED 4 
@@ -326,36 +323,42 @@ void *realloc();
 
 /* Funny story about this one in /usr/include/apache/ap_config.h */
 #if defined(AIX)
-  #if AIX >= 42
-  #define NET_SIZE_T size_t
-  #endif
+#  if AIX >= 42
+#    define NET_SIZE_T size_t
+#  endif
 #elif defined(LINUX)
-  #if defined(__GLIBC__) && (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ > 0))
-  #define NET_SIZE_T socklen_t
-  #endif
+#  if defined(__GLIBC__) && (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ > 0))
+#  define NET_SIZE_T socklen_t
+#  endif
 #elif defined(SEQUENT)
-  #if SEQUENT < 44
-    #define NO_KILLPG 1
-    #define NET_SIZE_T int
-  #endif
-  #if SEQUENT >= 44
-    #undef NO_KILLPG
-    #define NET_SIZE_T size_t
-  #endif
+#  if SEQUENT < 44
+#    define NO_KILLPG 1
+#    define NET_SIZE_T int
+#  endif
+#  if SEQUENT >= 44
+#    undef NO_KILLPG
+#    define NET_SIZE_T size_t
+#  endif
 #elif defined(SVR4)
-  #define NET_SIZE_T size_t
+#  define NET_SIZE_T size_t
 #elif defined(UW)
-  #define NET_SIZE_T size_t
+#  define NET_SIZE_T size_t
 #elif defined(__FreeBSD__)
   /* XXX: Apache didn't have this one,
           so watch it be wrong :)... */
-  #define NET_SIZE_T size_t
+#  define NET_SIZE_T size_t
+#elif defined(OPENBSD)
+#  define NET_SIZE_T socklen_t
 #elif defined(OS390)
-  #define NET_SIZE_T size_t
+#  define NET_SIZE_T size_t
+#elif defined(SOLARIS)
+#  define NET_SIZE_T socklen_t
+#elif defined(WIN32)
+#  define NET_SIZE_T int
 #endif
 
 #ifndef NET_SIZE_T
-  #define NET_SIZE_T int
+#  define NET_SIZE_T int
 #endif
 
 /********************** LOCAL INCLUDES *****************************/
@@ -371,7 +374,8 @@ void *realloc();
 #include "protocols.h"
 #include "nmap_rpc.h"
 #include "targets.h"
-
+#include "Target.h"
+#include "TargetGroup.h"
 
 /***********************STRUCTURES**********************************/
 
@@ -391,6 +395,7 @@ int check_ident_port(struct in_addr target);
 int ftp_anon_connect(struct ftpinfo *ftp);
 
 /* port manipulators */
+void getprobepts(char *expr);
 struct scan_lists *getpts(char *expr); /* someone stole the name getports()! */
 int getidentinfoz(struct in_addr target, u16 localport, u16 remoteport,
 		  char *owner, int ownersz);
@@ -412,7 +417,6 @@ int nmap_main(int argc, char *argv[]);
 void *safe_malloc(int size);
 char *grab_next_host_spec(FILE *inputfd, int argc, char **fakeargv);
 int parse_targets(struct targets *targets, char *h);
-void options_init();
 char *statenum2str(int state);
 char *scantype2str(stype scantype);
 void sigdie(int signo);
@@ -427,7 +431,7 @@ char *tsseqclass2ascii(int seqclass);
 const char *seqidx2difficultystr(unsigned long idx);
 int nmap_fetchfile(char *filename_returned, int bufferlen, char *file);
 int fileexistsandisreadable(char *pathname);
-int check_firewallmode(struct hoststruct *target, struct scanstats *ss);
+int check_firewallmode(Target *target, struct scanstats *ss);
 int gather_logfile_resumption_state(char *fname, int *myargc, char ***myargv);
 
 /* From glibc 2.0.6 because Solaris doesn't seem to have this function */
@@ -435,14 +439,5 @@ int gather_logfile_resumption_state(char *fname, int *myargc, char ***myargv);
 int inet_aton(register const char *, struct in_addr *);
 #endif
 
-/* Sets a pcap filter function -- makes SOCK_RAW reads easier */
-#ifndef WINIP_H
-typedef int (*PFILTERFN)(const char *packet, int len); /* 1 to keep */
-void set_pcap_filter(struct hoststruct *target, pcap_t *pd, PFILTERFN filter, char *bpf, ...);
-#endif
-
-int flt_icmptcp(const char *packet, int len);
-int flt_icmptcp_2port(const char *packet, int len);
-int flt_icmptcp_5port(const char *packet, int len);
 
 #endif /* NMAP_H */

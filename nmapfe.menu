@@ -1,0 +1,1 @@
+?package(nmap-frontend): needs="x11" genericname="Security Auditing" longtitle="Graphical Front End to Nmap" section="Networking/Monitoring" title="NmapFE" command="nmapfe" icon="nmapfe.xpm"

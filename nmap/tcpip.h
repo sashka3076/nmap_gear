@@ -1,49 +1,49 @@
 
-/***********************************************************************/
-/* tcpip.h -- Various functions relating to low level TCP/IP handling, */
-/* including sending raw packets, routing, printing packets, reading   */
-/* from libpcap, etc.                                                  */
-/*                                                                     */
-/***********************************************************************/
-/*  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  */
-/*  program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published  */
-/*  by the Free Software Foundation; Version 2.  This guarantees your  */
-/*  right to use, modify, and redistribute this software under certain */
-/*  conditions.  If this license is unacceptable to you, we may be     */
-/*  willing to sell alternative licenses (contact sales@insecure.com). */
-/*                                                                     */
-/*  If you received these files with a written license agreement       */
-/*  stating terms other than the (GPL) terms above, then that          */
-/*  alternative license agreement takes precendence over this comment. */
-/*                                                                     */
-/*  Source is provided to this software because we believe users have  */
-/*  a right to know exactly what a program is going to do before they  */
-/*  run it.  This also allows you to audit the software for security   */
-/*  holes (none have been found so far).                               */
-/*                                                                     */
-/*  Source code also allows you to port Nmap to new platforms, fix     */
-/*  bugs, and add new features.  You are highly encouraged to send     */
-/*  your changes to fyodor@insecure.org for possible incorporation     */
-/*  into the main distribution.  By sending these changes to Fyodor or */
-/*  one the insecure.org development mailing lists, it is assumed that */
-/*  you are offering Fyodor the unlimited, non-exclusive right to      */
-/*  reuse, modify, and relicense the code.  This is important because  */
-/*  the inability to relicense code has caused devastating problems    */
-/*  for other Free Software projects (such as KDE and NASM).  Nmap     */
-/*  will always be available Open Source.  If you wish to specify      */
-/*  special license conditions of your contributions, just say so      */
-/*  when you send them.                                                */
-/*                                                                     */
-/*  This program is distributed in the hope that it will be useful,    */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of     */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  */
-/*  General Public License for more details (                          */
-/*  http://www.gnu.org/copyleft/gpl.html ).                            */
-/*                                                                     */
-/***********************************************************************/
+/***********************************************************************
+ * tcpip.h -- Various functions relating to low level TCP/IP handling, *
+ * including sending raw packets, routing, printing packets, reading   *
+ * from libpcap, etc.                                                  *
+ *                                                                     *
+ ***********************************************************************
+ *  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  *
+ *  program is free software; you can redistribute it and/or modify    *
+ *  it under the terms of the GNU General Public License as published  *
+ *  by the Free Software Foundation; Version 2.  This guarantees your  *
+ *  right to use, modify, and redistribute this software under certain *
+ *  conditions.  If this license is unacceptable to you, we may be     *
+ *  willing to sell alternative licenses (contact sales@insecure.com). *
+ *                                                                     *
+ *  If you received these files with a written license agreement       *
+ *  stating terms other than the (GPL) terms above, then that          *
+ *  alternative license agreement takes precendence over this comment. *
+ *                                                                     *
+ *  Source is provided to this software because we believe users have  *
+ *  a right to know exactly what a program is going to do before they  *
+ *  run it.  This also allows you to audit the software for security   *
+ *  holes (none have been found so far).                               *
+ *                                                                     *
+ *  Source code also allows you to port Nmap to new platforms, fix     *
+ *  bugs, and add new features.  You are highly encouraged to send     *
+ *  your changes to fyodor@insecure.org for possible incorporation     *
+ *  into the main distribution.  By sending these changes to Fyodor or *
+ *  one the insecure.org development mailing lists, it is assumed that *
+ *  you are offering Fyodor the unlimited, non-exclusive right to      *
+ *  reuse, modify, and relicense the code.  This is important because  *
+ *  the inability to relicense code has caused devastating problems    *
+ *  for other Free Software projects (such as KDE and NASM).  Nmap     *
+ *  will always be available Open Source.  If you wish to specify      *
+ *  special license conditions of your contributions, just say so      *
+ *  when you send them.                                                *
+ *                                                                     *
+ *  This program is distributed in the hope that it will be useful,    *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of     *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  *
+ *  General Public License for more details (                          *
+ *  http://www.gnu.org/copyleft/gpl.html ).                            *
+ *                                                                     *
+ ***********************************************************************/
 
-/* $Id: tcpip.h,v 1.38 2001/03/27 03:07:56 fyodor Exp $ */
+/* $Id: tcpip.h,v 1.47 2002/09/09 07:59:51 fyodor Exp $ */
 
 
 #ifndef TCPIP_H
@@ -171,7 +171,7 @@ void *realloc();
 #ifdef __cplusplus
 extern "C" {
 #endif
-  #include <pcap.h>
+#include <pcap.h>
 #ifdef __cplusplus
 }
 #endif
@@ -199,7 +199,7 @@ extern "C" {
 #endif
 
 #ifndef BSDFIX
-#if FREEBSD || BSDI || NETBSD
+#if FREEBSD || BSDI || NETBSD || DEC
 #define BSDFIX(x) x
 #define BSDUFIX(x) x
 #else
@@ -214,13 +214,26 @@ extern "C" {
 
 #define MORE_FRAGMENTS 8192 /*NOT a user serviceable parameter*/
 
+/* Used for tracing all packets sent or received (eg the
+   --packet_trace option) */
+class PacketTrace {
+ public:
+  /*  static const int SEND=1;
+      static const int RCV=2; */
+  enum pdirection { SENT=1, RCVD=2 };
+  /* Takes an IP PACKET and prints it if packet tracing is enabled.
+     'packet' must point to the IPv4 header. The direction must be
+     PacketTrace::SENT or PacketTrace::RCVD .  Optional 'now' argument
+     makes this function slightly more efficient by avoiding a gettimeofday()
+     call. */
+  static void trace(pdirection pdir, const u8 *packet, u32 len,
+		    struct timeval *now=NULL);
+};
+
 struct interface_info {
     char name[64];
     struct in_addr addr;
 };
-
-
-
 
 #ifndef HAVE_STRUCT_IP
 #define HAVE_STRUCT_IP
@@ -353,8 +366,20 @@ struct icmp
 #define SA struct sockaddr
 
 /* Prototypes */
-
-/* Tries to resolve given hostname and stores
+/* Converts an IP address given in a sockaddr_storage to an IPv4 or
+   IPv6 IP address string.  Since a static buffer is returned, this is
+   not thread-safe and can only be used once in calls like printf() 
+*/
+const char *inet_socktop(struct sockaddr_storage *ss);
+/* Tries to resolve the given name (or literal IP) into a sockaddr
+   structure.  The af should be PF_INET (for IPv4) or PF_INET6.  Returns 0
+   if hostname cannot be resolved.  It is OK to pass in a sockaddr_in or 
+   sockaddr_in6 casted to a sockaddr_storage as long as you use the matching 
+   pf.*/
+int resolve(char *hostname, struct sockaddr_storage *ss, size_t *sslen,
+	    int pf);
+/* LEGACY resolve() function that only supports IPv4 -- see IPv6 version
+   above.  Tries to resolve given hostname and stores
    result in ip .  returns 0 if hostname cannot
    be resolved */
 int resolve(char *hostname, struct in_addr *ip);
@@ -362,62 +387,73 @@ int resolve(char *hostname, struct in_addr *ip);
    destination should be routed through.  It returns NULL if no appropriate
    interface is found, oterwise it returns the device name and fills in the
    source parameter */
-char *routethrough(struct in_addr *dest, struct in_addr *source);
+char *routethrough(const struct in_addr * const dest, struct in_addr *source);
 unsigned short in_cksum(u16 *ptr,int nbytes);
-int send_tcp_raw( int sd, struct in_addr *source, struct in_addr *victim, 
+int send_tcp_raw( int sd, const struct in_addr *source, 
+		  const struct in_addr *victim, 
 		  u16 sport, u16 dport, u32 seq, u32 ack, u8 flags,
 		  u16 window, u8 *options, int optlen, char *data, 
 		  u16 datalen);
-int send_udp_raw( int sd, struct in_addr *source, struct in_addr *victim, 
-		  u16 sport, u16 dport, u8 *data, u16 datalen);
+int send_udp_raw( int sd, struct in_addr *source, const struct in_addr *victim,
+ 		  u16 sport, u16 dport, char *data, u16 datalen);
 
-int send_ip_raw( int sd, struct in_addr *source, struct in_addr *victim, 
-		 u8 proto, u8 *data, u16 datalen);
+int send_ip_raw( int sd, struct in_addr *source, const struct in_addr *victim, 
+		 u8 proto, char *data, u16 datalen);
 
 /* Much of this is swiped from my send_tcp_raw function above, which 
    doesn't support fragmentation */
-int send_small_fragz(int sd, struct in_addr *source, struct in_addr *victim,
+int send_small_fragz(int sd, struct in_addr *source, 
+		     const struct in_addr *victim,
 		     u32 seq, u16 sport, u16 dport, int flags);
 /* Decoy versions of the raw packet sending functions ... */
-int send_tcp_raw_decoys( int sd, struct in_addr *victim, u16 sport, 
+int send_tcp_raw_decoys( int sd, const struct in_addr *victim, u16 sport, 
 			 u16 dport, u32 seq, u32 ack, u8 flags, u16 window, 
-                         u8 *options, int optlen, u8 *data, u16 datalen);
+                         u8 *options, int optlen, char *data, u16 datalen);
 
-int send_udp_raw_decoys( int sd, struct in_addr *victim, u16 sport, 
-			 u16 dport, u8 *data, u16 datalen);
+int send_udp_raw_decoys( int sd, const struct in_addr *victim, u16 sport, 
+			 u16 dport, char *data, u16 datalen);
 
-int send_small_fragz_decoys(int sd, struct in_addr *victim, u32 seq, 
+int send_small_fragz_decoys(int sd, const struct in_addr *victim, u32 seq, 
 			    u16 sport, u16 dport, int flags);
 
-int send_ip_raw_decoys( int sd, struct in_addr *victim, u8 proto,
-			u8 *data, u16 datalen);
+int send_ip_raw_decoys( int sd, const struct in_addr *victim, u8 proto,
+			char *data, u16 datalen);
 
 /* Calls pcap_open_live and spits out an error (and quits) if the call fails.
    So a valid pcap_t will always be returned. */
 pcap_t *my_pcap_open_live(char *device, int snaplen, int promisc, int to_ms);
 
+
+/* Returns a buffer of ASCII information about a packet that may look
+   like "TCP 127.0.0.1:50923 > 127.0.0.1:3 S ttl=61 id=39516 iplen=40
+   seq=625950769" or "ICMP PING (0/1) ttl=61 id=39516 iplen=40".
+   Since this is a static buffer, don't use threads or call twice
+   within (say) printf().  And certainly don't try to free() it!  The
+   returned buffer is NUL-terminated */
+const char *ippackethdrinfo(const u8 *packet, u32 len);
+/* Shows the most important fields of an IP packet (including dissecting TCP/UDP headers.  packet should point to the beginning of the IP header  */
+void readippacket(const u8 *packet, int readdata);
 /* A simple function I wrote to help in debugging, shows the important fields
    of a TCP packet*/
-int readtcppacket(unsigned char *packet, int readdata);
-int readudppacket(unsigned char *packet, int readdata);
+int readtcppacket(const u8 *packet, int readdata);
+int readudppacket(const u8 *packet, int readdata);
 /* Convert an IP address to the device (IE ppp0 eth0) using that address */
-int ipaddr2devname( char *dev, struct in_addr *addr );
+int ipaddr2devname( char *dev, const struct in_addr *addr );
 /* And vice versa */
 int devname2ipaddr(char *dev, struct in_addr *addr);
 /* Where the above 2 functions get their info */
 struct interface_info *getinterfaces(int *howmany);
 void sethdrinclude(int sd);
-int getsourceip(struct in_addr *src, struct in_addr *dst);
+int getsourceip(struct in_addr *src, const struct in_addr * const dst);
 /* Get the source IP and interface name that a packet
    to dst should be sent to.  Interface name is dynamically
    assigned and thus should be freed */
 char *getsourceif(struct in_addr *src, struct in_addr *dst);
-int islocalhost(struct in_addr *addr);
+int islocalhost(const struct in_addr * const addr);
 int unblock_socket(int sd);
 int Sendto(char *functionname, int sd, const unsigned char *packet, int len, 
 	   unsigned int flags, struct sockaddr *to, int tolen);
-/* Standard swiped internet checksum routine */
-unsigned short in_cksum(unsigned short *ptr,int nbytes);
+
 /* Hex dump */
 int get_link_offset(char *device);
 char *readip_pcap(pcap_t *pd, unsigned int *len, long to_usec);
@@ -462,6 +498,16 @@ int recvtime(int sd, char *buf, int len, int seconds);
    always true nowadays --fyodor).  This is now 
    implemented in isup() for users who are root.  */
 unsigned long calculate_sleep(struct in_addr target);
+
+/* Sets a pcap filter function -- makes SOCK_RAW reads easier */
+#ifndef WINIP_H
+typedef int (*PFILTERFN)(const char *packet, unsigned int len); /* 1 to keep */
+void set_pcap_filter(Target *target, pcap_t *pd, PFILTERFN filter, char *bpf, ...);
+#endif
+
+int flt_icmptcp(const char *packet, unsigned int len);
+int flt_icmptcp_2port(const char *packet, unsigned int len);
+int flt_icmptcp_5port(const char *packet, unsigned int len);
 
 #endif /*TCPIP_H*/
 

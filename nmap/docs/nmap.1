@@ -39,7 +39,7 @@ of course).
 The result of running nmap is usually a list of interesting
 ports on the machine(s) being scanned (if any).  Nmap always
 gives the port's "well known" service name (if any), number,
-state, and protocol.  The state is either 'open',
+state, and protocol.  The state is either \'open\',
 \'filtered\', or \'unfiltered\'.  Open means that the target
 machine will accept() connections on that port.  Filtered
 means that a firewall, filter, or other network obstacle is
@@ -71,6 +71,18 @@ for a quick reference page listing all the options.
 .TP
 .B SCAN TYPES
 .TP
+.B \-sS
+TCP SYN scan: This technique is often referred to as "half-open"
+scanning, because you don't open a full TCP connection. You send a SYN
+packet, as if you are going to open a real connection and you wait for
+a response. A SYN|ACK indicates the port is listening. A RST is
+indicative of a non\-listener.  If a SYN|ACK is received, a RST is
+immediately sent to tear down the connection (actually our OS kernel
+does this for us). The primary advantage to this scanning technique is
+that fewer sites will log it.  Unfortunately you need root privileges
+to build these custom SYN packets.  This is the default scan type for
+privileged users.
+.TP
 .B \-sT 
 TCP connect() scan: This is the most basic form of TCP
 scanning. The connect() system call provided by your
@@ -81,23 +93,10 @@ reachable. One strong advantage to this technique is that
 you don't need any special privileges. Any user on most UNIX
 boxes is free to use this call.
 .Sp
-This sort of scan is easily detectable as target host logs
-will show a bunch of connection and error messages for the
-services which accept() the connection just to have it
-immediately shutdown.
-.TP
-.B \-sS
-TCP SYN scan: This technique is often referred to as
-"half-open" scanning, because you don't open a full TCP
-connection. You send a SYN packet, as if you are going to
-open a real connection and you wait for a response. A
-SYN|ACK indicates the port is listening. A RST is indicative
-of a non\-listener.  If a SYN|ACK is received, a RST is
-immediately sent to tear down the connection (actually our
-OS kernel does this for us). The primary advantage to this
-scanning technique is that fewer sites will log it.
-Unfortunately you need root privileges to build these custom
-SYN packets.
+This sort of scan is easily detectable as target host logs will show a
+bunch of connection and error messages for the services which accept()
+the connection just to have it immediately shutdown.  This is the
+default scan type for unprivileged users.
 .TP
 .B \-sF \-sX \-sN 
 Stealth FIN, Xmas Tree, or Null scan modes: There are times
@@ -211,10 +210,9 @@ your real IP address).  Instead, a unique side-channel attack exploits
 predictable "IP fragmentation ID" sequence generation on the zombie host
 to glean information about the open ports on the target.  IDS systems
 will display the scan as coming from the zombie machine you specify
-(which must be up and meet certain criteria).  I am planning to put a
-more detailed explanation up at
-http://www.insecure.org/nmap/nmap_documentation.html in the near
-future.
+(which must be up and meet certain criteria).  I wrote an informal
+paper about this technique at
+http://www.insecure.org/nmap/idlescan.html .
 .Sp
 Besides being extraordinarily stealthy (due to its blind nature), this
 scan type permits mapping out IP-based trust relationships between machines.
@@ -270,11 +268,10 @@ found open and then floods them with SunRPC program NULL
 commands in an attempt to determine whether they are RPC
 ports, and if so, what program and version number they serve
 up.  Thus you can effectively obtain the same info as
-'rpcinfo -p' even if the target's portmapper is behind a
+\'rpcinfo -p\' even if the target's portmapper is behind a
 firewall (or protected by TCP wrappers).  Decoys do not
 currently work with RPC scan, at some point I may add decoy
 support for UDP RPC scans.
-.TP
 .TP
 .B \-sL
 List scan.  This method simply generates and prints a list of
@@ -303,7 +300,7 @@ ftp server allows reading from and writing to some directory
 (such as /incoming), you can send arbitrary data to ports
 that you do find open (nmap doesn't do this for you though).
 .Sp
-The argument passed to the 'b' option is the host you want
+The argument passed to the \'b\' option is the host you want
 to use as a proxy, in standard URL notation.  The format is:
 .I username:password@server:port.  
 Everything but 
@@ -316,7 +313,10 @@ this attack, you can see my article in
 URL (http://www.insecure.org/nmap).
 .TP
 .B GENERAL OPTIONS
-None of these are required but some can be quite useful.
+None of these are required but some can be quite useful.  Note that
+the -P options can now be combined -- you can increase your odds of
+penetrating strict firewalls by sending many probe types using
+different TCP ports/flags and ICMP codes.
 .TP
 .B \-P0
 Do not try and ping hosts at all before scanning them.  This
@@ -338,15 +338,16 @@ to trickle back.  Hosts that are up should respond with a
 RST.  This option preserves the efficiency of only scanning
 hosts that are up while still allowing you to scan
 networks/hosts that block ping packets.  For non root users,
-we use connect().  To set the destination port of the probe
-packets use -PT<port number>.  The default port is 80, since
-this port is often not filtered out.
+we use connect().  To set the destination ports of the probe
+packets use -PT<port1>[,port2][...].  The default port is 80, since
+this port is often not filtered out.  Note that this option now
+accepts multiple, comma-separated port numbers.
 .TP
 .B \-PS
 This option uses SYN (connection request) packets instead of
 ACK packets for root users.  Hosts that are up should
 respond with a RST (or, rarely, a SYN|ACK).  You can set the
-destination port in the same manner as \-PT above.
+destination ports in the same manner as \-PT above.
 .TP
 .B \-PI
 This option uses a true ping (ICMP echo request) packet.  It
@@ -374,14 +375,16 @@ This is the default ping type.  It uses both the ACK (
 .B \-PI
 ) sweeps in parallel.  This way you can get firewalls that filter
 either one (but not both).  The TCP probe destination port can be set
-in the same manner as with \-PT above.
+in the same manner as with \-PT above.  Note that this flag is now deprecated
+as pingtype flags can now be used in combination.  So you should use both "PE"
+and "PT" to achieve this same effect.
 .TP
 .B \-O
 This option activates remote host identification via TCP/IP
 fingerprinting.  In other words, it uses a bunch of
 techniques to detect subtleties in the underlying operating
 system network stack of the computers you are scanning.  It
-uses this information to create a 'fingerprint' which it
+uses this information to create a \'fingerprint\' which it
 compares with its database of known OS fingerprints (the
 nmap-os-fingerprints file) to decide what type of system you
 are scanning.
@@ -410,6 +413,14 @@ classification such as "worthy challenge" or "trivial joke".  This is
 only reported in normal output with -v.
 .Sp
 When verbose mode (\-v) is on with \-O, IPID Sequence Generation is also reported.  Most machines are in the "incremental" class, which means that they increment the "ID" field in the IP header for each packet they send.  This makes them vulnerable to several advanced information gathering and spoofing attacks.
+.TP
+.B \-6
+This options enables IPv6 support.  All targets must be IPv6 if this
+option is used, and they can be specified via normal DNS name (AAAA
+record) or as a literal IP address such as
+3ffe:501:4819:2000:210:f3ff:fe03:4d0 .  Currently, connect() TCP scan
+and TCP connect() Ping scan are supported.  If you need UDP or other
+scan types, have a look at http://nmap6.sourceforge.net/ .
 .TP
 .B \-I
 This turns on TCP reverse ident scanning. As noted by Dave
@@ -449,15 +460,15 @@ variants.
 .B \-v
 Verbose mode.  This is a highly recommended option and it
 gives out more information about what is going on.  You can
-use it twice for greater effect.  Use
+use it twice for greater effect.  You can also use 
 .B \-d
-a couple of times if you really want to get crazy with
+a few of times if you really want to get crazy with
 scrolling the screen!
 .TP
 .B \-h
 This handy option display a quick reference screen of nmap
 usage options.  As you may have noticed, this man page is
-not exactly a 'quick reference' :)
+not exactly a \'quick reference\' :)
 .TP
 .B \-oN <logfilename>
 This logs the results of your scans in a normal
@@ -537,7 +548,7 @@ to find some web servers to look at.
 .TP
 .B \-p <port ranges>
 This option specifies what ports you want to specify. For
-example '-p 23' will only try port 23 of the target host(s).
+example \'-p 23\' will only try port 23 of the target host(s).
 \'\-p 20-30,139,60000-\' scans ports between 20 and 30, port
 139, and all ports greater than 60000.  The default is to
 scan all ports between 1 and 1024 as well as any ports
@@ -571,11 +582,11 @@ mechanisms, it is generally an extremely effective technique
 for hiding your IP address.
 .Sp
 Separate each decoy host with commas, and you can optionally
-use 'ME' as one of the decoys to represent the position you
-want your IP address to be used.  If your put 'ME' in the
+use \'ME\' as one of the decoys to represent the position you
+want your IP address to be used.  If your put \'ME\' in the
 6th position or later, some common port scan detectors (such
 as Solar Designer's excellent scanlogd) are unlikeley to
-show your IP address at all.  If you don't use 'ME', nmap
+show your IP address at all.  If you don't use \'ME\', nmap
 will put you in a random position.
 .Sp
 Note that the hosts you use as decoys should be up or you
@@ -763,12 +774,23 @@ never try to scan more than 1 port at a time.  It also
 effects other parallel scans such as ping sweep, RPC scan,
 etc.
 .TP
+.B --min_parallelism <number>
+Tells Nmap to scan at least the given number of ports in parallel.
+This can speed up scans against certain firewalled hosts by an order
+of magnitude.  But be careful -- results will become unreliable if you
+push it too far.
+.TP
 .B --scan_delay <milliseconds>
 Specifies the 
 .B minimum
 amount of time Nmap must wait between probes.  This is
 mostly useful to reduce network load or to slow the scan way
 down to sneak under IDS thresholds.
+.TP
+.B --packet_trace
+Tells Nmap to show all the packets it sends and receives in a
+tcpdump-like format.  This can be tremendously useful for debugging,
+and is also a good learning tool.
 
 .SH TARGET SPECIFICATION
 Everything that isn't an option (or option argument) in nmap
@@ -776,27 +798,27 @@ is treated as a target host specification.  The simplest
 case is listing single hostnames or IP addresses on the
 command line.  If you want to scan a subnet of IP addresses,
 you can append
-.B '/mask' 
+.B \'/mask\' 
 to the hostname
 or IP address. 
 .B mask 
 must be between 0 (scan the whole internet) and 32 (scan the
-single host specified).  Use /24 to scan a class 'C' address
-and /16 for a class 'B'.
+single host specified).  Use /24 to scan a class \'C\' address
+and /16 for a class \'B\'.
 .Sp
 Nmap also has a more powerful notation which lets you
 specify an IP address using lists/ranges for each element.
-Thus you can scan the whole class 'B' network 192.168.*.* by
-specifying '192.168.*.*' or '192.168.0-255.0-255' or even
-\'192.168.1-50,51-255.1,2,3,4,5-255'.  And of course you can
-use the mask notation: '192.168.0.0/16'.  These are all
-equivalent.  If you use asterisks ('*'), remember that most
+Thus you can scan the whole class \'B\' network 192.168.*.* by
+specifying \'192.168.*.*\' or \'192.168.0-255.0-255\' or even
+\'192.168.1-50,51-255.1,2,3,4,5-255\'.  And of course you can
+use the mask notation: \'192.168.0.0/16\'.  These are all
+equivalent.  If you use asterisks (\'*\'), remember that most
 shells require you to escape them with back slashes or
 protect them with quotes.
 .Sp
 Another interesting thing to do is slice the Internet the
 other way.  Instead of scanning all the hosts in a class
-'B', scan '*.*.5.6-7' to scan every IP address that ends in
+\'B\', scan \'*.*.5.6-7\' to scan every IP address that ends in
 .5.6 or .5.7 Pick your own numbers.  For more information on
 specifying hosts to scan, see the
 .I examples
@@ -824,7 +846,7 @@ target.example.com .  The \-v means turn on verbose mode.
 .B nmap -sS -O target.example.com/24
 .Sp
 Launches a stealth SYN scan against each machine that is up
-out of the 255 machines on class 'C' where
+out of the 255 machines on class \'C\' where
 target.example.com resides.  It also tries to determine what
 operating system is running on each host that is up and
 running.  This requires root privileges because of the SYN
@@ -833,13 +855,13 @@ scan and the OS detection.
 .B nmap -sX -p 22,53,110,143,4564 "198.116.*.1-127"
 .Sp
 Sends an Xmas tree scan to the first half of each of the 255
-possible 8 bit subnets in the 198.116 class 'B' address
+possible 8 bit subnets in the 198.116 class \'B\' address
 space.  We are testing whether the systems run sshd, DNS,
 pop3d, imapd, or port 4564.  Note that Xmas scan doesn't
 work on Microsoft boxes due to their deficient TCP stack.
 Same goes with CISCO, IRIX, HP/UX, and BSDI boxes.
 .Sp
-.B nmap -v --randomize_hosts -p 80 '*.*.2.3-5'
+.B nmap -v --randomize_hosts -p 80 \'*.*.2.3-5\'
 .Sp
 Rather than focus on a specific IP range, it is sometimes
 interesting to slice up the entire Internet and scan a small
@@ -847,11 +869,11 @@ sample from each slice.  This command finds all web servers
 on machines with IP addresses ending in .2.3, .2.4, or .2.5
 .  If you are root you might as well add -sS.  Also you will
 find more interesting machines starting at 127. so you might
-want to use '127-222' instead of the first asterisks because
+want to use \'127-222\' instead of the first asterisks because
 that section has a greater density of interesting machines
 (IMHO).
 .Sp
-.B host -l company.com | cut '-d ' -f 4 | ./nmap -v -iL -
+.B host -l company.com | cut \'-d \' -f 4 | ./nmap -v -iL -
 .Sp
 Do a DNS zone transfer to find the hosts in company.com and
 then feed the IP addresses to
@@ -875,14 +897,6 @@ can be obtained from
 .Sp
 .I nmap 
 is (C) 1995-2001 by Insecure.Com LLC
-.Sp
-.I libpcap
-is also distributed along with nmap.  It is copyrighted by
-Van Jacobson, Craig Leres and Steven McCanne, all of the
-Lawrence Berkeley National Laboratory, University of
-California, Berkeley, CA.  The version distributed with nmap
-may be modified, pristine sources are available from
-ftp://ftp.ee.lbl.gov/libpcap.tar.Z .
 .Sp
 This program is free software; you can redistribute it
 and/or modify it under the terms of the GNU General Public
@@ -938,8 +952,22 @@ doing even a light scan of a network.
 .Sp
 Nmap should never be run with privileges (eg suid root) for security
 reasons.
+.Sp 
+
+This product includes software developed by the Apache Software
+Foundation (http://www.apache.org/).  The
+.I Libpcap 
+portable packet capture library is distributed along with nmap.
+Libpcap was originally copyrighted by Van Jacobson, Craig Leres and
+Steven McCanne, all of the Lawrence Berkeley National Laboratory,
+University of California, Berkeley, CA.  It is now maintained by
+http://www.tcpdump.org .
 .Sp
-All versions of Nmap equal to or greater than 2.0 are
-believed to be Year 2000 (Y2K) compliant in all respects.
-There is no reason to believe versions earlier than 2.0 are
-susceptible to problems, but we have not tested them.
+US Export Control: Insecure.Com LLC believes that Nmap falls under US
+ECCN (export control classification number) 5D992.  This category is
+called '"Information Security" "software" not controlled by 5D002'.
+The only restriction of this classification is AT (anti-terrorism),
+which applies to almost all goods and denies export to a handful of
+rogue nations such as Iraq and North Korea.  Thus exporting Nmap does
+not require any special license, permit, or other governmental
+authorization.

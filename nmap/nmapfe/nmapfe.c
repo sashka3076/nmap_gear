@@ -42,7 +42,7 @@
 /*                                                                     */
 /***********************************************************************/
 
-/* $Id: nmapfe.c,v 1.10 2001/03/12 20:52:55 fyodor Exp $ */
+/* $Id: nmapfe.c,v 1.11 2002/07/20 09:26:25 fyodor Exp $ */
 
 
 /* Original Author: Zach
@@ -160,7 +160,7 @@ create_main_win ()
   our_uid = 0;
   /* for nmap version */
 #include "nmap_winconfig.h"
-#define VERSION "0." NMAP_VERSION
+#define VERSION NMAP_VERSION
 #else
   our_uid = getuid();
 #endif

@@ -1,4 +1,11 @@
-@(#) $Header: /CVS/nmap/libpcap-possiblymodified/CHANGES,v 1.1.1.1 2001/06/03 08:19:45 fyodor Exp $ (LBL)
+@(#) $Header: /CVS/nmap/libpcap-possiblymodified/CHANGES,v 1.2 2002/12/18 06:10:07 fyodor Exp $ (LBL)
+
+Monday October 23, 2001. mcr@sandelman.ottawa.on.ca. Summary for 0.7 release
+
+	Added pcap_findalldevs() call to get list of interfaces in a MI way.
+
+	pcap_stats() has been documented as to what its counters mean on 
+	each platform.
 
 Tuesday January 9, 2001. guy@alum.mit.edu. Summary for 0.6 release
 

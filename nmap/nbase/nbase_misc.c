@@ -8,7 +8,7 @@
  *  functions written by others.  License conditions for those files   *
  *  may vary and is generally included at the top of the files.   Be   *
  *  sure to read that information before you redistribute or           *
- *  contents of those files.                                           *
+ *  incorporate parts of those files into your software.               *
  *                                                                     *   
  *  Source is provided to this software because we believe users have  *
  *  a right to know exactly what a program is going to do before they  *
@@ -34,5 +34,5 @@
  *                                                                     *
  ***********************************************************************/
 
-/* $Id: nbase_misc.c,v 1.2 2000/11/22 08:34:31 fyodor Exp $ */
+/* $Id: nbase_misc.c,v 1.3 2002/04/21 00:28:08 fyodor Exp $ */
 

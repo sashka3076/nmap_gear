@@ -14,7 +14,7 @@
  *  functions written by others.  License conditions for those files   *
  *  may vary and is generally included at the top of the files.   Be   *
  *  sure to read that information before you redistribute or           *
- *  contents of those files.                                           *
+ *  incorporate parts of those files into your software.               *
  *                                                                     *   
  *  Source is provided to this software because we believe users have  *
  *  a right to know exactly what a program is going to do before they  *
@@ -40,7 +40,7 @@
  *                                                                     *
  ***********************************************************************/
 
-/* $Id: nbase.h,v 1.14 2002/03/20 06:07:02 fyodor Exp $ */
+/* $Id: nbase.h,v 1.23 2002/09/19 02:24:30 fyodor Exp $ */
 
 #ifndef NBASE_H
 #define NBASE_H
@@ -65,6 +65,9 @@
  *
  * * Various string functions such as Strncpy() and strcasestr() see protos 
  *   for more info.
+ *
+ * * IPv6 structures like 'sockaddr_storage' are provided if they do
+ *   not already exist.
  */
 
 #if HAVE_CONFIG_H
@@ -89,14 +92,12 @@
 
 #include <stdlib.h>
 #include <ctype.h>
+#if HAVE_SYS_TYPES_H
 #include <sys/types.h>
+#endif
 
 #if HAVE_SYS_PARAM_H
 #include <sys/param.h>
-#endif
-
-#if HAVE_NETDB_H
-#include <netdb.h>
 #endif
 
 #if HAVE_STRING_H
@@ -241,10 +242,16 @@ void usleep(unsigned long usec);
 #define DEVNULL "/dev/null"
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /***************** String functions -- See nbase_str.c ******************/
-#ifndef HAVE_STRCASESTR
+/* I modified this conditional because !@# Redhat does not easily provide
+   the prototype even though the function exists */
+#if !defined(HAVE_STRCASESTR) || defined(LINUX)
 /* strcasestr is like strstr() except case insensitive */
-char *strcasestr(char *haystack, char *pneedle);
+char *strcasestr(const char *haystack, const char *pneedle);
 #endif
 
 #ifndef HAVE_STRCASECMP
@@ -263,6 +270,11 @@ int gettimeofday(struct timeval *tv, struct timeval *tz);
 unsigned int sleep(unsigned int seconds);
 #endif
 
+#ifndef HAVE_INET_ATON
+struct in_addr;
+int inet_aton(const char *cp, struct in_addr *addr);
+#endif
+
 /* Strncpy is like strcpy() except it ALWAYS zero-terminates, even if
    it must truncate */
 int Strncpy(char *dest, const char *src, size_t n);
@@ -279,7 +291,10 @@ int Strncpy(char *dest, const char *src, size_t n);
 #define STDERR_FILENO 2
 #endif
 
+#include "nbase_ipv6.h"
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* NBASE_H */
-
-

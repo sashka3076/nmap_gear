@@ -9,7 +9,7 @@
  *  functions written by others.  License conditions for those files   *
  *  may vary and is generally included at the top of the files.   Be   *
  *  sure to read that information before you redistribute or           *
- *  contents of those files.                                           *
+ *  incorporate parts of those files into your software.               *
  *                                                                     *   
  *  Source is provided to this software because we believe users have  *
  *  a right to know exactly what a program is going to do before they  *
@@ -35,19 +35,20 @@
  *                                                                     *
  ***********************************************************************/
 
-/* $Id: nbase_str.c,v 1.1 2000/10/15 07:16:22 fyodor Exp $ */
+/* $Id: nbase_str.c,v 1.4 2002/12/18 08:41:38 fyodor Exp $ */
 
 #include "nbase.h"
 #include <string.h>
 
 #ifndef HAVE_STRCASESTR
-char *strcasestr(char *haystack, char *pneedle) {
+char *strcasestr(const char *haystack, const char *pneedle) {
 char buf[512];
 unsigned int needlelen;
-char *needle, *p, *q, *foundto;
+const char *p;
+char *needle, *q, *foundto;
 
 /* Should crash if !pneedle -- this is OK */
-if (!*pneedle) return haystack;
+if (!*pneedle) return (char *) haystack;
 if (!haystack) return NULL;
 
 needlelen = strlen(pneedle);
@@ -64,7 +65,7 @@ needlelen = strlen(pneedle);
        /* Yeah, we found it */
        if (needlelen >= sizeof(buf))
          free(needle);
-       return p - needlelen + 1;
+       return (char *) (p - needlelen + 1);
      }
    } else foundto = needle;
  }

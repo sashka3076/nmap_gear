@@ -8,7 +8,7 @@
  *  functions written by others.  License conditions for those files   *
  *  may vary and is generally included at the top of the files.   Be   *
  *  sure to read that information before you redistribute or           *
- *  contents of those files.                                           *
+ *  incorporate parts of those files into your software.               *
  *                                                                     *   
  *  Source is provided to this software because we believe users have  *
  *  a right to know exactly what a program is going to do before they  *
@@ -34,7 +34,7 @@
  *                                                                     *
  ***********************************************************************/
 
-/* $Id: strcasecmp.c,v 1.3 2002/04/02 06:57:13 fyodor Exp $ */
+/* $Id: strcasecmp.c,v 1.5 2002/08/27 21:08:21 fyodor Exp $ */
 
 #if !defined(HAVE_STRCASECMP) || !defined(HAVE_STRNCASECMP)
 #include <stdlib.h>
@@ -83,7 +83,7 @@ int strncasecmp(const char *s1, const char *s2, size_t n)
   char *cp1,*cp2;
   int i=0;
   
-  cp1=malloc(strlen(s1)+1);
+  cp1= (char *) malloc(strlen(s1)+1);
   memset(cp1,0,strlen(s1)+1);
   memcpy(cp1,s1,strlen(s1));
   for (i=0; cp1[i]>0; i++)
@@ -92,7 +92,7 @@ int strncasecmp(const char *s1, const char *s2, size_t n)
 	cp1[i] -= 32;
     }
   
-  cp2=malloc(strlen(s2)+1);
+  cp2= (char *) malloc(strlen(s2)+1);
   memset(cp2,0,strlen(s2)+1);
   memcpy(cp2,s2,strlen(s2));
   for (i=0; cp2[i]>0; i++)

@@ -1,0 +1,13 @@
+--- nmap-3.10ALPHA3/nbase/nbase.h.orig	2002-09-01 04:03:14 +0400
++++ nmap-3.10ALPHA3/nbase/nbase.h	2002-09-23 20:09:12 +0400
+@@ -247,9 +247,7 @@
+ #endif
+ 
+ /***************** String functions -- See nbase_str.c ******************/
+-/* I modified this conditional because !@# Redhat does not easily provide
+-   the prototype even though the function exists */
+-#if !defined(HAVE_STRCASESTR) || defined(LINUX)
++#ifndef HAVE_STRCASESTR
+ /* strcasestr is like strstr() except case insensitive */
+ char *strcasestr(char *haystack, char *pneedle);
+ #endif

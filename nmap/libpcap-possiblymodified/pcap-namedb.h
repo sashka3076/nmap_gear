@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * @(#) $Header: /CVS/nmap/libpcap-possiblymodified/pcap-namedb.h,v 1.1.1.1 2001/06/03 08:19:45 fyodor Exp $ (LBL)
+ * @(#) $Header: /CVS/nmap/libpcap-possiblymodified/pcap-namedb.h,v 1.2 2002/12/18 06:10:07 fyodor Exp $ (LBL)
  */
 
 #ifndef lib_pcap_ethers_h

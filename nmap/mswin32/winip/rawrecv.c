@@ -25,15 +25,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 #include "..\tcpip.h"
 #include "winip.h"
+#include "..\..\NmapOps.h"
 
 #ifndef SIO_RCVALL
 #define IOC_VENDOR 0x18000000
 #define SIO_RCVALL _WSAIOW(IOC_VENDOR, 1)
 #endif
 
-extern struct ops o;
+extern NmapOps o;
 
-static int nullfilter(const char *packet, int len)
+static int nullfilter(const char *packet, unsigned int len)
 {
 	return 1;
 }

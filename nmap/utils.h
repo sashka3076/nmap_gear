@@ -1,47 +1,48 @@
-/***********************************************************************/
-/* utils.c -- Various miscellaneous utility functions which defy       */
-/* categorization :)                                                   */
-/*                                                                     */
-/***********************************************************************/
-/*  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  */
-/*  program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published  */
-/*  by the Free Software Foundation; Version 2.  This guarantees your  */
-/*  right to use, modify, and redistribute this software under certain */
-/*  conditions.  If this license is unacceptable to you, we may be     */
-/*  willing to sell alternative licenses (contact sales@insecure.com). */
-/*                                                                     */
-/*  If you received these files with a written license agreement       */
-/*  stating terms other than the (GPL) terms above, then that          */
-/*  alternative license agreement takes precendence over this comment. */
-/*                                                                     */
-/*  Source is provided to this software because we believe users have  */
-/*  a right to know exactly what a program is going to do before they  */
-/*  run it.  This also allows you to audit the software for security   */
-/*  holes (none have been found so far).                               */
-/*                                                                     */
-/*  Source code also allows you to port Nmap to new platforms, fix     */
-/*  bugs, and add new features.  You are highly encouraged to send     */
-/*  your changes to fyodor@insecure.org for possible incorporation     */
-/*  into the main distribution.  By sending these changes to Fyodor or */
-/*  one the insecure.org development mailing lists, it is assumed that */
-/*  you are offering Fyodor the unlimited, non-exclusive right to      */
-/*  reuse, modify, and relicense the code.  This is important because  */
-/*  the inability to relicense code has caused devastating problems    */
-/*  for other Free Software projects (such as KDE and NASM).  Nmap     */
-/*  will always be available Open Source.  If you wish to specify      */
-/*  special license conditions of your contributions, just say so      */
-/*  when you send them.                                                */
-/*                                                                     */
-/*  This program is distributed in the hope that it will be useful,    */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of     */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  */
-/*  General Public License for more details (                          */
-/*  http://www.gnu.org/copyleft/gpl.html ).                            */
-/*                                                                     */
-/***********************************************************************/
 
-/* $Id: utils.h,v 1.31 2001/12/30 12:16:22 fyodor Exp $ */
+/***********************************************************************
+ * utils.c -- Various miscellaneous utility functions which defy       *
+ * categorization :)                                                   *
+ *                                                                     *
+ ***********************************************************************
+ *  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  *
+ *  program is free software; you can redistribute it and/or modify    *
+ *  it under the terms of the GNU General Public License as published  *
+ *  by the Free Software Foundation; Version 2.  This guarantees your  *
+ *  right to use, modify, and redistribute this software under certain *
+ *  conditions.  If this license is unacceptable to you, we may be     *
+ *  willing to sell alternative licenses (contact sales@insecure.com). *
+ *                                                                     *
+ *  If you received these files with a written license agreement       *
+ *  stating terms other than the (GPL) terms above, then that          *
+ *  alternative license agreement takes precendence over this comment. *
+ *                                                                     *
+ *  Source is provided to this software because we believe users have  *
+ *  a right to know exactly what a program is going to do before they  *
+ *  run it.  This also allows you to audit the software for security   *
+ *  holes (none have been found so far).                               *
+ *                                                                     *
+ *  Source code also allows you to port Nmap to new platforms, fix     *
+ *  bugs, and add new features.  You are highly encouraged to send     *
+ *  your changes to fyodor@insecure.org for possible incorporation     *
+ *  into the main distribution.  By sending these changes to Fyodor or *
+ *  one the insecure.org development mailing lists, it is assumed that *
+ *  you are offering Fyodor the unlimited, non-exclusive right to      *
+ *  reuse, modify, and relicense the code.  This is important because  *
+ *  the inability to relicense code has caused devastating problems    *
+ *  for other Free Software projects (such as KDE and NASM).  Nmap     *
+ *  will always be available Open Source.  If you wish to specify      *
+ *  special license conditions of your contributions, just say so      *
+ *  when you send them.                                                *
+ *                                                                     *
+ *  This program is distributed in the hope that it will be useful,    *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of     *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  *
+ *  General Public License for more details (                          *
+ *  http://www.gnu.org/copyleft/gpl.html ).                            *
+ *                                                                     *
+ ***********************************************************************/
+
+/* $Id: utils.h,v 1.36 2002/09/16 02:54:43 fyodor Exp $ */
 
 #ifndef UTILS_H
 #define UTILS_H
@@ -126,10 +127,14 @@
 /* assign one timeval to another timeval plus some msecs: a = b + msecs */
 #define TIMEVAL_MSEC_ADD(a, b, msecs) (a).tv_sec = (b).tv_sec + ((msecs) / 1000); (a).tv_usec = (b).tv_usec + ((msecs) % 1000) * 1000; (a).tv_sec += (a).tv_usec / 1000000; (a).tv_usec %= 1000000
 
-
+/* Return num if it is between min and max.  Otherwise return min or
+   max (whichever is closest to num), */
+int box(int bmin, int bmax, int bnum);
 void *safe_malloc(int size);
+/* Zero-initializing version of safe_malloc */
+void *safe_zalloc(int size);
 void hdump(unsigned char *packet, unsigned int len);
-void lamont_hdump(unsigned char *bp, unsigned int length);
+void lamont_hdump(char *cp, unsigned int length);
 int get_random_bytes(void *buf, int numbytes);
 int get_random_int();
 unsigned short get_random_ushort();
@@ -163,6 +168,16 @@ void usleep(unsigned long usec);
 char *strerror(int errnum);
 #endif
 
+/* Convert a comma-separated list of ASCII u16-sized numbers into the
+   given 'dest' array, which is of total size (meaning sizeof() as
+   opposed to numelements) of destsize.  If min_elem and max_elem are
+   provided, each number must be within (or equal to) those
+   constraints.  The number of numbers stored in 'dest' is returned,
+   except that -1 is returned in the case of an error. If -1 is
+   returned and errorstr is non-null, *errorstr is filled with a ptr to a
+   static string literal describing the error. */
+int numberlist2array(char *expr, u16 *dest, int destsize, char **errorstr, 
+		     u16 min_elem=0, u16 max_elem=65535);
 
 /* mmap() an entire file into the address space.  Returns a pointer
    to the beginning of the file.  The mmap'ed length is returned
@@ -181,6 +196,8 @@ char *mmapfile(char *fname, int *length, int openflags);
 #define PROT_NONE       0x0             /* page can not be accessed */
 
 #define MAP_SHARED      0x01            /* Share changes */
+
+int win32_munmap(char *filestr, int filelen);
 
 #endif /* WIN32 */
 

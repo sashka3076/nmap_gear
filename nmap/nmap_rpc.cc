@@ -1,55 +1,56 @@
 
-/***********************************************************************/
-/* rpc.c -- Functions related to the RPCGrind (-sR) facility of Nmap.  */
-/* This includes reading the nmap-rpc services file and sending rpc    */
-/* queries and interpreting responses.  The actual scan engine used    */
-/* for rpc grinding is pos_scan (which is not in this file)            */
-/*                                                                     */
-/***********************************************************************/
-/*  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  */
-/*  program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published  */
-/*  by the Free Software Foundation; Version 2.  This guarantees your  */
-/*  right to use, modify, and redistribute this software under certain */
-/*  conditions.  If this license is unacceptable to you, we may be     */
-/*  willing to sell alternative licenses (contact sales@insecure.com). */
-/*                                                                     */
-/*  If you received these files with a written license agreement       */
-/*  stating terms other than the (GPL) terms above, then that          */
-/*  alternative license agreement takes precendence over this comment. */
-/*                                                                     */
-/*  Source is provided to this software because we believe users have  */
-/*  a right to know exactly what a program is going to do before they  */
-/*  run it.  This also allows you to audit the software for security   */
-/*  holes (none have been found so far).                               */
-/*                                                                     */
-/*  Source code also allows you to port Nmap to new platforms, fix     */
-/*  bugs, and add new features.  You are highly encouraged to send     */
-/*  your changes to fyodor@insecure.org for possible incorporation     */
-/*  into the main distribution.  By sending these changes to Fyodor or */
-/*  one the insecure.org development mailing lists, it is assumed that */
-/*  you are offering Fyodor the unlimited, non-exclusive right to      */
-/*  reuse, modify, and relicense the code.  This is important because  */
-/*  the inability to relicense code has caused devastating problems    */
-/*  for other Free Software projects (such as KDE and NASM).  Nmap     */
-/*  will always be available Open Source.  If you wish to specify      */
-/*  special license conditions of your contributions, just say so      */
-/*  when you send them.                                                */
-/*                                                                     */
-/*  This program is distributed in the hope that it will be useful,    */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of     */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  */
-/*  General Public License for more details (                          */
-/*  http://www.gnu.org/copyleft/gpl.html ).                            */
-/*                                                                     */
-/***********************************************************************/
+/***********************************************************************
+ * rpc.cc -- Functions related to the RPCGrind (-sR) facility of Nmap. *
+ * This includes reading the nmap-rpc services file and sending rpc    *
+ * queries and interpreting responses.  The actual scan engine used    *
+ * for rpc grinding is pos_scan (which is not in this file)            *
+ *                                                                     *
+ ***********************************************************************
+ *  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  *
+ *  program is free software; you can redistribute it and/or modify    *
+ *  it under the terms of the GNU General Public License as published  *
+ *  by the Free Software Foundation; Version 2.  This guarantees your  *
+ *  right to use, modify, and redistribute this software under certain *
+ *  conditions.  If this license is unacceptable to you, we may be     *
+ *  willing to sell alternative licenses (contact sales@insecure.com). *
+ *                                                                     *
+ *  If you received these files with a written license agreement       *
+ *  stating terms other than the (GPL) terms above, then that          *
+ *  alternative license agreement takes precendence over this comment. *
+ *                                                                     *
+ *  Source is provided to this software because we believe users have  *
+ *  a right to know exactly what a program is going to do before they  *
+ *  run it.  This also allows you to audit the software for security   *
+ *  holes (none have been found so far).                               *
+ *                                                                     *
+ *  Source code also allows you to port Nmap to new platforms, fix     *
+ *  bugs, and add new features.  You are highly encouraged to send     *
+ *  your changes to fyodor@insecure.org for possible incorporation     *
+ *  into the main distribution.  By sending these changes to Fyodor or *
+ *  one the insecure.org development mailing lists, it is assumed that *
+ *  you are offering Fyodor the unlimited, non-exclusive right to      *
+ *  reuse, modify, and relicense the code.  This is important because  *
+ *  the inability to relicense code has caused devastating problems    *
+ *  for other Free Software projects (such as KDE and NASM).  Nmap     *
+ *  will always be available Open Source.  If you wish to specify      *
+ *  special license conditions of your contributions, just say so      *
+ *  when you send them.                                                *
+ *                                                                     *
+ *  This program is distributed in the hope that it will be useful,    *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of     *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  *
+ *  General Public License for more details (                          *
+ *  http://www.gnu.org/copyleft/gpl.html ).                            *
+ *                                                                     *
+ ***********************************************************************/
 
-/* $Id: nmap_rpc.c,v 1.3 2001/07/30 06:08:00 fyodor Exp $ */
+/* $Id: nmap_rpc.cc,v 1.2 2002/08/25 01:56:10 fyodor Exp $ */
 
 
 #include "nmap_rpc.h"
+#include "NmapOps.h"
 
-extern struct ops o;
+extern NmapOps o;
 static int services_initialized = 0;
 static struct rpc_info ri;
 static int udp_rpc_socket = -1;
@@ -151,7 +152,7 @@ int get_rpc_procs(unsigned long **programs, unsigned long *num_programs) {
 /* Send an RPC query to the specified host/port on the specified protocol
    looking for the specified RPC program.  We cache our sending sockets
    to avoid recreating and (with TCP) reconnect() ing them each time */
-int send_rpc_query(struct in_addr *target_host, unsigned short portno,
+int send_rpc_query(const struct in_addr *target_host, unsigned short portno,
 		   int ipproto, unsigned long program, int scan_offset, 
 		   int trynum) {
   static struct in_addr last_target_host;
@@ -194,7 +195,7 @@ int send_rpc_query(struct in_addr *target_host, unsigned short portno,
   last_target_host.s_addr = target_host->s_addr;
   last_portno = portno;
   
-  bzero(&sock, sizeof(&sock));
+  bzero(&sock, sizeof(sock));
   sock.sin_family = AF_INET;
   sock.sin_addr.s_addr = target_host->s_addr;
   sock.sin_port = htons(portno);
@@ -272,7 +273,7 @@ int send_rpc_query(struct in_addr *target_host, unsigned short portno,
   return 0;
 }
 
-int rpc_are_we_done(char *msg, int msg_len, struct hoststruct *target, 
+int rpc_are_we_done(char *msg, int msg_len, Target *target, 
 		    struct portinfo *scan, struct scanstats *ss, 
 		    struct portinfolist *pil, struct rpcscaninfo *rsi) {
 
@@ -408,7 +409,7 @@ int rpc_are_we_done(char *msg, int msg_len, struct hoststruct *target,
   return 0;
 }
 
-void get_rpc_results(struct hoststruct *target, struct portinfo *scan,
+void get_rpc_results(Target *target, struct portinfo *scan,
 		     struct scanstats *ss, struct portinfolist *pil, 
 		     struct rpcscaninfo *rsi) {
 
@@ -475,10 +476,10 @@ unsigned long current_msg_len;
      if (o.debugging > 1)
        printf("Received %d byte UDP packet\n", res);
      /* Now we check that the response is from the expected host/port */
-     if (from.sin_addr.s_addr != target->host.s_addr ||
+     if (from.sin_addr.s_addr != target->v4host().s_addr ||
 	 from.sin_port != htons(rsi->rpc_current_port->portno)) {
        if (o.debugging > 1) {
-	 printf("Received UDP packet from %d.%d.%d.%d/%hu when expecting packet from %d.%d.%d.%d/%hu\n", NIPQUAD(from.sin_addr.s_addr), ntohs(from.sin_port), NIPQUAD(target->host.s_addr), rsi->rpc_current_port->portno);
+	 printf("Received UDP packet from %d.%d.%d.%d/%hu when expecting packet from %d.%d.%d.%d/%hu\n", NIPQUAD(from.sin_addr.s_addr), ntohs(from.sin_port), NIPQUAD(target->v4host().s_addr), rsi->rpc_current_port->portno);
        }
        continue;
      }

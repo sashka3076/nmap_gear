@@ -31,6 +31,8 @@
 
 #undef HAVE_LIBIBERTY_H
 
+#undef HAVE_ERRNO_H
+
 /* both bzero() and memcpy() are used in the source */
 #undef HAVE_BZERO
 #undef HAVE_MEMCPY
@@ -60,6 +62,8 @@
 
 #undef HAVE_GETOPT_LONG
 
+#undef HAVE_INET_ATON
+
 #undef HAVE_NETINET_IN_SYSTEM_H
 
 #undef HAVE_SOCKADDR_SA_LEN
@@ -82,25 +86,28 @@
 
 #undef SPRINTF_RETURNS_STRING
 
+/* IPv6 stuff */
+#undef HAVE_IPV6
+#undef HAVE_AF_INET6
+#undef HAVE_SOCKADDR_IN6
+#undef HAVE_SOCKADDR_STORAGE
+#undef HAVE_GETADDRINFO
+#undef HAVE_GAI_STRERROR
+#undef HAVE_GETNAMEINFO
+#undef HAVE_INET_NTOP
+#undef HAVE_INET_PTON
+
 /* Integer widths */
 #undef SIZEOF_CHAR
 #undef SIZEOF_SHORT
 #undef SIZEOF_INT
 #undef SIZEOF_LONG
 
-/* Define if you have the snprintf function.  */
 #undef HAVE_SNPRINTF
-
-/* Define if you have the vasnprintf function.  */
 #undef HAVE_VASNPRINTF
-
-/* Define if you have the vasprintf function.  */
+#undef HAVE_ASPRINTF
 #undef HAVE_VASPRINTF
-
-/* Define if you have the vfprintf function.  */
 #undef HAVE_VFPRINTF
-
-/* Define if you have the vsnprintf function.  */
 #undef HAVE_VSNPRINTF
 
 /* define if your compiler has __attribute__ */

@@ -38,14 +38,6 @@
 #endif /* WIN32 */
 #endif /* HAVE_CONFIG_H */
 
-#if !defined __STDC__ || !__STDC__
-/* This is a separate conditional since some stdc systems
-   reject `defined (const)'.  */
-# ifndef const
-#  define const
-# endif
-#endif
-
 #include <stdio.h>
 
 /* Comment out all this code if we are using the GNU C Library, and are not
@@ -245,11 +237,6 @@ my_index (const char *str, int chr)
 #ifdef __GNUC__
 /* Note that Motorola Delta 68k R3V7 comes with GCC but not stddef.h.
    That was relevant to code that was here before.  */
-# if (!defined __STDC__ || !__STDC__) && !defined strlen
-/* gcc with -traditional declares the built-in strlen to return int,
-   and has done so at least since version 2.4.5. -- rms.  */
-extern int strlen (const char *);
-# endif /* not __STDC__ */
 #endif /* __GNUC__ */
 
 #endif /* not __GNU_LIBRARY__ */
@@ -312,9 +299,7 @@ text_set_element (__libc_subinit, store_args_and_env);
    `first_nonopt' and `last_nonopt' are relocated so that they describe
    the new indices of the non-options in ARGV after they are moved.  */
 
-#if defined __STDC__ && __STDC__
 static void exchange (char **);
-#endif
 
 static void
 exchange (char **argv)
@@ -397,9 +382,7 @@ exchange (char **argv)
 
 /* Initialize the internal data when the first call is made.  */
 
-#if defined __STDC__ && __STDC__
 static const char *_getopt_initialize (int, char *const *, const char *);
-#endif
 
 static const char *
 _getopt_initialize (int argc, char *const *argv, const char *optstring)

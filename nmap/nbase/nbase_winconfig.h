@@ -10,7 +10,7 @@
  *  functions written by others.  License conditions for those files   *
  *  may vary and is generally included at the top of the files.   Be   *
  *  sure to read that information before you redistribute or           *
- *  contents of those files.                                           *
+ *  incorporate parts of those files into your software.               *
  *                                                                     *   
  *  Source is provided to this software because we believe users have  *
  *  a right to know exactly what a program is going to do before they  *
@@ -36,7 +36,7 @@
  *                                                                     *
  ***********************************************************************/
 
-/* $Id: nbase_winconfig.h,v 1.5 2002/04/02 06:57:13 fyodor Exp $ */
+/* $Id: nbase_winconfig.h,v 1.9 2002/12/18 08:41:38 fyodor Exp $ */
 
 #ifndef NBASE_WINCONFIG_H
 #define NBASE_WINCONFIG_H
@@ -51,6 +51,7 @@
 #define HAVE_MEMCPY 1
 #define HAVE_STRERROR 1
 #define HAVE_SYS_SOCKIO_H 1
+#define HAVE_ERRNO_H 1
 /* #define HAVE_STRCASESTR 1 */
 #define HAVE_STRCASECMP 1
 #define HAVE_NETINET_IN_SYSTEM_H 1
@@ -65,5 +66,8 @@
 #define SIZEOF_SHORT 2
 #define SIZEOF_INT 4
 #define SIZEOF_LONG 4
+
+#define HAVE_AF_INET6 1
+/* #undef HAVE_SOCKADDR_STORAGE */
 
 #endif /* NBASE_WINCONFIG_H */

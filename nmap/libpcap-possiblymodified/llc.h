@@ -18,7 +18,7 @@
  * WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * @(#) $Header: /CVS/nmap/libpcap-possiblymodified/llc.h,v 1.1.1.1 2001/06/03 08:19:45 fyodor Exp $ (LBL)
+ * @(#) $Header: /CVS/nmap/libpcap-possiblymodified/llc.h,v 1.2 2002/12/18 06:10:07 fyodor Exp $ (LBL)
  */
 
 /*
@@ -58,9 +58,12 @@
 #ifndef LLCSAP_SNAP
 #define	LLCSAP_SNAP		0xaa
 #endif
-#ifndef LLCSAP_ISONS
-#define	LLCSAP_ISONS		0xfe
-#endif
 #ifndef LLCSAP_IPX
 #define LLCSAP_IPX		0xe0
+#endif
+#ifndef LLCSAP_NETBEUI
+#define LLCSAP_NETBEUI		0xf0
+#endif
+#ifndef LLCSAP_ISONS
+#define	LLCSAP_ISONS		0xfe
 #endif

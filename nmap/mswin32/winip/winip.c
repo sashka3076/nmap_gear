@@ -39,6 +39,7 @@ If used outside nmap in a GPL'ed app, just copy them from wintcpip.c.
 #include "nmap.h"
 #include "..\tcpip.h"
 #include "winip.h"
+#include "..\..\NmapOps.h"
 
 #ifdef _MSC_VER
 # include <delayimp.h>
@@ -54,12 +55,13 @@ If used outside nmap in a GPL'ed app, just copy them from wintcpip.c.
 #define DLI_ERROR VcppException(ERROR_SEVERITY_ERROR, ERROR_MOD_NOT_FOUND)
 #endif
 
-extern struct ops o;
+extern NmapOps o;
 
 int pcap_avail = 0;
 int rawsock_avail = 0;
 int winbug = 0;
-extern int iphlp_avail, net_avail;
+extern int iphlp_avail;
+extern int net_avail;
 
 /*   internal functions   */
 static void winip_cleanup(void);
@@ -405,7 +407,7 @@ void winip_postopt_init()
 	o.isr00t = (pcap_avail | rawsock_avail);
 	if(wo.trace) printf("***WinIP***  o.isr00t = %d\n", o.isr00t);
 
-	qsort(nametable, numifs, sizeof(WINIP_NAME), strcmp);
+	qsort(nametable, numifs, sizeof(WINIP_NAME), (int (*)(const void *, const void *)) strcmp);
 	atexit(winip_cleanup);
 
 	if(wo.listinterfaces)
@@ -517,7 +519,7 @@ static void winip_cleanup(void)
 int name2ifi(const char *name)
 {
 	WINIP_NAME *n = (WINIP_NAME*)bsearch(name, nametable, numifs,
-		sizeof(WINIP_NAME), strcmp);
+		sizeof(WINIP_NAME), (int (*)(const void *, const void *)) strcmp);
 	if(!n) return -1;
 
 	return n->ifi;
@@ -587,7 +589,7 @@ int devname2ipaddr(char *dev, struct in_addr *addr)
 	return ifi2ipaddr(name2ifi(dev), addr);
 }
 
-int ipaddr2devname( char *dev, struct in_addr *addr )
+int ipaddr2devname( char *dev, const struct in_addr *addr )
 {
 	int ifi = ipaddr2ifi(addr->s_addr);
 	if(ifi == -1) return -1;
@@ -648,7 +650,7 @@ static void winip_list_interfaces()
 //	I will fail this if no raw, so nmap will still work
 
 typedef DWORD (__stdcall *PGBI)(IPAddr, PDWORD);
-char *routethrough(struct in_addr *dest, struct in_addr *source)
+char *routethrough(const struct in_addr *dest, struct in_addr *source)
 {
 /*
 	In theory, GetBestInterface is ideal. But we need
@@ -776,7 +778,7 @@ int win32_sendto(int sd, const char *packet, int len,
 int Sendto(char *functionname, int sd, const unsigned char *packet, int len, 
 	   unsigned int flags, struct sockaddr *to, int tolen)
 {
-	return win32_sendto(sd, packet, len, flags, to, tolen);
+	return win32_sendto(sd, (char *) packet, len, flags, to, tolen);
 }
 
 int win32_socket(int af, int type, int proto)
@@ -838,13 +840,13 @@ int winip_corruption_possible()
 	return rawsock_avail;	//	for now
 }
 
-inline void sethdrinclude(int sd) 
+void sethdrinclude(int sd) 
 {
 	int one = 1;
 	if(sd != 501)
 	{
 //		error("sethdrinclude called -- this probably shouldn't happen\n");
-		setsockopt(sd, IPPROTO_IP, IP_HDRINCL, (void *) &one, sizeof(one));
+		setsockopt(sd, IPPROTO_IP, IP_HDRINCL, (char *) &one, sizeof(one));
 	}
 }
 
@@ -856,7 +858,7 @@ char *readip_pcap(pcap_t *pd, unsigned int *len, long to_usec)
 	else return readip_pcap_real(pd, len, to_usec);
 }
 
-void set_pcap_filter(struct hoststruct *target,
+void set_pcap_filter(Target *target,
 					 pcap_t *pd, PFILTERFN filter, char *bpf, ...)
 {
 	va_list ap;
@@ -882,7 +884,7 @@ void set_pcap_filter(struct hoststruct *target,
 		log_write(LOG_STDOUT, "Packet capture filter: %s\n", buf);
 
 	/* Due to apparent bug in libpcap */
-	if (islocalhost(&(target->host)))
+	if (islocalhost(target->v4hostip()))
 		buf[0] = '\0';
 
 	if (pcap_compile(pd, &fcode, buf, 0, netmask) < 0)

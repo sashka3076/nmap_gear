@@ -1,0 +1,322 @@
+diff -urpNk.orig nmap-3.10ALPHA3.orig/droppriv.cc nmap-3.10ALPHA3/droppriv.cc
+--- nmap-3.10ALPHA3.orig/droppriv.cc	1970-01-01 03:00:00 +0300
++++ nmap-3.10ALPHA3/droppriv.cc	2002-09-23 20:56:45 +0400
+@@ -0,0 +1,66 @@
++#include <stdlib.h>
++#include <error.h>
++#include <errno.h>
++#include <unistd.h>
++#include <pwd.h>
++#include <grp.h>
++#include <sys/capability.h>
++#include <sys/prctl.h>
++
++#include "droppriv.h"
++
++void
++drop_priv (void)
++{
++	const char *user = "nmapuser";
++	const char *dir = "/var/resolv";
++	struct passwd *pw;
++	cap_t   caps;
++
++	if (geteuid())
++		return;
++
++	nmap_services_init();
++	nmap_protocols_init();
++	rpc_services_init();
++
++	if (setgroups (0, 0) < 0)
++		error (EXIT_FAILURE, errno, "setgroups failed");
++
++	if (prctl (PR_SET_KEEPCAPS, 1))
++		error (EXIT_FAILURE, errno, "prctl (PR_SET_KEEPCAPS, 1) failed");
++
++	pw = getpwnam (user);
++	if (!pw)
++		error (EXIT_FAILURE, 0,
++		       "lookup of user \"%s\" failed", user);
++	endpwent ();
++
++	if (!pw->pw_uid)
++		error (EXIT_FAILURE, 0,
++		       "user \"%s\" shouldn't be root", user);
++
++	if (chroot (dir) < 0)
++		error (EXIT_FAILURE, errno, "chroot to \"%s\" failed", dir);
++
++	if (chdir ("/") < 0)
++		error (EXIT_FAILURE, errno, "chroot to \"/\" failed");
++
++	if (setgid (pw->pw_gid) < 0)
++		error (EXIT_FAILURE, errno, "setgid failed");
++
++	if (seteuid (pw->pw_uid) < 0)
++		error (EXIT_FAILURE, errno, "seteuid failed");
++
++	caps = cap_from_text ("cap_net_raw=ep");
++	if (!caps)
++		error (EXIT_FAILURE, errno, "cap_from_text failed");
++
++	if (cap_set_proc (caps) < 0)
++		error (EXIT_FAILURE, errno, "cap_set_proc failed");
++
++	cap_free (caps);
++
++	if (setreuid (pw->pw_uid, pw->pw_uid) < 0)
++		error (EXIT_FAILURE, errno, "setreuid failed");
++}
+diff -urpNk.orig nmap-3.10ALPHA3.orig/droppriv.h nmap-3.10ALPHA3/droppriv.h
+--- nmap-3.10ALPHA3.orig/droppriv.h	1970-01-01 03:00:00 +0300
++++ nmap-3.10ALPHA3/droppriv.h	2002-09-23 20:56:35 +0400
+@@ -0,0 +1,10 @@
++#ifndef NMAP_DROPPRIV_H
++#define NMAP_DROPPRIV_H
++
++extern void drop_priv (void);
++extern int nmap_services_init (void);
++extern int nmap_protocols_init (void);
++extern void rpc_services_init (void);
++
++#endif /* NMAP_DROPPRIV_H */
++
+diff -urpNk.orig nmap-3.10ALPHA3.orig/Makefile.in nmap-3.10ALPHA3/Makefile.in
+--- nmap-3.10ALPHA3.orig/Makefile.in	2002-09-23 20:50:58 +0400
++++ nmap-3.10ALPHA3/Makefile.in	2002-09-23 21:00:24 +0400
+@@ -20,7 +20,7 @@ CXXFLAGS = -g -Wall @CXXFLAGS@ $(CCOPT) 
+ # CFLAGS = -g -Wall $(DEFS) $(INCLS)
+ STATIC = 
+ LDFLAGS = @LDFLAGS@ $(STATIC)
+-LIBS =  @LIBS@ -lpcap
++LIBS =  @LIBS@ -lpcap -lcap
+ # LIBS =  -lefence @LIBS@ -lpcap
+ # LIBS =  -lrmalloc @LIBS@ -lpcap
+ SHTOOL = ./shtool
+@@ -32,11 +32,11 @@ TARGET = nmap
+ TARGETNMAPFE=@TARGETNMAPFE@
+ INSTALLNMAPFE=@INSTALLNMAPFE@
+ 
+-SRCS = main.cc nmap.cc targets.cc tcpip.cc nmap_error.cc utils.cc idle_scan.cc osscan.cc output.cc scan_engine.cc timing.cc charpool.cc services.cc protocols.cc nmap_rpc.cc portlist.cc NmapOps.cc TargetGroup.cc Target.cc @COMPAT_SRCS@
++SRCS = main.cc nmap.cc targets.cc tcpip.cc nmap_error.cc utils.cc idle_scan.cc osscan.cc output.cc scan_engine.cc timing.cc charpool.cc services.cc protocols.cc nmap_rpc.cc portlist.cc droppriv.cc NmapOps.cc TargetGroup.cc Target.cc @COMPAT_SRCS@
+ 
+-OBJS = main.o nmap.o targets.o tcpip.o nmap_error.o utils.o idle_scan.o osscan.o output.o scan_engine.o timing.o charpool.o services.o protocols.o nmap_rpc.o portlist.o NmapOps.o TargetGroup.o Target.o @COMPAT_OBJS@
++OBJS = main.o nmap.o targets.o tcpip.o nmap_error.o utils.o idle_scan.o osscan.o output.o scan_engine.o timing.o charpool.o services.o protocols.o nmap_rpc.o portlist.o droppriv.o NmapOps.o TargetGroup.o Target.o @COMPAT_OBJS@
+ 
+-DEPS = nmap.h nmap_error.h targets.h idle_scan.h osscan.h output.h scan_engine.h timing.h tcpip.h utils.h global_structures.h charpool.h services.h protocols.h nmap_rpc.h portlist.h NmapOps.h TargetGroup.h Target.h
++DEPS = nmap.h nmap_error.h targets.h idle_scan.h osscan.h output.h scan_engine.h timing.h tcpip.h utils.h global_structures.h charpool.h services.h protocols.h nmap_rpc.h portlist.h droppriv.h NmapOps.h TargetGroup.h Target.h
+ 
+ all: $(TARGET) $(TARGETNMAPFE)
+ 
+diff -urpNk.orig nmap-3.10ALPHA3.orig/nmap.cc nmap-3.10ALPHA3/nmap.cc
+--- nmap-3.10ALPHA3.orig/nmap.cc	2002-09-16 07:00:21 +0400
++++ nmap-3.10ALPHA3/nmap.cc	2002-09-23 21:26:01 +0400
+@@ -50,6 +50,7 @@
+ #include "scan_engine.h"
+ #include "idle_scan.h"
+ #include "timing.h"
++#include "droppriv.h"
+ #include "NmapOps.h"
+ 
+ /* global options */
+@@ -623,6 +624,8 @@ int nmap_main(int argc, char *argv[]) {
+     }
+   }
+ 
++  drop_priv();
++
+   /* By now, we've got our port lists.  Give the user a warning if no 
+    * ports are specified for the type of scan being requested.  Other things
+    * (such as OS ident scan) might break cause no ports were specified,  but
+diff -urpNk.orig nmap-3.10ALPHA3.orig/nmap_rpc.cc nmap-3.10ALPHA3/nmap_rpc.cc
+--- nmap-3.10ALPHA3.orig/nmap_rpc.cc	2002-08-28 01:43:22 +0400
++++ nmap-3.10ALPHA3/nmap_rpc.cc	2002-09-23 21:25:54 +0400
+@@ -48,10 +48,10 @@
+ 
+ 
+ #include "nmap_rpc.h"
++#include "droppriv.h"
+ #include "NmapOps.h"
+ 
+ extern NmapOps o;
+-static int services_initialized = 0;
+ static struct rpc_info ri;
+ static int udp_rpc_socket = -1;
+ static int tcp_rpc_socket = -1;
+@@ -63,13 +63,17 @@ static unsigned long rpc_xid_base = (uns
+ static size_t tcp_readlen=0; /* used in get_rpc_results but can be reset in 
+ 			    send_rpc_query */
+ 
+-static void rpc_services_init() {
++void rpc_services_init() {
++  static int services_initialized = 0;
+   char filename[512];
+   FILE *fp;
+   char *tmpptr, *p;
+   char line[1024];
+   int lineno = 0;
+ 
++  if (services_initialized)
++    return;
++
+   services_initialized = 1;
+   ri.num_alloc = 256;
+   ri.num_used = 0;
+@@ -127,9 +131,7 @@ static void rpc_services_init() {
+ char *nmap_getrpcnamebynum(unsigned long num) {
+   int i;
+ 
+-  if (!services_initialized) {
+-    rpc_services_init();
+-  }
++  rpc_services_init();
+ 
+   for(i=0; i < ri.num_used; i++) {
+     if (ri.numbers[i] == num)
+@@ -139,9 +141,7 @@ char *nmap_getrpcnamebynum(unsigned long
+ }
+ 
+ int get_rpc_procs(unsigned long **programs, unsigned long *num_programs) {
+-  if (!services_initialized) {
+-    rpc_services_init();
+-  }
++  rpc_services_init();
+   
+   *programs = ri.numbers;
+   *num_programs = ri.num_used;
+diff -urpNk.orig nmap-3.10ALPHA3.orig/protocols.cc nmap-3.10ALPHA3/protocols.cc
+--- nmap-3.10ALPHA3.orig/protocols.cc	2002-08-28 01:43:23 +0400
++++ nmap-3.10ALPHA3/protocols.cc	2002-09-23 21:26:13 +0400
+@@ -45,14 +45,15 @@
+ /* $Id: protocols.cc,v 1.2 2002/08/25 01:56:10 fyodor Exp $ */
+ 
+ #include "protocols.h"
++#include "droppriv.h"
+ #include "NmapOps.h"
+ 
+ extern NmapOps o;
+-static int protocols_initialized = 0;
+ static int numipprots = 0;
+ static struct protocol_list *protocol_table[PROTOCOL_TABLE_SIZE];
+ 
+-static int nmap_protocols_init() {
++int nmap_protocols_init() {
++  static int protocols_initialized = 0;
+   char filename[512];
+   FILE *fp;
+   char protocolname[128];
+@@ -63,6 +64,9 @@ static int nmap_protocols_init() {
+   struct protocol_list *current, *previous;
+   int res;
+ 
++  if (protocols_initialized)
++      return 0;
++
+   if (nmap_fetchfile(filename, sizeof(filename), "nmap-protocols") == -1) {
+     error("Unable to find nmap-protocols!  Resorting to /etc/protocol");
+     strcpy(filename, "/etc/protocols");
+@@ -124,9 +128,8 @@ static int nmap_protocols_init() {
+ struct protoent *nmap_getprotbynum(int num) {
+   struct protocol_list *current;
+ 
+-  if (!protocols_initialized)
+-    if (nmap_protocols_init() == -1)
+-      return NULL;
++  if (nmap_protocols_init() == -1)
++    return NULL;
+ 
+   for(current = protocol_table[num % PROTOCOL_TABLE_SIZE];
+       current; current = current->next) {
+@@ -147,9 +150,8 @@ struct scan_lists *getdefaultprots(void)
+   int bucket;
+   int protsneeded = 255;
+ 
+-  if (!protocols_initialized)
+-    if (nmap_protocols_init() == -1)
+-      fatal("getdefaultprots(): Couldn't get protocol numbers");
++  if (nmap_protocols_init() == -1)
++    fatal("getdefaultprots(): Couldn't get protocol numbers");
+   
+   scanlist = (struct scan_lists *) cp_alloc(sizeof(struct scan_lists));
+   bzero(scanlist, sizeof(*scanlist));
+@@ -171,9 +173,8 @@ struct scan_lists *getfastprots(void) {
+   int bucket;
+   int protsneeded = 0;
+ 
+-  if (!protocols_initialized)
+-    if (nmap_protocols_init() == -1)
+-      fatal("Getfastprots: Couldn't get protocol numbers");
++  if (nmap_protocols_init() == -1)
++    fatal("Getfastprots: Couldn't get protocol numbers");
+   
+   bzero(usedprots, sizeof(usedprots));
+ 
+diff -urpNk.orig nmap-3.10ALPHA3.orig/services.cc nmap-3.10ALPHA3/services.cc
+--- nmap-3.10ALPHA3.orig/services.cc	2002-08-28 01:43:23 +0400
++++ nmap-3.10ALPHA3/services.cc	2002-09-23 21:26:19 +0400
+@@ -45,15 +45,16 @@
+ /* $Id: services.cc,v 1.2 2002/08/25 01:56:10 fyodor Exp $ */
+ 
+ #include "services.h"
++#include "droppriv.h"
+ #include "NmapOps.h"
+ 
+ extern NmapOps o;
+-static int services_initialized = 0;
+ static int numtcpports = 0;
+ static int numudpports = 0;
+ static struct service_list *service_table[SERVICE_TABLE_SIZE];
+ 
+-static int nmap_services_init() {
++int nmap_services_init() {
++  static int services_initialized = 0;
+   char filename[512];
+   FILE *fp;
+   char servicename[128], proto[16];
+@@ -64,6 +65,9 @@ static int nmap_services_init() {
+   struct service_list *current, *previous;
+   int res;
+ 
++  if (services_initialized)
++    return 0;
++
+   if (nmap_fetchfile(filename, sizeof(filename), "nmap-services") == -1) {
+ #ifndef WIN32
+     error("Unable to find nmap-services!  Resorting to /etc/services");
+@@ -161,9 +165,8 @@ static int nmap_services_init() {
+ struct servent *nmap_getservbyport(int port, const char *proto) {
+   struct service_list *current;
+ 
+-  if (!services_initialized)
+-    if (nmap_services_init() == -1)
+-      return NULL;
++  if (nmap_services_init() == -1)
++    return NULL;
+ 
+   for(current = service_table[port % SERVICE_TABLE_SIZE];
+       current; current = current->next) {
+@@ -189,9 +192,8 @@ struct scan_lists *getdefaultports(int t
+   int tcpportsneeded = 0;
+   int udpportsneeded = 0;
+ 
+-  if (!services_initialized)
+-    if (nmap_services_init() == -1)
+-      fatal("Getfastports: Coudn't get port numbers");
++  if (nmap_services_init() == -1)
++    fatal("Getfastports: Coudn't get port numbers");
+   
+   bzero(usedports, sizeof(usedports));
+   for(bucket = 1; bucket < 1025; bucket++) {  
+@@ -255,9 +257,8 @@ struct scan_lists *getfastports(int tcps
+   int tcpportsneeded = 0;
+   int udpportsneeded = 0;
+ 
+-  if (!services_initialized)
+-    if (nmap_services_init() == -1)
+-      fatal("Getfastports: Coudn't get port numbers");
++  if (nmap_services_init() == -1)
++    fatal("Getfastports: Coudn't get port numbers");
+   
+   bzero(usedports, sizeof(usedports));
+ 

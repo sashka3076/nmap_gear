@@ -1,26 +1,35 @@
 Name: nmap
-Version: 2.54BETA32
+Version: 3.10ALPHA9
 Release: alt1
-Serial: 20020110
+Serial: 20020501
 
 Summary: Network exploration tool and security scanner
 Summary(ru_RU.CP1251): Инструмент для исследования сети и сетевой безопасности.
-Summary(ru_RU.KOI8-R): йОУФТХНЕОФ ДМС ЙУУМЕДПЧБОЙС УЕФЙ Й УЕФЕЧПК ВЕЪПРБУОПУФЙ.
 License: GPL
 Group: Monitoring
 Url: http://www.insecure.org/%name
+Packager: Nmap Development Team <nmap@packages.altlinux.org>
 
-Source: %name-%version.tar.bz2
-Patch: %name-2.54BETA20-compile.patch
+Source: %url/dist/%name-%version.tar.bz2
+Source1: nmapfe.menu
+Source2: nmapfe.xpm
 
-# Automatically added by buildreq on Mon Apr 01 2002
-BuildRequires: XFree86-devel XFree86-libs glib-devel gtk+-devel libpcap-devel
+Patch1: %name-3.10ALPHA3-alt-with_system_pcap.patch
+Patch2: %name-3.10ALPHA3-alt-drop_priv.patch
+Patch3: %name-3.10ALPHA3-alt-configure.patch
+Patch4: %name-3.10ALPHA3-alt-build.patch
+
+PreReq: libpcap >= 0.7.1-alt2, chrooted >= 0.2, net-tools, /var/resolv
+
+# Automatically added by buildreq on Fri Dec 20 2002
+BuildRequires: XFree86-devel XFree86-libs gcc-c++ glib-devel gtk+-devel libbfd-devel 
+BuildRequires: libcap-devel libiberty-devel libpcap-devel libstdc++-devel
 
 %package frontend
 Summary: Gtk+ frontend for %name
 Summary(ru_RU.CP1251): Графический интерфейс пользователя для %name
 Group: Monitoring
-Requires: %name = %version-%release
+Requires: %name = %serial:%version-%release
 
 %description
 Nmap is a utility for network exploration or security auditing. It
@@ -33,16 +42,10 @@ predictability characteristics, sunRPC scanning, reverse-identd
 scanning, and more.
 
 %description -l ru_RU.CP1251
-Nmap это утилита для исследования сети и аудита защиты. Она поддерживает
+Nmap - это утилита для исследования сети и аудита защиты. Она поддерживает
 сканирование при помощи ping (определение действующих машин), множественное
 сканирование портов (определение предоставляемых машиной сервисов) и отпечатки
 TCP/IP (идентификация удалённой системы).
-
-%description -l ru_RU.KOI8-R
-Nmap ЬФП ХФЙМЙФБ ДМС ЙУУМЕДПЧБОЙС УЕФЙ Й БХДЙФБ ЪБЭЙФЩ. пОБ РПДДЕТЦЙЧБЕФ
-УЛБОЙТПЧБОЙЕ РТЙ РПНПЭЙ ping (ПРТЕДЕМЕОЙЕ ДЕКУФЧХАЭЙИ НБЫЙО), НОПЦЕУФЧЕООПЕ
-УЛБОЙТПЧБОЙЕ РПТФПЧ (ПРТЕДЕМЕОЙЕ РТЕДПУФБЧМСЕНЩИ НБЫЙОПК УЕТЧЙУПЧ) Й ПФРЕЮБФЛЙ
-TCP/IP (ЙДЕОФЙЖЙЛБГЙС ХДБМЈООПК УЙУФЕНЩ).
 
 %description frontend
 This package includes nmapfe, a Gtk+ frontend for %name. The %name package must
@@ -52,51 +55,110 @@ be installed before installing %name-frontend.
 Этот пакет содержит nmapfe, Gtk+ интерфейс для nmap. Пакет nmap должен быть
 установлен до начала установки nmap-frontend.
 
-%description frontend -l ru_RU.KOI8-R
-ьФПФ РБЛЕФ УПДЕТЦЙФ nmapfe, Gtk+ ЙОФЕТЖЕКУ ДМС %name. рБЛЕФ %name ДПМЦЕО ВЩФШ
-ХУФБОПЧМЕО ДП ОБЮБМБ ХУФБОПЧЛЙ %name-frontend.
-
 %prep
 %setup -q
-%patch -p1
+%patch1 -p1
+%patch2 -p1
+%patch3 -p1
+%patch4 -p1
 
 %build
+aclocal
+autoconf
+
+#pushd nbase
+#	aclocal -I .
+#	autoconf
+#popd
+
 %configure
 %make_build
 
 %install
-mkdir -p $RPM_BUILD_ROOT{%_bindir,%_mandir/man1}
-mkdir -p $RPM_BUILD_ROOT%_datadir/{%name,gnome/apps/Utilities}
+mkdir -p $RPM_BUILD_ROOT{%_bindir,%_man1dir,%_menudir,%_iconsdir}
+mkdir -p $RPM_BUILD_ROOT%_datadir/%name
 mkdir -p $RPM_BUILD_ROOT%_x11dir/{bin,man/man1}
 %makeinstall nmapdatadir=$RPM_BUILD_ROOT%_datadir/%name
-mv $RPM_BUILD_ROOT%_bindir/{nmapfe,xnmap} $RPM_BUILD_ROOT%_x11bindir
-mv $RPM_BUILD_ROOT%_mandir/man1/{nmapfe,xnmap}.1 $RPM_BUILD_ROOT%_x11mandir/man1
+mv $RPM_BUILD_ROOT%_bindir/{nmapfe,xnmap} $RPM_BUILD_ROOT%_x11bindir/
+mv $RPM_BUILD_ROOT%_man1dir/{nmapfe,xnmap}.1 $RPM_BUILD_ROOT%_x11mandir/man1/
+install -p -m644 %SOURCE1 $RPM_BUILD_ROOT%_menudir/nmapfe
+install -p -m644 %SOURCE2 $RPM_BUILD_ROOT%_iconsdir/
+
+%pre
+/usr/sbin/groupadd -r -f nmapuser >/dev/null 2>&1
+/usr/sbin/useradd -r -g nmapuser -d /dev/null -s /dev/null -n nmapuser >/dev/null 2>&1 ||:
+
+%post
+/etc/chroot.d/resolv.all
 
 %files
 %_bindir/*
 %_datadir/%name
 %_mandir/man?/*
-%doc CHANGELOG docs/{README,*.{txt,html}}
+%doc CHANGELOG HACKING docs/{README,*.{txt,html}}
 
 %files frontend
 %_x11bindir/*
 %_x11mandir/man?/*
+%_menudir/*
+%_iconsdir/*
 
 %changelog
-* Mon Apr 02 2002 Sass <sass@altlinux.ru> 2.54BETA32-alt1
+* Fri Dec 27 2002 Aleksandr Blokhin 'Sass' <sass@altlinux.ru> 20020501:3.10ALPHA9-alt1
+- 3.10ALPHA9
+
+* Fri Dec 20 2002 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 20020501:3.10ALPHA7-alt1
+- 3.10ALPHA7
+- Updated buildrequires
+
+* Thu Nov 14 2002 Aleksandr Blokhin 'Sass' <sass@altlinux.ru> 20020501:3.10ALPHA4-alt2
+- Added menuitem for nmapfe
+
+* Wed Nov 13 2002 Aleksandr Blokhin 'Sass' <sass@altlinux.ru> 20020501:3.10ALPHA4-alt1
+- 3.10ALPHA4
+- Updated buildrequires.
+
+* Mon Sep 23 2002 Dmitry V. Levin <ldv@altlinux.org> 20020501:3.10ALPHA3-alt1
+- 3.10ALPHA3, redone patches.
+- Fixed build warnings.
+- Updated buildrequires.
+
+* Fri Aug 02 2002 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 3.00-alt1
+- 3.00
+
+* Fri Jul 12 2002 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 2.54BETA37-alt1
+- 2.54BETA37
+- builded with gcc-3.1
+
+* Thu Jun 20 2002 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 2.54BETA36-alt1
+- 2.54BETA36
+
+* Mon Jun 10 2002 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 2.54BETA34-alt1
+- 2.54BETA34
+
+* Wed May  1 2002 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 2.54BETA33-alt1
+- 2.54BETA33
+
+* Thu Apr 18 2002 Dmitry V. Levin <ldv@alt-linux.org> 2.54BETA32-alt2
+- Dropped obsolete summaries and descriptions in koi8r encoding.
+- Dropped obsolete "compile" patch.
+- Build with system pcap (requires libpcap >= 0.7.1-alt2).
+- Added drop_priv (user=nmapuser, root=/var/resolv).
+
+* Tue Apr  2 2002 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 2.54BETA32-alt1
 - 2.54BETA32
 
-* Mon Apr 01 2002 Sass <sass@altlinux.ru> 2.54BETA31-alt1
+* Mon Apr  1 2002 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 2.54BETA31-alt1
 - 2.54BETA31
 
-* Wed Jan 09 2002 Sass <sass@altlinux.ru> 2.54BETA30-alt3
+* Wed Jan  9 2002 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 2.54BETA30-alt3
 - added Summary & description in CP1251 encoding
 
-* Tue Dec 25 2001 Sass <sass@altlinux.ru> 2.54BETA30-alt2
+* Tue Dec 25 2001 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 2.54BETA30-alt2
 - updated spec
 - updated to rpm-4.0.3
 
-* Thu Oct 16 2001 Sass <sass@altlinux.ru> 2.54BETA30-alt1
+* Thu Oct 16 2001 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 2.54BETA30-alt1
 - 2.54BETA30
 
 * Mon Aug 13 2001 Dmitry V. Levin <ldv@altlinux.ru> 2.54BETA29-alt1

@@ -1,7 +1,14 @@
-dnl Process this file with autoconf to produce a configure script.
+dnl #
+dnl # Autoconf configuration file for Nbase
+dnl #
+dnl # Process this file with autoconf to produce a configure script.
+dnl # $Id: configure.in,v 1.17 2002/09/01 00:03:14 fyodor Exp $
 
 # Require autoconf 2.13
 AC_PREREQ(2.13)
+
+# Include my own macros
+sinclude(configlocal.m4)
 
 AC_INIT(nbase.h)
 
@@ -56,6 +63,9 @@ case "$host" in
     AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
     AC_DEFINE(SOLARIS)
     ;;
+  *-solaris2.[1-9][0-9]*)
+    AC_DEFINE(SOLARIS)
+    ;;
   *-solaris2.1*)
     AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
     AC_DEFINE(SOLARIS)
@@ -100,7 +110,7 @@ esac
 
 dnl Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS( string.h getopt.h strings.h memory.h sys/param.h sys/time.h unistd.h bstring.h netinet/if_ether.h netinet/in.h sys/time.h sys/socket.h sys/sockio.h rpc/types.h netdb.h pwd.h arpa/inet.h sys/resource.h sys/stat.h sys/wait.h  libiberty.h )
+AC_CHECK_HEADERS( string.h getopt.h strings.h memory.h sys/param.h sys/time.h unistd.h bstring.h errno.h sys/types.h sys/time.h sys/socket.h netinet/in.h netinet/if_ether.h sys/sockio.h rpc/types.h netdb.h pwd.h arpa/inet.h sys/resource.h sys/stat.h sys/wait.h libiberty.h )
 AC_HEADER_TIME
 
 dnl equiv to '#define inline' to 'inline', '__inline__', '__inline' or ''
@@ -117,6 +127,10 @@ AC_SUBST(CFLAGS)
 dnl check endedness
 AC_C_BIGENDIAN
 
+dnl If any socket libraries needed
+AC_CHECK_FUNC(gethostent, , AC_CHECK_LIB(nsl, gethostent))
+AC_CHECK_FUNC(setsockopt, , AC_CHECK_LIB(socket, setsockopt))
+
 dnl determine integer widths so nbase can export u32, u16, etc.
 AC_CHECK_SIZEOF(char, 1)
 AC_CHECK_SIZEOF(short, 2)
@@ -126,26 +140,81 @@ AC_CHECK_SIZEOF(long, 4)
 dnl Checks for library functions.
 dnl AC_TYPE_SIGNAL
 AC_CHECK_FUNCS( bzero snprintf vsnprintf memcpy nanosleep strerror strcasestr strcasecmp strncasecmp signal )
+AC_REPLACE_FUNCS(inet_aton)
 
 needsnprintf=no
 AC_CHECK_FUNCS(vsnprintf snprintf asprintf asnprintf vasprintf vasnprintf,,
         [needsnprintf=yes])
 if test $needsnprintf = yes; then
-        LIBOBJS="$LIBOBJS snprintf.o"
+        AC_LIBOBJ([snprintf])
 fi
 
 AC_CHECK_FUNCS(usleep gettimeofday sleep, ,
-  [ LIBOBJS="$LIBOBJS nbase_time.o" ])
-
-AC_REPLACE_FUNCS(inet_ntop inet_pton inet_aton)
+  [ AC_LIBOBJ([nbase_time]) ])
 
 AC_CHECK_FUNC(getopt_long_only, , 
-  [ LIBOBJS="$LIBOBJS getopt.o getopt1.o" ])
+  [ AC_LIBOBJ([getopt])
+    AC_LIBOBJ([getopt1]) ])
 
 AC_CHECK_FUNCS(strcasecmp strncasecmp, , 
-  [ LIBOBJS="$LIBOBJS strcasecmp.o" ])
+  [ AC_LIBOBJ([strcasecmp]) ])
 
 dnl We always want some of our files
-LIBOBJS="$LIBOBJS nbase_str.o nbase_misc.o"
+AC_LIBOBJ([nbase_str])
+AC_LIBOBJ([nbase_misc])
+
+# Check for IPv6 support -- modified from Apache 2.0.40:
+
+AC_ARG_ENABLE(ipv6,
+  [  --disable-ipv6          Disable IPv6 support ],
+  [ if test "$enableval" = "no"; then
+        user_disabled_ipv6=1
+    fi ],
+  [ user_disabled_ipv6=0 ] )
+
+AC_SEARCH_LIBS(getaddrinfo, inet6)
+AC_SEARCH_LIBS(gai_strerror, inet6)
+AC_SEARCH_LIBS(getnameinfo, inet6)
+AC_CHECK_FUNCS(gai_strerror)
+AC_REPLACE_FUNCS(inet_ntop inet_pton)
+APR_CHECK_WORKING_GETADDRINFO
+APR_CHECK_WORKING_GETNAMEINFO
+APR_CHECK_SOCKADDR_IN6
+APR_CHECK_SOCKADDR_STORAGE
+CHECK_AF_INET6_DEFINE
+
+AC_MSG_CHECKING(for IPv6 support)
+have_ipv6="0"
+if test "$user_disabled_ipv6" = 1; then
+    AC_MSG_RESULT("no -- disabled by user")
+else
+    if test "x$have_sockaddr_in6" = "x1"; then
+        if test "x$ac_cv_working_getaddrinfo" = "xyes"; then
+            if test "x$ac_cv_working_getnameinfo" = "xyes"; then
+                have_ipv6="1"
+                AC_MSG_RESULT(yes)
+            else
+                AC_MSG_RESULT("no -- no working getnameinfo")
+            fi
+        else
+            AC_MSG_RESULT("no -- no working getaddrinfo")
+        fi
+    else
+        AC_MSG_RESULT("no -- no sockaddr_in6");
+    fi
+fi
+
+if test "x$ac_cv_working_getaddrinfo" != "xyes"; then
+AC_LIBOBJ([getaddrinfo])
+fi
+
+if test "x$ac_cv_working_getnameinfo" != "xyes"; then
+AC_LIBOBJ([getnameinfo])
+fi
+
+if test "$have_ipv6" = "1"; then
+  AC_DEFINE(HAVE_IPV6)
+fi
 
 AC_OUTPUT(Makefile)
+

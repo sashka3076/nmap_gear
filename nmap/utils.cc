@@ -1,52 +1,63 @@
 
-/***********************************************************************/
-/* utils.c -- Various miscellaneous utility functions which defy       */
-/* categorization :)                                                   */
-/*                                                                     */
-/***********************************************************************/
-/*  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  */
-/*  program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published  */
-/*  by the Free Software Foundation; Version 2.  This guarantees your  */
-/*  right to use, modify, and redistribute this software under certain */
-/*  conditions.  If this license is unacceptable to you, we may be     */
-/*  willing to sell alternative licenses (contact sales@insecure.com). */
-/*                                                                     */
-/*  If you received these files with a written license agreement       */
-/*  stating terms other than the (GPL) terms above, then that          */
-/*  alternative license agreement takes precendence over this comment. */
-/*                                                                     */
-/*  Source is provided to this software because we believe users have  */
-/*  a right to know exactly what a program is going to do before they  */
-/*  run it.  This also allows you to audit the software for security   */
-/*  holes (none have been found so far).                               */
-/*                                                                     */
-/*  Source code also allows you to port Nmap to new platforms, fix     */
-/*  bugs, and add new features.  You are highly encouraged to send     */
-/*  your changes to fyodor@insecure.org for possible incorporation     */
-/*  into the main distribution.  By sending these changes to Fyodor or */
-/*  one the insecure.org development mailing lists, it is assumed that */
-/*  you are offering Fyodor the unlimited, non-exclusive right to      */
-/*  reuse, modify, and relicense the code.  This is important because  */
-/*  the inability to relicense code has caused devastating problems    */
-/*  for other Free Software projects (such as KDE and NASM).  Nmap     */
-/*  will always be available Open Source.  If you wish to specify      */
-/*  special license conditions of your contributions, just say so      */
-/*  when you send them.                                                */
-/*                                                                     */
-/*  This program is distributed in the hope that it will be useful,    */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of     */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  */
-/*  General Public License for more details (                          */
-/*  http://www.gnu.org/copyleft/gpl.html ).                            */
-/*                                                                     */
-/***********************************************************************/
+/***********************************************************************
+ * utils.cc -- Various miscellaneous utility functions which defy      *
+ * categorization :)                                                   *
+ *                                                                     *
+ ***********************************************************************
+ *  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  *
+ *  program is free software; you can redistribute it and/or modify    *
+ *  it under the terms of the GNU General Public License as published  *
+ *  by the Free Software Foundation; Version 2.  This guarantees your  *
+ *  right to use, modify, and redistribute this software under certain *
+ *  conditions.  If this license is unacceptable to you, we may be     *
+ *  willing to sell alternative licenses (contact sales@insecure.com). *
+ *                                                                     *
+ *  If you received these files with a written license agreement       *
+ *  stating terms other than the (GPL) terms above, then that          *
+ *  alternative license agreement takes precendence over this comment. *
+ *                                                                     *
+ *  Source is provided to this software because we believe users have  *
+ *  a right to know exactly what a program is going to do before they  *
+ *  run it.  This also allows you to audit the software for security   *
+ *  holes (none have been found so far).                               *
+ *                                                                     *
+ *  Source code also allows you to port Nmap to new platforms, fix     *
+ *  bugs, and add new features.  You are highly encouraged to send     *
+ *  your changes to fyodor@insecure.org for possible incorporation     *
+ *  into the main distribution.  By sending these changes to Fyodor or *
+ *  one the insecure.org development mailing lists, it is assumed that *
+ *  you are offering Fyodor the unlimited, non-exclusive right to      *
+ *  reuse, modify, and relicense the code.  This is important because  *
+ *  the inability to relicense code has caused devastating problems    *
+ *  for other Free Software projects (such as KDE and NASM).  Nmap     *
+ *  will always be available Open Source.  If you wish to specify      *
+ *  special license conditions of your contributions, just say so      *
+ *  when you send them.                                                *
+ *                                                                     *
+ *  This program is distributed in the hope that it will be useful,    *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of     *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  *
+ *  General Public License for more details (                          *
+ *  http://www.gnu.org/copyleft/gpl.html ).                            *
+ *                                                                     *
+ ***********************************************************************/
 
-/* $Id: utils.c,v 1.27 2001/07/30 06:08:00 fyodor Exp $ */
-
+/* $Id: utils.cc,v 1.4 2002/11/11 19:00:44 fyodor Exp $ */
 
 #include "utils.h"
 
+/* Return num if it is between min and max.  Otherwise return min or
+   max (whichever is closest to num), */
+int box(int bmin, int bmax, int bnum) {
+  if (bmin > bmax)
+    fatal("box(bmin=%d,bmax=%d,bnum=%d) called = bmin must be <= bmax", bmin, 
+	  bmax, bnum);
+  if (bnum >= bmax)
+    return bmax;
+  if (bnum <= bmin)
+    return bmin;
+  return bnum;
+}
 
 void *safe_malloc(int size)
 {
@@ -59,6 +70,17 @@ void *safe_malloc(int size)
   return mymem;
 }
 
+/* Zero-initializing version of safe_malloc */
+void *safe_zalloc(int size)
+{
+  void *mymem;
+  if (size < 0)
+    fatal("Tried to malloc negative amount of memory!!!");
+  mymem = calloc(1, size);
+  if (mymem == NULL)
+    fatal("Malloc Failed! Probably out of space.");
+  return mymem;
+}
 
 /* Hex dump */
 void hdump(unsigned char *packet, unsigned int len) {
@@ -79,18 +101,19 @@ printf("\n");
 
 /* A better version of hdump, from Lamont Granquist.  Modified slightly
    by Fyodor (fyodor@insecure.org) */
-void lamont_hdump(unsigned char *bp, unsigned int length) {
+void lamont_hdump(char *cp, unsigned int length) {
 
   /* stolen from tcpdump, then kludged extensively */
 
   static const char asciify[] = "................................ !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~.................................................................................................................................";
 
-  register const u_short *sp;
-  register const u_char *ap;
-  register u_int i, j;
-  register int nshorts, nshorts2;
-  register int padding;
-
+  const u_short *sp;
+  const u_char *ap;
+  unsigned char *bp = (unsigned char *) cp;
+  u_int i, j;
+  int nshorts, nshorts2;
+  int padding;
+  
   printf("\n\t");
   padding = 0;
   sp = (u_short *)bp;
@@ -164,6 +187,61 @@ char *chomp(char *string) {
   return string;
 }
 
+/* Convert a comma-separated list of ASCII u16-sized numbers into the
+   given 'dest' array, which is of total size (meaning sizeof() as
+   opposed to numelements) of destsize.  If min_elem and max_elem are
+   provided, each number must be within (or equal to) those
+   constraints.  The number of numbers stored in 'dest' is returned,
+   except that -1 is returned in the case of an error. If -1 is
+   returned and errorstr is non-null, *errorstr is filled with a ptr to a
+   static string literal describing the error. */
+
+int numberlist2array(char *expr, u16 *dest, int destsize, char **errorstr, u16 min_elem, u16 max_elem) {
+  char *current_range;
+  char *endptr;
+  char *errbogus;
+  long val;
+  int max_vals = destsize / 2;
+  int num_vals_saved = 0;
+  current_range = expr;
+
+  if (!errorstr)
+    errorstr = &errbogus;
+
+  if (destsize % 2 != 0) {
+    *errorstr = "Bogus call to numerlist2array() -- destsize must be a multiple of 2";
+    return -1;
+  }
+
+  if (!expr || !*expr)
+    return 0;
+
+  do {
+    if (num_vals_saved == max_vals) {
+      *errorstr = "Buffer would overflow -- too many numbers in provided list";
+      return -1;
+    }
+    if( !isdigit((int) *current_range) ) {
+      *errorstr = "Alleged number begins with nondigit!  Example of proper form: \"20,80,65532\"";
+      return -1;
+    }
+    val = strtol(current_range, &endptr, 10);
+    if( val < min_elem || val > max_elem ) {
+      *errorstr = "Number given in list is outside given legal range";
+      return -1;
+    }
+    dest[num_vals_saved++] = (u16) val;
+    current_range = endptr;
+    while (*current_range == ',' || isspace(*current_range))
+      current_range++;
+    if (*current_range && !isdigit(*current_range)) {
+      *errorstr = "Bogus character in supposed number-list string. Example of proper form: \"20,80,65532\"";
+      return -1;
+    }
+  } while( current_range && *current_range);
+
+  return num_vals_saved;
+}
 
 int get_random_int() {
 int i;
@@ -209,7 +287,8 @@ short *iptr;
 if (numbytes < 0 || numbytes > 0xFFFF) return -1;
 
 if (bytesleft == 0) {
-  fp = fopen("/dev/urandom", "r");
+  fp = fopen("/dev/arandom", "r");
+  if (!fp) fp = fopen("/dev/urandom", "r");
   if (!fp) fp = fopen("/dev/random", "r");
   if (fp) {
     res = fread(bytebuf, 1, sizeof(bytebuf), fp);
@@ -421,7 +500,7 @@ int arg_parse(const char *command, char ***argv) {
     return -1;
   }
   myargv = (char **) malloc((MAX_PARSE_ARGS + 2) * sizeof(char *));
-  bzero(myargv, (MAX_PARSE_ARGS+2) * sizeof(char *));
+  memset(myargv, 0, (MAX_PARSE_ARGS+2) * sizeof(char *));
   myargv[0] = (char *) 0x123456; /* Integrity checker */
   myargv++;
   start = mycommand;
@@ -509,9 +588,9 @@ char *mmapfile(char *fname, int *length, int openflags) {
     return NULL;
   }
 
-  fileptr = (char *) mmap(0, st.st_size, (openflags & O_RDONLY)? PROT_READ :
-                 (openflags & O_RDWR)? (PROT_READ|PROT_WRITE) : PROT_WRITE,
-                 MAP_SHARED, fd, 0);
+  fileptr = (char *)mmap(0, st.st_size, (openflags == O_RDONLY)? PROT_READ :
+			 (openflags == O_RDWR)? (PROT_READ|PROT_WRITE) 
+			 : PROT_WRITE, MAP_SHARED, fd, 0);
 
   close(fd);
 

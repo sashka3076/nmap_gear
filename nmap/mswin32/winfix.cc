@@ -1,7 +1,9 @@
 #include <winclude.h>
 #include <sys/timeb.h>
 
-inline int my_close(int sd)
+#include "nmap_error.h"
+
+int my_close(int sd)
 {
 	if(sd == 501) return 0;
 	return closesocket(sd);

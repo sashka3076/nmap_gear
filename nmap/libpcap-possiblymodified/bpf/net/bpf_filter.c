@@ -40,7 +40,7 @@
 
 #if !(defined(lint) || defined(KERNEL) || defined(_KERNEL))
 static const char rcsid[] =
-    "@(#) $Header: /CVS/nmap/libpcap-possiblymodified/bpf/net/bpf_filter.c,v 1.1.1.1 2001/06/03 08:19:45 fyodor Exp $ (LBL)";
+    "@(#) $Header: /CVS/nmap/libpcap-possiblymodified/bpf/net/bpf_filter.c,v 1.2 2002/12/18 06:10:07 fyodor Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -69,8 +69,8 @@ static const char rcsid[] =
 #define u_int32 bpf_u_int32
 
 #ifndef LBL_ALIGN
-#if defined(sparc) || defined(mips) || defined(ibm032) || \
-    defined(__alpha) || defined(__hpux)
+#if defined(sparc) || defined(__sparc__) || defined(mips) || \
+    defined(ibm032) || defined(__alpha) || defined(__hpux)
 #define LBL_ALIGN
 #endif
 #endif

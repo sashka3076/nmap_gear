@@ -1,64 +1,65 @@
 
-/***********************************************************************/
-/* output.c -- Handles the Nmap output system.  This currently         */
-/* involves console-style human readable output, XML output,           */
-/* Script |<iddi3 output, and the legacy greppable output (used to be  */
-/* called "machine readable").  I expect that future output forms      */
-/* (such as HTML) may be created by a different program, library, or   */
-/* script using the XML output.                                        */
-/*                                                                     */
-/***********************************************************************/
-/*  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  */
-/*  program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published  */
-/*  by the Free Software Foundation; Version 2.  This guarantees your  */
-/*  right to use, modify, and redistribute this software under certain */
-/*  conditions.  If this license is unacceptable to you, we may be     */
-/*  willing to sell alternative licenses (contact sales@insecure.com). */
-/*                                                                     */
-/*  If you received these files with a written license agreement       */
-/*  stating terms other than the (GPL) terms above, then that          */
-/*  alternative license agreement takes precendence over this comment. */
-/*                                                                     */
-/*  Source is provided to this software because we believe users have  */
-/*  a right to know exactly what a program is going to do before they  */
-/*  run it.  This also allows you to audit the software for security   */
-/*  holes (none have been found so far).                               */
-/*                                                                     */
-/*  Source code also allows you to port Nmap to new platforms, fix     */
-/*  bugs, and add new features.  You are highly encouraged to send     */
-/*  your changes to fyodor@insecure.org for possible incorporation     */
-/*  into the main distribution.  By sending these changes to Fyodor or */
-/*  one the insecure.org development mailing lists, it is assumed that */
-/*  you are offering Fyodor the unlimited, non-exclusive right to      */
-/*  reuse, modify, and relicense the code.  This is important because  */
-/*  the inability to relicense code has caused devastating problems    */
-/*  for other Free Software projects (such as KDE and NASM).  Nmap     */
-/*  will always be available Open Source.  If you wish to specify      */
-/*  special license conditions of your contributions, just say so      */
-/*  when you send them.                                                */
-/*                                                                     */
-/*  This program is distributed in the hope that it will be useful,    */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of     */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  */
-/*  General Public License for more details (                          */
-/*  http://www.gnu.org/copyleft/gpl.html ).                            */
-/*                                                                     */
-/***********************************************************************/
+/***********************************************************************
+ * output.cc -- Handles the Nmap output system.  This currently        *
+ * involves console-style human readable output, XML output,           *
+ * Script |<iddi3 output, and the legacy greppable output (used to be  *
+ * called "machine readable").  I expect that future output forms      *
+ * (such as HTML) may be created by a different program, library, or   *
+ * script using the XML output.                                        *
+ *                                                                     *
+ ***********************************************************************
+ *  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  *
+ *  program is free software; you can redistribute it and/or modify    *
+ *  it under the terms of the GNU General Public License as published  *
+ *  by the Free Software Foundation; Version 2.  This guarantees your  *
+ *  right to use, modify, and redistribute this software under certain *
+ *  conditions.  If this license is unacceptable to you, we may be     *
+ *  willing to sell alternative licenses (contact sales@insecure.com). *
+ *                                                                     *
+ *  If you received these files with a written license agreement       *
+ *  stating terms other than the (GPL) terms above, then that          *
+ *  alternative license agreement takes precendence over this comment. *
+ *                                                                     *
+ *  Source is provided to this software because we believe users have  *
+ *  a right to know exactly what a program is going to do before they  *
+ *  run it.  This also allows you to audit the software for security   *
+ *  holes (none have been found so far).                               *
+ *                                                                     *
+ *  Source code also allows you to port Nmap to new platforms, fix     *
+ *  bugs, and add new features.  You are highly encouraged to send     *
+ *  your changes to fyodor@insecure.org for possible incorporation     *
+ *  into the main distribution.  By sending these changes to Fyodor or *
+ *  one the insecure.org development mailing lists, it is assumed that *
+ *  you are offering Fyodor the unlimited, non-exclusive right to      *
+ *  reuse, modify, and relicense the code.  This is important because  *
+ *  the inability to relicense code has caused devastating problems    *
+ *  for other Free Software projects (such as KDE and NASM).  Nmap     *
+ *  will always be available Open Source.  If you wish to specify      *
+ *  special license conditions of your contributions, just say so      *
+ *  when you send them.                                                *
+ *                                                                     *
+ *  This program is distributed in the hope that it will be useful,    *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of     *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  *
+ *  General Public License for more details (                          *
+ *  http://www.gnu.org/copyleft/gpl.html ).                            *
+ *                                                                     *
+ ***********************************************************************/
 
-/* $Id: output.c,v 1.13 2001/12/24 20:52:37 fyodor Exp $ */
+/* $Id: output.cc,v 1.3 2002/09/09 07:59:51 fyodor Exp $ */
 
 #include "output.h"
 #include "osscan.h"
+#include "NmapOps.h"
 
-extern struct ops o;
-char *logtypes[LOG_TYPES]=LOG_NAMES;
+extern NmapOps o;
+static char *logtypes[LOG_TYPES]=LOG_NAMES;
 
 /* Prints the familiar Nmap tabular output showing the "interesting"
    ports found on the machine.  It also handles the Machine/Greppable
    output and the XML output.  It is pretty ugly -- in particular I
    should write helper functions to handle the table creation */
-void printportoutput(struct hoststruct *currenths, portlist *plist) {
+void printportoutput(Target *currenths, portlist *plist) {
   char protocol[4];
   char rpcinfo[64];
   char rpcmachineinfo[64];
@@ -74,6 +75,7 @@ void printportoutput(struct hoststruct *currenths, portlist *plist) {
   int numignoredports;
   int portno, protocount;
   struct port **protoarrays[2];
+  char hostname[1200];
 
   numignoredports = plist->state_counts[plist->ignored_port_state];
 
@@ -86,23 +88,23 @@ void printportoutput(struct hoststruct *currenths, portlist *plist) {
 
   if (numignoredports == plist->numports) {
     log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,
-              "%s %d scanned %s on %s (%s) %s: %s\n",
+              "%s %d scanned %s on %s %s: %s\n",
 	      (numignoredports == 1)? "The" : "All", numignoredports,
-	      (numignoredports == 1)? "port" : "ports", currenths->name, 
-	      inet_ntoa(currenths->host), 
+	      (numignoredports == 1)? "port" : "ports", 
+	      currenths->NameIP(hostname, sizeof(hostname)), 
 	      (numignoredports == 1)? "is" : "are", 
 	      statenum2str(currenths->ports.ignored_port_state));
     log_write(LOG_MACHINE,"Host: %s (%s)\tStatus: Up", 
-	      inet_ntoa(currenths->host), currenths->name);
+	      currenths->targetipstr(), currenths->HostName());
     log_write(LOG_XML, "</ports>\n");
     return;
   }
 
-  log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Interesting %s on %s (%s):\n",
-	    (o.ipprotscan)? "protocols" : "ports", currenths->name, 
-	    inet_ntoa(currenths->host));
-  log_write(LOG_MACHINE,"Host: %s (%s)", inet_ntoa(currenths->host), 
-	    currenths->name);
+  log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Interesting %s on %s:\n",
+	    (o.ipprotscan)? "protocols" : "ports", 
+	    currenths->NameIP(hostname, sizeof(hostname)));
+  log_write(LOG_MACHINE,"Host: %s (%s)", currenths->targetipstr(), 
+	    currenths->HostName());
   
   if (numignoredports > 0) {
     log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"(The %d %s%s scanned but not shown below %s in state: %s)\n", numignoredports, o.ipprotscan?"protocol":"port", (numignoredports == 1)? "" : "s", (numignoredports == 1)? "is" : "are", statenum2str(plist->ignored_port_state));
@@ -208,21 +210,21 @@ void printportoutput(struct hoststruct *currenths, portlist *plist) {
 	  else snprintf(tmpbuf, sizeof(tmpbuf), "#%li", current->rpc_program);
 	  log_write(LOG_XML, "<service name=\"%s\" proto=\"rpc\" rpcnum=\"%li\" lowver=\"%i\" highver=\"%i\" method=\"detection\" conf=\"5\" />\n", tmpbuf, current->rpc_program, current->rpc_lowver, current->rpc_highver);
 	} else if (service) {
-	  log_write(LOG_XML, "<service name=\"%s\" method=\"table\" conf=\"3\"%s />\n", service->s_name, (o.rpcscan && current->rpc_status == RPC_STATUS_UNKNOWN)? "proto=\"rpc\"" : ""); 
+	  log_write(LOG_XML, "<service name=\"%s\" method=\"table\" conf=\"3\" %s />\n", service->s_name, (o.rpcscan && current->rpc_status == RPC_STATUS_UNKNOWN)? "proto=\"rpc\"" : ""); 
 	}
 	log_write(LOG_XML, "</port>\n");
       }
     }
    }
   }
-  log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"\n");
+  /*  log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"\n"); */
   log_write(LOG_MACHINE, "\tIgnored State: %s (%d)", statenum2str(plist->ignored_port_state), plist->state_counts[plist->ignored_port_state]);
   log_write(LOG_XML, "</ports>\n");
 }
 
 char* xml_convert (const char* str) {
   char *temp, ch=0, prevch = 0, *p;
-  temp = malloc(strlen(str)*6+1);
+  temp = (char *) malloc(strlen(str)*6+1);
   for (p = temp;(prevch = ch, ch = *str);str++) {
     char *a;
     switch (ch) {
@@ -253,7 +255,7 @@ char* xml_convert (const char* str) {
     strcpy(p,a); p += strlen(a);
   }
   *p = 0;
-  temp = realloc(temp,strlen(temp)+1);
+  temp = (char *) realloc(temp,strlen(temp)+1);
   return temp;
 }
 
@@ -474,11 +476,11 @@ void output_xml_scaninfo_records(struct scan_lists *scanlist) {
 
 /* Helper function to write the status and address/hostname info of a host 
    into the XML log */
-static void write_xml_initial_hostinfo(struct hoststruct *currenths,
-				  char *status) {
-  log_write(LOG_XML, "<status state=\"%s\" />\n<address addr=\"%s\" addrtype=\"ipv4\" />\n", status,inet_ntoa(currenths->host));
-  if (currenths->name && *currenths->name) {
-    log_write(LOG_XML, "<hostnames><hostname name=\"%s\" type=\"PTR\" /></hostnames>\n", currenths->name);
+static void write_xml_initial_hostinfo(Target *currenths,
+				  const char *status) {
+  log_write(LOG_XML, "<status state=\"%s\" />\n<address addr=\"%s\" addrtype=\"%s\" />\n", status,currenths->targetipstr(), (o.af() == AF_INET)? "ipv4" : "ipv6");
+  if (*currenths->HostName()) {
+    log_write(LOG_XML, "<hostnames><hostname name=\"%s\" type=\"PTR\" /></hostnames>\n", currenths->HostName());
   } else /* If machine is up, put blank hostname so front ends know that
 	    no name resolution is forthcoming */
     if (strcmp(status, "up") == 0) log_write(LOG_XML, "<hostnames />\n");
@@ -488,12 +490,13 @@ static void write_xml_initial_hostinfo(struct hoststruct *currenths,
    example is "Host: 10.11.12.13 (foo.bar.example.com)\tStatus: Up\n" to 
    machine log.  resolve_all should be passed nonzero if the user asked
    for all hosts (even down ones) to be resolved */
-void write_host_status(struct hoststruct *currenths, int resolve_all) {
+void write_host_status(Target *currenths, int resolve_all) {
+  char hostname[1200];
 
   if (o.listscan) {
     /* write "unknown" to stdout, machine, and xml */
-    log_write(LOG_STDOUT|LOG_NORMAL|LOG_SKID, "Host %s (%s) not scanned\n", currenths->name, inet_ntoa(currenths->host));
-    log_write(LOG_MACHINE, "Host: %s (%s)\tStatus: Unknown\n", inet_ntoa(currenths->host), currenths->name);
+    log_write(LOG_STDOUT|LOG_NORMAL|LOG_SKID, "Host %s not scanned\n", currenths->NameIP(hostname, sizeof(hostname)));
+    log_write(LOG_MACHINE, "Host: %s (%s)\tStatus: Unknown\n", currenths->targetipstr(), currenths->HostName());
     write_xml_initial_hostinfo(currenths, "unknown");
   } 
 
@@ -503,15 +506,16 @@ void write_host_status(struct hoststruct *currenths, int resolve_all) {
 			       (currenths->flags & HOST_UP)? "up" : "down");
     log_write(LOG_XML, "<smurf responses=\"%d\" />\n", 
 	      currenths->wierd_responses);
-    log_write(LOG_MACHINE,"Host: %s (%s)\tStatus: Smurf (%d responses)\n",  inet_ntoa(currenths->host), currenths->name, currenths->wierd_responses);
+    log_write(LOG_MACHINE,"Host: %s (%s)\tStatus: Smurf (%d responses)\n",  currenths->targetipstr(), currenths->HostName(), currenths->wierd_responses);
     
     if (o.pingscan)
-      log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Host  %s (%s) seems to be a subnet broadcast address (returned %d extra pings).%s\n",  currenths->name, inet_ntoa(currenths->host), currenths->wierd_responses, 
+      log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Host %s seems to be a subnet broadcast address (returned %d extra pings).%s\n",  currenths->NameIP(hostname, sizeof(hostname)), currenths->wierd_responses, 
 		(currenths->flags & HOST_UP)? " Note -- the actual IP also responded." : "");
     else {
-      log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Host  %s (%s) seems to be a subnet broadcast address (returned %d extra pings). %s.\n",  currenths->name, 
-		inet_ntoa(currenths->host), currenths->wierd_responses,
-		(currenths->flags & HOST_UP)? 
+      log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Host %s seems to be a subnet broadcast address (returned %d extra pings). %s.\n",  
+		currenths->NameIP(hostname, sizeof(hostname)),
+		currenths->wierd_responses,
+	       (currenths->flags & HOST_UP)? 
 		" Still scanning it due to ping response from its own IP" 
 		: "Skipping host");
     }
@@ -521,13 +525,13 @@ void write_host_status(struct hoststruct *currenths, int resolve_all) {
     write_xml_initial_hostinfo(currenths, 
 			       (currenths->flags & HOST_UP)? "up" : "down");
     if (currenths->flags & HOST_UP) {
-      log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Host %s (%s) appears to be up.\n", currenths->name, inet_ntoa(currenths->host));
-      log_write(LOG_MACHINE,"Host: %s (%s)\tStatus: Up\n", inet_ntoa(currenths->host), currenths->name);
+      log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Host %s appears to be up.\n", currenths->NameIP(hostname, sizeof(hostname)));
+      log_write(LOG_MACHINE,"Host: %s (%s)\tStatus: Up\n", currenths->targetipstr(), currenths->HostName());
     } else if (o.verbose || resolve_all) {
       if (resolve_all)
-	log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Host %s (%s) appears to be down.\n", currenths->name, inet_ntoa(currenths->host));
-      else log_write(LOG_STDOUT,"Host %s (%s) appears to be down.\n", currenths->name, inet_ntoa(currenths->host));
-      log_write(LOG_MACHINE, "Host: %s (%s)\tStatus: Down\n", inet_ntoa(currenths->host), currenths->name);
+	log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Host %s appears to be down.\n", currenths->NameIP(hostname, sizeof(hostname)));
+      else log_write(LOG_STDOUT,"Host %s appears to be down.\n", currenths->NameIP(hostname, sizeof(hostname)));
+      log_write(LOG_MACHINE, "Host: %s (%s)\tStatus: Down\n", currenths->targetipstr(), currenths->HostName());
     }
   } 
 
@@ -536,17 +540,17 @@ void write_host_status(struct hoststruct *currenths, int resolve_all) {
 			       (currenths->flags & HOST_UP)? "up" : "down");
     if (o.verbose) {
       if (currenths->flags & HOST_UP) {
-	log_write(LOG_STDOUT, "Host %s (%s) appears to be up ... good.\n", 
-		  currenths->name, inet_ntoa(currenths->host));
+	log_write(LOG_STDOUT, "Host %s appears to be up ... good.\n", 
+		  currenths->NameIP(hostname, sizeof(hostname)));
       } else {
 
 	if (resolve_all) {   
-	  log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Host %s (%s) appears to be down, skipping it.\n", currenths->name, inet_ntoa(currenths->host));
+	  log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Host %s appears to be down, skipping it.\n", currenths->NameIP(hostname, sizeof(hostname)));
 	}
 	else {
-	  log_write(LOG_STDOUT,"Host %s (%s) appears to be down, skipping it.\n", currenths->name, inet_ntoa(currenths->host));
+	  log_write(LOG_STDOUT,"Host %s appears to be down, skipping it.\n", currenths->NameIP(hostname, sizeof(hostname)));
 	}
-	log_write(LOG_MACHINE, "Host: %s (%s)\tStatus: Down\n", inet_ntoa(currenths->host), currenths->name);
+	log_write(LOG_MACHINE, "Host: %s (%s)\tStatus: Down\n", currenths->targetipstr(), currenths->HostName());
       }
     }
   }
@@ -555,7 +559,7 @@ void write_host_status(struct hoststruct *currenths, int resolve_all) {
 
 /* Prints the formatted OS Scan output to stdout, logfiles, etc (but only
    if an OS Scan was performed */
-void printosscanoutput(struct hoststruct *currenths) {
+void printosscanoutput(Target *currenths) {
   int i;
   char numlst[512]; /* For creating lists of numbers */
   char *p; /* Used in manipulating numlst above */
@@ -662,7 +666,7 @@ void printosscanoutput(struct hoststruct *currenths) {
      if (currenths->seq.responses > 3) {
        p=numlst;
        for(i=0; i < currenths->seq.responses; i++) {
-	 if (p - numlst > (sizeof(numlst) - 15)) 
+	 if (p - numlst > (int) (sizeof(numlst) - 15)) 
 	   fatal("STRANGE ERROR #3877 -- please report to fyodor@insecure.org\n");
 	 if (p != numlst) *p++=',';
 	 sprintf(p, "%X", currenths->seq.seqs[i]);
@@ -678,7 +682,7 @@ void printosscanoutput(struct hoststruct *currenths) {
      if (currenths->seq.responses > 2) {
        p=numlst;
        for(i=0; i < currenths->seq.responses; i++) {
-	 if (p - numlst > (sizeof(numlst) - 15)) 
+	 if (p - numlst > (int) (sizeof(numlst) - 15)) 
 	   fatal("STRANGE ERROR #3876 -- please report to fyodor@insecure.org\n");
 	 if (p != numlst) *p++=',';
 	 sprintf(p, "%hX", currenths->seq.ipids[i]);
@@ -691,7 +695,7 @@ void printosscanoutput(struct hoststruct *currenths) {
 
        p=numlst;
        for(i=0; i < currenths->seq.responses; i++) {
-	 if (p - numlst > (sizeof(numlst) - 15)) 
+	 if (p - numlst > (int) (sizeof(numlst) - 15)) 
 	   fatal("STRANGE ERROR #3877 -- please report to fyodor@insecure.org\n");
 	 if (p != numlst) *p++=',';
 	 sprintf(p, "%X", currenths->seq.timestamps[i]);
@@ -714,7 +718,9 @@ void printfinaloutput(int numhosts_scanned, int numhosts_up,
   time_t timep;
   int i;
   char mytime[128];
+  struct timeval tv;
 
+  gettimeofday(&tv, NULL);
   timep = time(NULL);
   i = timep - starttime;
   
@@ -722,8 +728,8 @@ void printfinaloutput(int numhosts_scanned, int numhosts_up,
     fprintf(stderr, "WARNING: No targets were specified, so 0 hosts scanned.\n");
   if (numhosts_scanned == 1 && numhosts_up == 0 && !o.listscan)
     log_write(LOG_STDOUT, "Note: Host seems down. If it is really up, but blocking our ping probes, try -P0\n");
-  log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"\n");
-  log_write(LOG_STDOUT|LOG_SKID, "Nmap run completed -- %d %s (%d %s up) scanned in %d %s\n", numhosts_scanned, (numhosts_scanned == 1)? "IP address" : "IP addresses", numhosts_up, (numhosts_up == 1)? "host" : "hosts",  i, (i == 1)? "second": "seconds");
+  /*  log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"\n"); */
+  log_write(LOG_STDOUT|LOG_SKID, "Nmap run completed -- %d %s (%d %s up) scanned in %.3f seconds\n", numhosts_scanned, (numhosts_scanned == 1)? "IP address" : "IP addresses", numhosts_up, (numhosts_up == 1)? "host" : "hosts",  o.TimeSinceStartMS(&tv) / 1000.0);
 
 
   Strncpy(mytime, ctime(&timep), sizeof(mytime));
@@ -731,8 +737,8 @@ void printfinaloutput(int numhosts_scanned, int numhosts_up,
   
   log_write(LOG_XML, "<runstats><finished time=\"%d\" /><hosts up=\"%d\" down=\"%d\" total=\"%d\" />\n", timep, numhosts_up, numhosts_scanned - numhosts_up, numhosts_scanned);
 
-  log_write(LOG_XML, "<!-- Nmap run completed at %s; %d %s (%d %s up) scanned in %d %s -->\n", mytime, numhosts_scanned, (numhosts_scanned == 1)? "IP address" : "IP addresses", numhosts_up, (numhosts_up == 1)? "host" : "hosts",  i, (i == 1)? "second": "seconds");
-  log_write(LOG_NORMAL|LOG_MACHINE, "# Nmap run completed at %s -- %d %s (%d %s up) scanned in %d %s\n", mytime, numhosts_scanned, (numhosts_scanned == 1)? "IP address" : "IP addresses", numhosts_up, (numhosts_up == 1)? "host" : "hosts",  i, (i == 1)? "second": "seconds");
+  log_write(LOG_XML, "<!-- Nmap run completed at %s; %d %s (%d %s up) scanned in %.3f seconds -->\n", mytime, numhosts_scanned, (numhosts_scanned == 1)? "IP address" : "IP addresses", numhosts_up, (numhosts_up == 1)? "host" : "hosts",  o.TimeSinceStartMS(&tv) / 1000.0 );
+  log_write(LOG_NORMAL|LOG_MACHINE, "# Nmap run completed at %s -- %d %s (%d %s up) scanned in %.3f seconds\n", mytime, numhosts_scanned, (numhosts_scanned == 1)? "IP address" : "IP addresses", numhosts_up, (numhosts_up == 1)? "host" : "hosts", o.TimeSinceStartMS(&tv) / 1000.0 );
 
   log_write(LOG_XML, "</runstats></nmaprun>\n");
 

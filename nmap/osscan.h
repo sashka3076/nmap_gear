@@ -1,50 +1,50 @@
 
-/***********************************************************************/
-/* osscan.h -- Routines used for OS detection via TCP/IP               */
-/* fingerprinting.  For more information on how this works in Nmap,    */
-/* see my paper at                                                     */
-/* http://www.insecure.org/nmap/nmap-fingerprinting-article.html       */
-/*                                                                     */
-/***********************************************************************/
-/*  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  */
-/*  program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published  */
-/*  by the Free Software Foundation; Version 2.  This guarantees your  */
-/*  right to use, modify, and redistribute this software under certain */
-/*  conditions.  If this license is unacceptable to you, we may be     */
-/*  willing to sell alternative licenses (contact sales@insecure.com). */
-/*                                                                     */
-/*  If you received these files with a written license agreement       */
-/*  stating terms other than the (GPL) terms above, then that          */
-/*  alternative license agreement takes precendence over this comment. */
-/*                                                                     */
-/*  Source is provided to this software because we believe users have  */
-/*  a right to know exactly what a program is going to do before they  */
-/*  run it.  This also allows you to audit the software for security   */
-/*  holes (none have been found so far).                               */
-/*                                                                     */
-/*  Source code also allows you to port Nmap to new platforms, fix     */
-/*  bugs, and add new features.  You are highly encouraged to send     */
-/*  your changes to fyodor@insecure.org for possible incorporation     */
-/*  into the main distribution.  By sending these changes to Fyodor or */
-/*  one the insecure.org development mailing lists, it is assumed that */
-/*  you are offering Fyodor the unlimited, non-exclusive right to      */
-/*  reuse, modify, and relicense the code.  This is important because  */
-/*  the inability to relicense code has caused devastating problems    */
-/*  for other Free Software projects (such as KDE and NASM).  Nmap     */
-/*  will always be available Open Source.  If you wish to specify      */
-/*  special license conditions of your contributions, just say so      */
-/*  when you send them.                                                */
-/*                                                                     */
-/*  This program is distributed in the hope that it will be useful,    */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of     */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  */
-/*  General Public License for more details (                          */
-/*  http://www.gnu.org/copyleft/gpl.html ).                            */
-/*                                                                     */
-/***********************************************************************/
+/***********************************************************************
+ * osscan.h -- Routines used for OS detection via TCP/IP               *
+ * fingerprinting.  For more information on how this works in Nmap,    *
+ * see my paper at                                                     *
+ * http://www.insecure.org/nmap/nmap-fingerprinting-article.html       *
+ *                                                                     *
+ ***********************************************************************
+ *  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  *
+ *  program is free software; you can redistribute it and/or modify    *
+ *  it under the terms of the GNU General Public License as published  *
+ *  by the Free Software Foundation; Version 2.  This guarantees your  *
+ *  right to use, modify, and redistribute this software under certain *
+ *  conditions.  If this license is unacceptable to you, we may be     *
+ *  willing to sell alternative licenses (contact sales@insecure.com). *
+ *                                                                     *
+ *  If you received these files with a written license agreement       *
+ *  stating terms other than the (GPL) terms above, then that          *
+ *  alternative license agreement takes precendence over this comment. *
+ *                                                                     *
+ *  Source is provided to this software because we believe users have  *
+ *  a right to know exactly what a program is going to do before they  *
+ *  run it.  This also allows you to audit the software for security   *
+ *  holes (none have been found so far).                               *
+ *                                                                     *
+ *  Source code also allows you to port Nmap to new platforms, fix     *
+ *  bugs, and add new features.  You are highly encouraged to send     *
+ *  your changes to fyodor@insecure.org for possible incorporation     *
+ *  into the main distribution.  By sending these changes to Fyodor or *
+ *  one the insecure.org development mailing lists, it is assumed that *
+ *  you are offering Fyodor the unlimited, non-exclusive right to      *
+ *  reuse, modify, and relicense the code.  This is important because  *
+ *  the inability to relicense code has caused devastating problems    *
+ *  for other Free Software projects (such as KDE and NASM).  Nmap     *
+ *  will always be available Open Source.  If you wish to specify      *
+ *  special license conditions of your contributions, just say so      *
+ *  when you send them.                                                *
+ *                                                                     *
+ *  This program is distributed in the hope that it will be useful,    *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of     *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  *
+ *  General Public License for more details (                          *
+ *  http://www.gnu.org/copyleft/gpl.html ).                            *
+ *                                                                     *
+ ***********************************************************************/
 
-/* $Id: osscan.h,v 1.17 2001/08/10 05:53:08 fyodor Exp $ */
+/* $Id: osscan.h,v 1.21 2002/08/21 08:52:13 fyodor Exp $ */
 
 #ifndef OSSCAN_H
 #define OSSCAN_H
@@ -64,27 +64,44 @@
 /* moved to global_structures.h */
 
 /**********************  PROTOTYPES  ***********************************/
-int os_scan(struct hoststruct *target);
-FingerPrint *get_fingerprint(struct hoststruct *target, struct seq_info *si);
+int os_scan(Target *target);
+FingerPrint *get_fingerprint(Target *target, struct seq_info *si);
 struct AVal *fingerprint_iptcppacket(struct ip *ip, int mss, unsigned int syn);
 struct AVal *fingerprint_portunreach(struct ip *ip, struct udpprobeinfo *upi);
-struct udpprobeinfo *send_closedudp_probe(int rawsd, struct in_addr *dest,
+struct udpprobeinfo *send_closedudp_probe(int rawsd, 
+					  const struct in_addr *dest,
 					  u16 sport, u16 dport);
 
 unsigned int get_gcd_n_ulong(int numvalues, unsigned int *values);
 unsigned int euclid_gcd(unsigned int a, unsigned int b);
 char *fp2ascii(FingerPrint *FP);
-FingerPrint **parse_fingerprint_reference_file();
-/* Takes a fingerprint and returns the matches in FPR (which must
-   point to an allocated FingerPrintResults structure) -- results will
-   be reverse-sorted by accuracy.  No results below
-   accuracy_threshhold will be included.  The max matches returned is
-   the maximum that fits in a FingerPrintResults structure.  The
-   allocated FingerPrintResults does not have to be initialized --
-   that will be done in this function.  */
 
+/* Parses a single fingerprint from the memory region given.  If a
+ non-null fingerprint is returned, the user is in charge of freeing it
+ when done.  This function does not require the fingerprint to be 100%
+ complete since it is used by scripts such as scripts/fingerwatch for
+ which some partial fingerpritns are OK. */
+FingerPrint *parse_single_fingerprint(char *fprint_orig);
+FingerPrint **parse_fingerprint_file(char *fname);
+FingerPrint **parse_fingerprint_reference_file();
+
+/* Compares 2 fingerprints -- a referenceFP (can have expression
+   attributes) with an observed fingerprint (no expressions).  If
+   verbose is nonzero, differences will be printed.  The comparison
+   accuracy (between 0 and 1) is returned) */
+double compare_fingerprints(FingerPrint *referenceFP, FingerPrint *observedFP,
+			    int verbose);
+
+/* Takes a fingerprint and looks for matches inside reference_FPs[].
+   The results are stored in in FPR (which must point to an allocated
+   FingerPrintResults structure) -- results will be reverse-sorted by
+   accuracy.  No results below accuracy_threshhold will be included.
+   The max matches returned is the maximum that fits in a
+   FingerPrintResults structure.  The allocated FingerPrintResults
+   does not have to be initialized -- that will be done in this
+   function.  */
 void match_fingerprint(FingerPrint *FP, struct FingerPrintResults *FPR, 
-		       double accuracy_threshold);
+		       FingerPrint **reference_FPs, double accuracy_threshold);
 struct AVal *str2AVal(char *p);
 struct AVal *gettestbyname(FingerPrint *FP, const char *name);
 

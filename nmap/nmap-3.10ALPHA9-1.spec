@@ -1,5 +1,5 @@
 %define name nmap
-%define version 2.54BETA32
+%define version 3.10ALPHA9
 %define release 1
 %define prefix /usr
 
@@ -38,7 +38,7 @@ scanning, and more.
 Summary: Gtk+ frontend for nmap
 Group: Applications/System
 Requires: nmap, gtk+
-Version: 0.%{version}
+Version: %{version}
 %description frontend
 This package includes nmapfe, a Gtk+ frontend for nmap. The nmap package must
 be installed before installing nmap-frontend.
@@ -48,18 +48,18 @@ be installed before installing nmap-frontend.
 %setup -q
 
 %build
-CFLAGS="$RPM_OPT_FLAGS" ./configure --prefix=%{prefix}
+CFLAGS="$RPM_OPT_FLAGS" ./configure --prefix=%{prefix} --mandir=%{prefix}/share/man
 make 
 
 %install
 [ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
 
-make prefix=$RPM_BUILD_ROOT%{prefix} install
+make prefix=$RPM_BUILD_ROOT%{prefix} mandir=$RPM_BUILD_ROOT%{prefix}/share/man install
 
 mkdir -p $RPM_BUILD_ROOT%{prefix}/share/gnome/apps/Utilities
 
 strip $RPM_BUILD_ROOT%{prefix}/bin/* || :
-gzip $RPM_BUILD_ROOT%{prefix}/man/man1/* || :
+gzip $RPM_BUILD_ROOT%{prefix}/share/man/man1/* || :
 
 %if "%{buildfe}" == "1"
 %post frontend
@@ -86,7 +86,7 @@ rm -f ${prefix}/bin/xnmap
 %doc docs/nmap_manpage-ru.html
 %{prefix}/bin/nmap
 %{prefix}/share/nmap
-%{prefix}/man/man1/nmap.1.gz
+%{prefix}/share/man/man1/nmap.1.gz
 
 %if "%{buildfe}" == "1"
 %files frontend
@@ -94,11 +94,14 @@ rm -f ${prefix}/bin/xnmap
 %{prefix}/bin/nmapfe
 %{prefix}/bin/xnmap
 %{prefix}/share/gnome/apps/Utilities/nmapfe.desktop
-%{prefix}/man/man1/xnmap.1.gz
-%{prefix}/man/man1/nmapfe.1.gz
+%{prefix}/share/man/man1/xnmap.1.gz
+%{prefix}/share/man/man1/nmapfe.1.gz
 %endif
 
 %changelog
+
+* Mon Dec 16 2002 Matthieu Verbert (mve@zurich.ibm.com)
+- Place man pages under ${prefix}/share/man rather than ${prefix}/man
 
 * Fri Jun 01 2001 GOMEZ Henri (hgomez@slib.fr)
 - Patch which checks that $RPM_BUILD_ROOT is not "/" before rm'ing it.
@@ -106,7 +109,7 @@ rm -f ${prefix}/bin/xnmap
 * Tue Mar 06 2001 Ben Reed <ben@opennms.org>
 - changed spec to handle not building the frontend
 
-* Thu Dec 30 1999 Fyodor <fyodor@insecure.org>
+* Thu Dec 30 1999 Fyodor (fyodor@insecure.org)
 - Updated description
 - Eliminated source1 (nmapfe.desktop) directive and simply packaged it with Nmap
 - Fixed nmap distribution URL (source0)
@@ -131,12 +134,12 @@ rm -f ${prefix}/bin/xnmap
 	many files/dirs
 - added desktop entry for gnome
 
-* Sun Jan 10 1999 Fyodor <fyodor@insecure.org>
+* Sun Jan 10 1999 Fyodor (fyodor@insecure.org)
 - Merged in spec file sent in by Ian Macdonald <ianmacd@xs4all.nl>
 
-* Tue Dec 29 1998 Fyodor <fyodor@insecure.org>
+* Tue Dec 29 1998 Fyodor (fyodor@insecure.org)
 - Made some changes, and merged in another .spec file sent in
   by Oren Tirosh <oren@hishome.net>
 
-* Mon Dec 21 1998 Riku Meskanen <mesrik@cc.jyu.fi>
+* Mon Dec 21 1998 Riku Meskanen (mesrik@cc.jyu.fi)
 - initial build for RH 5.x

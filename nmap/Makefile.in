@@ -1,4 +1,4 @@
-NMAP_VERSION = 2.54BETA32
+NMAP_VERSION = 3.10ALPHA9
 NMAP_NAME= nmap
 NMAP_URL= www.insecure.org/nmap/
 NMAP_PLATFORM=@host@
@@ -12,12 +12,13 @@ nmapdatadir = @datadir@/nmap
 deskdir = $(prefix)/share/gnome/apps/Utilities
 
 NBASEDIR=@NBASEDIR@
-CC = @CC@
+# CC = @CXX@
 CCOPT = 
 LIBPCAPDIR = @libpcapdir@
 INCLS = -I$(LIBPCAPDIR) 
 DEFS = @DEFS@ -DNMAP_VERSION=\"$(NMAP_VERSION)\" -DNMAP_NAME=\"$(NMAP_NAME)\" -DNMAP_URL=\"$(NMAP_URL)\" -DNMAP_PLATFORM=\"$(NMAP_PLATFORM)\" -DNMAPDATADIR=\"$(nmapdatadir)\"
-CFLAGS = -g @CFLAGS@ $(CCOPT) $(DEFS) $(INCLS)
+CXXFLAGS = -g -Wall @CXXFLAGS@ $(CCOPT) $(DEFS) $(INCLS)
+# CFLAGS = $(CXXFLAGS)
 # CFLAGS = -g -Wall $(DEFS) $(INCLS)
 STATIC = 
 LDFLAGS = @LDFLAGS@ $(STATIC)
@@ -30,19 +31,21 @@ MAKEDEPEND = @MAKEDEPEND@
 RPMTDIR=$(HOME)/rpmdir
 
 TARGET = nmap
+TARGETNMAPFE=@TARGETNMAPFE@
+INSTALLNMAPFE=@INSTALLNMAPFE@
 
-SRCS = nmap.c targets.c tcpip.c nmap_error.c utils.c idle_scan.c osscan.c output.c scan_engine.c timing.c charpool.c services.c protocols.c nmap_rpc.c portlist.c @COMPAT_SRCS@
+SRCS = main.cc nmap.cc targets.cc tcpip.cc nmap_error.cc utils.cc idle_scan.cc osscan.cc output.cc scan_engine.cc timing.cc charpool.cc services.cc protocols.cc nmap_rpc.cc portlist.cc NmapOps.cc TargetGroup.cc Target.cc @COMPAT_SRCS@
 
-OBJS = nmap.o targets.o tcpip.o nmap_error.o utils.o idle_scan.o osscan.o output.o scan_engine.o timing.o charpool.o services.o protocols.o nmap_rpc.o portlist.o @COMPAT_OBJS@
+OBJS = main.o nmap.o targets.o tcpip.o nmap_error.o utils.o idle_scan.o osscan.o output.o scan_engine.o timing.o charpool.o services.o protocols.o nmap_rpc.o portlist.o NmapOps.o TargetGroup.o Target.o @COMPAT_OBJS@
 
-DEPS = nmap.h nmap_error.h targets.h idle_scan.h osscan.h output.h scan_engine.h timing.h tcpip.h utils.h global_structures.h charpool.h services.h protocols.h nmap_rpc.h portlist.h
+DEPS = nmap.h nmap_error.h targets.h idle_scan.h osscan.h output.h scan_engine.h timing.h tcpip.h utils.h global_structures.h charpool.h services.h protocols.h nmap_rpc.h portlist.h NmapOps.h TargetGroup.h Target.h
 
-all: $(TARGET) nmapfe/nmapfe
+all: $(TARGET) $(TARGETNMAPFE)
 
 $(TARGET): $(DEPS) @PCAP_DEPENDS@ $(NBASEDIR)/libnbase.a $(OBJS)
 	@echo Compiling nmap
 	rm -f $@
-	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
+	$(CXX) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
 $(LIBPCAPDIR)/libpcap.a: $(LIBPCAPDIR)/Makefile
 	@echo Compiling libpcap; cd $(LIBPCAPDIR); $(MAKE)
@@ -55,11 +58,11 @@ $(NBASEDIR)/libnbase.a: $(NBASEDIR)/Makefile
 #	@echo Configuring libpcap; cd $(LIBPCAPDIR); ./configure
 
 nmapfe/nmapfe: 
-	@echo "FAILURES HERE ARE OK -- THEY JUST MEAN YOU CANNOT USE nmapfe"
+#	@echo "FAILURES HERE ARE OK -- THEY JUST MEAN YOU CANNOT USE nmapfe"
 #	-rm -f nmapfe/Makefile
 #	-cd nmapfe; ./configure;
-	-cd nmapfe; test -f Makefile && $(MAKE) VERSION=0.$(NMAP_VERSION) STATIC=$(STATIC);
-	@echo "END OF SECTION WHERE FAILURES ARE OK"
+	-cd nmapfe; test -f Makefile && $(MAKE) VERSION=$(NMAP_VERSION) STATIC=$(STATIC);
+#	@echo "END OF SECTION WHERE FAILURES ARE OK"
 
 # This target is just for me ... don't you get any ideas --Fyodor
 distro: 
@@ -76,12 +79,14 @@ distro:
 # nodepage option is included in man2html because of bug in that program which causes it to
 # drop lines if you let it try to delete page breaks
 	nroff -man docs/nmap.1 | man2html -nodepage -title 'Nmap network security scanner man page' > docs/nmap_manpage.html
-	nroff -man docs/nmap_spanish.1 | man2html -nodepage -title 'Nmap network security scanner man page (Spanish translation)' > docs/nmap_manpage-es.html
+	nroff -man docs/nmap_french.1 | man2html -nodepage -title 'Nmap network security scanner man page (French translation)' > docs/nmap_manpage-fr.html
+	nroff -man docs/nmap_german.1 | man2html -nodepage -title 'Nmap network security scanner man page (German translation)' > docs/nmap_manpage-de.html
 	nroff -man docs/nmap_italian.1 | man2html -nodepage -title 'Nmap network security scanner man page (Italian translation)' > docs/nmap_manpage-it.html
-	nroff -man docs/nmap_portuguese.1 | man2html -nodepage -title 'Nmap network security scanner man page (Portuguese translation)' > docs/nmap_manpage-pt.html
 	nroff -Tlatin1 -man docs/nmap_lithuanian.1 | man2html -nodepage -title 'Nmap network security scanner man page (Lithuanian translation)' > docs/nmap_manpage-lt.html
 # We need a content-type for the Lithuanian version
 	sr '<HEAD>' '<HEAD><META http-equiv="Content-Type" content="text/html; charset=windows-1257">' docs/nmap_manpage-lt.html
+	nroff -man docs/nmap_portuguese.1 | man2html -nodepage -title 'Nmap network security scanner man page (Portuguese translation)' > docs/nmap_manpage-pt.html
+	nroff -man docs/nmap_spanish.1 | man2html -nodepage -title 'Nmap network security scanner man page (Spanish translation)' > docs/nmap_manpage-es.html
 	rm -rf /usr/tmp/nmap-$(NMAP_VERSION)
 	mkdir /usr/tmp/nmap-$(NMAP_VERSION)
 # Make the RPM .spec file
@@ -96,32 +101,37 @@ distro:
             config.sub INSTALL README-WIN32 COPYING CHANGELOG HACKING \
             /usr/tmp/nmap-$(NMAP_VERSION)
 	$(SHTOOL) mkdir /usr/tmp/nmap-$(NMAP_VERSION)/mswin32
-	cd mswin32; cp -ra *.[hHcC] ARPA NET NETINET RPC icon1.ico \
+	cd mswin32; cp -ra *.[hHcC] *.cc ARPA NET NETINET RPC icon1.ico \
                     ifaddrlist.h lib libpcap-note.txt nmap.dsp \
                     nmap.dsw nmap.rc winip \
                     /usr/tmp/nmap-$(NMAP_VERSION)/mswin32
 	$(SHTOOL) mkdir /usr/tmp/nmap-$(NMAP_VERSION)/$(LIBPCAPDIR)
-	cd $(LIBPCAPDIR); cp -ra CHANGES CREDITS CVS FILES INSTALL LICENSE \
-            Makefile.in NMAP_MODIFICATIONS README README.aix README.linux \
-            SUNOS4 TODO VERSION aclocal.m4 bpf bpf_dump.c bpf_image.c \
-            config.h.in configure configure.in etherent.c ethertype.h \
-            gencode.c gencode.h grammar.c grammar.y \
-            inet.c lbl llc.h mkdep nametoaddr.c nlpid.h \
-            optimize.c pcap-bpf.c pcap-dlpi.c pcap-enet.c pcap-int.h \
-            pcap-linux.c pcap-namedb.h pcap-nit.c pcap-nit.h pcap-null.c \
-            pcap-pf.c pcap-pf.h pcap-snit.c pcap-snoop.c pcap.3 pcap.c \
-            pcap.h ppp.h savefile.c scanner.c scanner.l sll.h tokdefs.h \
-            /usr/tmp/nmap-$(NMAP_VERSION)/$(LIBPCAPDIR)
 
+	cd $(LIBPCAPDIR); cp -ra acconfig.h aclocal.m4 arcnet.h bpf \
+                          bpf_dump.c bpf_filter.c bpf_image.c CHANGES \
+                          config.guess config.h.in config.sub configure \
+                          configure.in CREDITS etherent.c ethertype.h FILES \
+                          gencode.c gencode.h grammar.c grammar.y inet.c \
+                          install-sh INSTALL.txt lbl LICENSE llc.h \
+                          Makefile.in mkdep nametoaddr.c net nlpid.h \
+                          NMAP_MODIFICATIONS optimize.c pcap.3 pcap-bpf.c \
+                          pcap.c pcap-dlpi.c pcap-enet.c pcap.h pcap-int.h \
+                          pcap-linux.c pcap-namedb.h pcap-nit.c pcap-nit.h \
+                          pcap-null.c pcap-pf.c pcap-pf.h pcap-snit.c \
+                          pcap-snoop.c ppp.h README README.aix README.linux \
+                          README.tru64 savefile.c scanner.c scanner.l sll.h \
+                          SUNOS4 TODO tokdefs.h VERSION \
+                          /usr/tmp/nmap-$(NMAP_VERSION)/$(LIBPCAPDIR)
 	$(SHTOOL) mkdir /usr/tmp/nmap-$(NMAP_VERSION)/docs
 	cd docs; cp -ra README copying.html nmap-fingerprinting-article.txt \
-                    nmap.1 nmap.deprecated.txt nmap.usage.txt nmap_doc.html \
-                    nmap_manpage-es.html nmap_manpage-fr.html \
-                    nmap_manpage-lt.html nmap_manpage-ru.html \
-	            nmap_manpage-it.html nmap_manpage.html \
-                    nmap_spanish.1 nmap_lithuanian.1 nmap_italian.1 \
-                    nmap_portuguese.1 nmapfe.1 \
-	            xnmap.1 nmap.dtd \
+                    nmap.deprecated.txt nmap.usage.txt nmap_doc.html \
+                    nmap_manpage-de.html nmap_manpage-es.html \
+                    nmap_manpage-fr.html nmap_manpage-it.html \
+                    nmap_manpage-lt.html nmap_manpage-pt.html \
+                    nmap_manpage-ru.html nmap_manpage.html \
+                    nmap.1 nmapfe.1 nmap_french.1 nmap_german.1 \
+                    nmap_italian.1 nmap_lithuanian.1 nmap_portuguese.1 \
+                    nmap_spanish.1 xnmap.1 nmap.dtd \
                     /usr/tmp/nmap-$(NMAP_VERSION)/docs
 	$(SHTOOL) mkdir /usr/tmp/nmap-$(NMAP_VERSION)/nmapfe
 	cd nmapfe; cp -ra Makefile.in aclocal.m4 configure configure.in \
@@ -129,9 +139,9 @@ distro:
 	              nmapfe_error.c nmapfe_error.h NmapFE.dsp nmapfe.dsw \
 	              /usr/tmp/nmap-$(NMAP_VERSION)/nmapfe
 	$(SHTOOL) mkdir /usr/tmp/nmap-$(NMAP_VERSION)/nbase
-	cd $(NBASEDIR); cp -ra Makefile.in aclocal.m4 configure configure.in \
-	             nbase_config.h.in \
-                     *.c *.h CHANGELOG /usr/tmp/nmap-$(NMAP_VERSION)/nbase
+	cd $(NBASEDIR); cp -ra Makefile.in aclocal.m4 configlocal.m4 \
+                        configure configure.in nbase_config.h.in \
+                        *.c *.h CHANGELOG /usr/tmp/nmap-$(NMAP_VERSION)/nbase
 
 	rm -f /usr/tmp/nmap-$(NMAP_VERSION)/nbase/nbase_config.h 
 # Kill the CVS crap
@@ -142,14 +152,21 @@ distro:
 # Make the actual RPM
 	rpm -ta /usr/tmp/nmap-$(NMAP_VERSION).tgz
 	cp -f $(RPMTDIR)/RPMS/i386/nmap-$(NMAP_VERSION)-1.i386.rpm /usr/tmp
-	cp -f $(RPMTDIR)/RPMS/i386/nmap-frontend-0.$(NMAP_VERSION)-1.i386.rpm /usr/tmp
+	cp -f $(RPMTDIR)/RPMS/i386/nmap-frontend-$(NMAP_VERSION)-1.i386.rpm /usr/tmp
 	cp -f $(RPMTDIR)/SRPMS/nmap-$(NMAP_VERSION)-1.src.rpm /usr/tmp
 	rm -rf /usr/tmp/nmap-$(NMAP_VERSION)
+
+# Update the web site
+web:
+	test x$(wroot) != x
+	cp -a CHANGELOG HACKING COPYING INSTALL nmap-os-fingerprints nmap-protocols nmap-services nmap-rpc README-WIN32 $(wroot)/nmap/data
+	cd docs && cp -a nmap_manpage*.html nmap.usage.txt nmap.dtd $(wroot)/nmap/data/
+	find $(wroot)/nmap/data/ -type f -exec chmod 644 '{}' \;
 
 # For distributing the binary
 static: 	
 	cd $(LIBPCAPDIR); $(MAKE)
-	$(CC) $(CFLAGS) -static $(LDFLAGS) -o nmap.linux.bin  $(SRCS) $(LIBS)
+	$(CC) $(CXXFLAGS) -static $(LDFLAGS) -o nmap.linux.bin  $(SRCS) $(LIBS)
 	strip nmap.linux.bin
 
 clean: @PCAP_CLEAN@ nmapfe_clean nbase_clean my_clean
@@ -173,16 +190,21 @@ my_distclean:
 depend:
 	$(MAKEDEPEND) $(INCLS) -s "# DO NOT DELETE" -- $(DEFS) -- $(SRCS)
 
-install: $(TARGET)
+install-nmap: $(TARGET)
 	$(SHTOOL) mkdir -f -p -m 755 $(bindir) $(mandir)/man1 $(nmapdatadir) $(deskdir)
 	$(INSTALL) -c -m 755 nmap $(bindir)/nmap
-	@echo "If the next command fails -- you cannot use the X front end"
-	-test -f nmapfe/nmapfe && $(INSTALL) -c -m 755 nmapfe/nmapfe $(bindir)/nmapfe && $(SHTOOL) mkln -f -s $(bindir)/nmapfe $(bindir)/xnmap && $(INSTALL) -c -m 644 nmapfe.desktop $(deskdir)/nmapfe.desktop && $(INSTALL) -c -m 644 docs/nmapfe.1 $(mandir)/man1/nmapfe.1 && $(INSTALL) -c -m 644 docs/xnmap.1 $(mandir)/man1/xnmap.1
 	$(INSTALL) -c -m 644 docs/$(TARGET).1 $(mandir)/man1/$(TARGET).1
 	$(INSTALL) -c -m 644 nmap-os-fingerprints  $(nmapdatadir)/nmap-os-fingerprints
 	$(INSTALL) -c -m 644 nmap-services  $(nmapdatadir)/nmap-services
 	$(INSTALL) -c -m 644 nmap-protocols  $(nmapdatadir)/nmap-protocols
 	$(INSTALL) -c -m 644 nmap-rpc  $(nmapdatadir)/nmap-rpc
+
+install-nmapfe: $(TARGETNMAPFE)
+	$(SHTOOL) mkdir -f -p -m 755 $(bindir) $(mandir)/man1 $(nmapdatadir) $(deskdir)
+	@echo "If the next command fails -- you cannot use the X front end"
+	-test -f nmapfe/nmapfe && $(INSTALL) -c -m 755 nmapfe/nmapfe $(bindir)/nmapfe && rm -f $(bindir)/xnmap && $(SHTOOL) mkln -f -s $(bindir)/nmapfe $(bindir)/xnmap && $(INSTALL) -c -m 644 nmapfe.desktop $(deskdir)/nmapfe.desktop && $(INSTALL) -c -m 644 docs/nmapfe.1 $(mandir)/man1/nmapfe.1 && $(INSTALL) -c -m 644 docs/xnmap.1 $(mandir)/man1/xnmap.1
+
+install: install-nmap $(INSTALLNMAPFE)
 
 uninstall:
 	rm -f $(bindir)/$(TARGET) $(bindir)/nmapfe $(bindir)/xnmap

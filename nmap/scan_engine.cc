@@ -1,54 +1,56 @@
-/***********************************************************************/
-/* scanengine.c -- Includes much of the "engine" functions for         */
-/* scanning, such as pos_scan and super_scan.  It also includes        */
-/* dependant functions such as those for collectiong SYN/connect scan  */
-/* responses.                                                          */
-/*                                                                     */
-/***********************************************************************/
-/*  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  */
-/*  program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published  */
-/*  by the Free Software Foundation; Version 2.  This guarantees your  */
-/*  right to use, modify, and redistribute this software under certain */
-/*  conditions.  If this license is unacceptable to you, we may be     */
-/*  willing to sell alternative licenses (contact sales@insecure.com). */
-/*                                                                     */
-/*  If you received these files with a written license agreement       */
-/*  stating terms other than the (GPL) terms above, then that          */
-/*  alternative license agreement takes precendence over this comment. */
-/*                                                                     */
-/*  Source is provided to this software because we believe users have  */
-/*  a right to know exactly what a program is going to do before they  */
-/*  run it.  This also allows you to audit the software for security   */
-/*  holes (none have been found so far).                               */
-/*                                                                     */
-/*  Source code also allows you to port Nmap to new platforms, fix     */
-/*  bugs, and add new features.  You are highly encouraged to send     */
-/*  your changes to fyodor@insecure.org for possible incorporation     */
-/*  into the main distribution.  By sending these changes to Fyodor or */
-/*  one the insecure.org development mailing lists, it is assumed that */
-/*  you are offering Fyodor the unlimited, non-exclusive right to      */
-/*  reuse, modify, and relicense the code.  This is important because  */
-/*  the inability to relicense code has caused devastating problems    */
-/*  for other Free Software projects (such as KDE and NASM).  Nmap     */
-/*  will always be available Open Source.  If you wish to specify      */
-/*  special license conditions of your contributions, just say so      */
-/*  when you send them.                                                */
-/*                                                                     */
-/*  This program is distributed in the hope that it will be useful,    */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of     */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  */
-/*  General Public License for more details (                          */
-/*  http://www.gnu.org/copyleft/gpl.html ).                            */
-/*                                                                     */
-/***********************************************************************/
 
-/* $Id: scan_engine.c,v 1.11 2002/04/02 06:57:12 fyodor Exp $ */
+/***********************************************************************
+ * scanengine.cc -- Includes much of the "engine" functions for        *
+ * scanning, such as pos_scan and super_scan.  It also includes        *
+ * dependant functions such as those for collectiong SYN/connect scan  *
+ * responses.                                                          *
+ *                                                                     *
+ ***********************************************************************
+ *  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  *
+ *  program is free software; you can redistribute it and/or modify    *
+ *  it under the terms of the GNU General Public License as published  *
+ *  by the Free Software Foundation; Version 2.  This guarantees your  *
+ *  right to use, modify, and redistribute this software under certain *
+ *  conditions.  If this license is unacceptable to you, we may be     *
+ *  willing to sell alternative licenses (contact sales@insecure.com). *
+ *                                                                     *
+ *  If you received these files with a written license agreement       *
+ *  stating terms other than the (GPL) terms above, then that          *
+ *  alternative license agreement takes precendence over this comment. *
+ *                                                                     *
+ *  Source is provided to this software because we believe users have  *
+ *  a right to know exactly what a program is going to do before they  *
+ *  run it.  This also allows you to audit the software for security   *
+ *  holes (none have been found so far).                               *
+ *                                                                     *
+ *  Source code also allows you to port Nmap to new platforms, fix     *
+ *  bugs, and add new features.  You are highly encouraged to send     *
+ *  your changes to fyodor@insecure.org for possible incorporation     *
+ *  into the main distribution.  By sending these changes to Fyodor or *
+ *  one the insecure.org development mailing lists, it is assumed that *
+ *  you are offering Fyodor the unlimited, non-exclusive right to      *
+ *  reuse, modify, and relicense the code.  This is important because  *
+ *  the inability to relicense code has caused devastating problems    *
+ *  for other Free Software projects (such as KDE and NASM).  Nmap     *
+ *  will always be available Open Source.  If you wish to specify      *
+ *  special license conditions of your contributions, just say so      *
+ *  when you send them.                                                *
+ *                                                                     *
+ *  This program is distributed in the hope that it will be useful,    *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of     *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  *
+ *  General Public License for more details (                          *
+ *  http://www.gnu.org/copyleft/gpl.html ).                            *
+ *                                                                     *
+ ***********************************************************************/
+
+/* $Id: scan_engine.cc,v 1.7 2002/12/18 06:10:07 fyodor Exp $ */
 
 #include "scan_engine.h"
 #include "timing.h"
+#include "NmapOps.h"
 
-extern struct ops o;
+extern NmapOps o;
 
 /*  predefined filters -- I need to kill these globals at some pont. */
 extern unsigned long flt_dsthost, flt_srchost;
@@ -59,7 +61,7 @@ extern unsigned short flt_baseport;
    to be open trynum is the try number that was successful 
    I USE CURRENT->STATE TO DETERMINE WHETHER THE PORT IS OPEN
    OR FIREWALLED */
-static void posportupdate(struct hoststruct *target, struct portinfo *current, 
+static void posportupdate(Target *target, struct portinfo *current, 
 		   int trynum, struct portinfo *scan,
 		   struct scanstats *ss ,stype scantype, int newstate,
 		   struct portinfolist *pil, struct connectsockinfo *csi) {
@@ -70,9 +72,9 @@ static void posportupdate(struct hoststruct *target, struct portinfo *current,
   int i;
   char owner[1024];
 
-  if (tryident == -1 || target->host.s_addr != lasttarget) 
+  if (tryident == -1 || target->v4host().s_addr != lasttarget) 
     tryident = o.identscan;
-  lasttarget = target->host.s_addr;
+  lasttarget = target->v4host().s_addr;
   owner[0] = '\0';
   if (current->state != PORT_OPEN && current->state != PORT_CLOSED &&
       current->state != PORT_FIREWALLED && current->state != PORT_TESTING) {
@@ -98,7 +100,7 @@ static void posportupdate(struct hoststruct *target, struct portinfo *current,
 	ss->numqueries_ideal *= ss->fallback_percent; /* We need to act 
 							 forcefully on what 
 							 little info we have */
-      if (ss->numqueries_ideal < 1.0) ss->numqueries_ideal = 1.0;
+      ss->numqueries_ideal = MAX(ss->min_width, ss->numqueries_ideal);
     }
   }
 
@@ -108,7 +110,7 @@ static void posportupdate(struct hoststruct *target, struct portinfo *current,
 		    &sockaddr_in_len )) {
       pfatal("getsockname");
     }
-    if (getidentinfoz(target->host, ntohs(mysock.sin_port), current->portno, owner, sizeof(owner)) == -1)
+    if (getidentinfoz(target->v4host(), ntohs(mysock.sin_port), current->portno, owner, sizeof(owner)) == -1)
       tryident = 0;
   }
 
@@ -184,7 +186,7 @@ static void posportupdate(struct hoststruct *target, struct portinfo *current,
 
 /* Grab results from a connect() scan (eg check all the non-blocking
    outstanding connect requests for completion.  */
-static int get_connect_results(struct hoststruct *target, 
+static int get_connect_results(Target *target, 
 			       struct portinfo *scan, 
 			       struct scanstats *ss, struct portinfolist *pil, 
 			       int *portlookup, u32 *sequences, 
@@ -202,7 +204,9 @@ static int get_connect_results(struct hoststruct *target,
   struct timeval tv;
   int res;
 #ifdef LINUX
-  struct sockaddr_in sin,sout;
+  struct sockaddr_storage sin,sout;
+  struct sockaddr_in *s_in;
+  struct sockaddr_in6 *s_in6;
   NET_SIZE_T sinlen = sizeof(sin);
   NET_SIZE_T soutlen = sizeof(sout);
 #endif
@@ -278,15 +282,20 @@ static int get_connect_results(struct hoststruct *target,
 	      if (getpeername(sd, (struct sockaddr *) &sin, &sinlen) < 0) {
 		pfatal("error in getpeername of connect_results for port %hu", current->portno);
 	      } else {
-		if (current->portno != ntohs(sin.sin_port)) {
-		  error("Mismatch!!!! we think we have port %hu but we really have %hu", current->portno, ntohs(sin.sin_port));
+		s_in = (struct sockaddr_in *) &sin;
+		s_in6 = (struct sockaddr_in6 *) &sin;
+		if ((o.af() == AF_INET && 
+		    current->portno != ntohs(s_in->sin_port)) || (o.af() == AF_INET6 && current->portno != ntohs(s_in6->sin6_port))) {
+		  error("Mismatch!!!! we think we have port %hu but we really have a different one", current->portno);
 		}
 	      }
 
 	      if (getsockname(sd, (struct sockaddr *) &sout, &soutlen) < 0) {
 		pfatal("error in getsockname for port %hu", current->portno);
 	      }
-	      if (htons(sout.sin_port) == current->portno) {
+	      s_in = (struct sockaddr_in *) &sout;
+	      s_in6 = (struct sockaddr_in6 *) &sout;
+	      if ((o.af() == AF_INET && htons(s_in->sin_port) == current->portno) || (o.af() == AF_INET6 && htons(s_in6->sin6_port) == current->portno)) {
 		/* Linux 2.2 bug can lead to bogus successful connect()ions
 		   in this case -- we treat the port as bogus even though it
 		   is POSSIBLE that this is a real connection */
@@ -317,12 +326,12 @@ static int get_connect_results(struct hoststruct *target,
 	case ENETUNREACH:
 	case ENETRESET:
 	case ECONNABORTED:
-	  snprintf(buf, sizeof(buf), "Strange SO_ERROR from connection to %s (%d) -- bailing scan", inet_ntoa(target->host), optval);
+	  snprintf(buf, sizeof(buf), "Strange SO_ERROR from connection to %s (%d) -- bailing scan", target->targetipstr(), optval);
 	  perror(buf);
 	  return -1;
 	  break;
 	default:
-	  snprintf(buf, sizeof(buf), "Strange read error from %s (%d)", inet_ntoa(target->host), optval);
+	  snprintf(buf, sizeof(buf), "Strange read error from %s (%d)", target->targetipstr(), optval);
 	  perror(buf);
 	  break;
 	}
@@ -335,7 +344,7 @@ static int get_connect_results(struct hoststruct *target,
 
 /* Grab results for a SYN scan.  We assume the SYNs have already been sent,
    and we sniff for SYN|ACK or RST packets */
-static void get_syn_results(struct hoststruct *target, struct portinfo *scan,
+static void get_syn_results(Target *target, struct portinfo *scan,
 		     struct scanstats *ss, struct portinfolist *pil, 
 		     int *portlookup, pcap_t *pd, u32 *sequences, 
 		     stype scantype) {
@@ -383,7 +392,8 @@ static void get_syn_results(struct hoststruct *target, struct portinfo *scan,
       quit = 1;
     }
 
-    if (ip->ip_src.s_addr == target->host.s_addr && ip->ip_p == IPPROTO_TCP) {
+    if (ip->ip_src.s_addr == target->v4host().s_addr && 
+	ip->ip_p == IPPROTO_TCP) {
       tcp = (struct tcphdr *) (((char *) ip) + 4 * ip->ip_hl);
       i = ntohs(tcp->th_dport);
       if (i < o.magic_port || i > o.magic_port + 15) {
@@ -394,10 +404,10 @@ static void get_syn_results(struct hoststruct *target, struct portinfo *scan,
       newport = ntohs(tcp->th_sport);
       /* In case we are scanning localhost and see outgoing packets */
       /* If only one of SYN, ACK flags are set, we skip it */
-      if (ip->ip_src.s_addr == target->source_ip.s_addr && ((tcp->th_flags == TH_ACK) || (tcp->th_flags == TH_SYN))) {
+      if (ip->ip_src.s_addr == target->v4source().s_addr && ((tcp->th_flags == TH_ACK) || (tcp->th_flags == TH_SYN))) {
 	continue;
       }
-      if (portlookup[newport] < 0) {
+      if (portlookup[newport] < 0 || scan[portlookup[newport]].state == PORT_FRESH) {
 	if (o.debugging) {
 	  log_write(LOG_STDOUT, "Strange packet from port %d:\n", ntohs(tcp->th_sport));
 	  readtcppacket((unsigned char *)ip, bytes);
@@ -472,7 +482,7 @@ static void get_syn_results(struct hoststruct *target, struct portinfo *scan,
 
       /* Lets ensure this packet relates to a packet to the host
 	 we are scanning ... */
-      if (ip2->ip_dst.s_addr != target->host.s_addr) {
+      if (ip2->ip_dst.s_addr != target->v4host().s_addr) {
 	if (o.debugging > 1)
 	  error("Got an ICMP message which does not relate to a packet sent to the host being scanned");
 	continue;
@@ -492,7 +502,7 @@ static void get_syn_results(struct hoststruct *target, struct portinfo *scan,
 	}
        
 	newport = ntohs(data[1]);
-	if (portlookup[newport] >= 0) {
+	if (portlookup[newport] >= 0 && scan[portlookup[newport]].state != PORT_FRESH) {
 	  current = &scan[portlookup[newport]];
 	  trynum = (current->trynum == 0)? 0 : -1;
 	  newstate = PORT_FIREWALLED;
@@ -521,24 +531,26 @@ static void get_syn_results(struct hoststruct *target, struct portinfo *scan,
 /* Handles the "positive-response" scans (where we get a response
    telling us that the port is open based on the probe.  This includes
    SYN Scan, Connect Scan, RPC scan, Window Scan, and ACK scan */
-void pos_scan(struct hoststruct *target, u16 *portarray, int numports, stype scantype) {
+void pos_scan(Target *target, u16 *portarray, int numports, stype scantype) {
   int initial_packet_width;  /* How many scan packets in parallel (to start with) */
   struct scanstats ss;
-  int rawsd;
-  char myname[513];
+  int rawsd = -1;
   int scanflags = 0;
   int victim;
   int senddelay = 0;
   pcap_t *pd = NULL;
   char filter[512];
-  char *p;
   u32 ack_number = 0;
   int tries = 0;
   int  res;
   int connecterror = 0;
   int starttime;
-  struct hostent *myhostent = NULL;
-  struct sockaddr_in sock;
+  struct sockaddr_storage sock;
+  struct sockaddr_in *sin = (struct sockaddr_in *) &sock;
+#if HAVE_IPV6
+  struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) &sock;
+#endif
+  size_t socklen;
   struct portinfo *scan = NULL,  *current, *next;
   struct portinfolist pil;
   int portlookup[65536]; /* Indexes port number -> scan[] index */
@@ -548,13 +560,14 @@ void pos_scan(struct hoststruct *target, u16 *portarray, int numports, stype sca
   u32 sequences[3]; /* for various reasons we use 3 separate
 				 ones rather than simply incrementing from
 				 a base */
+  char hostname[1200];
   int i;
   unsigned long j;
 
   if (target->timedout)
     return;
 
-  if (! numports) return;		 /* nothing to scan for */
+  if (! numports && scantype != RPC_SCAN) return; /* nothing to scan for */
 
   /* If it is a SYN scan and we have already figured out the states
      of all the TCP ports, might as well skip the scan (this can happen
@@ -599,8 +612,11 @@ void pos_scan(struct hoststruct *target, u16 *portarray, int numports, stype sca
     }
   }
 
-  if (initial_packet_width > ss.max_width)
-    initial_packet_width = ss.max_width;
+  if (o.min_parallelism) {
+    ss.min_width = o.min_parallelism;
+  } else ss.min_width = 1;
+
+  initial_packet_width = box(ss.min_width, ss.max_width, initial_packet_width);
   ss.numqueries_ideal = initial_packet_width;
 
   memset(portlookup, 255, sizeof(portlookup)); /* 0xffffffff better always be (int) -1 */
@@ -608,7 +624,7 @@ void pos_scan(struct hoststruct *target, u16 *portarray, int numports, stype sca
 
   if (scantype != RPC_SCAN) {
     /* Initialize our portlist (scan) */
-    scan = (struct portinfo *) safe_malloc(numports * sizeof(struct portinfo));
+    scan = (struct portinfo *) safe_zalloc(numports * sizeof(struct portinfo));
     for(i = 0; i < numports; i++) {
       scan[i].state = PORT_FRESH;
       scan[i].portno = portarray[i];
@@ -639,17 +655,6 @@ void pos_scan(struct hoststruct *target, u16 *portarray, int numports, stype sca
     /* Init ISNs */
     get_random_bytes(sequences, sizeof(sequences));
 
-    /* Do we have a correct source address? */
-    if (!target->source_ip.s_addr) {
-      if (gethostname(myname, MAXHOSTNAMELEN) != 0 ||
-	  !((myhostent = gethostbyname(myname))))
-	fatal("Cannot get hostname!  Try using -S <my_IP_address> or -e <interface to scan through>\n"); 
-      memcpy(&target->source_ip, myhostent->h_addr_list[0], sizeof(struct in_addr));
-      if (o.debugging || o.verbose) 
-	log_write(LOG_STDOUT, "We skillfully deduced that your address is %s\n",
-		inet_ntoa(target->source_ip));
-    }
-    
     /* Now for the pcap opening nonsense ...
        Note that the snaplen is 100 = 64 byte max IPhdr + 24 byte max 
        link_layer header + first 12 bytes of TCP header.
@@ -657,12 +662,10 @@ void pos_scan(struct hoststruct *target, u16 *portarray, int numports, stype sca
     
     pd = my_pcap_open_live(target->device, 100,  (o.spoofsource)? 1 : 0, 20);
     
-    flt_srchost = target->host.s_addr;
-    flt_dsthost = target->source_ip.s_addr;
+    flt_srchost = target->v4host().s_addr;
+    flt_dsthost = target->v4source().s_addr;
 
-    p = strdup(inet_ntoa(target->host));
-    snprintf(filter, sizeof(filter), "(icmp and dst host %s) or (tcp and src host %s and dst host %s)", inet_ntoa(target->source_ip), p, inet_ntoa(target->source_ip));
-    free(p);
+    snprintf(filter, sizeof(filter), "dst host %s and (icmp or (tcp and src host %s))", inet_ntoa(target->v4source()), target->targetipstr());
 
     set_pcap_filter(target, pd, flt_icmptcp, filter);
 
@@ -674,11 +677,10 @@ void pos_scan(struct hoststruct *target, u16 *portarray, int numports, stype sca
   } else if (scantype == CONNECT_SCAN) {
     rawsd = -1;
     /* Init our sock */
-    bzero((char *)&sock,sizeof(struct sockaddr_in));
-    sock.sin_addr.s_addr = target->host.s_addr;
-    sock.sin_family=AF_INET;
-  } else {
-    /* RPC Scan */
+    if (target->TargetSockAddr(&sock, &socklen) != 0) {
+      fatal("Failed to get target socket address in pos_scan");
+    }
+  } else if (scantype == RPC_SCAN) {
     get_rpc_procs(&(rsi.rpc_progs), &(rsi.rpc_number));
     scan = (struct portinfo *) safe_malloc(rsi.rpc_number * sizeof(struct portinfo));
     for(j = 0; j < rsi.rpc_number; j++) {
@@ -693,6 +695,8 @@ void pos_scan(struct hoststruct *target, u16 *portarray, int numports, stype sca
     current = pil.testinglist = &scan[0]; 
     rawsd = -1;
     rsi.rpc_current_port = NULL; /*nextport(&target->ports, NULL, 0, PORT_OPEN); */
+  } else {
+    fatal("Unknown scan type given to pos_scan()");
   }
 
   starttime = time(NULL);
@@ -702,7 +706,7 @@ void pos_scan(struct hoststruct *target, u16 *portarray, int numports, stype sca
   else ack_number = 0;
 
   if (o.debugging || o.verbose) {  
-    log_write(LOG_STDOUT, "Initiating %s against %s (%s)\n", scantype2str(scantype), target->name, inet_ntoa(target->host));
+    log_write(LOG_STDOUT, "Initiating %s against %s\n", scantype2str(scantype), target->NameIP(hostname, sizeof(hostname)));
   }
 
   do {
@@ -813,9 +817,9 @@ void pos_scan(struct hoststruct *target, u16 *portarray, int numports, stype sca
 		now = current->sent[current->trynum];
 		if ((scantype == SYN_SCAN) || (scantype == WINDOW_SCAN) || (scantype == ACK_SCAN)) {	      
 		  if (o.fragscan)
-		    send_small_fragz_decoys(rawsd, &target->host, sequences[current->trynum], o.magic_port + tries * 3 + current->trynum, current->portno, scanflags);
+		    send_small_fragz_decoys(rawsd, target->v4hostip(), sequences[current->trynum], o.magic_port + tries * 3 + current->trynum, current->portno, scanflags);
 		  else 
-		    send_tcp_raw_decoys(rawsd, &target->host, o.magic_port + 
+		    send_tcp_raw_decoys(rawsd, target->v4hostip(), o.magic_port + 
 					tries * 3 + current->trynum, 
 					current->portno, 
 					sequences[current->trynum], 
@@ -824,7 +828,7 @@ void pos_scan(struct hoststruct *target, u16 *portarray, int numports, stype sca
 					o.extra_payload_length);
 
 		} else if (scantype == RPC_SCAN) {
-		  if (send_rpc_query(&target->host, rsi.rpc_current_port->portno,
+		  if (send_rpc_query(target->v4hostip(), rsi.rpc_current_port->portno,
 				     rsi.rpc_current_port->proto, 
 				     current->portno, current - scan, 
 				     current->trynum) == -1) {
@@ -854,14 +858,18 @@ void pos_scan(struct hoststruct *target, u16 *portarray, int numports, stype sca
 		  } else {
 		    ss.numqueries_outstanding++;
 		  }
-		  res = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		  res = socket(o.af(), SOCK_STREAM, IPPROTO_TCP);
 		  if (res == -1) pfatal("Socket troubles in pos_scan 143");
 		  csi.socklookup[res] = current;
 		  unblock_socket(res);
 		  init_socket(res);
-		  sock.sin_port = htons(current->portno);
+		  if (sin->sin_family == AF_INET)
+		    sin->sin_port = htons(current->portno);
+#if HAVE_IPV6
+		  else sin6->sin6_port = htons(current->portno);
+#endif
 		  current->sd[current->trynum] = res;		
-		  res =  connect(res,(struct sockaddr *)&sock,sizeof(struct sockaddr));
+		  res =  connect(res,(struct sockaddr *)&sock, socklen);
 		  if (res != -1) {
 		    posportupdate(target, current, current->trynum, scan, &ss, scantype, PORT_OPEN, &pil, &csi);
 		  } else {
@@ -909,15 +917,15 @@ void pos_scan(struct hoststruct *target, u16 *portarray, int numports, stype sca
 	    if ((scantype == SYN_SCAN) || (scantype == WINDOW_SCAN) || 
 		(scantype == ACK_SCAN)) {	  
 	      if (o.fragscan)
-		send_small_fragz_decoys(rawsd, &target->host, sequences[current->trynum], o.magic_port + tries * 3, current->portno, scanflags);
+		send_small_fragz_decoys(rawsd, target->v4hostip(), sequences[current->trynum], o.magic_port + tries * 3, current->portno, scanflags);
 	      else
-		send_tcp_raw_decoys(rawsd, &target->host, 
+		send_tcp_raw_decoys(rawsd, target->v4hostip(), 
 				    o.magic_port + tries * 3, current->portno,
 				    sequences[current->trynum], ack_number, 
 				    scanflags, 0, NULL, 0, o.extra_payload, 
 				    o.extra_payload_length);
 	    } else if (scantype == RPC_SCAN) {
-	      if (send_rpc_query(&target->host, rsi.rpc_current_port->portno,
+	      if (send_rpc_query(target->v4hostip(), rsi.rpc_current_port->portno,
 				 rsi.rpc_current_port->proto, current->portno, 
 				 current - scan, current->trynum) == -1) {
 		/* Futz, I'll give up on this guy ... */
@@ -925,7 +933,7 @@ void pos_scan(struct hoststruct *target, u16 *portarray, int numports, stype sca
 		break;
 	      }
 	    } else { /* CONNECT SCAN */
-	      res = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	      res = socket(o.af(), SOCK_STREAM, IPPROTO_TCP);
 	      if (res == -1) pfatal("Socket troubles in pos_scan 11234");
 #ifdef WIN32
 	      if(res > 2047)
@@ -934,9 +942,13 @@ void pos_scan(struct hoststruct *target, u16 *portarray, int numports, stype sca
 	      csi.socklookup[res] = current;
 	      unblock_socket(res);
 	      init_socket(res);
-	      sock.sin_port = htons(current->portno);
+	      if (sin->sin_family == AF_INET)
+		sin->sin_port = htons(current->portno);
+#if HAVE_IPV6
+	      else sin6->sin6_port = htons(current->portno);
+#endif
 	      current->sd[current->trynum] = res;		
-	      res =  connect(res,(struct sockaddr *)&sock,sizeof(struct sockaddr));
+	      res =  connect(res,(struct sockaddr *)&sock, socklen);
 	      if (res != -1) {
 		posportupdate(target, current, current->trynum, scan, &ss, scantype, PORT_OPEN, &pil, &csi);
 	      } else {
@@ -1079,14 +1091,15 @@ void pos_scan(struct hoststruct *target, u16 *portarray, int numports, stype sca
 /* FTP bounce attack scan.  This function is rather lame and should be
    rewritten.  But I don't think it is used much anyway.  If I'm going to
    allow FTP bounce scan, I should really allow SOCKS proxy scan.  */
-void bounce_scan(struct hoststruct *target, u16 *portarray, int numports,
+void bounce_scan(Target *target, u16 *portarray, int numports,
 		 struct ftpinfo *ftp) {
   int starttime,  res , sd = ftp->sd,  i=0;
-  char *t = (char *)&target->host; 
+  const char *t = (const char *)target->v4hostip(); 
   int retriesleft = FTP_RETRIES;
   char recvbuf[2048]; 
   char targetstr[20];
   char command[512];
+  char hostname[1200];
   unsigned short portno,p1,p2;
   struct timeval now;
 
@@ -1096,8 +1109,8 @@ void bounce_scan(struct hoststruct *target, u16 *portarray, int numports,
 
   starttime = time(NULL);
   if (o.verbose || o.debugging)
-    log_write(LOG_STDOUT, "Initiating TCP ftp bounce scan against %s (%s)\n",
-	    target->name,  inet_ntoa(target->host));
+    log_write(LOG_STDOUT, "Initiating TCP ftp bounce scan against %s\n",
+	    target->NameIP(hostname, sizeof(hostname)));
   for(i=0; portarray[i]; i++) {
 
     /* Check for timeout */
@@ -1208,13 +1221,12 @@ void bounce_scan(struct hoststruct *target, u16 *portarray, int numports,
 /* Handles the scan types where no positive-acknowledgement of open
    port is received (those scans are in pos_scan).  Super_scan
    includes scans such as FIN/XMAS/NULL/Maimon/UDP and IP Proto scans */
-void super_scan(struct hoststruct *target, u16 *portarray, int numports,
+void super_scan(Target *target, u16 *portarray, int numports,
 		stype scantype) {
   int initial_packet_width;  /* How many scan packets in parallel (to start with) */
   int packet_incr = 4; /* How much we increase the parallel packets by each round */
   double fallback_percent = 0.7;
   int rawsd;
-  char myname[513];
   int scanflags = 0;
 
   int dropped = 0;  /* These three are for UDP squelching */
@@ -1225,17 +1237,16 @@ void super_scan(struct hoststruct *target, u16 *portarray, int numports,
   struct ip *ip, *ip2;
   struct tcphdr *tcp;
   char filter[512];
-  char *p;
   int changed = 0;  /* Have we found new ports (or rejected earlier "found" ones) this round? */
   int numqueries_outstanding = 0; /* How many unexpired queries are on the 'net right now? */
   double numqueries_ideal; /* How many do we WANT to be on the 'net right now? */
   int max_width; /* No more packets than this at once, pleeze */
+  int min_width; /* At least this many at once */
   int tries = 0;
   int tmp = 0;
   int starttime;
   u16 newport;
   int newstate = 999; /* This ought to break something if used illegally */
-  struct hostent *myhostent = NULL;
   struct portinfo *scan, *openlist, *current, *testinglist, *next;
   int portlookup[65536]; /* Indexes port number -> scan[] index */
   struct timeval now, end;
@@ -1248,6 +1259,7 @@ void super_scan(struct hoststruct *target, u16 *portarray, int numports,
   struct icmp *icmp;
   int portno;
   struct port *current_port_tmp;
+  char hostname[1200];
 
   if (target->timedout)
     return;
@@ -1258,7 +1270,8 @@ void super_scan(struct hoststruct *target, u16 *portarray, int numports,
     log_write(LOG_STDOUT, "Starting super_scan\n");
 
   max_width = (o.max_parallelism)? o.max_parallelism : 125;
-  numqueries_ideal = initial_packet_width = MIN(max_width, 10);
+  min_width = (o.min_parallelism)? o.min_parallelism : 1;
+  numqueries_ideal = initial_packet_width = MAX(min_width, MIN(max_width, 10));
 
   memset(portlookup, 255, 65536 * sizeof(int)); /* 0xffffffff better always be (int) -1 */
   scan = (struct portinfo *) safe_malloc(numports * sizeof(struct portinfo));
@@ -1297,32 +1310,18 @@ void super_scan(struct hoststruct *target, u16 *portarray, int numports,
      unblock_socket(rawsd);
   */
 
-  /* Do we have a correct source address? */
-  if (!target->source_ip.s_addr) {
-    if (gethostname(myname, MAXHOSTNAMELEN) != 0 ||
-	!((myhostent = gethostbyname(myname))))
-      fatal("Cannot get hostname!  Try using -S <my_IP_address> or -e <interface to scan through>\n"); 
-    memcpy(&target->source_ip, myhostent->h_addr_list[0], sizeof(struct in_addr));
-    if (o.debugging || o.verbose) 
-      log_write(LOG_STDOUT, "We skillfully deduced that your address is %s\n",
-	      inet_ntoa(target->source_ip));
-  }
-
   /* Now for the pcap opening nonsense ... */
   /* Note that the snaplen is 92 = 64 byte max IPhdr + 24 byte max link_layer
    * header + 4 bytes of TCP port info.
    */
-
   pd = my_pcap_open_live(target->device, 92,  (o.spoofsource)? 1 : 0, 10);
 
 
-  flt_srchost = target->host.s_addr;
-  flt_dsthost = target->source_ip.s_addr;
+  flt_srchost = target->v4host().s_addr;
+  flt_dsthost = target->v4source().s_addr;
   flt_baseport = o.magic_port;
 
-  p = strdup(inet_ntoa(target->host));
-  snprintf(filter, sizeof(filter), "(icmp and dst host %s) or (tcp and src host %s and dst host %s and ( dst port %d or dst port %d))", inet_ntoa(target->source_ip), p, inet_ntoa(target->source_ip), o.magic_port , o.magic_port + 1);
-  free(p);
+  snprintf(filter, sizeof(filter), "(icmp and dst host %s) or (tcp and src host %s and dst host %s and ( dst port %d or dst port %d))", inet_ntoa(target->v4source()), target->targetipstr(), inet_ntoa(target->v4source()), o.magic_port , o.magic_port + 1);
 
   set_pcap_filter(target, pd, flt_icmptcp_2port, filter);
 
@@ -1337,7 +1336,7 @@ void super_scan(struct hoststruct *target, u16 *portarray, int numports,
   starttime = time(NULL);
 
   if (o.debugging || o.verbose)
-    log_write(LOG_STDOUT, "Initiating %s against %s (%s)\n", scantype2str(scantype), target->name, inet_ntoa(target->host));
+    log_write(LOG_STDOUT, "Initiating %s against %s\n", scantype2str(scantype), target->NameIP(hostname, sizeof(hostname)));
   
 
   do {
@@ -1391,14 +1390,14 @@ void super_scan(struct hoststruct *target, u16 *portarray, int numports,
 		gettimeofday(&current->sent[1], NULL);
 		now = current->sent[1];
 		if (o.fragscan)
-		  send_small_fragz_decoys(rawsd, &target->host, 0,i, current->portno, scanflags);
+		  send_small_fragz_decoys(rawsd, target->v4hostip(), 0,i, current->portno, scanflags);
 		else if (scantype == UDP_SCAN)
-		  send_udp_raw_decoys(rawsd, &target->host, i,
+		  send_udp_raw_decoys(rawsd, target->v4hostip(), i,
 				      current->portno, o.extra_payload, o.extra_payload_length);
 		else if (scantype == IPPROT_SCAN)
-		  send_ip_raw_decoys(rawsd, &target->host, current->portno, o.extra_payload, o.extra_payload_length);
+		  send_ip_raw_decoys(rawsd, target->v4hostip(), current->portno, o.extra_payload, o.extra_payload_length);
 		else
-		  send_tcp_raw_decoys(rawsd, &target->host, i, 
+		  send_tcp_raw_decoys(rawsd, target->v4hostip(), i, 
 				      current->portno, 0, 0, scanflags, 0, NULL, 0,
 				      o.extra_payload, o.extra_payload_length);
 		if (senddelay &&
@@ -1420,15 +1419,15 @@ void super_scan(struct hoststruct *target, u16 *portarray, int numports,
 	    numqueries_outstanding++;
 	    gettimeofday(&current->sent[0], NULL);
 	    if (o.fragscan)
-	      send_small_fragz_decoys(rawsd, &target->host, 0, o.magic_port, current->portno, scanflags);
+	      send_small_fragz_decoys(rawsd, target->v4hostip(), 0, o.magic_port, current->portno, scanflags);
 	    else if (scantype == UDP_SCAN)
-	      send_udp_raw_decoys(rawsd, &target->host, o.magic_port,
+	      send_udp_raw_decoys(rawsd, target->v4hostip(), o.magic_port,
 				  current->portno, o.extra_payload, o.extra_payload_length);
 	    else if (scantype == IPPROT_SCAN)
-	      send_ip_raw_decoys(rawsd, &target->host,
+	      send_ip_raw_decoys(rawsd, target->v4hostip(),
 				 current->portno, o.extra_payload, o.extra_payload_length);
 	    else
-	      send_tcp_raw_decoys(rawsd, &target->host, o.magic_port, 
+	      send_tcp_raw_decoys(rawsd, target->v4hostip(), o.magic_port, 
 				  current->portno, 0, 0, scanflags, 0, NULL, 0,
 				  o.extra_payload, o.extra_payload_length);
 	    if ((scantype == UDP_SCAN || scantype == IPPROT_SCAN) &&
@@ -1461,7 +1460,7 @@ void super_scan(struct hoststruct *target, u16 *portarray, int numports,
 	      continue;	
 	    current = NULL;
 	    if (ip->ip_p == IPPROTO_ICMP ||
-		ip->ip_src.s_addr == target->host.s_addr) {
+		ip->ip_src.s_addr == target->v4host().s_addr) {
 	      if (ip->ip_p == IPPROTO_TCP) {
 		tcp = (struct tcphdr *) (((char *) ip) + 4 * ip->ip_hl);
 		if (tcp->th_flags & TH_RST) {	    
@@ -1500,7 +1499,7 @@ void super_scan(struct hoststruct *target, u16 *portarray, int numports,
 	      } else if (ip->ip_p == IPPROTO_ICMP) {
 		icmp = (struct icmp *) ((char *)ip + 4 * ip->ip_hl);
 		ip2 = (struct ip *) (((char *) icmp) + 8);
-		if (ip2->ip_dst.s_addr != target->host.s_addr)
+		if (ip2->ip_dst.s_addr != target->v4host().s_addr)
 		  continue;
 		data = (u16 *) ((char *)ip2 + 4 * ip2->ip_hl);
 		/*	    log_write(LOG_STDOUT, "Caught ICMP packet:\n");
@@ -1540,7 +1539,8 @@ void super_scan(struct hoststruct *target, u16 *portarray, int numports,
 		    break;
 		  
 		  case 3: /* p0rt unreachable */		
-		    if (scantype == UDP_SCAN) {
+		    if (scantype == UDP_SCAN && 
+			ip->ip_src.s_addr == target->v4host().s_addr) {
 		      newstate = PORT_CLOSED;
 		    } else newstate = PORT_FIREWALLED;
 		    break;
@@ -1597,8 +1597,7 @@ void super_scan(struct hoststruct *target, u16 *portarray, int numports,
 			log_write(LOG_STDOUT, "Too many drops ... increasing senddelay to %d\n", senddelay);
 		    }
 		    if (windowdecrease == 0) {
-		      numqueries_ideal *= fallback_percent;
-		      if (numqueries_ideal < 1) numqueries_ideal = 1;
+		      numqueries_ideal = MAX(min_width, numqueries_ideal * fallback_percent);
 		      if (o.debugging) { log_write(LOG_STDOUT, "Lost a packet, decreasing window to %d\n", (int) numqueries_ideal);
 		      windowdecrease++;
 		      if (scantype == UDP_SCAN || scantype == IPPROT_SCAN)

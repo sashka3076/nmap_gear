@@ -15,7 +15,7 @@
  * WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * @(#) $Header: /CVS/nmap/libpcap-possiblymodified/nlpid.h,v 1.1.1.1 2001/06/03 08:19:45 fyodor Exp $ (Juniper)
+ * @(#) $Header: /CVS/nmap/libpcap-possiblymodified/nlpid.h,v 1.2 2002/12/18 06:10:07 fyodor Exp $ (Juniper)
  */
 
 /* Types missing from some systems */

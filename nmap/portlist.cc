@@ -1,59 +1,60 @@
 
-/***********************************************************************/
-/* portlist.c -- Functions for manipulating various lists of ports     */
-/* maintained internally by Nmap.                                      */
-/*                                                                     */
-/***********************************************************************/
-/*  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  */
-/*  program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published  */
-/*  by the Free Software Foundation; Version 2.  This guarantees your  */
-/*  right to use, modify, and redistribute this software under certain */
-/*  conditions.  If this license is unacceptable to you, we may be     */
-/*  willing to sell alternative licenses (contact sales@insecure.com). */
-/*                                                                     */
-/*  If you received these files with a written license agreement       */
-/*  stating terms other than the (GPL) terms above, then that          */
-/*  alternative license agreement takes precendence over this comment. */
-/*                                                                     */
-/*  Source is provided to this software because we believe users have  */
-/*  a right to know exactly what a program is going to do before they  */
-/*  run it.  This also allows you to audit the software for security   */
-/*  holes (none have been found so far).                               */
-/*                                                                     */
-/*  Source code also allows you to port Nmap to new platforms, fix     */
-/*  bugs, and add new features.  You are highly encouraged to send     */
-/*  your changes to fyodor@insecure.org for possible incorporation     */
-/*  into the main distribution.  By sending these changes to Fyodor or */
-/*  one the insecure.org development mailing lists, it is assumed that */
-/*  you are offering Fyodor the unlimited, non-exclusive right to      */
-/*  reuse, modify, and relicense the code.  This is important because  */
-/*  the inability to relicense code has caused devastating problems    */
-/*  for other Free Software projects (such as KDE and NASM).  Nmap     */
-/*  will always be available Open Source.  If you wish to specify      */
-/*  special license conditions of your contributions, just say so      */
-/*  when you send them.                                                */
-/*                                                                     */
-/*  This program is distributed in the hope that it will be useful,    */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of     */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  */
-/*  General Public License for more details (                          */
-/*  http://www.gnu.org/copyleft/gpl.html ).                            */
-/*                                                                     */
-/***********************************************************************/
+/***********************************************************************
+ * portlist.cc -- Functions for manipulating various lists of ports    *
+ * maintained internally by Nmap.                                      *
+ *                                                                     *
+ ***********************************************************************
+ *  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  *
+ *  program is free software; you can redistribute it and/or modify    *
+ *  it under the terms of the GNU General Public License as published  *
+ *  by the Free Software Foundation; Version 2.  This guarantees your  *
+ *  right to use, modify, and redistribute this software under certain *
+ *  conditions.  If this license is unacceptable to you, we may be     *
+ *  willing to sell alternative licenses (contact sales@insecure.com). *
+ *                                                                     *
+ *  If you received these files with a written license agreement       *
+ *  stating terms other than the (GPL) terms above, then that          *
+ *  alternative license agreement takes precendence over this comment. *
+ *                                                                     *
+ *  Source is provided to this software because we believe users have  *
+ *  a right to know exactly what a program is going to do before they  *
+ *  run it.  This also allows you to audit the software for security   *
+ *  holes (none have been found so far).                               *
+ *                                                                     *
+ *  Source code also allows you to port Nmap to new platforms, fix     *
+ *  bugs, and add new features.  You are highly encouraged to send     *
+ *  your changes to fyodor@insecure.org for possible incorporation     *
+ *  into the main distribution.  By sending these changes to Fyodor or *
+ *  one the insecure.org development mailing lists, it is assumed that *
+ *  you are offering Fyodor the unlimited, non-exclusive right to      *
+ *  reuse, modify, and relicense the code.  This is important because  *
+ *  the inability to relicense code has caused devastating problems    *
+ *  for other Free Software projects (such as KDE and NASM).  Nmap     *
+ *  will always be available Open Source.  If you wish to specify      *
+ *  special license conditions of your contributions, just say so      *
+ *  when you send them.                                                *
+ *                                                                     *
+ *  This program is distributed in the hope that it will be useful,    *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of     *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  *
+ *  General Public License for more details (                          *
+ *  http://www.gnu.org/copyleft/gpl.html ).                            *
+ *                                                                     *
+ ***********************************************************************/
 
-/* $Id: portlist.c,v 1.17 2001/12/30 11:20:08 fyodor Exp $ */
+/* $Id: portlist.cc,v 1.3 2002/11/11 18:03:45 fyodor Exp $ */
 
 
 #include "portlist.h"
 #include "nmap_error.h"
 #include "nmap.h"
+#include "NmapOps.h"
 
 #if HAVE_STRINGS_H
 #include <strings.h>
 #endif /* HAVE_STRINGS_H */
 
-extern struct ops o;  /* option structure */
+extern NmapOps o;  /* option structure */
 static struct port *freeportlist = NULL;
 
 /* gawd, my next project will be in c++ so I don't have to deal with
@@ -67,12 +68,20 @@ int addport(portlist *plist, u16 portno, u8 protocol, char *owner, int state) {
     if (owner && *owner) {
       snprintf(msg, sizeof(msg), " (owner: %s)", owner);
     } else msg[0] = '\0';
-
+    
     log_write(LOG_STDOUT, "Adding %s port %hu/%s%s\n",
 	      statenum2str(state), portno, 
 	      (protocol == IPPROTO_TCP)? "tcp" : "udp", msg);
     log_flush(LOG_STDOUT);
+    
+    /* Write out add port messages for XML format so wrapper libraries can
+       use it and not have to parse LOG_STDOUT ;), which is a pain! */
+    
+    log_write(LOG_XML, "<addport state=\"%s\" portid=\"%hu\" protocol=\"%s\"/>\n", statenum2str(state), portno,
+	      (protocol == IPPROTO_TCP)? "tcp" : "udp");
+    log_flush(LOG_XML); 
   }
+
 
 /* Make sure state is OK */
   if (state != PORT_OPEN && state != PORT_CLOSED && state != PORT_FIREWALLED &&
@@ -81,21 +90,18 @@ int addport(portlist *plist, u16 portno, u8 protocol, char *owner, int state) {
 
   if (protocol == IPPROTO_TCP) {
     if (!plist->tcp_ports) {
-      plist->tcp_ports = (struct port **) safe_malloc(65536 * sizeof(struct port *));
-      bzero(plist->tcp_ports, 65536 * sizeof(struct port *));
+      plist->tcp_ports = (struct port **) safe_zalloc(65536 * sizeof(struct port *));
     }
     portarray = plist->tcp_ports;
   } else if (protocol == IPPROTO_UDP) {
     if (!plist->udp_ports) {
-      plist->udp_ports = (struct port **) safe_malloc(65536 * sizeof(struct port *));
-      bzero(plist->udp_ports, 65536 * sizeof(struct port *));
+      plist->udp_ports = (struct port **) safe_zalloc(65536 * sizeof(struct port *));
     }
     portarray = plist->udp_ports;
   } else if (protocol == IPPROTO_IP) {
     assert(portno < 256);
     if (!plist->ip_prots) {
-      plist->ip_prots = (struct port **) safe_malloc(256 * sizeof(struct port *));
-      bzero(plist->ip_prots, 256 * sizeof(struct port *));
+      plist->ip_prots = (struct port **) safe_zalloc(256 * sizeof(struct port *));
     }
     portarray = plist->ip_prots;
   } else fatal("addport: attempted port insertion with invalid protocol");
@@ -245,7 +251,7 @@ void resetportlist(portlist *plist) {
     free(plist->ip_prots);
   }
 
-  bzero(plist, sizeof(portlist));
+  bzero(plist, sizeof(*plist));
 }
 
 

@@ -1,58 +1,59 @@
 
-/***********************************************************************/
-/* idle_scan.c -- Includes the function specific to "Idle Scan"        */
-/* support (-sI).  This is an extraordinarily cool scan type that      */
-/* can allow for completely blind scanning (eg no packets sent to the  */
-/* target from your own IP address) and can also be used to penetrate  */
-/* firewalls and scope out router ACLs.  This is one of the "advanced" */
-/* scans meant for epxerienced Nmap users.                             */
-/*                                                                     */
-/***********************************************************************/
-/*  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  */
-/*  program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published  */
-/*  by the Free Software Foundation; Version 2.  This guarantees your  */
-/*  right to use, modify, and redistribute this software under certain */
-/*  conditions.  If this license is unacceptable to you, we may be     */
-/*  willing to sell alternative licenses (contact sales@insecure.com). */
-/*                                                                     */
-/*  If you received these files with a written license agreement       */
-/*  stating terms other than the (GPL) terms above, then that          */
-/*  alternative license agreement takes precendence over this comment. */
-/*                                                                     */
-/*  Source is provided to this software because we believe users have  */
-/*  a right to know exactly what a program is going to do before they  */
-/*  run it.  This also allows you to audit the software for security   */
-/*  holes (none have been found so far).                               */
-/*                                                                     */
-/*  Source code also allows you to port Nmap to new platforms, fix     */
-/*  bugs, and add new features.  You are highly encouraged to send     */
-/*  your changes to fyodor@insecure.org for possible incorporation     */
-/*  into the main distribution.  By sending these changes to Fyodor or */
-/*  one the insecure.org development mailing lists, it is assumed that */
-/*  you are offering Fyodor the unlimited, non-exclusive right to      */
-/*  reuse, modify, and relicense the code.  This is important because  */
-/*  the inability to relicense code has caused devastating problems    */
-/*  for other Free Software projects (such as KDE and NASM).  Nmap     */
-/*  will always be available Open Source.  If you wish to specify      */
-/*  special license conditions of your contributions, just say so      */
-/*  when you send them.                                                */
-/*                                                                     */
-/*  This program is distributed in the hope that it will be useful,    */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of     */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  */
-/*  General Public License for more details (                          */
-/*  http://www.gnu.org/copyleft/gpl.html ).                            */
-/*                                                                     */
-/***********************************************************************/
+/***********************************************************************
+ * idle_scan.cc -- Includes the function specific to "Idle Scan"       *
+ * support (-sI).  This is an extraordinarily cool scan type that      *
+ * can allow for completely blind scanning (eg no packets sent to the  *
+ * target from your own IP address) and can also be used to penetrate  *
+ * firewalls and scope out router ACLs.  This is one of the "advanced" *
+ * scans meant for epxerienced Nmap users.                             *
+ *                                                                     *
+ ***********************************************************************
+ *  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  *
+ *  program is free software; you can redistribute it and/or modify    *
+ *  it under the terms of the GNU General Public License as published  *
+ *  by the Free Software Foundation; Version 2.  This guarantees your  *
+ *  right to use, modify, and redistribute this software under certain *
+ *  conditions.  If this license is unacceptable to you, we may be     *
+ *  willing to sell alternative licenses (contact sales@insecure.com). *
+ *                                                                     *
+ *  If you received these files with a written license agreement       *
+ *  stating terms other than the (GPL) terms above, then that          *
+ *  alternative license agreement takes precendence over this comment. *
+ *                                                                     *
+ *  Source is provided to this software because we believe users have  *
+ *  a right to know exactly what a program is going to do before they  *
+ *  run it.  This also allows you to audit the software for security   *
+ *  holes (none have been found so far).                               *
+ *                                                                     *
+ *  Source code also allows you to port Nmap to new platforms, fix     *
+ *  bugs, and add new features.  You are highly encouraged to send     *
+ *  your changes to fyodor@insecure.org for possible incorporation     *
+ *  into the main distribution.  By sending these changes to Fyodor or *
+ *  one the insecure.org development mailing lists, it is assumed that *
+ *  you are offering Fyodor the unlimited, non-exclusive right to      *
+ *  reuse, modify, and relicense the code.  This is important because  *
+ *  the inability to relicense code has caused devastating problems    *
+ *  for other Free Software projects (such as KDE and NASM).  Nmap     *
+ *  will always be available Open Source.  If you wish to specify      *
+ *  special license conditions of your contributions, just say so      *
+ *  when you send them.                                                *
+ *                                                                     *
+ *  This program is distributed in the hope that it will be useful,    *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of     *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  *
+ *  General Public License for more details (                          *
+ *  http://www.gnu.org/copyleft/gpl.html ).                            *
+ *                                                                     *
+ ***********************************************************************/
 
-/* $Id: idle_scan.c,v 1.13 2001/10/26 06:18:00 fyodor Exp $ */
+/* $Id: idle_scan.cc,v 1.14 2002/12/25 04:08:15 fyodor Exp $ */
 
 #include "idle_scan.h"
 #include "scan_engine.h"
 #include "timing.h"
 #include "osscan.h"
 #include "nmap.h"
+#include "NmapOps.h"
 
 #include <stdio.h>
 
@@ -65,7 +66,7 @@
 #pragma warning(disable: 4244)
 #endif
 
-extern struct ops o;
+extern NmapOps o;
 
 /*  predefined filters -- I need to kill these globals at some point. */
 extern unsigned long flt_dsthost, flt_srchost;
@@ -73,11 +74,13 @@ extern unsigned short flt_baseport;
 
 
 struct idle_proxy_info {
-  struct hoststruct host; /* contains name, IP, source IP, timing info, etc. */
+  Target host; /* contains name, IP, source IP, timing info, etc. */
   int seqclass; /* IPID sequence class (IPID_SEQ_* defined in nmap.h) */
   u16 latestid; /* The most recent IPID we have received from the proxy */
   u16 probe_port; /* The port we use for probing IPID infoz */
   u16 max_groupsz; /* We won't test groups larger than this ... */
+  u16 min_groupsz; /* We won't allow the group size to fall below this
+		      level.  Affected by --min_parallelism */
   double current_groupsz; /* Current group size being used ... depends on
                           conditions ... won't be higher than
                           max_groupsz */
@@ -109,7 +112,7 @@ int ipid_proxy_probe(struct idle_proxy_info *proxy, int *probes_sent,
   struct timeval tv_sent[3];
   int ipid = -1;
   int to_usec;
-  int bytes;
+  unsigned int bytes;
   int timedout = 0;
   int base_port;
   struct ip *ip;
@@ -131,8 +134,8 @@ int ipid_proxy_probe(struct idle_proxy_info *proxy, int *probes_sent,
     gettimeofday(&tv_sent[tries], NULL);
 
     /* Time to send the pr0be!*/
-    send_tcp_raw(proxy->rawsd, &(proxy->host.source_ip), &(proxy->host.host), 
-		 base_port + tries , proxy->probe_port, 
+    send_tcp_raw(proxy->rawsd, proxy->host.v4sourceip(), 
+		 proxy->host.v4hostip(), base_port + tries, proxy->probe_port, 
 		 seq_base + (packet_send_count++ * 500) + 1, ack, 
 		 TH_SYN|TH_ACK, 0, 
 		 NULL, 0, NULL, 0);
@@ -142,10 +145,10 @@ int ipid_proxy_probe(struct idle_proxy_info *proxy, int *probes_sent,
     /* Now it is time to wait for the response ... */
     to_usec = proxy->host.to.timeout;
     gettimeofday(&tv_end, NULL);
-    while((ipid == -1 || sent > rcvd) && to_usec >= 0) {
+    while((ipid == -1 || sent > rcvd) && to_usec > 0) {
 
       to_usec = proxy->host.to.timeout - TIMEVAL_SUBTRACT(tv_end, tv_sent[tries-1]);
-    
+      if (to_usec < 0) to_usec = 0; // Final no-block poll
       ip = (struct ip *) readip_pcap(proxy->pd, &bytes, to_usec);      
       gettimeofday(&tv_end, NULL);
       if (ip) {
@@ -161,12 +164,12 @@ int ipid_proxy_probe(struct idle_proxy_info *proxy, int *probes_sent,
 		error("Received IPID zombie probe response which probably came from an earlier prober instance ... increasing rttvar from %d to %d", 
 		      proxy->host.to.rttvar, (int) (proxy->host.to.rttvar * 1.2));
 	      }
-	      proxy->host.to.rttvar *= 1.2;
+	      proxy->host.to.rttvar = (int) (proxy->host.to.rttvar * 1.2);
 	      rcvd++;
 	    }
 	    else if (o.debugging > 1) {
 	      error("Received unexpected response packet from %s during ipid zombie probing:", inet_ntoa(ip->ip_src));
-	      readtcppacket((char *)ip,BSDUFIX(ip->ip_len));
+	      readtcppacket( (unsigned char *) ip,BSDUFIX(ip->ip_len));
 	    }
 	    continue;
 	  }
@@ -214,10 +217,10 @@ int ipid_distance(int seqclass , u16 startid, u16 endid) {
    the program */
 #define NUM_IPID_PROBES 6
 void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
-			  struct in_addr *first_target) {
+			  const struct in_addr *first_target) {
   int probes_sent = 0, probes_returned = 0;
   int hardtimeout = 9000000; /* Generally don't wait more than 9 secs total */
-  int bytes, to_usec;
+  unsigned int bytes, to_usec;
   int timedout = 0;
   char *p, *q;
   char *endptr = NULL;
@@ -227,6 +230,8 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
   int i;
   char filter[512]; /* Libpcap filter string */
   char name[MAXHOSTNAMELEN + 1];
+  struct sockaddr_storage ss;
+  size_t sslen;
   u32 sequence_base;
   u32 ack = 0;
   struct timeval probe_send_times[NUM_IPID_PROBES], tmptv;
@@ -249,6 +254,7 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
   proxy->host.to.timeout = o.initial_rtt_timeout * 1000;
 
   proxy->max_groupsz = (o.max_parallelism)? o.max_parallelism : 100;
+  proxy->min_groupsz = (o.min_parallelism)? o.min_parallelism : 4;
   proxy->max_senddelay = 100000;
 
   Strncpy(name, proxyName, sizeof(name));
@@ -259,23 +265,36 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
     if (*q==0 || !endptr || *endptr != '\0' || !proxy->probe_port) {
       fatal("Invalid port number given in IPID zombie specification: %s", proxyName);
     }
-  } else proxy->probe_port = o.tcp_probe_port;
+  } else {
+    proxy->probe_port = (o.num_ping_synprobes > 0)? o.ping_synprobes[0] : 
+      (o.num_ping_ackprobes > 0)? o.ping_ackprobes[0] :
+      DEFAULT_TCP_PROBE_PORT;
+  }
 
-  proxy->host.name = strdup(name);
-
-  if (resolve(name, &(proxy->host.host)) == 0) {
+  proxy->host.setHostName(name);
+  if (resolve(name, &ss, &sslen, o.pf()) == 0) {
     fatal("Could not resolve idlescan zombie host: %s", name);
   }
+  proxy->host.setTargetSockAddr(&ss, sslen);
 
   /* Lets figure out the appropriate source address to use when sending
      the pr0bez */
-  if (o.source && o.source->s_addr) {
-    proxy->host.source_ip.s_addr = o.source->s_addr;
-    Strncpy(proxy->host.device, o.device, sizeof(proxy->host.device));
+  if (o.spoofsource) {
+    o.SourceSockAddr(&ss, &sslen);
+    proxy->host.setSourceSockAddr(&ss, sslen);
+    Strncpy(proxy->host.device, o.device, sizeof(proxy->host.device));    
   } else {
-    dev = routethrough(&(proxy->host.host), &(proxy->host.source_ip));  
+    struct sockaddr_in *sin = (struct sockaddr_in *)&ss;
+    sslen = sizeof(*sin);
+    bzero(sin, sslen);
+    dev = routethrough(proxy->host.v4hostip(), &(sin->sin_addr));  
     if (!dev) fatal("Unable to find appropriate source address and device interface to use when sending packets to %s", proxyName);
     Strncpy(proxy->host.device, dev, sizeof(proxy->host.device));
+    sin->sin_family = AF_INET;
+#if HAVE_SOCKADDR_SA_LEN
+    sin->sin_len = sslen;
+#endif
+    proxy->host.setSourceSockAddr((struct sockaddr_storage *) sin, sslen);
   }
   /* Now lets send some probes to check IPID algorithm ... */
   /* First we need a raw socket ... */
@@ -290,8 +309,8 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
   * header + 64 byte max TCP header. */
   proxy->pd = my_pcap_open_live(proxy->host.device, 152,  (o.spoofsource)? 1 : 0, 50);
 
-  p = strdup(inet_ntoa(proxy->host.host));
-  q = strdup(inet_ntoa(proxy->host.source_ip));
+  p = strdup(proxy->host.targetipstr());
+  q = strdup(inet_ntoa(proxy->host.v4source()));
   snprintf(filter, sizeof(filter), "tcp and src host %s and dst host %s and src port %hu", p, q, proxy->probe_port);
  free(p); 
  free(q);
@@ -299,8 +318,8 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
 /* Windows nonsense -- I am not sure why this is needed, but I should
    get rid of it at sometime */
 
- flt_srchost = proxy->host.source_ip.s_addr;
- flt_dsthost = proxy->host.host.s_addr;
+ flt_srchost = proxy->host.v4source().s_addr;
+ flt_dsthost = proxy->host.v4host().s_addr;
 
  sequence_base = get_random_u32();
 
@@ -316,7 +335,8 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
        a response with the exact request for timing purposes.  So I
        think I'll use TH_SYN, although it is a tough call. */
     /* We can't use decoys 'cause that would screw up the IPIDs */
-    send_tcp_raw(proxy->rawsd, &(proxy->host.source_ip), &(proxy->host.host), 
+    send_tcp_raw(proxy->rawsd, proxy->host.v4sourceip(), 
+		 proxy->host.v4hostip(), 
 		 o.magic_port + probes_sent + 1, proxy->probe_port, 
 		 sequence_base + probes_sent + 1, 0, TH_SYN|TH_ACK, 
 		 ack, NULL, 0, NULL, 0);
@@ -391,14 +411,19 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
     }
   }
 
+  if (probes_returned == 0)
+    fatal("Idlescan zombie %s (%s) port %hu cannot be used because it has not returned any of our probes -- perhaps it is down or firewalled.", 
+	  proxy->host.HostName(), proxy->host.targetipstr(), 
+	  proxy->probe_port);
+
   proxy->seqclass = ipid_sequence(probes_returned, ipids, 0);
   switch(proxy->seqclass) {
   case IPID_SEQ_INCR:
   case IPID_SEQ_BROKEN_INCR:
-    log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "Idlescan using zombie %s (%s:%hu); Class: %s\n", proxy->host.name, inet_ntoa(proxy->host.host), proxy->probe_port, ipidclass2ascii(proxy->seqclass));
+    log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "Idlescan using zombie %s (%s:%hu); Class: %s\n", proxy->host.HostName(), proxy->host.targetipstr(), proxy->probe_port, ipidclass2ascii(proxy->seqclass));
     break;
   default:
-    fatal("Idlescan zombie %s (%s) port %hu cannot be used because IPID sequencability class is: %s.  Try another proxy.", proxy->host.name, inet_ntoa(proxy->host.host), proxy->probe_port, ipidclass2ascii(proxy->seqclass));
+    fatal("Idlescan zombie %s (%s) port %hu cannot be used because IPID sequencability class is: %s.  Try another proxy.", proxy->host.HostName(), proxy->host.targetipstr(), proxy->probe_port, ipidclass2ascii(proxy->seqclass));
   }
 
   proxy->latestid = ipids[probes_returned - 1];
@@ -409,6 +434,7 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
     if (o.debugging)
       error("idlescan initial zombie qualification test: %d probes sent, only %d returned", NUM_IPID_PROBES, probes_returned);
     proxy->current_groupsz = MIN(12, proxy->max_groupsz);
+    proxy->current_groupsz = MAX(proxy->current_groupsz, proxy->min_groupsz);
     proxy->senddelay += 5000;
   }
 
@@ -426,7 +452,7 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
   if (first_target) {  
     for (probes_sent = 0; probes_sent < 4; probes_sent++) {  
       if (probes_sent) usleep(50000);
-      send_tcp_raw(proxy->rawsd, first_target, &(proxy->host.host), 
+      send_tcp_raw(proxy->rawsd, first_target, proxy->host.v4hostip(), 
 		   o.magic_port, proxy->probe_port, 
 		   sequence_base + probes_sent + 1, 0, TH_SYN|TH_ACK, 
 		   ack, NULL, 0, NULL, 0);
@@ -439,13 +465,13 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
     if (newipid == -1)
       newipid = ipid_proxy_probe(proxy, NULL, NULL); /* OK, we'll give it one more try */
 
-    if (newipid < 0) fatal("Your IPID Zombie (%s; %s) is behaving strangely -- suddenly cannot obtain IPID", proxy->host.name, inet_ntoa(proxy->host.host));
+    if (newipid < 0) fatal("Your IPID Zombie (%s; %s) is behaving strangely -- suddenly cannot obtain IPID", proxy->host.HostName(), proxy->host.targetipstr());
       
     distance = ipid_distance(proxy->seqclass, proxy->latestid, newipid);
     if (distance <= 0) {
-      fatal("Your IPID Zombie (%s; %s) is behaving strangely -- suddenly cannot obtain valid IPID distance.", proxy->host.name, inet_ntoa(proxy->host.host));
+      fatal("Your IPID Zombie (%s; %s) is behaving strangely -- suddenly cannot obtain valid IPID distance.", proxy->host.HostName(), proxy->host.targetipstr());
     } else if (distance == 1) {
-      fatal("Even though your Zombie (%s; %s) appears to be vulnerable to IPID sequence prediction (class: %s), our attempts have failed.  There generally means that either the Zombie uses a separate IPID base for each host (like Solaris), or because you cannot spoof IP packets (perhaps your ISP has enabled egress filtering to prevent IP spoofing), or maybe the target network recognizes the packet source as bogus and drops them", proxy->host.name, inet_ntoa(proxy->host.host), ipidclass2ascii(proxy->seqclass));
+      fatal("Even though your Zombie (%s; %s) appears to be vulnerable to IPID sequence prediction (class: %s), our attempts have failed.  This generally means that either the Zombie uses a separate IPID base for each host (like Solaris), or because you cannot spoof IP packets (perhaps your ISP has enabled egress filtering to prevent IP spoofing), or maybe the target network recognizes the packet source as bogus and drops them", proxy->host.HostName(), proxy->host.targetipstr(), ipidclass2ascii(proxy->seqclass));
     }
     if (o.debugging && distance != 5) {
       error("WARNING: IPID spoofing test sent 4 packets and expected a distance of 5, but instead got %d", distance);
@@ -463,7 +489,7 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
    testcount was correct, timing is made more aggressive, while it is
    slowed down in the case of an error */
 void adjust_idle_timing(struct idle_proxy_info *proxy, 
-			struct hoststruct *target, int testcount, 
+			Target *target, int testcount, 
 			int realcount) {
 
   static int notidlewarning = 0;
@@ -484,29 +510,28 @@ void adjust_idle_timing(struct idle_proxy_info *proxy,
 	 about the first two.  The solution is to decrease our group
 	 size and add a sending delay */
 
-      proxy->current_groupsz *= 0.80; /* packets could be dropped because
-					too many sent at once */
-      proxy->current_groupsz = MAX(proxy->current_groupsz, 1);
+/* packets could be dropped because too many sent at once */
+      proxy->current_groupsz = MAX(proxy->min_groupsz, proxy->current_groupsz * 0.8);
       proxy->senddelay += 10000;
       proxy->senddelay = MIN(proxy->max_senddelay, proxy->senddelay);
        /* No group size should be greater than .5s of send delays */
-      proxy->current_groupsz = MAX(2, MIN(proxy->current_groupsz, 500000 / (proxy->senddelay + 1)));
+      proxy->current_groupsz = MAX(proxy->min_groupsz, MIN(proxy->current_groupsz, 500000 / (proxy->senddelay + 1)));
 
     } else if (testcount > realcount) {
       /* Perhaps the proxy host is not really idle ... */
       /* I guess all I can do is decrease the group size, so that if the proxy is not really idle, at least we may be able to scan cnunks more quickly in between outside packets */
-      proxy->current_groupsz *= 0.8;
-      proxy->current_groupsz = MAX(proxy->current_groupsz, 2);
+      proxy->current_groupsz = MAX(proxy->min_groupsz, proxy->current_groupsz * 0.8);
 
       if (!notidlewarning && o.verbose) {
 	notidlewarning = 1;
-	error("WARNING: Idlescan has erroneously detected phantom ports -- is the proxy %s (%s) really idle?", proxy->host.name, inet_ntoa(proxy->host.host));
+	error("WARNING: Idlescan has erroneously detected phantom ports -- is the proxy %s (%s) really idle?", proxy->host.HostName(), proxy->host.targetipstr());
       }
     } else {
       /* W00p We got a perfect match.  That means we get a slight increase
 	 in allowed group size and we can lightly decrease the senddelay */
 
-      proxy->senddelay *= 0.9;
+      proxy->senddelay = (int) (proxy->senddelay * 0.9);
+      if (proxy->senddelay < 500) proxy->senddelay = 0;
       proxy->current_groupsz = MIN(proxy->current_groupsz * 1.1, 500000 / (proxy->senddelay + 1));
       proxy->current_groupsz = MIN(proxy->max_groupsz, proxy->current_groupsz);
 
@@ -526,7 +551,7 @@ void adjust_idle_timing(struct idle_proxy_info *proxy,
    timing adjustments if the numbers turn out to be accurate */
 
 int idlescan_countopen2(struct idle_proxy_info *proxy, 
-			struct hoststruct *target, u16 *ports, int numports,
+			Target *target, u16 *ports, int numports,
 			struct timeval *sent_time, struct timeval *rcv_time) 
 {
 
@@ -549,7 +574,7 @@ int idlescan_countopen2(struct idle_proxy_info *proxy,
   struct timeval probe_times[4];
   int pr0be;
   static u32 seq = 0;
-  int newipid;
+  int newipid = 0;
   int sleeptime;
   int lasttry = 0;
   int dotry3 = 0;
@@ -571,22 +596,19 @@ int idlescan_countopen2(struct idle_proxy_info *proxy,
        but doing it the straightforward way (using the same decoys as
        we use in probing the proxy box is risky.  I'll have to think
        about this more. */
-
-    send_tcp_raw(proxy->rawsd, &(proxy->host.host), &target->host, 
+    send_tcp_raw(proxy->rawsd, proxy->host.v4hostip(), target->v4hostip(), 
 		 proxy->probe_port, ports[pr0be], seq, 0, TH_SYN, 0, NULL, 0, 
 		 o.extra_payload, o.extra_payload_length);
   }
   gettimeofday(&end, NULL);
 
-
   openports = -1;
   tries = 0;
-  /* CHANGEME: I d'nt think that MAX() line works right */
   TIMEVAL_MSEC_ADD(probe_times[0], start, MAX(50, (target->to.srtt * 3/4) / 1000));
   TIMEVAL_MSEC_ADD(probe_times[1], start, target->to.srtt / 1000 );
-  TIMEVAL_MSEC_ADD(probe_times[2], end, MAX(75, (target->to.srtt + 
+  TIMEVAL_MSEC_ADD(probe_times[2], end, MAX(75, (2 * target->to.srtt + 
 						   target->to.rttvar) / 1000));
-  TIMEVAL_MSEC_ADD(probe_times[3], end, MIN(4000, (target->to.srtt + 
+  TIMEVAL_MSEC_ADD(probe_times[3], end, MIN(4000, (2 * target->to.srtt + 
 						     (target->to.rttvar << 2 )) / 1000));
 
   do {
@@ -645,12 +667,13 @@ int idlescan_countopen2(struct idle_proxy_info *proxy,
     proxy->senddelay += 5000;
     proxy->senddelay = MIN(proxy->max_senddelay, proxy->senddelay);
     /* No group size should be greater than .5s of send delays */
-    proxy->current_groupsz = MAX(2, MIN(proxy->current_groupsz, 500000 / (proxy->senddelay+1)));
+    proxy->current_groupsz = MAX(proxy->min_groupsz, MIN(proxy->current_groupsz, 500000 / (proxy->senddelay+1)));
   } else {
     /* Yeah, we got as many responses as we sent probes.  This calls for a 
        very light timing acceleration ... */
-    proxy->senddelay *= 0.95;
-    proxy->current_groupsz = MAX(2, MIN(proxy->current_groupsz, 500000 / (proxy->senddelay+1)));
+    proxy->senddelay = (int) (proxy->senddelay * 0.95);
+    if (proxy->senddelay < 500) proxy->senddelay = 0;
+    proxy->current_groupsz = MAX(proxy->min_groupsz, MIN(proxy->current_groupsz, 500000 / (proxy->senddelay+1)));
   }
 
   if ((openports > 0) && (openports <= numports)) {
@@ -669,7 +692,7 @@ int idlescan_countopen2(struct idle_proxy_info *proxy,
    the number of open ports in the given list.  Under the covers, this
    function just farms out the hard work to another function */
 int idlescan_countopen(struct idle_proxy_info *proxy, 
-		       struct hoststruct *target, u16 *ports, int numports,
+		       Target *target, u16 *ports, int numports,
 		       struct timeval *sent_time, struct timeval *rcv_time) {
   int tries = 0;
   int openports;
@@ -690,11 +713,15 @@ int idlescan_countopen(struct idle_proxy_info *proxy,
     if (tries == 5)
       sleep(45); /* We're gonna give up if this fails, so we will be a bit
 		    patient */
+    /* Since the host may have received packets while we were sleeping,
+       lets update our proxy IPID counter */
+    proxy->latestid = ipid_proxy_probe(proxy, NULL, NULL);
   } while(1);
 
   if (openports < 0 || openports > numports ) {
     /* Oh f*ck!!!! */
-    fatal("Idlescan is unable to obtain meaningful results from proxy %s (%s).  I'm sorry it didn't work out.", proxy->host.name, inet_ntoa(proxy->host.host));
+    fatal("Idlescan is unable to obtain meaningful results from proxy %s (%s).  I'm sorry it didn't work out.", proxy->host.HostName(), 
+	  proxy->host.targetipstr());
   }
 
   if (o.debugging > 2) error("idlescan_countopen: %d ports found open out of %d, starting with %hu", openports, numports, ports[0]);
@@ -705,7 +732,7 @@ int idlescan_countopen(struct idle_proxy_info *proxy,
 /* Recursively Idlescans scans a group of ports using a depth-first
    divide-and-conquer strategy to find the open one(s) */
 
-int idle_treescan(struct idle_proxy_info *proxy, struct hoststruct *target,
+int idle_treescan(struct idle_proxy_info *proxy, Target *target,
 		 u16 *ports, int numports, int expectedopen) {
 
   int firstHalfSz = (numports + 1)/2;
@@ -718,7 +745,7 @@ int idle_treescan(struct idle_proxy_info *proxy, struct hoststruct *target,
   /* Scan the first half of the range */
 
   if (o.debugging > 1) {  
-    error("idle_treescan: Called against %s with %d ports, starting with %hu. expectedopen: %d", inet_ntoa(target->host), numports, ports[0], expectedopen);
+    error("idle_treescan: Called against %s with %d ports, starting with %hu. expectedopen: %d", target->targetipstr(), numports, ports[0], expectedopen);
     error("IDLESCAN TIMING: grpsz: %.3f delay: %d srtt: %d rttvar: %d\n",
 	  proxy->current_groupsz, proxy->senddelay, target->to.srtt,
 	  target->to.rttvar);
@@ -843,7 +870,7 @@ int idle_treescan(struct idle_proxy_info *proxy, struct hoststruct *target,
 /* The very top-level idle scan function -- scans the given target
    host using the given proxy -- the proxy is cached so that you can keep
    calling this function with different targets */
-void idle_scan(struct hoststruct *target, u16 *portarray, int numports,
+void idle_scan(Target *target, u16 *portarray, int numports,
 	       char *proxyName) {
 
   static char lastproxy[MAXHOSTNAMELEN + 1] = ""; /* The proxy used in any previous call */
@@ -864,19 +891,23 @@ void idle_scan(struct hoststruct *target, u16 *portarray, int numports,
 
   /* If this is the first call,  */
   if (!*lastproxy) {
-    initialize_idleproxy(&proxy, proxyName, &(target->host));
+    initialize_idleproxy(&proxy, proxyName, target->v4hostip());
   }
 
   if (o.debugging || o.verbose) {  
-    log_write(LOG_STDOUT, "Initiating Idlescan against %s (%s)\n", target->name, inet_ntoa(target->host));
+    log_write(LOG_STDOUT, "Initiating Idlescan against %s (%s)\n", target->HostName(), target->targetipstr());
   }
   starttime = time(NULL);
 
   /* If we don't have timing infoz for the new target, we'll use values 
      derived from the proxy */
   if (target->to.srtt == -1 && target->to.rttvar == -1) {
-    target->to.srtt = 2 * proxy.host.to.srtt;
-    target->to.rttvar = MAX(10000, MIN(target->to.srtt, 2000000));
+    target->to.srtt = MAX(200000,2 * proxy.host.to.srtt);
+    target->to.rttvar = MAX(10000, MIN(proxy.host.to.rttvar, 2000000));
+    target->to.timeout = target->to.srtt + (target->to.rttvar << 2);
+  } else {
+    target->to.srtt = MAX(target->to.srtt, proxy.host.to.srtt);
+    target->to.rttvar = MAX(target->to.rttvar, proxy.host.to.rttvar);
     target->to.timeout = target->to.srtt + (target->to.rttvar << 2);
   }
 

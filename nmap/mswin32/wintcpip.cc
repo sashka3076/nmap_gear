@@ -7,12 +7,13 @@
   */
 
 #include "../tcpip.h"
+#include "../NmapOps.h"
 #include "winip\winip.h"
 
 //	Note: we cheat with the timeouts here
 #include "pcap-int.h"
 
-extern struct ops o;
+extern NmapOps o;
 
 void nmapwin_init();
 void nmapwin_cleanup();
@@ -25,10 +26,10 @@ int if2nameindex(int ifi);
 //	All of these are modified from, but
 //	based on, ryan@eeye.com's wintcpip.c
 
-int send_ip_raw( int sd, struct in_addr *source, struct in_addr *victim, 
-	u8 proto, u8 *data, u16 datalen)
+int send_ip_raw( int sd, struct in_addr *source, const struct in_addr *victim, 
+	u8 proto, char *data, u16 datalen)
 {
-	char *packet = safe_malloc(sizeof(struct ip) + datalen);
+	char *packet = (char *) safe_malloc(sizeof(struct ip) + datalen);
 	struct ip *ip = (struct ip *) packet;
 	static int myttl = 0;
 	int res = -1;
@@ -49,7 +50,7 @@ int send_ip_raw( int sd, struct in_addr *source, struct in_addr *victim,
 	if (!source) 
 	{
 		source_malloced = 1;
-		source = safe_malloc(sizeof(struct in_addr));
+		source = (struct in_addr *) safe_malloc(sizeof(struct in_addr));
 		if(!routethrough(victim, source))
 		{
 			error("send_ip_raw: failed to get a route\n");
@@ -86,15 +87,15 @@ int send_ip_raw( int sd, struct in_addr *source, struct in_addr *victim,
 	if (TCPIP_DEBUGGING > 1) 
 	{
 		printf("Raw IP packet creation completed!  Here it is:\n");
-		hdump(packet, BSDUFIX(ip->ip_len));
+		hdump((unsigned char *) packet, BSDUFIX(ip->ip_len));
 	}
-	res = Sendto("send_ip_raw", sd, packet, BSDUFIX(ip->ip_len), 0,(struct sockaddr *)&sock,  (int)sizeof(struct sockaddr_in));
+	res = Sendto("send_ip_raw", sd, (unsigned char *) packet, BSDUFIX(ip->ip_len), 0,(struct sockaddr *)&sock,  (int)sizeof(struct sockaddr_in));
 	if (source_malloced) free(source);
 	free(packet); 
 	return res;
 }
 
-int send_tcp_raw( int sd, struct in_addr *source, struct in_addr *victim, 
+int send_tcp_raw( int sd, const struct in_addr *source, const struct in_addr *victim, 
 		  u16 sport, u16 dport, u32 seq, u32 ack, u8 flags,
 		  u16 window, u8 *options, int optlen, char *data, 
 		  u16 datalen)
@@ -109,7 +110,7 @@ int send_tcp_raw( int sd, struct in_addr *source, struct in_addr *victim,
 		unsigned char protocol;
 		unsigned short length;
 	};
-	char *packet = safe_malloc(sizeof(struct ip) + sizeof(struct tcphdr) + optlen + datalen);
+	unsigned char *packet = (unsigned char *) safe_malloc(sizeof(struct ip) + sizeof(struct tcphdr) + optlen + datalen);
 	struct ip *ip = (struct ip *) packet;
 	struct tcphdr *tcp = (struct tcphdr *) (packet + sizeof(struct ip));
 	struct pseudo_header *pseudo =  (struct pseudo_header *) (packet + sizeof(struct ip) - sizeof(struct pseudo_header)); 
@@ -119,7 +120,6 @@ int send_tcp_raw( int sd, struct in_addr *source, struct in_addr *victim,
 	wasting too much in computing the checksum */
 	int res = -1;
 	struct sockaddr_in sock;
-	int source_malloced = 0;
 
 	/* check that required fields are there and not too silly */
 	/* We used to check that sport and dport were nonzer0, but scr3w that! */
@@ -139,30 +139,14 @@ int send_tcp_raw( int sd, struct in_addr *source, struct in_addr *victim,
 	if (!myttl) myttl = (get_random_uint() % 23) + 37;
 
 	//	No sethdrinclude since it is implied by the WinIP library
-
-	/* if they didn't give a source address, fill in our first address */
-	if (!source) 
-	{
-		source_malloced = 1;
-		source = safe_malloc(sizeof(struct in_addr));
-		if(!routethrough(victim, source))
-		{
-			error("send_ip_raw: failed to get a route\n");
-			free(packet);
-			free(source);
-			return -1;
-		}
-#if ( TCPIP_DEBUGGING )
-		printf("We skillfully deduced that your address is %s\n", inet_ntoa(*source));
-#endif
-	}
+    assert(source);
 
 	/*do we even have to fill out this damn thing?  This is a raw packet, 
 	after all */
 	sock.sin_family = AF_INET;
 	sock.sin_port = htons(dport);
 	sock.sin_addr.s_addr = victim->s_addr;
-	bzero((char *) packet, sizeof(struct ip) + sizeof(struct tcphdr));
+	bzero((unsigned char *) packet, sizeof(struct ip) + sizeof(struct tcphdr));
 	pseudo->s_addy = source->s_addr;
 	pseudo->d_addr = victim->s_addr;
 	pseudo->protocol = IPPROTO_TCP;
@@ -207,7 +191,9 @@ int send_tcp_raw( int sd, struct in_addr *source, struct in_addr *victim,
 	get_random_bytes(&(ip->ip_id), 2);
 	ip->ip_ttl = myttl;
 	ip->ip_p = IPPROTO_TCP;
-	if(source->s_addr == victim->s_addr) source->s_addr++;
+	if (source->s_addr == victim->s_addr) {
+		ip->ip_src.s_addr = source->s_addr + 1;
+	} else
 	ip->ip_src.s_addr = source->s_addr;
 	ip->ip_dst.s_addr= victim->s_addr;
 
@@ -221,16 +207,15 @@ int send_tcp_raw( int sd, struct in_addr *source, struct in_addr *victim,
 	}
 
 	res = Sendto("send_tcp_raw", sd, packet, BSDUFIX(ip->ip_len), 0, (struct sockaddr *)&sock,  (int)sizeof(struct sockaddr_in));
-	if (source_malloced) free(source);
 	free(packet);
 	return res;
 }
 
-int send_udp_raw( int sd, struct in_addr *source, struct in_addr *victim, 
-		  u16 sport, u16 dport, u8 *data, u16 datalen) 
+int send_udp_raw( int sd, struct in_addr *source, const struct in_addr *victim, 
+		  u16 sport, u16 dport, char *data, u16 datalen) 
 {
 
-	char *packet = safe_malloc(sizeof(struct ip) + sizeof(udphdr_bsd) + datalen);
+	unsigned char *packet = (unsigned char *) safe_malloc(sizeof(struct ip) + sizeof(udphdr_bsd) + datalen);
 	struct ip *ip = (struct ip *) packet;
 	udphdr_bsd *udp = (udphdr_bsd *) (packet + sizeof(struct ip));
 	static int myttl = 0;
@@ -262,7 +247,7 @@ int send_udp_raw( int sd, struct in_addr *source, struct in_addr *victim,
 	if (!source) 
 	{
 		source_malloced = 1;
-		source = safe_malloc(sizeof(struct in_addr));
+		source = (struct in_addr *) safe_malloc(sizeof(struct in_addr));
 		if(!routethrough(victim, source))
 		{
 			error("send_ip_raw: failed to get a route\n");
@@ -320,7 +305,7 @@ int send_udp_raw( int sd, struct in_addr *source, struct in_addr *victim,
 
 /* Much of this is swiped from my send_tcp_raw function above, which 
    doesn't support fragmentation */
-int send_small_fragz(int sd, struct in_addr *source, struct in_addr *victim,
+int send_small_fragz(int sd, struct in_addr *source, const struct in_addr *victim,
 		     u32 seq, u16 sport, u16 dport, int flags)
 {
 	struct pseudo_header 
@@ -334,11 +319,11 @@ int send_small_fragz(int sd, struct in_addr *source, struct in_addr *victim,
 	};
 	/*In this placement we get data and some field alignment so we aren't wasting
 	too much to compute the TCP checksum.*/
-	char packet[sizeof(struct ip) + sizeof(struct tcphdr) + 100];
+	unsigned char packet[sizeof(struct ip) + sizeof(struct tcphdr) + 100];
 	struct ip *ip = (struct ip *) packet;
 	struct tcphdr *tcp = (struct tcphdr *) (packet + sizeof(struct ip));
 	struct pseudo_header *pseudo = (struct pseudo_header *) (packet + sizeof(struct ip) - sizeof(struct pseudo_header)); 
-	char *frag2 = packet + sizeof(struct ip) + 16;
+	unsigned char *frag2 = packet + sizeof(struct ip) + 16;
 	struct ip *ip2 = (struct ip *) (frag2 - sizeof(struct ip));
 	static int myttl = 0;
 	int res;
@@ -354,7 +339,7 @@ int send_small_fragz(int sd, struct in_addr *source, struct in_addr *victim,
 	if (!source) 
 	{
 		source_malloced = 1;
-		source = safe_malloc(sizeof(struct in_addr));
+		source = (struct in_addr *) safe_malloc(sizeof(struct in_addr));
 		if(!routethrough(victim, source))
 		{
 			error("send_ip_raw: failed to get a route\n");
@@ -438,7 +423,7 @@ int send_small_fragz(int sd, struct in_addr *source, struct in_addr *victim,
 		log_write(LOG_STDOUT, "\nTrying sendto(%d , ip2, %d, 0 , %s , %d)\n", sd, ntohs(ip2->ip_len), inet_ntoa(*victim), (int) sizeof(struct sockaddr_in));
 	}
 		/*if ((res = sendto(sd, (void *)ip2,sizeof(struct ip) + 4 , 0, (struct sockaddr *)&sock, (int) sizeof(struct sockaddr_in))) == -1)*/
-	if ((res = Sendto("send_small_fragz",sd, (void *)ip2,sizeof(struct ip) + 4 , 0, (struct sockaddr *)&sock, (int) sizeof(struct sockaddr_in))) == -1)
+	if ((res = Sendto("send_small_fragz",sd, (unsigned char *)ip2,sizeof(struct ip) + 4 , 0, (struct sockaddr *)&sock, (int) sizeof(struct sockaddr_in))) == -1)
 	{
 		perror("sendto in send_tcp_raw frag #2");
 		if(source_malloced) free(source);
@@ -469,7 +454,7 @@ int resolve(char *hostname, struct in_addr *ip)
 	return 0;
 }
 
-inline int unblock_socket(int sd) 
+int unblock_socket(int sd) 
 {
 	u_long one = 1;
 	if(sd != 501)
@@ -480,11 +465,11 @@ inline int unblock_socket(int sd)
 
 /* A simple function I wrote to help in debugging, shows the important fields
    of a TCP packet*/
-int readtcppacket(unsigned char *packet, int readdata) 
+int readtcppacket(const u8 *packet, int readdata) 
 {
 	struct ip *ip = (struct ip *) packet;
 	struct tcphdr *tcp = (struct tcphdr *) (packet + sizeof(struct ip));
-	char *data = packet +  sizeof(struct ip) + sizeof(struct tcphdr);
+	const u8 *data = packet +  sizeof(struct ip) + sizeof(struct tcphdr);
 	int tot_len;
 	struct in_addr bullshit, bullshit2;
 	char sourcehost[16];
@@ -539,7 +524,7 @@ int readudppacket(unsigned char *packet, int readdata)
 
 	struct ip *ip = (struct ip *) packet;
 	udphdr_bsd *udp = (udphdr_bsd *) (packet + sizeof(struct ip));
-	char *data = packet +  sizeof(struct ip) + sizeof(udphdr_bsd);
+	unsigned char *data = packet +  sizeof(struct ip) + sizeof(udphdr_bsd);
 	int tot_len;
 	struct in_addr bullshit, bullshit2;
 	char sourcehost[16];
@@ -653,20 +638,20 @@ char *readip_pcap_real(pcap_t *pd, unsigned int *len, long to_usec)
 
 
 //	The decoy helpers
-int send_tcp_raw_decoys( int sd, struct in_addr *victim, u16 sport, 
+int send_tcp_raw_decoys( int sd, const struct in_addr *victim, u16 sport, 
 			 u16 dport, u32 seq, u32 ack, u8 flags, u16 window, 
-                         u8 *options, int optlen, u8 *data, u16 datalen) 
+                         u8 *options, int optlen, char *data, u16 datalen) 
 {
 	int decoy;
 	for(decoy = 0; decoy < o.numdecoys; decoy++) 
 	{
-		if (send_tcp_raw(sd, &o.decoys[decoy], victim, sport, dport, seq, ack, flags, window, options, optlen, data, datalen) == -1) return -1;
+		if (send_tcp_raw(sd, &o.decoys[decoy], victim, sport, dport, seq, ack, flags, window, options, optlen, (char *) data, datalen) == -1) return -1;
 	}
 	return 0;
 }
 
-int send_udp_raw_decoys( int sd, struct in_addr *victim, u16 sport, 
-			 u16 dport, u8 *data, u16 datalen) 
+int send_udp_raw_decoys( int sd, const struct in_addr *victim, u16 sport, 
+			 u16 dport, char *data, u16 datalen) 
 {
 	int decoy;
   
@@ -677,7 +662,7 @@ int send_udp_raw_decoys( int sd, struct in_addr *victim, u16 sport,
 	return 0;
 }
 
-int send_small_fragz_decoys(int sd, struct in_addr *victim, u32 seq, 
+int send_small_fragz_decoys(int sd, const struct in_addr *victim, u32 seq, 
 			    u16 sport, u16 dport, int flags)
 {
 	int decoy;
@@ -689,8 +674,8 @@ int send_small_fragz_decoys(int sd, struct in_addr *victim, u32 seq,
 	return 0;
 }
 
-int send_ip_raw_decoys( int sd, struct in_addr *victim, u8 proto,
-			u8 *data, u16 datalen) 
+int send_ip_raw_decoys( int sd, const struct in_addr *victim, u8 proto,
+			char *data, u16 datalen) 
 {
 	int decoy;
 	for(decoy = 0; decoy < o.numdecoys; decoy++)
@@ -742,7 +727,7 @@ pcap_t *my_real_pcap_open_live(char *device, int snaplen, int promisc, int to_ms
 
 /* Tests whether a packet sent to  IP is LIKELY to route 
  through the kernel localhost interface */
-int islocalhost(struct in_addr *addr) 
+int islocalhost(const struct in_addr * const addr) 
 {
 	char dev[128];
   /* If it is 0.0.0.0 or starts with 127.0.0.1 then it is 

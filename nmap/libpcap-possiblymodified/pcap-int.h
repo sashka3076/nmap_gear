@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * @(#) $Header: /CVS/nmap/libpcap-possiblymodified/pcap-int.h,v 1.1.1.1 2001/06/03 08:19:45 fyodor Exp $ (LBL)
+ * @(#) $Header: /CVS/nmap/libpcap-possiblymodified/pcap-int.h,v 1.2 2002/12/18 06:10:07 fyodor Exp $ (LBL)
  */
 
 #ifndef pcap_int_h
@@ -65,7 +65,6 @@ struct pcap_md {
 	long	OrigMissed;	/* missed by i/f before this run */
 #ifdef linux
 	int	sock_packet;	/* using Linux 2.0 compatible interface */
-	int	readlen;	/* byte count to hand to "recvmsg()" */
 	int	timeout;	/* timeout specified to pcap_open_live */
 	int	clear_promisc;	/* must clear promiscuous mode when we close */
 	int	cooked;		/* using SOCK_DGRAM rather than SOCK_RAW */
