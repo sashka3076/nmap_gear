@@ -1,29 +1,28 @@
 Name: nmap
-Version: 3.10ALPHA9
+Version: 3.48
 Release: alt1
 Serial: 20020501
 
 Summary: Network exploration tool and security scanner
-Summary(ru_RU.CP1251): Инструмент для исследования сети и сетевой безопасности.
 License: GPL
 Group: Monitoring
 Url: http://www.insecure.org/%name
 Packager: Nmap Development Team <nmap@packages.altlinux.org>
+Summary(ru_RU.CP1251): Инструмент для исследования сети и сетевой безопасности.
 
 Source: %url/dist/%name-%version.tar.bz2
 Source1: nmapfe.menu
 Source2: nmapfe.xpm
 
-Patch1: %name-3.10ALPHA3-alt-with_system_pcap.patch
-Patch2: %name-3.10ALPHA3-alt-drop_priv.patch
-Patch3: %name-3.10ALPHA3-alt-configure.patch
-Patch4: %name-3.10ALPHA3-alt-build.patch
+Patch1: nmap-3.40PVT17-alt-glibc.patch
+Patch2: nmap-3.40PVT17-alt-autoheader.patch
+Patch3: nmap-3.40PVT17-alt-owl-libpcap.patch
+Patch4: nmap-3.46-alt-drop_priv.patch
 
-PreReq: libpcap >= 0.7.1-alt2, chrooted >= 0.2, net-tools, /var/resolv
+PreReq: libpcap >= 0.7.2-alt2, chrooted >= 0.2, net-tools, /var/resolv
 
-# Automatically added by buildreq on Fri Dec 20 2002
-BuildRequires: XFree86-devel XFree86-libs gcc-c++ glib-devel gtk+-devel libbfd-devel 
-BuildRequires: libcap-devel libiberty-devel libpcap-devel libstdc++-devel
+# Automatically added by buildreq on Thu Oct 02 2003
+BuildRequires: XFree86-devel XFree86-libs gcc-c++ glib-devel gtk+-devel libcap-devel libpcap-devel libpcre-devel libssl-devel libstdc++-devel
 
 %package frontend
 Summary: Gtk+ frontend for %name
@@ -32,14 +31,17 @@ Group: Monitoring
 Requires: %name = %serial:%version-%release
 
 %description
-Nmap is a utility for network exploration or security auditing. It
-supports ping scanning (determine which hosts are up), many port
-scanning techniques (determine what services the hosts are offering),
-and TCP/IP fingerprinting (remote host operating system
-identification). Nmap also offers flexible target and port
-specification, decoy scanning, determination of TCP sequence
-predictability characteristics, sunRPC scanning, reverse-identd
-scanning, and more.
+Nmap is designed to allow system administrators and curious individuals
+to scan large networks to determine which hosts are up and what services
+they are offering.  Nmap supports a large number of scanning techniques,
+such as: UDP, TCP connect(), TCP SYN (half open), ftp proxy (bounce
+attack), Reverse-ident, ICMP (ping sweep), FIN, ACK sweep, Xmas Tree,
+SYN sweep, IP Protocol, and Null scan.  Nmap also offers a number of
+advanced features such as remote OS detection via TCP/IP fingerprinting,
+stealth scanning, dynamic delay and retransmission calculations, parallel
+scanning, detection of down hosts via parallel pings, decoy scanning, port
+filtering detection, direct (non-portmapper) RPC scanning, fragmentation
+scanning, and flexible target and port specification.
 
 %description -l ru_RU.CP1251
 Nmap - это утилита для исследования сети и аудита защиты. Она поддерживает
@@ -48,44 +50,40 @@ Nmap - это утилита для исследования сети и аудита защиты. Она поддерживает
 TCP/IP (идентификация удалённой системы).
 
 %description frontend
-This package includes nmapfe, a Gtk+ frontend for %name. The %name package must
-be installed before installing %name-frontend.
+This package includes nmapfe, a Gtk+ frontend for %name.
 
 %description frontend -l ru_RU.CP1251
-Этот пакет содержит nmapfe, Gtk+ интерфейс для nmap. Пакет nmap должен быть
-установлен до начала установки nmap-frontend.
+Этот пакет содержит nmapfe, Gtk+ интерфейс для nmap.
 
 %prep
-%setup -q
+%setup -q -n %name-%version
 %patch1 -p1
 %patch2 -p1
 %patch3 -p1
 %patch4 -p1
+find -type f -name \*.orig -print -delete
 
 %build
 aclocal
+autoheader
 autoconf
 
-#pushd nbase
-#	aclocal -I .
-#	autoconf
-#popd
-
-%configure
+export ac_cv_header_libiberty_h=no
+%configure --with-libpcre=yes
 %make_build
 
 %install
-mkdir -p $RPM_BUILD_ROOT{%_bindir,%_man1dir,%_menudir,%_iconsdir}
-mkdir -p $RPM_BUILD_ROOT%_datadir/%name
-mkdir -p $RPM_BUILD_ROOT%_x11dir/{bin,man/man1}
+%__mkdir_p $RPM_BUILD_ROOT{%_bindir,%_man1dir,%_iconsdir}
+%__mkdir_p $RPM_BUILD_ROOT%_datadir/%name
+%__mkdir_p $RPM_BUILD_ROOT%_x11dir/{bin,man/man1}
 %makeinstall nmapdatadir=$RPM_BUILD_ROOT%_datadir/%name
-mv $RPM_BUILD_ROOT%_bindir/{nmapfe,xnmap} $RPM_BUILD_ROOT%_x11bindir/
-mv $RPM_BUILD_ROOT%_man1dir/{nmapfe,xnmap}.1 $RPM_BUILD_ROOT%_x11mandir/man1/
-install -p -m644 %SOURCE1 $RPM_BUILD_ROOT%_menudir/nmapfe
-install -p -m644 %SOURCE2 $RPM_BUILD_ROOT%_iconsdir/
+%__mv $RPM_BUILD_ROOT%_bindir/{nmapfe,xnmap} $RPM_BUILD_ROOT%_x11bindir/
+%__mv $RPM_BUILD_ROOT%_man1dir/{nmapfe,xnmap}.1 $RPM_BUILD_ROOT%_x11mandir/man1/
+%__install -pD -m644 %SOURCE1 $RPM_BUILD_ROOT%_menudir/nmapfe
+%__install -p -m644 %SOURCE2 $RPM_BUILD_ROOT%_iconsdir/
 
 %pre
-/usr/sbin/groupadd -r -f nmapuser >/dev/null 2>&1
+/usr/sbin/groupadd -r -f nmapuser
 /usr/sbin/useradd -r -g nmapuser -d /dev/null -s /dev/null -n nmapuser >/dev/null 2>&1 ||:
 
 %post
@@ -104,6 +102,53 @@ install -p -m644 %SOURCE2 $RPM_BUILD_ROOT%_iconsdir/
 %_iconsdir/*
 
 %changelog
+* Wed Oct 08 2003 Dmitry V. Levin <ldv@altlinux.org> 20020501:3.48-alt1
+- Updated to 3.48.
+
+* Fri Oct 03 2003 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 20020501:3.47-alt1
+- 3.47
+- Dropped nmap-3.46-alt-pcap.patch
+
+* Thu Oct 02 2003 Dmitry V. Levin <ldv@altlinux.org> 20020501:3.46-alt2
+- Fixed libpcap version detection again.
+- Fixed build to avoid using libiberty-devel.
+- Enhanced droppriv patch to make tcpip.cc/routethrough() work again.
+
+* Sun Sep 21 2003 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 20020501:3.46-alt1
+- 3.46
+- Removed obsoleted patch.
+
+* Sun Sep 14 2003 Dmitry V. Levin <ldv@altlinux.org> 20020501:3.40PVT17-alt1
+- Updated to 3.40PVT17, few patches merged upstream.
+
+* Wed Sep 10 2003 Dmitry V. Levin <ldv@altlinux.org> 20020501:3.40PVT16-alt1
+- Updated to 3.40PVT16, reviewed and reworked patches.
+
+* Mon Jun 30 2003 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 20020501:3.30-alt1
+- 3.30
+
+* Mon Jun 16 2003 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 20020501:3.28-alt1
+- 3.28
+- Updated patches, removed obsoleted.
+
+* Tue Jun 03 2003 Dmitry V. Levin <ldv@altlinux.org> 20020501:3.27-alt2
+- Synced with Owl's nmap-3.27-owl1 package.
+
+* Tue Apr 29 2003 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 20020501:3.27-alt1
+- 3.27
+
+* Fri Apr 25 2003 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 20020501:3.26-alt1
+- 3.26
+
+* Mon Apr 21 2003 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 20020501:3.25-alt1
+- 3.25
+
+* Tue Apr 08 2003 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 20020501:3.21-alt1.CSW
+- 3.21 "CanSecWest" release.
+
+* Thu Mar 20 2003 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 20020501:3.20-alt1
+- 3.20
+
 * Fri Dec 27 2002 Aleksandr Blokhin 'Sass' <sass@altlinux.ru> 20020501:3.10ALPHA9-alt1
 - 3.10ALPHA9
 

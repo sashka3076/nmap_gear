@@ -1,48 +1,88 @@
 
-/***********************************************************************
- * NmapOps.cc -- The NmapOps class contains global options, mostly     *
- * based on user-provided command-line settings.                       *
- *                                                                     *
- ***********************************************************************
- *  The Nmap Security Scanner is (C) 1995-2002 Insecure.Com LLC. This  *
- *  program is free software; you can redistribute it and/or modify    *
- *  it under the terms of the GNU General Public License as published  *
- *  by the Free Software Foundation; Version 2.  This guarantees your  *
- *  right to use, modify, and redistribute this software under certain *
- *  conditions.  If this license is unacceptable to you, we may be     *
- *  willing to sell alternative licenses (contact sales@insecure.com). *
- *                                                                     *
- *  If you received these files with a written license agreement       *
- *  stating terms other than the (GPL) terms above, then that          *
- *  alternative license agreement takes precendence over this comment. *
- *                                                                     *
- *  Source is provided to this software because we believe users have  *
- *  a right to know exactly what a program is going to do before they  *
- *  run it.  This also allows you to audit the software for security   *
- *  holes (none have been found so far).                               *
- *                                                                     *
- *  Source code also allows you to port Nmap to new platforms, fix     *
- *  bugs, and add new features.  You are highly encouraged to send     *
- *  your changes to fyodor@insecure.org for possible incorporation     *
- *  into the main distribution.  By sending these changes to Fyodor or *
- *  one the insecure.org development mailing lists, it is assumed that *
- *  you are offering Fyodor the unlimited, non-exclusive right to      *
- *  reuse, modify, and relicense the code.  This is important because  *
- *  the inability to relicense code has caused devastating problems    *
- *  for other Free Software projects (such as KDE and NASM).  Nmap     *
- *  will always be available Open Source.  If you wish to specify      *
- *  special license conditions of your contributions, just say so      *
- *  when you send them.                                                *
- *                                                                     *
- *  This program is distributed in the hope that it will be useful,    *
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of     *
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  *
- *  General Public License for more details (                          *
- *  http://www.gnu.org/copyleft/gpl.html ).                            *
- *                                                                     *
- ***********************************************************************/
+/***************************************************************************
+ * NmapOps.cc -- The NmapOps class contains global options, mostly based   *
+ * on user-provided command-line settings.                                 *
+ *                                                                         *
+ ***********************IMPORTANT NMAP LICENSE TERMS************************
+ *                                                                         *
+ * The Nmap Security Scanner is (C) 1995-2003 Insecure.Com LLC. This       *
+ * program is free software; you may redistribute and/or modify it under   *
+ * the terms of the GNU General Public License as published by the Free    *
+ * Software Foundation; Version 2.  This guarantees your right to use,     *
+ * modify, and redistribute this software under certain conditions.  If    *
+ * you wish to embed Nmap technology into proprietary software, we may be  *
+ * willing to sell alternative licenses (contact sales@insecure.com).      *
+ * Many security scanner vendors already license Nmap technology such as   *
+ * our remote OS fingerprinting database and code.                         *
+ *                                                                         *
+ * Note that the GPL places important restrictions on "derived works", yet *
+ * it does not provide a detailed definition of that term.  To avoid       *
+ * misunderstandings, we consider an application to constitute a           *
+ * "derivative work" for the purpose of this license if it does any of the *
+ * following:                                                              *
+ * o Integrates source code from Nmap                                      *
+ * o Reads or includes Nmap copyrighted data files, such as                *
+ *   nmap-os-fingerprints or nmap-service-probes.                          *
+ * o Executes Nmap                                                         *
+ * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Links to a library or executes a program that does any of the above   *
+ *                                                                         *
+ * The term "Nmap" should be taken to also include any portions or derived *
+ * works of Nmap.  This list is not exclusive, but is just meant to        *
+ * clarify our interpretation of derived works with some common examples.  *
+ * These restrictions only apply when you actually redistribute Nmap.  For *
+ * example, nothing stops you from writing and selling a proprietary       *
+ * front-end to Nmap.  Just distribute it by itself, and point people to   *
+ * http://www.insecure.org/nmap/ to download Nmap.                         *
+ *                                                                         *
+ * We don't consider these to be added restrictions on top of the GPL, but *
+ * just a clarification of how we interpret "derived works" as it applies  *
+ * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
+ * Torvalds has announced his interpretation of how "derived works"        *
+ * applies to Linux kernel modules.  Our interpretation refers only to     *
+ * Nmap - we don't speak for any other GPL products.                       *
+ *                                                                         *
+ * If you have any questions about the GPL licensing restrictions on using *
+ * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
+ * we also offer alternative license to integrate Nmap into proprietary    *
+ * applications and appliances.  These contracts have been sold to many    *
+ * security vendors, and generally include a perpetual license as well as  *
+ * providing for priority support and updates as well as helping to fund   *
+ * the continued development of Nmap technology.  Please email             *
+ * sales@insecure.com for further information.                             *
+ *                                                                         *
+ * If you received these files with a written license agreement or         *
+ * contract stating terms other than the (GPL) terms above, then that      *
+ * alternative license agreement takes precedence over these comments.     *
+ *                                                                         *
+ * Source is provided to this software because we believe users have a     *
+ * right to know exactly what a program is going to do before they run it. *
+ * This also allows you to audit the software for security holes (none     *
+ * have been found so far).                                                *
+ *                                                                         *
+ * Source code also allows you to port Nmap to new platforms, fix bugs,    *
+ * and add new features.  You are highly encouraged to send your changes   *
+ * to fyodor@insecure.org for possible incorporation into the main         *
+ * distribution.  By sending these changes to Fyodor or one the            *
+ * Insecure.Org development mailing lists, it is assumed that you are      *
+ * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
+ * to reuse, modify, and relicense the code.  Nmap will always be          *
+ * available Open Source, but this is important because the inability to   *
+ * relicense code has caused devastating problems for other Free Software  *
+ * projects (such as KDE and NASM).  We also occasionally relicense the    *
+ * code to third parties as discussed above.  If you wish to specify       *
+ * special license conditions of your contributions, just say so when you  *
+ * send them.                                                              *
+ *                                                                         *
+ * This program is distributed in the hope that it will be useful, but     *
+ * WITHOUT ANY WARRANTY; without even the implied warranty of              *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
+ * General Public License for more details at                              *
+ * http://www.gnu.org/copyleft/gpl.html .                                  *
+ *                                                                         *
+ ***************************************************************************/
 
-/* $Id: NmapOps.cc,v 1.8 2002/12/25 04:08:15 fyodor Exp $ */
+/* $Id: NmapOps.cc,v 1.21 2003/09/16 06:04:55 fyodor Exp $ */
 #include "nmap.h"
 #include "nbase.h"
 #include "NmapOps.h"
@@ -50,7 +90,12 @@
 NmapOps o;
 
 NmapOps::NmapOps() {
+  datadir = NULL;
   Initialize();
+}
+
+NmapOps::~NmapOps() {
+  if (datadir) free(datadir);
 }
 
 void NmapOps::ReInit() {
@@ -111,8 +156,13 @@ int NmapOps::TimeSinceStartMS(struct timeval *now) {
 void NmapOps::Initialize() {
   setaf(AF_INET);
 #ifndef WIN32
-  isr00t = !(geteuid());
+# ifdef __amigaos__
+    isr00t = 1;
+# else
+    isr00t = !(geteuid());
+# endif // __amigaos__
 #else
+  isr00t = 1;
   winip_init();	/* wrapper for all win32 initialization */
 #endif
   debugging = DEBUGGING;
@@ -126,12 +176,14 @@ void NmapOps::Initialize() {
   reference_FPs = NULL;
   magic_port = 33000 + (get_random_uint() % 31000);
   magic_port_set = 0;
-  num_ping_synprobes = num_ping_ackprobes = 0;
+  num_ping_synprobes = num_ping_ackprobes = num_ping_udpprobes = 0;
+  timing_level = 3;
   max_parallelism = 0;
   min_parallelism = 0;
   max_rtt_timeout = MAX_RTT_TIMEOUT;
   min_rtt_timeout = MIN_RTT_TIMEOUT;
   initial_rtt_timeout = INITIAL_RTT_TIMEOUT;
+  max_ips_to_scan = 0;
   extra_payload_length = 0;
   extra_payload = NULL;
   host_timeout = HOST_TIMEOUT;
@@ -144,15 +196,19 @@ void NmapOps::Initialize() {
   decoyturn = -1;
   identscan = 0;
   osscan = 0;
+  servicescan = 0;
   pingtype = PINGTYPE_UNKNOWN;
   listscan = pingscan = allowall = ackscan = bouncescan = connectscan = 0;
   rpcscan = nullscan = xmasscan = fragscan = synscan = windowscan = 0;
   maimonscan = idlescan = finscan = udpscan = ipprotscan = noresolve = 0;
   force = append_output = 0;
-  bzero(logfd, sizeof(FILE *) * LOG_TYPES);
+  memset(logfd, 0, sizeof(FILE *) * LOG_TYPES);
+  ttl = -1;
   nmap_stdout = stdout;
   gettimeofday(&start_time, NULL);
-  pTrace = false;
+  pTrace = vTrace = false;
+  if (datadir) free(datadir);
+  datadir = NULL;
 }
 
 bool NmapOps::TCPScan() {
@@ -178,7 +234,7 @@ void NmapOps::ValidateOptions() {
     if (isr00t && af() == AF_INET)
       synscan++;
     else connectscan++;
-    if (verbose) error("No tcp, udp, or ICMP scantype specified, assuming %s scan. Use -sP if you really don't want to portscan (and just want to see what hosts are up).", synscan? "SYN Stealth" : "vanilla tcp connect()");
+    //    if (verbose) error("No tcp, udp, or ICMP scantype specified, assuming %s scan. Use -sP if you really don't want to portscan (and just want to see what hosts are up).", synscan? "SYN Stealth" : "vanilla tcp connect()");
   }
 
   if (pingtype != PINGTYPE_NONE && spoofsource) {
@@ -198,19 +254,20 @@ void NmapOps::ValidateOptions() {
     error("WARNING:  -S will only affect the source address used in a connect() scan if you specify one of your own addresses.  Use -sS or another raw scan if you want to completely spoof your source address, but then you need to know what you're doing to obtain meaningful results.");
   }
 
+ if ((pingtype & PINGTYPE_UDP) && (!o.isr00t || o.af() != AF_INET)) {
+   fatal("Sorry, UDP Ping (-PU) only works if you are root (because we need to read raw responses off the wire) and only for IPv4 (cause fyodor is too lazy right now to add IPv6 support and nobody has sent a patch)");
+ }
+
  if ((pingtype & PINGTYPE_TCP) && (!o.isr00t || o.af() != AF_INET)) {
    /* We will have to do a connect() style ping */
    if (num_ping_synprobes && num_ping_ackprobes) {
-     fatal("WARNING:  Cannot use both SYN and ACK ping probes if you are nonroot or using IPv6");
-   }
-   if (num_ping_synprobes > 1 || num_ping_ackprobes > 1) {
-     error("WARNING:  Multiple probe ports were given, but only the first one will be used for your connect()-style TCP ping.");
+     fatal("Cannot use both SYN and ACK ping probes if you are nonroot or using IPv6");
    }
 
-   if (num_ping_synprobes > 0) { 
-     num_ping_ackprobes = 1;
-     num_ping_synprobes = 0;
-     ping_ackprobes[0] = ping_synprobes[0];
+   if (num_ping_ackprobes > 0) { 
+     memcpy(ping_synprobes, ping_ackprobes, num_ping_ackprobes * sizeof(*ping_synprobes));
+     num_ping_synprobes = num_ping_ackprobes;
+     num_ping_ackprobes = 0;
    }
  }
 
@@ -233,6 +290,11 @@ void NmapOps::ValidateOptions() {
     if (pingtype & (PINGTYPE_ICMP_PING|PINGTYPE_ICMP_MASK|PINGTYPE_ICMP_TS)) {
       error("Warning:  You are not root -- using TCP pingscan rather than ICMP");
       pingtype = PINGTYPE_TCP;
+      if (num_ping_synprobes == 0)
+	{
+	  num_ping_synprobes = 1;
+	  ping_synprobes[0] = DEFAULT_TCP_PROBE_PORT;
+	}
     }
 #endif
     
@@ -318,7 +380,30 @@ void NmapOps::ValidateOptions() {
   }
   
   if (af() == AF_INET6 && (numdecoys|osscan|bouncescan|fragscan|ackscan|finscan|idlescan|ipprotscan|maimonscan|nullscan|rpcscan|synscan|udpscan|windowscan|xmasscan)) {
-    fatal("Sorry -- IPv6 support is currently only available for connect() scan (-sT), ping scan (-sP), and list scan (-sL).  If you want better IPv6 support, send your request to fyodor@insecure.org so he can guage demand.");
+    fatal("Sorry -- IPv6 support is currently only available for connect() scan (-sT), ping scan (-sP), and list scan (-sL).  Further support is under consideration.");
   }
 }
   
+void NmapOps::setMaxRttTimeout(int rtt) 
+{ 
+  if (rtt <= 0) fatal("NmapOps::setMaxRttTimeout(): maximum round trip time must be greater than 0");
+  max_rtt_timeout = rtt; 
+  if (rtt < min_rtt_timeout) min_rtt_timeout = rtt; 
+  if (rtt < initial_rtt_timeout) initial_rtt_timeout = rtt;
+}
+
+void NmapOps::setMinRttTimeout(int rtt) 
+{ 
+  if (rtt < 0) fatal("NmapOps::setMaxRttTimeout(): minimum round trip time must be at least 0");
+  min_rtt_timeout = rtt; 
+  if (rtt > max_rtt_timeout) max_rtt_timeout = rtt;  
+  if (rtt > initial_rtt_timeout) initial_rtt_timeout = rtt;
+}
+
+void NmapOps::setInitialRttTimeout(int rtt) 
+{ 
+  if (rtt <= 0) fatal("NmapOps::setMaxRttTimeout(): initial round trip time must be greater than 0");
+  initial_rtt_timeout = rtt; 
+  if (rtt > max_rtt_timeout) max_rtt_timeout = rtt;  
+  if (rtt < min_rtt_timeout) min_rtt_timeout = rtt;
+}

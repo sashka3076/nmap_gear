@@ -1,8 +1,7 @@
-/* Note -- this file was obtained from tcpdump-2000-9-17 CVS snapshot
-   ( www.tcpdump.org).  It has been modified slightly for compatability
-   with libnbase.  Modification etails may be in the nbase CHANGELOG 
-    - fyodor@insecure.org
- */
+/* Note -- this file was obtained from tcpdump-2000-9-17 CVS snapshot *
+ * ( www.tcpdump.org).  It has been modified slightly for             *
+ * compatability with libnbase.  Modification etails may be in the    *
+ * nbase CHANGELOG - fyodor@insecure.org                              */
 
 
 /*
@@ -38,7 +37,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: snprintf.c,v 1.4 2001/12/30 12:16:23 fyodor Exp $ */
+/* $Id: snprintf.c,v 1.5 2003/09/06 09:10:55 fyodor Exp $ */
 
 #if HAVE_CONFIG_H
 #include "nbase_config.h"
@@ -50,7 +49,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-     "@(#) $Header: /CVS/nbase/snprintf.c,v 1.4 2001/12/30 12:16:23 fyodor Exp $";
+     "@(#) $Header: /CVS/nbase/snprintf.c,v 1.5 2003/09/06 09:10:55 fyodor Exp $";
 #endif
 
 #include <stdio.h>

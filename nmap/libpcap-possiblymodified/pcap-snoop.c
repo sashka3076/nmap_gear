@@ -20,7 +20,7 @@
  */
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /CVS/nmap/libpcap-possiblymodified/pcap-snoop.c,v 1.2 2002/12/18 06:10:07 fyodor Exp $ (LBL)";
+    "@(#) $Header: /CVS/nmap/libpcap-possiblymodified/pcap-snoop.c,v 1.3 2003/09/20 09:03:01 fyodor Exp $ (LBL)";
 #endif
 
 #ifdef HAVE_CONFIG_H
@@ -92,7 +92,8 @@ again:
 	    bpf_filter(p->fcode.bf_insns, cp, datalen, caplen)) {
 		struct pcap_pkthdr h;
 		++p->md.stat.ps_recv;
-		h.ts = sh->snoop_timestamp;
+		h.ts.tv_sec = sh->snoop_timestamp.tv_sec;
+		h.ts.tv_usec = sh->snoop_timestamp.tv_usec;
 		h.len = datalen;
 		h.caplen = caplen;
 		(*callback)(user, &h, cp);
@@ -191,6 +192,7 @@ pcap_open_live(char *device, int snaplen, int promisc, int to_ms, char *ebuf)
 	    strncmp("ec", device, 2) == 0 ||	/* Indigo/Indy 10 Mbit,
 						   O2 10/100 */
 	    strncmp("ef", device, 2) == 0 ||	/* O200/2000 10/100 Mbit */
+	    strncmp("eg", device, 2) == 0 ||	/* Octane/O2xxx/O3xxx Gigabit */
 	    strncmp("gfe", device, 3) == 0 ||	/* GIO 100 Mbit */
 	    strncmp("fxp", device, 3) == 0 ||	/* Challenge VME Enet */
 	    strncmp("ep", device, 2) == 0 ||	/* Challenge 8x10 Mbit EPLEX */
@@ -249,8 +251,8 @@ pcap_open_live(char *device, int snaplen, int promisc, int to_ms, char *ebuf)
 #ifndef ifr_mtu
 #define ifr_mtu	ifr_metric
 #endif
-	if (snaplen > ifr.ifr_mtu)
-		snaplen = ifr.ifr_mtu;
+	if (snaplen > ifr.ifr_mtu + ll_hdrlen)
+		snaplen = ifr.ifr_mtu + ll_hdrlen;
 #endif
 
 	/*

@@ -1,86 +1,93 @@
 
-/***********************************************************************
- * utils.cc -- Various miscellaneous utility functions which defy      *
- * categorization :)                                                   *
- *                                                                     *
- ***********************************************************************
- *  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  *
- *  program is free software; you can redistribute it and/or modify    *
- *  it under the terms of the GNU General Public License as published  *
- *  by the Free Software Foundation; Version 2.  This guarantees your  *
- *  right to use, modify, and redistribute this software under certain *
- *  conditions.  If this license is unacceptable to you, we may be     *
- *  willing to sell alternative licenses (contact sales@insecure.com). *
- *                                                                     *
- *  If you received these files with a written license agreement       *
- *  stating terms other than the (GPL) terms above, then that          *
- *  alternative license agreement takes precendence over this comment. *
- *                                                                     *
- *  Source is provided to this software because we believe users have  *
- *  a right to know exactly what a program is going to do before they  *
- *  run it.  This also allows you to audit the software for security   *
- *  holes (none have been found so far).                               *
- *                                                                     *
- *  Source code also allows you to port Nmap to new platforms, fix     *
- *  bugs, and add new features.  You are highly encouraged to send     *
- *  your changes to fyodor@insecure.org for possible incorporation     *
- *  into the main distribution.  By sending these changes to Fyodor or *
- *  one the insecure.org development mailing lists, it is assumed that *
- *  you are offering Fyodor the unlimited, non-exclusive right to      *
- *  reuse, modify, and relicense the code.  This is important because  *
- *  the inability to relicense code has caused devastating problems    *
- *  for other Free Software projects (such as KDE and NASM).  Nmap     *
- *  will always be available Open Source.  If you wish to specify      *
- *  special license conditions of your contributions, just say so      *
- *  when you send them.                                                *
- *                                                                     *
- *  This program is distributed in the hope that it will be useful,    *
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of     *
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  *
- *  General Public License for more details (                          *
- *  http://www.gnu.org/copyleft/gpl.html ).                            *
- *                                                                     *
- ***********************************************************************/
+/***************************************************************************
+ * utils.cc -- Various miscellaneous utility functions which defy          *
+ * categorization :)                                                       *
+ *                                                                         *
+ ***********************IMPORTANT NMAP LICENSE TERMS************************
+ *                                                                         *
+ * The Nmap Security Scanner is (C) 1995-2003 Insecure.Com LLC. This       *
+ * program is free software; you may redistribute and/or modify it under   *
+ * the terms of the GNU General Public License as published by the Free    *
+ * Software Foundation; Version 2.  This guarantees your right to use,     *
+ * modify, and redistribute this software under certain conditions.  If    *
+ * you wish to embed Nmap technology into proprietary software, we may be  *
+ * willing to sell alternative licenses (contact sales@insecure.com).      *
+ * Many security scanner vendors already license Nmap technology such as   *
+ * our remote OS fingerprinting database and code.                         *
+ *                                                                         *
+ * Note that the GPL places important restrictions on "derived works", yet *
+ * it does not provide a detailed definition of that term.  To avoid       *
+ * misunderstandings, we consider an application to constitute a           *
+ * "derivative work" for the purpose of this license if it does any of the *
+ * following:                                                              *
+ * o Integrates source code from Nmap                                      *
+ * o Reads or includes Nmap copyrighted data files, such as                *
+ *   nmap-os-fingerprints or nmap-service-probes.                          *
+ * o Executes Nmap                                                         *
+ * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Links to a library or executes a program that does any of the above   *
+ *                                                                         *
+ * The term "Nmap" should be taken to also include any portions or derived *
+ * works of Nmap.  This list is not exclusive, but is just meant to        *
+ * clarify our interpretation of derived works with some common examples.  *
+ * These restrictions only apply when you actually redistribute Nmap.  For *
+ * example, nothing stops you from writing and selling a proprietary       *
+ * front-end to Nmap.  Just distribute it by itself, and point people to   *
+ * http://www.insecure.org/nmap/ to download Nmap.                         *
+ *                                                                         *
+ * We don't consider these to be added restrictions on top of the GPL, but *
+ * just a clarification of how we interpret "derived works" as it applies  *
+ * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
+ * Torvalds has announced his interpretation of how "derived works"        *
+ * applies to Linux kernel modules.  Our interpretation refers only to     *
+ * Nmap - we don't speak for any other GPL products.                       *
+ *                                                                         *
+ * If you have any questions about the GPL licensing restrictions on using *
+ * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
+ * we also offer alternative license to integrate Nmap into proprietary    *
+ * applications and appliances.  These contracts have been sold to many    *
+ * security vendors, and generally include a perpetual license as well as  *
+ * providing for priority support and updates as well as helping to fund   *
+ * the continued development of Nmap technology.  Please email             *
+ * sales@insecure.com for further information.                             *
+ *                                                                         *
+ * If you received these files with a written license agreement or         *
+ * contract stating terms other than the (GPL) terms above, then that      *
+ * alternative license agreement takes precedence over these comments.     *
+ *                                                                         *
+ * Source is provided to this software because we believe users have a     *
+ * right to know exactly what a program is going to do before they run it. *
+ * This also allows you to audit the software for security holes (none     *
+ * have been found so far).                                                *
+ *                                                                         *
+ * Source code also allows you to port Nmap to new platforms, fix bugs,    *
+ * and add new features.  You are highly encouraged to send your changes   *
+ * to fyodor@insecure.org for possible incorporation into the main         *
+ * distribution.  By sending these changes to Fyodor or one the            *
+ * Insecure.Org development mailing lists, it is assumed that you are      *
+ * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
+ * to reuse, modify, and relicense the code.  Nmap will always be          *
+ * available Open Source, but this is important because the inability to   *
+ * relicense code has caused devastating problems for other Free Software  *
+ * projects (such as KDE and NASM).  We also occasionally relicense the    *
+ * code to third parties as discussed above.  If you wish to specify       *
+ * special license conditions of your contributions, just say so when you  *
+ * send them.                                                              *
+ *                                                                         *
+ * This program is distributed in the hope that it will be useful, but     *
+ * WITHOUT ANY WARRANTY; without even the implied warranty of              *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
+ * General Public License for more details at                              *
+ * http://www.gnu.org/copyleft/gpl.html .                                  *
+ *                                                                         *
+ ***************************************************************************/
 
-/* $Id: utils.cc,v 1.4 2002/11/11 19:00:44 fyodor Exp $ */
+/* $Id: utils.cc,v 1.19 2003/09/11 02:12:57 fyodor Exp $ */
 
 #include "utils.h"
+#include "NmapOps.h"
 
-/* Return num if it is between min and max.  Otherwise return min or
-   max (whichever is closest to num), */
-int box(int bmin, int bmax, int bnum) {
-  if (bmin > bmax)
-    fatal("box(bmin=%d,bmax=%d,bnum=%d) called = bmin must be <= bmax", bmin, 
-	  bmax, bnum);
-  if (bnum >= bmax)
-    return bmax;
-  if (bnum <= bmin)
-    return bmin;
-  return bnum;
-}
-
-void *safe_malloc(int size)
-{
-  void *mymem;
-  if (size < 0)
-    fatal("Tried to malloc negative amount of memory!!!");
-  mymem = malloc(size);
-  if (mymem == NULL)
-    fatal("Malloc Failed! Probably out of space.");
-  return mymem;
-}
-
-/* Zero-initializing version of safe_malloc */
-void *safe_zalloc(int size)
-{
-  void *mymem;
-  if (size < 0)
-    fatal("Tried to malloc negative amount of memory!!!");
-  mymem = calloc(1, size);
-  if (mymem == NULL)
-    fatal("Malloc Failed! Probably out of space.");
-  return mymem;
-}
+extern NmapOps o;
 
 /* Hex dump */
 void hdump(unsigned char *packet, unsigned int len) {
@@ -243,94 +250,6 @@ int numberlist2array(char *expr, u16 *dest, int destsize, char **errorstr, u16 m
   return num_vals_saved;
 }
 
-int get_random_int() {
-int i;
-get_random_bytes(&i, sizeof(int));
-return i;
-}
-
-unsigned int get_random_uint() {
-unsigned int i;
-get_random_bytes(&i, sizeof(unsigned int));
-return i;
-}
-
-u32 get_random_u32() {
-  u32 i;
-  get_random_bytes(&i, sizeof(i));
-  return i;
-}
-
-u8 get_random_u8() {
-  u8 i;
-  get_random_bytes(&i, sizeof(i));
-  return i;
-}
-
-unsigned short get_random_ushort() {
-unsigned short s;
-get_random_bytes(&s, sizeof(unsigned short));
-return s;
-}
-
-int get_random_bytes(void *buf, int numbytes) {
-static char bytebuf[2048];
-static char badrandomwarning = 0;
-static int bytesleft = 0;
-int res;
-int tmp;
-struct timeval tv;
-FILE *fp = NULL;
-unsigned int i;
-short *iptr;
-
-if (numbytes < 0 || numbytes > 0xFFFF) return -1;
-
-if (bytesleft == 0) {
-  fp = fopen("/dev/arandom", "r");
-  if (!fp) fp = fopen("/dev/urandom", "r");
-  if (!fp) fp = fopen("/dev/random", "r");
-  if (fp) {
-    res = fread(bytebuf, 1, sizeof(bytebuf), fp);
-    if (res != sizeof(bytebuf)) {    
-      error("Failed to read from /dev/urandom or /dev/random");
-      fclose(fp);
-      fp = NULL;
-    }      
-    bytesleft = sizeof(bytebuf);
-  }
-  if (!fp) {  
-    if (badrandomwarning == 0) {
-      badrandomwarning++;
-      /*      error("WARNING: your system apparently does not offer /dev/urandom or /dev/random.  Reverting to less secure version."); */
-
-      /* Seed our random generator */
-      gettimeofday(&tv, NULL);
-      srand((tv.tv_sec ^ tv.tv_usec) ^ getpid());
-    }
-
-    for(i=0; i < sizeof(bytebuf) / sizeof(short); i++) {
-      iptr = (short *) ((char *)bytebuf + i * sizeof(short));
-      *iptr = rand();
-    }
-    bytesleft = (sizeof(bytebuf) / sizeof(short)) * sizeof(short);
-    /*    ^^^^^^^^^^^^^^^not as meaningless as it looks  */
-  } else fclose(fp);
-}
-
-if (numbytes <= bytesleft) { /* we can cover it */
-  memcpy(buf, bytebuf + (sizeof(bytebuf) - bytesleft), numbytes);
-  bytesleft -= numbytes;
-  return 0;
-}
-
-/* We don't have enough */
-memcpy(buf, bytebuf + (sizeof(bytebuf) - bytesleft), bytesleft);
-tmp = bytesleft;
-bytesleft = 0;
-return get_random_bytes((char *)buf + tmp, numbytes - tmp);
-}
-
 /* Scramble the contents of an array*/
 void genfry(unsigned char *arr, int elem_sz, int num_elem) {
 int i;
@@ -404,6 +323,25 @@ if (num_elem < 2)
  return;
 }
 
+// Send data to a socket, keep retrying until an error or the full length
+// is sent.  Returns -1 if there is an error, or len if the full length was sent.
+int Send(int sd, const void *msg, size_t len, int flags) {
+  int res;
+  unsigned int sentlen = 0;
+
+  do {
+    res = send(sd,(char *) msg + sentlen, len - sentlen, 0);
+    if (res > 0)
+      sentlen += res;
+  } while(sentlen < len && (res != -1 || socket_errno() == EINTR));
+
+  return (res < 0)? -1 : (int) len;
+}
+
+// Write data to a file descriptor, keep retrying until an error or the full length
+// is written.  Returns -1 if there is an error, or len if the full length was sent.
+// Note that this does NOT work well on Windows using sockets -- so use Send() above 
+// for those.  I don't know if it works with regular files on Windows with files).
 ssize_t Write(int fd, const void *buf, size_t count) {
   int res;
   unsigned int len;
@@ -413,9 +351,9 @@ ssize_t Write(int fd, const void *buf, size_t count) {
     res = write(fd,(char *) buf + len,count - len);
     if (res > 0)
       len += res;
-  } while(len < count && (res != -1 || errno == EINTR));
+  } while(len < count && (res != -1 || socket_errno() == EINTR));
 
-  return res;
+  return (res == -1)? -1 : (int) count;
 }
 
 
@@ -555,6 +493,81 @@ void arg_parse_free(char **argv) {
   free(argv);
 }
 
+// A simple function to form a character from 2 hex digits in ASCII form
+static unsigned char hex2char(unsigned char a, unsigned char b)
+{
+  int val;
+  if (!isxdigit(a) || !isxdigit(b)) return 0;
+  a = tolower(a);
+  b = tolower(b);
+  if (isdigit(a))
+    val = (a - '0') << 4;
+  else val = (10 + (a - 'a')) << 4;
+
+  if (isdigit(b))
+    val += (b - '0');
+  else val += 10 + (b - 'a');
+
+  return (unsigned char) val;
+}
+
+/* Convert a string in the format of a roughly C-style string literal
+   (e.g. can have \r, \n, \xHH escapes, etc.) into a binary string.
+   This is done in-place, and the new (shorter or the same) length is
+   stored in newlen.  If parsing fails, NULL is returned, otherwise
+   str is returned. */
+char *cstring_unescape(char *str, unsigned int *newlen) {
+  char *dst = str, *src = str;
+  char newchar;
+
+  while(*src) {
+    if (*src == '\\' ) {
+      src++;
+      switch(*src) {
+      case '0':
+	newchar = '\0'; src++; break;
+      case 'a': // Bell (BEL)
+	newchar = '\a'; src++; break;	
+      case 'b': // Backspace (BS)
+	newchar = '\b'; src++; break;	
+      case 'f': // Formfeed (FF)
+	newchar = '\f'; src++; break;	
+      case 'n': // Linefeed/Newline (LF)
+	newchar = '\n'; src++; break;	
+      case 'r': // Carriage Return (CR)
+	newchar = '\r'; src++; break;	
+      case 't': // Horizontal Tab (TAB)
+	newchar = '\t'; src++; break;	
+      case 'v': // Vertical Tab (VT)
+	newchar = '\v'; src++; break;	
+      case 'x':
+	src++;
+	if (!*src || !*(src + 1)) return NULL;
+	if (!isxdigit(*src) || !isxdigit(*(src + 1))) return NULL;
+	newchar = hex2char(*src, *(src + 1));
+	src += 2;
+	break;
+      default:
+	if (isalnum(*src))
+	  return NULL; // I don't really feel like supporting octals such as \015
+	// Other characters I'll just copy as is
+	newchar = *src;
+	src++;
+	break;
+      }
+      *dst = newchar;
+      dst++;
+    } else {
+      if (dst != src)
+	*dst = *src;
+      dst++; src++;
+    }
+  }
+
+  *dst = '\0'; // terminated, but this string can include other \0, so use newlen
+  if (newlen) *newlen = dst - str;
+  return str;
+}
 
 /* mmap() an entire file into the address space.  Returns a pointer
    to the beginning of the file.  The mmap'ed length is returned
@@ -595,7 +608,7 @@ char *mmapfile(char *fname, int *length, int openflags) {
   close(fd);
 
 #ifdef MAP_FAILED
-  if (fileptr == MAP_FAILED) return NULL;
+  if (fileptr == (void *)MAP_FAILED) return NULL;
 #else
   if (fileptr == (char *) -1) return NULL;
 #endif
@@ -608,9 +621,12 @@ char *mmapfile(char *fname, int *length, int openflags) {
    file at a time (note how gmap is used).*/
 /* I believe this was written by Ryan Permeh ( ryan@eeye.com) */
 
-HANDLE gmap = 0;
-char *mmapfile(char *fname, int *length, int openflags) {
+static HANDLE gmap = NULL;
+
+char *mmapfile(char *fname, int *length, int openflags)
+{
 	HANDLE fd;
+	DWORD mflags, oflags;
 	char *fileptr;
 
 	if (!length || !fname) {
@@ -618,27 +634,44 @@ char *mmapfile(char *fname, int *length, int openflags) {
 		return NULL;
 	}
 
-	*length = -1;
+ if (openflags == O_RDONLY) {
+  oflags = GENERIC_READ;
+  mflags = PAGE_READONLY;
+  }
+ else {
+  oflags = GENERIC_READ | GENERIC_WRITE;
+  mflags = PAGE_READONLY | PAGE_READWRITE;
+ }
 
-	fd= CreateFile(fname,
-		openflags,                // open for writing 
-		0,                            // do not share 
-		NULL,                         // no security 
-		OPEN_EXISTING,                // overwrite existing 
-		FILE_ATTRIBUTE_NORMAL,
-		NULL);                        // no attr. template 
+ fd = CreateFile (
+   fname,
+   oflags,                       // open flags
+   0,                            // do not share
+   NULL,                         // no security
+   OPEN_EXISTING,                // open existing
+   FILE_ATTRIBUTE_NORMAL,
+   NULL);                        // no attr. template
+ if (!fd)
+  pfatal ("%s(%u): CreateFile()", __FILE__, __LINE__);
 
-	gmap=CreateFileMapping(fd,NULL, (openflags & O_RDONLY)? PAGE_READONLY:(openflags & O_RDWR)? (PAGE_READONLY|PAGE_READWRITE) : PAGE_READWRITE,0,0,NULL);
+ *length = (int) GetFileSize (fd, NULL);
 
-	fileptr = (char *)MapViewOfFile(gmap, FILE_MAP_ALL_ACCESS,0,0,0);
-	*length = (int) GetFileSize(fd,NULL);
-	CloseHandle(fd);
+ gmap = CreateFileMapping (fd, NULL, mflags, 0, 0, NULL);
+ if (!gmap)
+  pfatal ("%s(%u): CreateFileMapping(), file '%s', length %d, mflags %08lX",
+    __FILE__, __LINE__, fname, *length, mflags);
 
-	#ifdef MAP_FAILED
-	if (fileptr == MAP_FAILED) return NULL;
-	#else
-	if (fileptr == (char *) -1) return NULL;
-	#endif
+ fileptr = (char*) MapViewOfFile (gmap, oflags == GENERIC_READ ? FILE_MAP_READ : FILE_MAP_WRITE,
+                                     0, 0, 0);
+ if (!fileptr)
+  pfatal ("%s(%u): MapViewOfFile()", __FILE__, __LINE__);
+
+ CloseHandle (fd);
+
+ if (o.debugging > 2)
+  printf ("mmapfile(): fd %08lX, gmap %08lX, fileptr %08lX, length %d\n",
+    (DWORD)fd, (DWORD)gmap, (DWORD)fileptr, *length);
+
 	return fileptr;
 }
 
@@ -647,13 +680,14 @@ char *mmapfile(char *fname, int *length, int openflags) {
    works if the file is the most recently mapped one */
 int win32_munmap(char *filestr, int filelen)
 {
-	if(gmap == 0)
-		fatal("win32_munmap: no current mapping !\n");
-	FlushViewOfFile(filestr, filelen);
-	UnmapViewOfFile(filestr);
-	CloseHandle(gmap);
-	gmap = 0;
-	return 0;
+  if (gmap == 0)
+    fatal("win32_munmap: no current mapping !\n");
+
+  FlushViewOfFile(filestr, filelen);
+  UnmapViewOfFile(filestr);
+  CloseHandle(gmap);
+  gmap = NULL;
+  return 0;
 }
 
 #endif

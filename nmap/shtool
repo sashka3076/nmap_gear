@@ -1721,7 +1721,7 @@ version )
     
     #   create the version file according the the selected language  
     echo "new version: $version.$revision$bptype$bplevel ($date)"
-    tmpfile="/tmp/version.tmp.$$"
+    tmpfile="version.tmp.$$"
     rm -f $tmpfile >/dev/null 2>&1
     case $LANGUAGE in
         txt )
@@ -1758,7 +1758,7 @@ const char @PREFIX@_VersionStr[] = "@VERSION@.@REVISION@@BPTYPE@@BPLEVEL@ (@DAY@
 const char @PREFIX@_Hello[]      = "This is @NAME@ Version @VERSION@.@REVISION@@BPTYPE@@BPLEVEL@ (@DAY@-@MONTH@-@YEAR@)";
 const char @PREFIX@_GNUVersion[] = "@NAME@ Version @VERSION@.@REVISION@@BPTYPE@@BPLEVEL@";
 const char @PREFIX@_WhatID[]     = "@(#)@NAME@ Version @VERSION@.@REVISION@@BPTYPE@@BPLEVEL@ (@DAY@-@MONTH@-@YEAR@)";
-const char @PREFIX@_RCSIdentID[] = "$Id: shtool,v 1.1 1999/12/22 05:04:11 fyodor Exp $";
+const char @PREFIX@_RCSIdentID[] = "$Id: shtool,v 1.2 2003/06/13 03:38:13 fyodor Exp $";
 const char @PREFIX@_WebID[]      = "@NAME@/@VERSION@.@REVISION@@BPTYPE@@BPLEVEL@";
 const char @PREFIX@_PlainID[]    = "@VERSION@.@REVISION@@BPTYPE@@BPLEVEL@";
 
@@ -1776,7 +1776,7 @@ $@PREFIX@_VersionStr = "@VERSION@.@REVISION@@BPTYPE@@BPLEVEL@ (@DAY@-@MONTH@-@YE
 $@PREFIX@_Hello      = "This is @NAME@ Version @VERSION@.@REVISION@@BPTYPE@@BPLEVEL@ (@DAY@-@MONTH@-@YEAR@)";
 $@PREFIX@_GNUVersion = "@NAME@ Version @VERSION@.@REVISION@@BPTYPE@@BPLEVEL@";
 $@PREFIX@_WhatID     = "@(#)@NAME@ Version @VERSION@.@REVISION@@BPTYPE@@BPLEVEL@ (@DAY@-@MONTH@-@YEAR@)";
-$@PREFIX@_RCSIdentID = "\$Id: shtool,v 1.1 1999/12/22 05:04:11 fyodor Exp $";
+$@PREFIX@_RCSIdentID = "\$Id: shtool,v 1.2 2003/06/13 03:38:13 fyodor Exp $";
 $@PREFIX@_WebID      = "@NAME@/@VERSION@.@REVISION@@BPTYPE@@BPLEVEL@";
 $@PREFIX@_PlainID    = "@VERSION@.@REVISION@@BPTYPE@@BPLEVEL@";
 
@@ -1815,7 +1815,7 @@ path )
     basename=no
     pathlist="$PATH"
     namelist=""
-    tmpfile="/tmp/path.tmp.$$"
+    tmpfile="path.tmp.$$"
     while [ ".$1" != . ]; do
         case $1 in
             -s ) silent=yes   ; shift; continue ;;

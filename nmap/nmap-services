@@ -1,6 +1,7 @@
-# This list of services is from the
-# Nmap security scanner ( http://www.insecure.org/nmap/ )
+# Well known service port numbers -*- mode: fundamental; -*-
+# From the Nmap security scanner ( http://www.insecure.org/nmap/ )
 #
+# $Id: nmap-services,v 1.60 2003/10/06 08:24:35 fyodor Exp $
 # For a HUGE list of services (including these and others), 
 # see http://www.graffiti.com/services
 tcpmux            1/tcp      # TCP Port Service Multiplexer [rfc-1078]
@@ -59,7 +60,7 @@ graphics          41/udp     #
 nameserver        42/tcp     # Host Name Server
 nameserver        42/udp     # Host Name Server
 whois             43/tcp     # nicname
-shois             43/udp     # nicname
+whois             43/udp     # nicname
 mpm-flags         44/tcp     # MPM FLAGS Protocol
 mpm-flags         44/udp     # MPM FLAGS Protocol
 mpm               45/tcp     # Message Processing Module [recv]
@@ -190,8 +191,8 @@ pop-2             109/tcp    # PostOffice V.2
 pop-2             109/udp    # PostOffice V.2
 pop-3             110/tcp    # PostOffice V.3
 pop-3             110/udp    # PostOffice V.3
-sunrpc            111/tcp    # portmapper, rpcbind
-sunrpc            111/udp    # portmapper, rpcbind
+rpcbind           111/tcp    # portmapper, rpcbind
+rpcbind           111/udp    # portmapper, rpcbind
 mcidas            112/tcp    # McIDAS Data Transmission Protocol
 mcidas            112/udp    # McIDAS Data Transmission Protocol
 auth              113/tcp    # ident, tap, Authentication Service
@@ -238,8 +239,8 @@ statsrv           133/tcp    # Statistics Service
 statsrv           133/udp    # Statistics Service
 ingres-net        134/tcp    # INGRES-NET Service
 ingres-net        134/udp    # INGRES-NET Service
-loc-srv           135/tcp    # NCS local location broker
-loc-srv           135/udp    # Location Service
+msrpc             135/tcp    # Microsoft RPC services
+msrpc             135/udp    # Microsoft RPC services
 profile           136/tcp    # PROFILE Naming System
 profile           136/udp    # PROFILE Naming System
 netbios-ns        137/tcp    # NETBIOS Name Service
@@ -254,8 +255,8 @@ emfis-cntl        141/tcp    # EMFIS Control Service
 emfis-cntl        141/udp    # EMFIS Control Service
 bl-idm            142/tcp    # Britton-Lee IDM
 bl-idm            142/udp    # Britton-Lee IDM
-imap2             143/tcp    # Interim Mail Access Protocol v2
-imap2             143/udp    # Interim Mail Access Protocol v2
+imap              143/tcp    # Interim Mail Access Protocol v2
+imap              143/udp    # Interim Mail Access Protocol v2
 news              144/tcp    # NewS window system
 news              144/udp    # NewS window system
 uaac              145/tcp    # UAAC Protocol
@@ -623,8 +624,8 @@ bnet              415/tcp    #
 bnet              415/udp    # 
 silverplatter     416/tcp    # 
 silverplatter     416/udp    # 
-onmux             417/tcp    # 
-onmux             417/udp    # 
+onmux             417/tcp    # Meeting maker
+onmux             417/udp    # Meeting maker
 hyper-g           418/tcp    # 
 hyper-g           418/udp    # 
 ariel1            419/tcp    # 
@@ -1002,7 +1003,7 @@ npmp-local        610/tcp    #
 npmp-local        610/udp    # 
 npmp-gui          611/tcp    # 
 npmp-gui          611/udp    # 
-sco-dtmgr         617/tcp    # SCO Desktop Administration Server
+sco-dtmgr         617/tcp    # SCO Desktop Administration Server or Arkeia (www.akriea.com) backup software
 sco-dtmgr         617/udp    # SCO Desktop Administration Server
 qmqp              628/tcp    # Qmail Quick Mail Queueing
 ipp               631/tcp    # Internet Printing Protocol -- for one implementation see http://www.cups.org (Common UNIX Printing System)
@@ -1010,20 +1011,22 @@ ginad             634/tcp    #
 ginad             634/udp    # 
 mount             635/udp    # NFS Mount Service
 ldapssl           636/tcp    # LDAP over SSL
+lanserver         637/tcp    #
+lanserver         637/udp    #
 pcnfs             640/udp    # PC-NFS DOS Authentication
 bwnfs             650/udp    # BW-NFS DOS Authentication
 mac-srvr-admin    660/tcp    # MacOS Server Admin
 mac-srvr-admin    660/udp    # MacOS Server Admin
 doom              666/tcp    # doom Id Software
 doom              666/udp    # doom Id Software
-lanserver         637/tcp    #
-lanserver         637/udp    #
+acap              674/tcp    # ACAP server of Communigate (www.stalker.com)
 resvc             691/tcp    # The Microsoft Exchange 2000 Server Routing Service          
 elcsd             704/tcp    # errlog copy/server daemon
 elcsd             704/udp    # errlog copy/server daemon
 silc              706/tcp    # Secure Internet Live Conferencing -- http://silcnet.org
 entrustmanager    709/tcp    # EntrustManager - NorTel DES auth network see 389/tcp
 entrustmanager    709/udp    # EntrustManager - NorTel DES auth network see 389/tcp
+omfs              723/tcp    # OpenMosix File System
 netviewdm1        729/tcp    # IBM NetView DM/6000 Server/Client
 netviewdm1        729/udp    # IBM NetView DM/6000 Server/Client
 netviewdm2        730/tcp    # IBM NetView DM/6000 send/tcp
@@ -1098,7 +1101,7 @@ hp-alarm-mgr      783/tcp    # hp performance data alarm manager
 hp-alarm-mgr      783/udp    # hp performance data alarm manager
 concert           786/tcp    # 
 concert           786/udp    # 
-controlit         799/tcp
+controlit         799/tcp    # Remotely possible
 mdbs_daemon       800/tcp    # 
 mdbs_daemon       800/udp    # 
 device            801/tcp    # 
@@ -1107,6 +1110,7 @@ supfilesrv        871/tcp    # SUP server
 rsync             873/tcp    # Rsync server ( http://rsync.samba.org )
 accessbuilder     888/tcp    # or Audio CD Database
 accessbuilder     888/udp    # 
+sun-manageconsole 898/tcp    # Solaris Management Console Java listener (Solaris 8 & 9)
 ftps-data         989/tcp    # ftp protocol, data, over TLS/SSL
 samba-swat        901/tcp    # Samba SWAT tool.  Also used by ISS RealSecure.
 oftep-rpc         950/tcp    # Often RPC.statd (on Redhat Linux)
@@ -1130,6 +1134,7 @@ ock               1000/udp   #
 ufsd              1008/tcp   # ufsd		# UFS-aware server
 ufsd              1008/udp   # 
 sometimes-rpc1    1012/udp   # This is rstatd on my openBSD box
+netvenuechat      1023/tcp   # Nortel NetVenue Notification, Chat, Intercom
 kdm               1024/tcp   # K Display Manager (KDE version of xdm)
 NFS-or-IIS        1025/tcp   # IIS, NFS, or listener RFS remote_file_sharing
 blackjack         1025/udp   # network blackjack
@@ -1144,6 +1149,7 @@ iad2              1031/udp   # BBN IAD
 iad3              1032/tcp   # BBN IAD
 iad3              1032/udp   # BBN IAD
 netinfo           1033/tcp   # Netinfo is apparently on many OS X boxes.
+netsaint          1040/tcp   # Netsaint status daemon
 java-or-OTGfileshare 1050/tcp # J2EE nameserver, also OTG, also called Disk/Application extender. Could also be MiniCommand backdoor OTGlicenseserv
 nim               1058/tcp   # 
 nim               1058/udp   # 
@@ -1153,6 +1159,7 @@ instl_boots       1067/tcp   # Installation Bootstrap Proto. Serv.
 instl_boots       1067/udp   # Installation Bootstrap Proto. Serv.
 instl_bootc       1068/tcp   # Installation Bootstrap Proto. Cli.
 instl_bootc       1068/udp   # Installation Bootstrap Proto. Cli.
+sns_credit        1076/tcp   # Shared Network Services (SNS) for Canadian credit card authorizations
 socks             1080/tcp   # 
 socks             1080/udp   # 
 ansoft-lm-1       1083/tcp   # Anasoft License Manager
@@ -1171,13 +1178,17 @@ nfa               1155/udp   # Network File Access
 phone             1167/udp   # conference calling
 skkserv           1178/tcp   # SKK (kanji input)
 lupa              1212/tcp   # 
-lupa              1212/udp   # 
+lupa              1212/udp   #
+fasttrack         1214/tcp   # Kazaa File Sharing
+fasttrack         1214/udp   # Kazaa File Sharing
+quicktime         1220/tcp   # Apple Darwin and QuickTime Streaming Administration Servers
 nerv              1222/tcp   # SNI R&D network
 nerv              1222/udp   # SNI R&D network
 hotline           1234/tcp   # 
-msg               1241/tcp   # remote message server
+nessus            1241/tcp   # Nessus or remote message server
 hermes            1248/tcp   # 
 hermes            1248/udp   # 
+waste             1337/tcp   # Nullsoft WASTE encrypted P2P app
 alta-ana-lm       1346/tcp   # Alta Analytics License Manager
 alta-ana-lm       1346/udp   # Alta Analytics License Manager
 bbn-mmc           1347/tcp   # multi media conferencing
@@ -1628,11 +1639,17 @@ CarbonCopy        1680/tcp   #
 L2TP              1701/udp   #
 H.323/Q.931       1720/tcp   # Interactive media
 pptp              1723/tcp   # Point-to-point tunnelling protocol
+wms               1755/tcp   # Windows media service
+landesk-rc        1761/tcp   # LANDesk Remote Control
+landesk-rc        1762/tcp   # LANDesk Remote Control
+landesk-rc        1763/tcp   # LANDesk Remote Control
+landesk-rc        1764/tcp   # LANDesk Remote Control
 radius            1812/udp   # RADIUS authentication protocol (RFC 2138)
 radacct           1813/udp   # RADIUS accounting protocol (RFC 2139)
 pcm               1827/tcp   # PCM Agent (AutoSecure Policy Compliance Manager
 UPnP              1900/tcp   # Universal PnP
 UPnP              1900/udp   # Universal PnP
+bigbrother        1984/tcp   # Big Brother monitoring server - www.bb4.com
 licensedaemon     1986/tcp   # cisco license management
 licensedaemon     1986/udp   # cisco license management
 tr-rsrb-p1        1987/tcp   # cisco RSRB Priority 1 port
@@ -1756,6 +1773,7 @@ dlsrpn            2065/tcp   # Data Link Switch Read Port Number
 dlsrpn            2065/udp   # Data Link Switch Read Port Number
 dlswpn            2067/tcp   # Data Link Switch Write Port Number
 dlswpn            2067/udp   # Data Link Switch Write Port Number
+advocentkvm       2068/tcp   # Advocent KVM Server
 zephyr-clt        2103/udp   # Zephyr serv-hm connection
 zephyr-hm         2104/udp   # Zephyr hostmanager
 eklogin           2105/tcp   # Kerberos (v4) encrypted rlogin
@@ -1803,6 +1821,9 @@ sybase            2638/tcp   # Sybase database
 listen            2766/tcp   # System V listener port
 www-dev           2784/tcp   # world wide web - development
 www-dev           2784/udp   # world wide web - development
+corbaloc          2809/tcp   # Corba
+extensisportfolio 2903/tcp   # Portfolio Server by Extensis Product Group
+symantec-av       2967/udp   # Symantec AntiVirus (rtvscan.exe)
 iss-realsec       2998/tcp   # ISS RealSecure IDS Remote Console Admin port
 ppp               3000/tcp   # User-level ppp daemon, or chili!soft asp
 nessusd           3001/tcp   # Nessus Security Scanner (www.nessus.org) Daemon or chili!soft asp
@@ -1821,11 +1842,13 @@ ccmail            3264/tcp   # cc:mail/lotus
 ccmail            3264/udp   # cc:mail/lotus
 globalcatLDAP     3268/tcp   # Global Catalog LDAP
 globalcatLDAPssl  3269/tcp   # Global Catalog LDAP over ssl
+meetingmaker      3292/tcp   # Meeting maker time management software
 mysql             3306/tcp   # mySQL
 dec-notes         3333/tcp   # DEC Notes
 dec-notes         3333/udp   # DEC Notes
 msdtc             3372/tcp   # MS distributed transaction coordinator
 ms-term-serv      3389/tcp   # Microsoft Remote Display Protocol
+squid-snmp        3401/udp   # Squid proxy SNMP port
 bmap              3421/tcp   # Bull Apprise portmapper
 bmap              3421/udp   # Bull Apprise portmapper
 prsvp             3455/tcp   # RSVP Port
@@ -1835,6 +1858,9 @@ IISrpc-or-vat     3456/udp   # also VAT default data
 vat-control       3457/tcp   # VAT default control
 vat-control       3457/udp   # VAT default control
 track             3462/tcp   # software distribution
+peerenabler       3531/tcp   # P2PNetworking/PeerEnabler protocol
+peerenabler       3531/udp   # P2PNetworking/PeerEnabler protocol
+rendezvous        3689/tcp   # Rendezvous Zeroconf (used by Apple)
 udt_os            3900/tcp   # Unidata UDT OS
 udt_os            3900/udp   # Unidata UDT OS
 mapper-nodemgr    3984/tcp   # MAPPER network node manager
@@ -1858,6 +1884,7 @@ nuts_dem          4132/udp   # NUTS Daemon
 nuts_bootp        4133/tcp   # NUTS Bootp Server
 nuts_bootp        4133/udp   # NUTS Bootp Server
 wincim            4144/tcp   # pc windows compuserve.com protocol
+xtell             4224/tcp   # Xtell messenging server
 rwhois            4321/tcp   # Remote Who Is
 rwhois            4321/udp   # Remote Who Is
 msql              4333/tcp   # mini-sql server
@@ -1870,8 +1897,10 @@ sae-urn           4500/tcp   #
 sae-urn           4500/udp   # 
 fax               4557/tcp   # FlexFax FAX transmission service
 hylafax           4559/tcp   # HylaFAX client-server protocol
+mosmig            4660/tcp   # OpenMOSix MIGrates local processes
 rfa               4672/tcp   # remote file access server
 rfa               4672/udp   # remote file access server
+squid-htcp        4827/udp   # Squid proxy HTCP port
 radmin            4899/tcp   # Radmin (www.radmin.com) remote PC control software
 maybeveritas      4987/tcp   #
 maybeveritas      4998/tcp   #
@@ -1881,13 +1910,15 @@ commplex-link     5001/tcp   #
 commplex-link     5001/udp   # 
 rfe               5002/tcp   # Radio Free Ethernet
 rfe               5002/udp   # Radio Free Ethernet
+filemaker         5003/tcp   # Filemaker Server - http://www.filemaker.com/ti/104289.html
+filemaker         5003/udp   # Filemaker Server - http://www.filemaker.com/ti/104289.html
 telelpathstart    5010/tcp   # 
 telelpathstart    5010/udp   # 
 telelpathattack   5011/tcp   # 
 telelpathattack   5011/udp   # 
 mmcc              5050/tcp   # multimedia conference control tool
 mmcc              5050/udp   # multimedia conference control tool
-admd              5100/tcp   # (chili!soft asp admin port)
+admd              5100/tcp   # (chili!soft asp admin port) or Yahoo pager
 admdog            5101/tcp   # (chili!soft asp)
 admeng            5102/tcp   # (chili!soft asp)
 rmonitor_secure   5145/tcp   # 
@@ -1919,6 +1950,8 @@ cfengine          5308/tcp   #
 cfengine          5308/udp   # 
 pcduo-old         5400/tcp   # RemCon PC-Duo - old port
 pcduo             5405/tcp   # RemCon PC-Duo - new port
+omid              5428/udp   # OpenMosix Info Dissemination
+connect-proxy     5490/tcp   # Many HTTP CONNECT proxies 
 postgres          5432/tcp   # postgres database server
 securid           5500/udp   # SecurID
 secureidprop      5510/tcp   # ACE/Server services
@@ -1994,6 +2027,10 @@ montage-lm        6147/udp   # Montage License Manager
 ricardo-lm        6148/tcp   # Ricardo North America License Manager
 ricardo-lm        6148/udp   # Ricardo North America License Manager
 gnutella          6346/tcp   # Gnutella file sharing protocol
+crystalreports    6400/tcp   # Seagate Crystal Reports
+crystalenterprise 6401/tcp   # Seagate Crystal Enterprise
+mythtv            6543/tcp
+mythtv            6544/tcp
 PowerChutePLUS    6547/tcp   #
 PowerChutePLUS    6548/tcp   #
 PowerChutePLUS    6549/udp   #
@@ -2037,17 +2074,21 @@ fodms             7200/tcp   # FODMS FLIP
 fodms             7200/udp   # FODMS FLIP
 dlip              7201/tcp   # 
 dlip              7201/udp   # 
+openmanage        7273/tcp   # Dell OpenManage
 icb               7326/tcp   # Internet Citizen's Band
+pythonds          7464/tcp   # Python Documentation Server
 qaz               7597/tcp   # Quaz trojan worm
 cucme-1           7648/udp   # cucme live video/audio server
 cucme-2           7649/udp   # cucme live video/audio server
 cucme-3           7650/udp   # cucme live video/audio server
 cucme-4           7651/udp   # cucme live video/audio server
+http-alt          8000/tcp   # A common alternative http port
 ajp12             8007/tcp   # Apache JServ Protocol 1.x
 ajp13             8009/tcp   # Apache JServ Protocol 1.3
 http-proxy        8080/tcp   # Common HTTP proxy/second web server port
 blackice-icecap   8081/tcp   # ICECap user console
 blackice-alerts   8082/tcp   # BlackIce Alerts sent to this port
+https-alt         8443/tcp   # Common alternative https port
 sun-answerbook    8888/tcp   # Sun Answerbook HTTP server
 seosload          8892/tcp   # From the new Computer Associates eTrust ACX
 zeus-admin        9090/tcp   # Zeus admin server
@@ -2060,7 +2101,8 @@ sd                9876/tcp   # Session Director
 sd                9876/udp   # Session Director
 issa              9991/tcp   # ISS System Scanner Agent
 issc              9992/tcp   # ISS System Scanner Console
-snet-sensor-mgmt  10000/tcp  # SecureNet Pro Sensor https management server
+abyss             9999/tcp   # Abyss web server remote web management interface
+snet-sensor-mgmt  10000/tcp  # SecureNet Pro Sensor https management server or apple airport admin
 stel              10005/tcp  # Secure telnet
 amanda            10080/udp  # Amanda Backup Util
 amandaidx         10082/tcp  # Amanda indexing
@@ -2089,12 +2131,20 @@ VeritasNetbackup  13721/tcp  # bpdbm         server
 VeritasNetbackup  13722/tcp  # bpjava-msvc   client
 VeritasNetbackup  13782/tcp  # bpcd          client
 VeritasNetbackup  13783/tcp  # vopied        client
+swgps             15126/tcp  # Nortel Java S/WGPS Global Payment Solutions for US credit card authorizations
 subseven          16959/tcp  # Subseven trojan
 isode-dua         17007/tcp  # 
 isode-dua         17007/udp  # 
 wdbrpc            17185/udp  # vxWorks WDB remote debugging ONCRPC
+kuang2            17300/tcp  # Kuang2 backdoor
 biimenu           18000/tcp  # Beckman Instruments, Inc.
 biimenu           18000/udp  # Beckman Instruments, Inc.
+opsec_cvp         18181/tcp  # Check Point OPSEC
+opsec_ufp         18182/tcp  # Check Point OPSEC
+opsec_sam         18183/tcp  # Check Point OPSEC
+opsec_lea         18184/tcp  # Check Point OPSEC
+opsec_omi         18185/tcp  # Check Point OPSEC
+opsec_ela         18187/tcp  # Check Point OPSEC
 btx               20005/tcp  # xcept4 (Interacts with German Telekom's CEPT videotext service)
 wnn6              22273/tcp  # Wnn6 (Japanese input)
 wnn6_Cn           22289/tcp  # Wnn6 (Chinese input)
@@ -2105,6 +2155,17 @@ hpnpd             22370/udp  # Hewlett-Packard Network Printer daemon
 quake             26000/udp  # Quake game server
 wnn6_DS           26208/tcp  # Wnn6 (Dserver)
 hexen2            26900/udp  # Hexen 2 game server
+flexlm0           27000/tcp  # FlexLM license manager additional ports
+flexlm1           27001/tcp  # FlexLM license manager additional ports
+flexlm2           27002/tcp  # FlexLM license manager additional ports
+flexlm3           27003/tcp  # FlexLM license manager additional ports
+flexlm4           27004/tcp  # FlexLM license manager additional ports
+flexlm5           27005/tcp  # FlexLM license manager additional ports
+flexlm6           27006/tcp  # FlexLM license manager additional ports
+flexlm7           27007/tcp  # FlexLM license manager additional ports
+flexlm8           27008/tcp  # FlexLM license manager additional ports
+flexlm9           27009/tcp  # FlexLM license manager additional ports
+flexlm10          27010/tcp  # FlexLM license manager additional ports
 halflife          27015/udp  # Half-life game server
 subseven          27374/tcp  # Subseven Windows trojan
 Trinoo_Bcast      27444/udp  # Trinoo distributed attack tool Master
@@ -2117,6 +2178,7 @@ heretic2          28910/udp  # Heretic 2 game server
 Trinoo_Register   31335/udp  # Trinoo distributed attack tool Bcast Daemon registration port
 BackOrifice       31337/udp  # cDc Back Orifice remote admin tool
 Elite             31337/tcp  # Sometimes interesting stuff can be found here
+omad              32768/udp  # OpenMosix Autodiscovery Daemon
 sometimes-rpc3    32770/tcp  # Sometimes an RPC port on my Solaris box
 sometimes-rpc4    32770/udp  # Sometimes an RPC port on my Solaris box
 sometimes-rpc5    32771/tcp  # Sometimes an RPC port on my Solaris box (rusersd)
@@ -2143,8 +2205,13 @@ sometimes-rpc25   32786/tcp  # Sometimes an RPC port (mountd)
 sometimes-rpc26   32786/udp  # Sometimes an RPC port
 sometimes-rpc27   32787/tcp  # Sometimes an RPC port dmispd (DMI Service Provider)
 sometimes-rpc28   32787/udp  # Sometimes an RPC port
+landesk-cba       38037/tcp
+landesk-cba       38037/udp
+landesk-cba       38292/tcp
+landesk-cba       38293/udp
 sygatefw          39213/udp  # Sygate Firewall management port version 3.0 build 521 and above
 reachout          43188/tcp
+tinyfw            44334/tcp  # tiny personal firewall admin port
 coldfusion-auth   44442/tcp  # ColdFusion Advanced Security/Siteminder Authentication Port (by Allaire/Netegrity)
 coldfusion-auth   44443/tcp  # ColdFusion Advanced Security/Siteminder Authentication Port (by Allaire/Netegrity)
 ciscopop          45000/udp  # Cisco Postoffice Protocol for Cisco Secure IDS

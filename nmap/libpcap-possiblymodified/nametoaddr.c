@@ -24,7 +24,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /CVS/nmap/libpcap-possiblymodified/nametoaddr.c,v 1.2 2002/12/18 06:10:07 fyodor Exp $ (LBL)";
+    "@(#) $Header: /CVS/nmap/libpcap-possiblymodified/nametoaddr.c,v 1.3 2003/09/20 09:03:01 fyodor Exp $ (LBL)";
 #endif
 
 #ifdef HAVE_CONFIG_H
@@ -36,24 +36,22 @@ static const char rcsid[] =
 #include <sys/socket.h>
 #include <sys/time.h>
 
-struct mbuf;
-struct rtentry;
-#include <net/if.h>
 #include <netinet/in.h>
+#ifdef HAVE_ETHER_HOSTTON
 #ifdef HAVE_NETINET_IF_ETHER_H
+struct mbuf;		/* Squelch compiler warnings on some platforms for */
+struct rtentry;		/* declarations in <net/if.h> */
+#include <net/if.h>	/* for "struct ifnet" in "struct arpcom" on Solaris */
 #include <netinet/if_ether.h>
-#endif
+#endif /* HAVE_NETINET_IF_ETHER_H */
+#endif /* HAVE_ETHER_HOSTTON */
 #include <arpa/inet.h>
-#ifdef INET6
 #include <netdb.h>
-#include <sys/socket.h>
-#endif /*INET6*/
 
 #include <ctype.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <memory.h>
-#include <netdb.h>
 #include <stdio.h>
 
 #include "pcap-int.h"

@@ -1,50 +1,89 @@
 
-/***********************************************************************
- * osscan.cc -- Routines used for OS detection via TCP/IP              *
- * fingerprinting.  For more information on how this works in Nmap,    *
- * see my paper at                                                     *
- * http://www.insecure.org/nmap/nmap-fingerprinting-article.html       *
- *                                                                     *
- ***********************************************************************
- *  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  *
- *  program is free software; you can redistribute it and/or modify    *
- *  it under the terms of the GNU General Public License as published  *
- *  by the Free Software Foundation; Version 2.  This guarantees your  *
- *  right to use, modify, and redistribute this software under certain *
- *  conditions.  If this license is unacceptable to you, we may be     *
- *  willing to sell alternative licenses (contact sales@insecure.com). *
- *                                                                     *
- *  If you received these files with a written license agreement       *
- *  stating terms other than the (GPL) terms above, then that          *
- *  alternative license agreement takes precendence over this comment. *
- *                                                                     *
- *  Source is provided to this software because we believe users have  *
- *  a right to know exactly what a program is going to do before they  *
- *  run it.  This also allows you to audit the software for security   *
- *  holes (none have been found so far).                               *
- *                                                                     *
- *  Source code also allows you to port Nmap to new platforms, fix     *
- *  bugs, and add new features.  You are highly encouraged to send     *
- *  your changes to fyodor@insecure.org for possible incorporation     *
- *  into the main distribution.  By sending these changes to Fyodor or *
- *  one the insecure.org development mailing lists, it is assumed that *
- *  you are offering Fyodor the unlimited, non-exclusive right to      *
- *  reuse, modify, and relicense the code.  This is important because  *
- *  the inability to relicense code has caused devastating problems    *
- *  for other Free Software projects (such as KDE and NASM).  Nmap     *
- *  will always be available Open Source.  If you wish to specify      *
- *  special license conditions of your contributions, just say so      *
- *  when you send them.                                                *
- *                                                                     *
- *  This program is distributed in the hope that it will be useful,    *
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of     *
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  *
- *  General Public License for more details (                          *
- *  http://www.gnu.org/copyleft/gpl.html ).                            *
- *                                                                     *
- ***********************************************************************/
+/***************************************************************************
+ * osscan.cc -- Routines used for OS detection via TCP/IP fingerprinting.  *
+ * For more information on how this works in Nmap, see my paper at         *
+ * http://www.insecure.org/nmap/nmap-fingerprinting-article.html           *
+ *                                                                         *
+ ***********************IMPORTANT NMAP LICENSE TERMS************************
+ *                                                                         *
+ * The Nmap Security Scanner is (C) 1995-2003 Insecure.Com LLC. This       *
+ * program is free software; you may redistribute and/or modify it under   *
+ * the terms of the GNU General Public License as published by the Free    *
+ * Software Foundation; Version 2.  This guarantees your right to use,     *
+ * modify, and redistribute this software under certain conditions.  If    *
+ * you wish to embed Nmap technology into proprietary software, we may be  *
+ * willing to sell alternative licenses (contact sales@insecure.com).      *
+ * Many security scanner vendors already license Nmap technology such as   *
+ * our remote OS fingerprinting database and code.                         *
+ *                                                                         *
+ * Note that the GPL places important restrictions on "derived works", yet *
+ * it does not provide a detailed definition of that term.  To avoid       *
+ * misunderstandings, we consider an application to constitute a           *
+ * "derivative work" for the purpose of this license if it does any of the *
+ * following:                                                              *
+ * o Integrates source code from Nmap                                      *
+ * o Reads or includes Nmap copyrighted data files, such as                *
+ *   nmap-os-fingerprints or nmap-service-probes.                          *
+ * o Executes Nmap                                                         *
+ * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Links to a library or executes a program that does any of the above   *
+ *                                                                         *
+ * The term "Nmap" should be taken to also include any portions or derived *
+ * works of Nmap.  This list is not exclusive, but is just meant to        *
+ * clarify our interpretation of derived works with some common examples.  *
+ * These restrictions only apply when you actually redistribute Nmap.  For *
+ * example, nothing stops you from writing and selling a proprietary       *
+ * front-end to Nmap.  Just distribute it by itself, and point people to   *
+ * http://www.insecure.org/nmap/ to download Nmap.                         *
+ *                                                                         *
+ * We don't consider these to be added restrictions on top of the GPL, but *
+ * just a clarification of how we interpret "derived works" as it applies  *
+ * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
+ * Torvalds has announced his interpretation of how "derived works"        *
+ * applies to Linux kernel modules.  Our interpretation refers only to     *
+ * Nmap - we don't speak for any other GPL products.                       *
+ *                                                                         *
+ * If you have any questions about the GPL licensing restrictions on using *
+ * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
+ * we also offer alternative license to integrate Nmap into proprietary    *
+ * applications and appliances.  These contracts have been sold to many    *
+ * security vendors, and generally include a perpetual license as well as  *
+ * providing for priority support and updates as well as helping to fund   *
+ * the continued development of Nmap technology.  Please email             *
+ * sales@insecure.com for further information.                             *
+ *                                                                         *
+ * If you received these files with a written license agreement or         *
+ * contract stating terms other than the (GPL) terms above, then that      *
+ * alternative license agreement takes precedence over these comments.     *
+ *                                                                         *
+ * Source is provided to this software because we believe users have a     *
+ * right to know exactly what a program is going to do before they run it. *
+ * This also allows you to audit the software for security holes (none     *
+ * have been found so far).                                                *
+ *                                                                         *
+ * Source code also allows you to port Nmap to new platforms, fix bugs,    *
+ * and add new features.  You are highly encouraged to send your changes   *
+ * to fyodor@insecure.org for possible incorporation into the main         *
+ * distribution.  By sending these changes to Fyodor or one the            *
+ * Insecure.Org development mailing lists, it is assumed that you are      *
+ * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
+ * to reuse, modify, and relicense the code.  Nmap will always be          *
+ * available Open Source, but this is important because the inability to   *
+ * relicense code has caused devastating problems for other Free Software  *
+ * projects (such as KDE and NASM).  We also occasionally relicense the    *
+ * code to third parties as discussed above.  If you wish to specify       *
+ * special license conditions of your contributions, just say so when you  *
+ * send them.                                                              *
+ *                                                                         *
+ * This program is distributed in the hope that it will be useful, but     *
+ * WITHOUT ANY WARRANTY; without even the implied warranty of              *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
+ * General Public License for more details at                              *
+ * http://www.gnu.org/copyleft/gpl.html .                                  *
+ *                                                                         *
+ ***************************************************************************/
 
-/* $Id: osscan.cc,v 1.2 2002/08/25 01:56:10 fyodor Exp $ */
+/* $Id: osscan.cc,v 1.18 2003/09/11 02:12:57 fyodor Exp $ */
 
 
 #include "osscan.h"
@@ -93,7 +132,7 @@ unsigned int sequence_base;
 unsigned int openport;
 unsigned int bytes;
 unsigned int closedport = 31337;
-struct port *tport = NULL;
+Port *tport = NULL;
 char filter[512];
 double seq_inc_sum = 0;
 unsigned int  seq_avg_inc = 0;
@@ -111,13 +150,13 @@ if (target->timedout)
   return NULL;
 
 /* The seqs must start out as zero for the si struct */
-bzero(si->seqs, sizeof(si->seqs));
+memset(si->seqs, 0, sizeof(si->seqs));
 si->ipid_seqclass = IPID_SEQ_UNKNOWN;
 si->ts_seqclass = TS_SEQ_UNKNOWN;
 si->lastboot = 0;
 
 /* Init our fingerprint tests to each be NULL */
-bzero(FPtests, sizeof(FPtests)); 
+memset(FPtests, 0, sizeof(FPtests)); 
 get_random_bytes(&sequence_base, sizeof(unsigned int));
 /* Init our raw socket */
  if ((rawsd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0 )
@@ -148,26 +187,20 @@ snprintf(filter, sizeof(filter), "dst host %s and (icmp or (tcp and src host %s)
 
  /* Lets find an open port to use */
  openport = (unsigned long) -1;
- target->osscan_openport = -1;
- target->osscan_closedport = -1;
+ target->FPR->osscan_opentcpport = -1;
+ target->FPR->osscan_closedtcpport = -1;
  tport = NULL;
- if (target->ports.state_counts_tcp[PORT_OPEN] > 0) { 
-   tport = nextport(&target->ports, NULL, IPPROTO_TCP, PORT_OPEN);
-   assert(tport);
+ if ((tport = target->ports.nextPort(NULL, IPPROTO_TCP, PORT_OPEN, false))) {
    openport = tport->portno;
-   target->osscan_openport = tport->portno;
+   target->FPR->osscan_opentcpport = tport->portno;
  }
  
  /* Now we should find a closed port */
- if (target->ports.state_counts_tcp[PORT_CLOSED] > 0) {
-   tport = nextport(&target->ports, NULL, IPPROTO_TCP, PORT_CLOSED);
-   assert(tport);
+ if ((tport = target->ports.nextPort(NULL, IPPROTO_TCP, PORT_CLOSED, false))) {
    closedport = tport->portno;
-   target->osscan_closedport = tport->portno;
- } else if (target->ports.state_counts_tcp[PORT_UNFIREWALLED] > 0) {
+   target->FPR->osscan_closedtcpport = tport->portno;
+ } else if ((tport = target->ports.nextPort(NULL, IPPROTO_TCP, PORT_UNFIREWALLED, false))) {
    /* Well, we will settle for unfiltered */
-   tport = nextport(&target->ports, NULL, IPPROTO_TCP, PORT_UNFIREWALLED);
-   assert(tport);
    closedport = tport->portno;
  } else {
    closedport = (get_random_uint() % 14781) + 30000;
@@ -188,28 +221,28 @@ if (o.verbose && openport != (unsigned long) -1)
      /* Test 1 */
      if (!FPtests[1]) {     
        if (o.scan_delay) enforce_scan_delay(NULL);
-       send_tcp_raw_decoys(rawsd, target->v4hostip(), current_port, 
-			   openport, sequence_base, 0,TH_BOGUS|TH_SYN, 0, (u8 *) "\003\003\012\001\002\004\001\011\010\012\077\077\077\077\000\000\000\000\000\000" , 20, NULL, 0);
+       send_tcp_raw_decoys(rawsd, target->v4hostip(), o.ttl, current_port, 
+			   openport, sequence_base, 0,TH_ECE|TH_SYN, 0, (u8 *) "\003\003\012\001\002\004\001\011\010\012\077\077\077\077\000\000\000\000\000\000" , 20, NULL, 0);
      }
      
      /* Test 2 */
      if (!FPtests[2]) {     
        if (o.scan_delay) enforce_scan_delay(NULL);
-       send_tcp_raw_decoys(rawsd, target->v4hostip(), current_port +1, 
+       send_tcp_raw_decoys(rawsd, target->v4hostip(), o.ttl, current_port +1, 
 			   openport, sequence_base, 0,0, 0, (u8 *) "\003\003\012\001\002\004\001\011\010\012\077\077\077\077\000\000\000\000\000\000" , 20, NULL, 0);
      }
 
      /* Test 3 */
      if (!FPtests[3]) {     
        if (o.scan_delay) enforce_scan_delay(NULL);
-       send_tcp_raw_decoys(rawsd, target->v4hostip(), current_port +2, 
+       send_tcp_raw_decoys(rawsd, target->v4hostip(), o.ttl, current_port +2, 
 			   openport, sequence_base, 0,TH_SYN|TH_FIN|TH_URG|TH_PUSH, 0,(u8 *) "\003\003\012\001\002\004\001\011\010\012\077\077\077\077\000\000\000\000\000\000" , 20, NULL, 0);
      }
 
      /* Test 4 */
      if (!FPtests[4]) {     
        if (o.scan_delay) enforce_scan_delay(NULL);
-       send_tcp_raw_decoys(rawsd, target->v4hostip(), current_port +3, 
+       send_tcp_raw_decoys(rawsd, target->v4hostip(), o.ttl, current_port +3, 
 			   openport, sequence_base, 0,TH_ACK, 0, (u8 *) "\003\003\012\001\002\004\001\011\010\012\077\077\077\077\000\000\000\000\000\000" , 20, NULL, 0);
      }
    }
@@ -217,21 +250,21 @@ if (o.verbose && openport != (unsigned long) -1)
    /* Test 5 */
    if (!FPtests[5]) {   
      if (o.scan_delay) enforce_scan_delay(NULL);
-     send_tcp_raw_decoys(rawsd, target->v4hostip(), current_port +4,
+     send_tcp_raw_decoys(rawsd, target->v4hostip(), o.ttl, current_port +4,
 			 closedport, sequence_base, 0,TH_SYN, 0, (u8 *) "\003\003\012\001\002\004\001\011\010\012\077\077\077\077\000\000\000\000\000\000" , 20, NULL, 0);
    }
 
      /* Test 6 */
    if (!FPtests[6]) {   
      if (o.scan_delay) enforce_scan_delay(NULL);
-     send_tcp_raw_decoys(rawsd, target->v4hostip(), current_port +5, 
+     send_tcp_raw_decoys(rawsd, target->v4hostip(), o.ttl, current_port +5, 
 			 closedport, sequence_base, 0,TH_ACK, 0, (u8 *) "\003\003\012\001\002\004\001\011\010\012\077\077\077\077\000\000\000\000\000\000" , 20, NULL, 0);
    }
 
      /* Test 7 */
    if (!FPtests[7]) {
      if (o.scan_delay) enforce_scan_delay(NULL);   
-     send_tcp_raw_decoys(rawsd, target->v4hostip(), current_port +6, 
+     send_tcp_raw_decoys(rawsd, target->v4hostip(), o.ttl, current_port +6, 
 			 closedport, sequence_base, 0,TH_FIN|TH_PUSH|TH_URG, 0, (u8 *) "\003\003\012\001\002\004\001\011\010\012\077\077\077\077\000\000\000\000\000\000" , 20, NULL, 0);
    }
 
@@ -249,7 +282,7 @@ if (o.verbose && openport != (unsigned long) -1)
        target->timedout = 1;
        goto osscan_timedout;
      }
-   while(( ip = (struct ip*) readip_pcap(pd, &bytes, oshardtimeout)) && !timeout) {
+   while(( ip = (struct ip*) readip_pcap(pd, &bytes, oshardtimeout, NULL)) && !timeout) {
      gettimeofday(&t2, NULL);
      if (TIMEVAL_SUBTRACT(t2,t1) > oshardtimeout) {
        timeout = 1;
@@ -311,7 +344,7 @@ if (o.verbose && openport != (unsigned long) -1)
    seq_packets_sent = 0;
    while (seq_packets_sent < NUM_SEQ_SAMPLES) {
      if (o.scan_delay) enforce_scan_delay(NULL);
-     send_tcp_raw_decoys(rawsd, target->v4hostip(), 
+     send_tcp_raw_decoys(rawsd, target->v4hostip(), o.ttl, 
 			 o.magic_port + seq_packets_sent + 1, 
 			 openport, 
 			 sequence_base + seq_packets_sent + 1, 0, 
@@ -327,8 +360,8 @@ if (o.verbose && openport != (unsigned long) -1)
      while(si->responses < seq_packets_sent && !timeout) {
        
        if (seq_packets_sent == NUM_SEQ_SAMPLES)
-	 ip = (struct ip*) readip_pcap(pd, &bytes, oshardtimeout);
-       else ip = (struct ip*) readip_pcap(pd, &bytes, 10);
+	 ip = (struct ip*) readip_pcap(pd, &bytes, oshardtimeout, NULL);
+       else ip = (struct ip*) readip_pcap(pd, &bytes, 10, NULL);
        
        gettimeofday(&t2, NULL);
        /*     error("DEBUG: got a response (len=%d):\n", bytes);  */
@@ -379,7 +412,7 @@ if (o.verbose && openport != (unsigned long) -1)
 	   if (seq_response_num < 0 || seq_response_num >= seq_packets_sent) {
 	     /* BzzT! Value out of range */
 	     if (o.debugging) {
-	       error("Unable to associate os scan response with sent packet (received ack: %lX; sequence base: %lX. Packet:", ntohl(tcp->th_ack), sequence_base);
+	       error("Unable to associate os scan response with sent packet (received ack: %lX; sequence base: %lX. Packet:", (unsigned long) ntohl(tcp->th_ack), (unsigned long) sequence_base);
 	       readtcppacket((unsigned char *)ip,BSDUFIX(ip->ip_len));
 	     }
 	     seq_response_num = si->responses;
@@ -466,7 +499,7 @@ if (o.verbose && openport != (unsigned long) -1)
        {
 	 /* Up 2 years?  Perhaps, but they're probably lying. */
 	 if (o.debugging) {
-	   error("Ignoring claimed uptime of %d days", 
+	   error("Ignoring claimed uptime of %lu days", 
 		 (seq_send_times[0].tv_sec - si->lastboot) / 86400);
 	 }
 	 si->lastboot = 0;
@@ -741,7 +774,7 @@ struct AVal *fingerprint_iptcppacket(struct ip *ip, int mss, u32 syn) {
   */
   AVs[4].attribute = "Flags";
   p = AVs[4].value;
-  if (tcp->th_flags & TH_BOG) *p++ = 'B';
+  if (tcp->th_flags & TH_ECE) *p++ = 'B';
   if (tcp->th_flags & TH_URG) *p++ = 'U';
   if (tcp->th_flags & TH_ACK) *p++ = 'A';
   if (tcp->th_flags & TH_PUSH) *p++ = 'P';
@@ -788,6 +821,36 @@ struct AVal *fingerprint_iptcppacket(struct ip *ip, int mss, u32 syn) {
   return AVs;
 }
 
+// Prints a note if observedFP has a classification and it is not in referenceFP
+// Returns 0 if they match, nonzero otherwise
+static int compareclassifications(FingerPrint *referenceFP, 
+				  FingerPrint *observedFP, bool verbose) {
+  int refclassno;
+  struct OS_Classification *obclass, *refclass;
+  if (observedFP->num_OS_Classifications > 0) {
+    obclass = &(observedFP->OS_class[0]);
+    for(refclassno = 0; refclassno < referenceFP->num_OS_Classifications; refclassno++) {
+      refclass = &(referenceFP->OS_class[refclassno]);
+      if (strcmp(obclass->OS_Vendor, refclass->OS_Vendor) == 0 &&
+	  strcmp(obclass->OS_Family, refclass->OS_Family) == 0 &&
+	  strcmp(obclass->Device_Type, refclass->Device_Type) == 0 &&
+	  (obclass->OS_Generation == refclass->OS_Generation ||
+	   (obclass->OS_Generation != NULL && refclass->OS_Generation != NULL && 
+	    strcmp(obclass->OS_Generation, refclass->OS_Generation) == 0))) {
+	// A match!  lets get out of here
+	return 0;
+      }
+    }
+  } else {
+    if (verbose)
+      printf("Observed fingerprint lacks a classification\n");
+    return 1;
+  }
+  if (verbose)
+    printf("Warning: Classification of observed fingerprint does not appear in reference fingerprint.\n");
+  return 1;
+}
+
 /* Compares 2 fingerprints -- a referenceFP (can have expression
    attributes) with an observed fingerprint (no expressions).  If
    verbose is nonzero, differences will be printed.  The comparison
@@ -800,6 +863,8 @@ double compare_fingerprints(FingerPrint *referenceFP, FingerPrint *observedFP,
   unsigned long  new_subtests, new_subtests_succeeded;
   assert(referenceFP);
   assert(observedFP);
+
+  if (verbose) compareclassifications(referenceFP, observedFP, true);
 
   for(currentReferenceTest = referenceFP; currentReferenceTest; 
       currentReferenceTest = currentReferenceTest->next) {
@@ -822,14 +887,12 @@ double compare_fingerprints(FingerPrint *referenceFP, FingerPrint *observedFP,
 }
 
 /* Takes a fingerprint and looks for matches inside reference_FPs[].
-   The results are stored in in FPR (which must point to an allocated
-   FingerPrintResults structure) -- results will be reverse-sorted by
+   The results are stored in in FPR (which must point to an instantiated
+   FingerPrintResults class) -- results will be reverse-sorted by
    accuracy.  No results below accuracy_threshhold will be included.
    The max matches returned is the maximum that fits in a
-   FingerPrintResults structure.  The allocated FingerPrintResults
-   does not have to be initialized -- that will be done in this
-   function.  */
-void match_fingerprint(FingerPrint *FP, struct FingerPrintResults *FPR, 
+   FingerPrintResults class.  */
+void match_fingerprint(FingerPrint *FP, FingerPrintResults *FPR, 
 		      FingerPrint **reference_FPs, double accuracy_threshold) {
 
   int i;
@@ -850,7 +913,6 @@ void match_fingerprint(FingerPrint *FP, struct FingerPrintResults *FPR,
   assert(FPR);
   assert(accuracy_threshold >= 0 && accuracy_threshold <= 1);
 
-  bzero(FPR, sizeof(*FPR));
   FPR->overall_results = OSSCAN_SUCCESS;
   
   for(i = 0; reference_FPs[i]; i++) {
@@ -1053,7 +1115,8 @@ return;
 
 
 int os_scan(Target *target) {
-struct FingerPrintResults FP_matches[3];
+
+FingerPrintResults FP_matches[3];
 struct seq_info si[3];
 int itry;
 int i;
@@ -1064,9 +1127,10 @@ int bestaccidx;
  if (target->timedout)
    return 1;
  
- bzero(FP_matches, sizeof(FP_matches));
+ if (target->FPR == NULL)
+   target->FPR = new FingerPrintResults;
 
- bzero(si, sizeof(si));
+ memset(si, 0, sizeof(si));
  if (target->ports.state_counts_tcp[PORT_OPEN] == 0 ||
      (target->ports.state_counts_tcp[PORT_CLOSED] == 0 &&
       target->ports.state_counts_tcp[PORT_UNFIREWALLED] == 0)) {
@@ -1088,10 +1152,10 @@ int bestaccidx;
 	 return 1;
        }
    }
-   target->FPs[itry] = get_fingerprint(target, &si[itry]); 
+   target->FPR->FPs[itry] = get_fingerprint(target, &si[itry]); 
    if (target->timedout)
      return 1;
-   match_fingerprint(target->FPs[itry], &FP_matches[itry], 
+   match_fingerprint(target->FPR->FPs[itry], &FP_matches[itry], 
 		     o.reference_FPs, OSSCAN_GUESS_THRESHOLD);
    if (FP_matches[itry].overall_results == OSSCAN_SUCCESS && 
        FP_matches[itry].num_perfect_matches > 0)
@@ -1100,13 +1164,13 @@ int bestaccidx;
      sleep(2);
  }
 
- target->numFPs = (itry == 3)? 3 : itry + 1;
- memcpy(&(target->seq), &si[target->numFPs - 1], sizeof(struct seq_info));
+ target->FPR->numFPs = (itry == 3)? 3 : itry + 1;
+ memcpy(&(target->seq), &si[target->FPR->numFPs - 1], sizeof(struct seq_info));
 
  /* Now lets find the best match */
  bestacc = 0;
  bestaccidx = 0;
- for(itry=0; itry < target->numFPs; itry++) {
+ for(itry=0; itry < target->FPR->numFPs; itry++) {
    if (FP_matches[itry].overall_results == OSSCAN_SUCCESS &&
        FP_matches[itry].num_matches > 0 &&
        FP_matches[itry].accuracy[0] > bestacc) {
@@ -1117,22 +1181,29 @@ int bestaccidx;
    }
  }
 
- memcpy(&(target->FPR), FP_matches + bestaccidx, sizeof(target->FPR));
 
- for(i=0; i < target->numFPs; i++) {
+ for(i=0; i < target->FPR->numFPs; i++) {
    if (i == bestaccidx)
      continue;
    if (o.debugging) {
-     error("Failed exact match #%d (0-based):\n%s", i, fp2ascii(target->FPs[i]));
+     error("Failed exact match #%d (0-based):\n%s", i, fp2ascii(target->FPR->FPs[i]));
    }
  }
 
- if (target->numFPs > 1 && target->FPR.overall_results == OSSCAN_SUCCESS &&
-     target->FPR.accuracy[0] == 1.0) {
-if (o.verbose) error("WARNING:  OS didn't match until the try #%d", target->numFPs);
+ if (target->FPR->numFPs > 1 && target->FPR->overall_results == OSSCAN_SUCCESS &&
+     target->FPR->accuracy[0] == 1.0) {
+   if (o.verbose) error("WARNING:  OS didn't match until the try #%d", target->FPR->numFPs);
  } 
 
- target->goodFP = bestaccidx;
+ target->FPR->goodFP = bestaccidx;
+
+ // Now we redo the match, since target->FPR has various data (such as
+ // target->FPR->numFPs) which is not in FP_matches[bestaccidx].  This is
+ // kinda ugly.
+ if (target->FPR->goodFP >= 0)
+   match_fingerprint(target->FPR->FPs[target->FPR->goodFP], target->FPR, 
+		     o.reference_FPs, OSSCAN_GUESS_THRESHOLD);
+
  
  return 1;
 }
@@ -1164,7 +1235,7 @@ char *end = str + sizeof(str) - 1; /* Last byte allowed to write into */
 if (numFPs <=0) return "(None)";
 if (numFPs > 32) return "(Too many)";
   
-bzero(str, sizeof(str));
+memset(str, 0, sizeof(str));
 for(i=0; i < numFPs; i++) {
   if (FPs[i] == NULL) {
     fatal("mergeFPs was handed a pointer to null fingerprint");
@@ -1222,11 +1293,11 @@ FingerPrint *current;
 struct AVal *AV;
 char *p = str;
 int len;
-bzero(str, sizeof(str));
+memset(str, 0, sizeof(str));
 
 if (!FP) return "(None)";
 
-if(*(FP->OS_name)) {
+if(FP->OS_name && *(FP->OS_name)) {
   len = snprintf(str, 128, "FingerPrint  %s\n", FP->OS_name);
   if (len < 0) fatal("OS name too long");
   p += len;
@@ -1256,6 +1327,109 @@ for(current = FP; current ; current = current->next) {
 return str;
 }
 
+/* Parse a 'Class' line found in the fingerprint file into the current
+   FP.  Classno is the number of 'class' lines found so far in the
+   current fingerprint.  The function quits if there is a parse error */
+
+void parse_classline(FingerPrint *FP, char *thisline, int lineno, int *classno) {
+  char *p, *q;
+
+  fflush(stdout);
+
+  if (!thisline || strncmp(thisline, "Class ", 6) == 1) {
+    fatal("Bogus line #%d (%s) passed to parse_classline()", lineno, thisline);
+  }
+
+  if (*classno >= MAX_OS_CLASSIFICATIONS_PER_FP)
+    fatal("Too many Class lines in fingerprint (line %d: %s), remove some or increase MAX_OS_CLASSIFICATIONS_PER_FP", lineno, thisline);
+  
+  p = thisline + 6;
+  
+  /* First lets get the vendor name */
+  while(*p && isspace(*p)) p++;
+  
+  q = strchr(p, '|');
+  if (!q) {
+    fatal("Parse error on line %d of fingerprint: %s\n", lineno, thisline);
+  }
+  
+  // Trim any trailing whitespace
+  q--;
+  while(isspace(*q)) q--;
+  q++;
+  if (q < p) { fatal("Parse error on line %d of fingerprint: %s\n", lineno, thisline); }
+  FP->OS_class[*classno].OS_Vendor = (char *) cp_alloc(q - p + 1);
+  memcpy(FP->OS_class[*classno].OS_Vendor, p, q - p);
+  FP->OS_class[*classno].OS_Vendor[q - p] = '\0';
+  
+  /* Next comes the OS Family */
+  p = q;
+  while(*p && !isalnum(*p)) p++;
+
+  q = strchr(p, '|');
+  if (!q) {
+    fatal("Parse error on line %d of fingerprint: %s\n", lineno, thisline);
+  }
+  // Trim any trailing whitespace
+  q--;
+  while(isspace(*q)) q--;
+  q++;
+  if (q < p) { fatal("Parse error on line %d of fingerprint: %s\n", lineno, thisline); }
+  FP->OS_class[*classno].OS_Family = (char *) cp_alloc(q - p + 1);
+  memcpy(FP->OS_class[*classno].OS_Family, p, q - p);
+  FP->OS_class[*classno].OS_Family[q - p] = '\0';
+  
+  /* And now the the OS generation, if available */
+  p = q;
+  while(*p && *p != '|') p++;
+  if (*p) p++;
+  while(*p && isspace(*p) && *p != '|') p++;
+  if (*p == '|') {
+    FP->OS_class[*classno].OS_Generation = NULL;
+    q = p;
+  }
+  else {
+    q = strpbrk(p, " |");
+    if (!q) {
+      fatal("Parse error on line %d of fingerprint: %s\n", lineno, thisline);
+    }
+    // Trim any trailing whitespace
+    q--;
+    while(isspace(*q)) q--;
+    q++;
+    if (q < p) { fatal("Parse error on line %d of fingerprint: %s\n", lineno, thisline); }
+    FP->OS_class[*classno].OS_Generation = (char *) cp_alloc(q - p + 1);
+    memcpy(FP->OS_class[*classno].OS_Generation, p, q - p);
+    FP->OS_class[*classno].OS_Generation[q - p] = '\0';
+  }
+  
+  /* And finally the device type */
+  p = q;
+  while(*p && !isalnum(*p)) p++;
+  
+  q = strchr(p, '|');
+  if (!q) {
+    q = p;
+    while(*q) q++;
+  }
+  
+  // Trim any trailing whitespace
+  q--;
+  while(isspace(*q)) q--;
+  q++;
+  if (q < p) { fatal("Parse error on line %d of fingerprint: %s\n", lineno, thisline); }
+  FP->OS_class[*classno].Device_Type = (char *) cp_alloc(q - p + 1);
+  memcpy(FP->OS_class[*classno].Device_Type, p, q - p);
+  FP->OS_class[*classno].Device_Type[q - p] = '\0';
+  
+
+  //  printf("Got classification #%d for the OS %s: VFGT: %s * %s * %s * %s\n", *classno, FP->OS_name, FP->OS_class[*classno].OS_Vendor, FP->OS_class[*classno].OS_Family, FP->OS_class[*classno].OS_Generation? FP->OS_class[*classno].OS_Generation : "(null)", FP->OS_class[*classno].Device_Type);
+
+  (*classno)++;
+  FP->num_OS_Classifications++;
+
+}
+
 /* Parses a single fingerprint from the memory region given.  If a
  non-null fingerprint is returned, the user is in charge of freeing it
  when done.  This function does not require the fingerprint to be 100%
@@ -1263,6 +1437,7 @@ return str;
  which some partial fingerpritns are OK. */
 FingerPrint *parse_single_fingerprint(char *fprint_orig) {
   int lineno = 0;
+  int classno = 0; /* Number of Class lines dealt with so far */
   char *p, *q;
   char *thisline, *nextline;
   char *fprint = strdup(fprint_orig); /* Make a copy we can futz with */
@@ -1281,28 +1456,27 @@ FingerPrint *parse_single_fingerprint(char *fprint_orig) {
 
     while(*thisline && isspace((int) *thisline)) thisline++;
     if (!*thisline) {
-      fatal("Parse error on line %d of fingerprint: %s", lineno);    
+      fatal("Parse error on line %d of fingerprint: %s", lineno, nextline);    
     }
 
-    if (strncasecmp(thisline, "FingerPrint", 11) == 0) {
+    if (strncmp(thisline, "Fingerprint ", 12) == 0) {
       p = thisline + 12;
-      q = FP->OS_name;
+      while(*p && isspace((int) *p)) p++;
+
+      q = strpbrk(p, "\n#");
+      if (!q) q = p + strlen(p);
+      while(isspace(*(--q)))
+	;
+
+      if (q < p) fatal("Parse error on line %d of fingerprint: %s", lineno, nextline);
+
+      FP->OS_name = (char *) cp_alloc(q - p + 2);
+      memcpy(FP->OS_name, p, q - p + 1);
+      FP->OS_name[q - p + 1] = '\0';
       
-      while(*p && *p != '\n' && *p != '#') {
-	if (q - FP->OS_name >= (int) (sizeof(FP->OS_name) - 2))
-	  fatal("Ack!  0v3rf0w r3ad|ng fIng3rpRint FiLE!");
-	*q++ = *p++;
-      }
-      
-      q--;
-      
-      /* Now let us back up through any ending spaces */
-      while(isspace((int)*q)) 
-	q--;
-      
-      /* Terminate the sucker */
-      q++; 
-      *q = '\0';
+    } else if (strncmp(thisline, "Class ", 6) == 0) {
+
+      parse_classline(FP, thisline, lineno, &classno);
 
     } else if ((q = strchr(thisline, '('))) {
       *q = '\0';
@@ -1337,6 +1511,7 @@ int max_records = 4096;
 char line[512];
 int numrecords = 0;
 int lineno = 0;
+int classno = 0; /* Number of Class lines dealt with so far */
 char *p, *q; /* OH YEAH!!!! */
 
  FPs = (FingerPrint **) safe_zalloc(sizeof(FingerPrint *) * max_records); 
@@ -1356,32 +1531,28 @@ while(fgets(line, sizeof(line), fp)) {
     fprintf(stderr, "Parse error on line %d of nmap-os-fingerprints file: %s\n", lineno, line);
     continue;
   }
+
   p = line + 12;
   while(*p && isspace((int) *p)) p++;
-  if (!*p) {
-    fprintf(stderr, "Parse error on line %d of nmap-os-fingerprints file: %s\n", lineno, line);    
-    continue;
-  }
+
+  q = strpbrk(p, "\n#");
+  if (!p) fatal("Parse error on line %d of fingerprint: %s", lineno, line);
+
+  while(isspace(*(--q)))
+    ;
+
+  if (q < p) fatal("Parse error on line %d of fingerprint: %s", lineno, line);
+
   FPs[numrecords] = (FingerPrint *) safe_zalloc(sizeof(FingerPrint));
-  q = FPs[numrecords]->OS_name;
-  while(*p && *p != '\n' && *p != '#') {
-    if (q - FPs[numrecords]->OS_name >= (int) (sizeof(FPs[numrecords]->OS_name) -2))
-      fatal("Ack!  0v3rf0w r3ad|ng fIng3rpRint FiLE!");
-    *q++ = *p++;
-  }
 
-  q--;
-
-  /* Now let us back up through any ending spaces */
-  while(isspace((int)*q)) 
-    q--;
-
-  /* Terminate the sucker */
-  q++; 
-  *q = '\0';
-
+  FPs[numrecords]->OS_name = (char *) cp_alloc(q - p + 2);
+  memcpy(FPs[numrecords]->OS_name, p, q - p + 1);
+  FPs[numrecords]->OS_name[q - p + 1] = '\0';
+      
   current = FPs[numrecords];
   current->line = lineno;
+  classno = 0;
+
   /* Now we read the fingerprint itself */
   while(fgets(line, sizeof(line), fp)) {
     lineno++;
@@ -1389,30 +1560,33 @@ while(fgets(line, sizeof(line), fp)) {
       continue;
     if (*line == '\n')
       break;
-    if (!strncmp(line, "FingerPrint",11)) {
+    if (!strncmp(line, "FingerPrint ",12)) {
       goto fparse;
+    } else if (strncmp(line, "Class ", 6) == 0) {
+      parse_classline(current, line, lineno, &classno);
+    } else {
+      p = line;
+      q = strchr(line, '(');
+      if (!q) {
+	fprintf(stderr, "Parse error on line %d of nmap-os-fingerprints file: %s\n", lineno, line);
+	goto top;
+      }
+      *q = '\0';
+      if(current->name) {
+	current->next = (FingerPrint *) safe_zalloc(sizeof(FingerPrint));
+	current = current->next;
+      }
+      current->name = strdup(p);
+      p = q+1;
+      *q = '(';
+      q = strchr(p, ')');
+      if (!q) {
+	fprintf(stderr, "Parse error on line %d of nmap-os-fingerprints file: %s\n", lineno, line);
+	goto top;
+      }
+      *q = '\0';
+      current->results = str2AVal(p);
     }
-    p = line;
-    q = strchr(line, '(');
-    if (!q) {
-      fprintf(stderr, "Parse error on line %d of nmap-os-fingerprints file: %s\n", lineno, line);
-      goto top;
-    }
-    *q = '\0';
-    if(current->name) {
-      current->next = (FingerPrint *) safe_zalloc(sizeof(FingerPrint));
-      current = current->next;
-    }
-    current->name = strdup(p);
-    p = q+1;
-    *q = '(';
-    q = strchr(p, ')');
-    if (!q) {
-      fprintf(stderr, "Parse error on line %d of nmap-os-fingerprints file: %s\n", lineno, line);
-      goto top;
-    }
-    *q = '\0';
-    current->results = str2AVal(p);
   }
   /* printf("Read in fingerprint:\n%s\n", fp2ascii(FPs[numrecords])); */
   numrecords++;
@@ -1503,7 +1677,7 @@ while(!id) id = get_random_uint();
 
 /* check that required fields are there and not too silly */
 if ( !victim || !sport || !dport || sd < 0) {
-  fprintf(stderr, "send_udp_raw: One or more of your parameters suck!\n");
+  fprintf(stderr, "send_closedudp_probe: One or more of your parameters suck!\n");
   return NULL;
 }
 
@@ -1523,7 +1697,7 @@ sethdrinclude(sd);
    sock.sin_addr.s_addr = victim->s_addr;
 
 
-   bzero((char *) packet, sizeof(struct ip) + sizeof(udphdr_bsd));
+   memset((char *) packet, 0, sizeof(struct ip) + sizeof(udphdr_bsd));
 
    udp->uh_sport = htons(sport);
    udp->uh_dport = htons(dport);
@@ -1539,13 +1713,13 @@ sethdrinclude(sd);
 realcheck = in_cksum((unsigned short *)pseudo, 20 /* pseudo + UDP headers */ +
  datalen);
 #if STUPID_SOLARIS_CHECKSUM_BUG
- udp->uh_sum = sizeof(struct udphdr) + datalen;
+ udp->uh_sum = sizeof(struct udphdr_bsd) + datalen;
 #else
 udp->uh_sum = realcheck;
 #endif
 
    /* Goodbye, pseudo header! */
-   bzero(pseudo, sizeof(*pseudo));
+   memset(pseudo, 0, sizeof(*pseudo));
 
    /* Now for the ip header */
    ip->ip_v = 4;

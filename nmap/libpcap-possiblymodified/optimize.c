@@ -22,15 +22,12 @@
  */
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /CVS/nmap/libpcap-possiblymodified/optimize.c,v 1.2 2002/12/18 06:10:07 fyodor Exp $ (LBL)";
+    "@(#) $Header: /CVS/nmap/libpcap-possiblymodified/optimize.c,v 1.3 2003/09/20 09:03:01 fyodor Exp $ (LBL)";
 #endif
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-
-#include <sys/types.h>
-#include <sys/time.h>
 
 #include <stdio.h>
 #include <stdlib.h>

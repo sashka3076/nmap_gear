@@ -17,7 +17,7 @@
 /* Modified by Fyodor (fyodor@insecure.org) for inclusion in the Nmap 
  * Security Scanner.
  *
- * $Id: inet_pton.c,v 1.5 2002/08/27 21:08:21 fyodor Exp $
+ * $Id: inet_pton.c,v 1.6 2003/08/16 03:29:26 fyodor Exp $
  */
 
 #include "nbase.h"
@@ -121,7 +121,7 @@ inet_pton4(const char *src, unsigned char *dst)
 		const char *pch;
 
 		if ((pch = strchr(digits, ch)) != NULL) {
-			unsigned int newval = *tp * 10 + (pch - digits);
+			unsigned int newval = (unsigned int) (*tp * 10 + (pch - digits));
 
 			if (newval > 255)
 				return (0);

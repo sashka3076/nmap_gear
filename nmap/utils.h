@@ -1,48 +1,88 @@
 
-/***********************************************************************
- * utils.c -- Various miscellaneous utility functions which defy       *
- * categorization :)                                                   *
- *                                                                     *
- ***********************************************************************
- *  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  *
- *  program is free software; you can redistribute it and/or modify    *
- *  it under the terms of the GNU General Public License as published  *
- *  by the Free Software Foundation; Version 2.  This guarantees your  *
- *  right to use, modify, and redistribute this software under certain *
- *  conditions.  If this license is unacceptable to you, we may be     *
- *  willing to sell alternative licenses (contact sales@insecure.com). *
- *                                                                     *
- *  If you received these files with a written license agreement       *
- *  stating terms other than the (GPL) terms above, then that          *
- *  alternative license agreement takes precendence over this comment. *
- *                                                                     *
- *  Source is provided to this software because we believe users have  *
- *  a right to know exactly what a program is going to do before they  *
- *  run it.  This also allows you to audit the software for security   *
- *  holes (none have been found so far).                               *
- *                                                                     *
- *  Source code also allows you to port Nmap to new platforms, fix     *
- *  bugs, and add new features.  You are highly encouraged to send     *
- *  your changes to fyodor@insecure.org for possible incorporation     *
- *  into the main distribution.  By sending these changes to Fyodor or *
- *  one the insecure.org development mailing lists, it is assumed that *
- *  you are offering Fyodor the unlimited, non-exclusive right to      *
- *  reuse, modify, and relicense the code.  This is important because  *
- *  the inability to relicense code has caused devastating problems    *
- *  for other Free Software projects (such as KDE and NASM).  Nmap     *
- *  will always be available Open Source.  If you wish to specify      *
- *  special license conditions of your contributions, just say so      *
- *  when you send them.                                                *
- *                                                                     *
- *  This program is distributed in the hope that it will be useful,    *
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of     *
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  *
- *  General Public License for more details (                          *
- *  http://www.gnu.org/copyleft/gpl.html ).                            *
- *                                                                     *
- ***********************************************************************/
+/***************************************************************************
+ * utils.h -- Various miscellaneous utility functions which defy           *
+ * categorization :)                                                       *
+ *                                                                         *
+ ***********************IMPORTANT NMAP LICENSE TERMS************************
+ *                                                                         *
+ * The Nmap Security Scanner is (C) 1995-2003 Insecure.Com LLC. This       *
+ * program is free software; you may redistribute and/or modify it under   *
+ * the terms of the GNU General Public License as published by the Free    *
+ * Software Foundation; Version 2.  This guarantees your right to use,     *
+ * modify, and redistribute this software under certain conditions.  If    *
+ * you wish to embed Nmap technology into proprietary software, we may be  *
+ * willing to sell alternative licenses (contact sales@insecure.com).      *
+ * Many security scanner vendors already license Nmap technology such as   *
+ * our remote OS fingerprinting database and code.                         *
+ *                                                                         *
+ * Note that the GPL places important restrictions on "derived works", yet *
+ * it does not provide a detailed definition of that term.  To avoid       *
+ * misunderstandings, we consider an application to constitute a           *
+ * "derivative work" for the purpose of this license if it does any of the *
+ * following:                                                              *
+ * o Integrates source code from Nmap                                      *
+ * o Reads or includes Nmap copyrighted data files, such as                *
+ *   nmap-os-fingerprints or nmap-service-probes.                          *
+ * o Executes Nmap                                                         *
+ * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Links to a library or executes a program that does any of the above   *
+ *                                                                         *
+ * The term "Nmap" should be taken to also include any portions or derived *
+ * works of Nmap.  This list is not exclusive, but is just meant to        *
+ * clarify our interpretation of derived works with some common examples.  *
+ * These restrictions only apply when you actually redistribute Nmap.  For *
+ * example, nothing stops you from writing and selling a proprietary       *
+ * front-end to Nmap.  Just distribute it by itself, and point people to   *
+ * http://www.insecure.org/nmap/ to download Nmap.                         *
+ *                                                                         *
+ * We don't consider these to be added restrictions on top of the GPL, but *
+ * just a clarification of how we interpret "derived works" as it applies  *
+ * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
+ * Torvalds has announced his interpretation of how "derived works"        *
+ * applies to Linux kernel modules.  Our interpretation refers only to     *
+ * Nmap - we don't speak for any other GPL products.                       *
+ *                                                                         *
+ * If you have any questions about the GPL licensing restrictions on using *
+ * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
+ * we also offer alternative license to integrate Nmap into proprietary    *
+ * applications and appliances.  These contracts have been sold to many    *
+ * security vendors, and generally include a perpetual license as well as  *
+ * providing for priority support and updates as well as helping to fund   *
+ * the continued development of Nmap technology.  Please email             *
+ * sales@insecure.com for further information.                             *
+ *                                                                         *
+ * If you received these files with a written license agreement or         *
+ * contract stating terms other than the (GPL) terms above, then that      *
+ * alternative license agreement takes precedence over these comments.     *
+ *                                                                         *
+ * Source is provided to this software because we believe users have a     *
+ * right to know exactly what a program is going to do before they run it. *
+ * This also allows you to audit the software for security holes (none     *
+ * have been found so far).                                                *
+ *                                                                         *
+ * Source code also allows you to port Nmap to new platforms, fix bugs,    *
+ * and add new features.  You are highly encouraged to send your changes   *
+ * to fyodor@insecure.org for possible incorporation into the main         *
+ * distribution.  By sending these changes to Fyodor or one the            *
+ * Insecure.Org development mailing lists, it is assumed that you are      *
+ * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
+ * to reuse, modify, and relicense the code.  Nmap will always be          *
+ * available Open Source, but this is important because the inability to   *
+ * relicense code has caused devastating problems for other Free Software  *
+ * projects (such as KDE and NASM).  We also occasionally relicense the    *
+ * code to third parties as discussed above.  If you wish to specify       *
+ * special license conditions of your contributions, just say so when you  *
+ * send them.                                                              *
+ *                                                                         *
+ * This program is distributed in the hope that it will be useful, but     *
+ * WITHOUT ANY WARRANTY; without even the implied warranty of              *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
+ * General Public License for more details at                              *
+ * http://www.gnu.org/copyleft/gpl.html .                                  *
+ *                                                                         *
+ ***************************************************************************/
 
-/* $Id: utils.h,v 1.36 2002/09/16 02:54:43 fyodor Exp $ */
+/* $Id: utils.h,v 1.48 2003/09/11 02:12:57 fyodor Exp $ */
 
 #ifndef UTILS_H
 #define UTILS_H
@@ -87,15 +127,6 @@
 #include "nmap.h"
 #include "global_structures.h"
 
-#ifndef MAX
-#define MAX(x,y) (((x)>(y))?(x):(y))
-#endif
-#ifndef MIN
-#define MIN(x,y) (((x)<(y))?(x):(y))
-#endif
-#ifndef ABS
-#define ABS(x) (((x) >= 0)?(x):(-x)) 
-#endif
 #ifndef MOD_DIFF
 #define MOD_DIFF(a,b) ((unsigned long) (MIN((unsigned long)(a) - (unsigned long ) (b), (unsigned long )(b) - (unsigned long) (a))))
 #endif
@@ -129,18 +160,19 @@
 
 /* Return num if it is between min and max.  Otherwise return min or
    max (whichever is closest to num), */
-int box(int bmin, int bmax, int bnum);
-void *safe_malloc(int size);
-/* Zero-initializing version of safe_malloc */
-void *safe_zalloc(int size);
+template<class T> T box(T bmin, T bmax, T bnum) {
+  if (bmin > bmax)
+    fatal("box(%d, %d, %d) called (min,max,num)", (int) bmin, (int) bmax, (int) bnum);
+  //  assert(bmin <= bmax);
+  if (bnum >= bmax)
+    return bmax;
+  if (bnum <= bmin)
+    return bmin;
+  return bnum;
+}
+
 void hdump(unsigned char *packet, unsigned int len);
 void lamont_hdump(char *cp, unsigned int length);
-int get_random_bytes(void *buf, int numbytes);
-int get_random_int();
-unsigned short get_random_ushort();
-unsigned int get_random_uint();
-u32 get_random_u32();
-u8 get_random_u8();
 
 /* Scramble the contents of an array*/
 void genfry(unsigned char *arr, int elem_sz, int num_elem);
@@ -148,6 +180,11 @@ void shortfry(unsigned short *arr, int num_elem);
 /* Like the perl equivialent -- It removes the terminating newline from string
    IF one exists.  It then returns the POSSIBLY MODIFIED string */
 char *chomp(char *string);
+
+// Send data to a socket, keep retrying until an error or the full length
+// is sent.  Returns -1 if there is an error, or len if the full length was sent.
+int Send(int sd, const void *msg, size_t len, int flags);
+
 ssize_t Write(int fd, const void *buf, size_t count);
 
 unsigned long gcd_ulong(unsigned long a, unsigned long b);
@@ -157,6 +194,13 @@ unsigned int gcd_n_uint(int nvals, unsigned int *val);
 
 int arg_parse(const char *command, char ***argv);
 void arg_parse_free(char **argv);
+
+/* Convert a string in the format of a roughly C-style string literal
+   (e.g. can have \r, \n, \xHH escapes, etc.) into a binary string.
+   This is done in-place, and the new (shorter or the same) length is
+   stored in newlen.  If parsing fails, NULL is returned, otherwise
+   str is returned. */
+char *cstring_unescape(char *str, unsigned int *len);
 
 #ifndef HAVE_USLEEP
 #ifdef HAVE_NANOSLEEP

@@ -1,50 +1,90 @@
 
-/***********************************************************************
- * rpc.cc -- Functions related to the RPCGrind (-sR) facility of Nmap. *
- * This includes reading the nmap-rpc services file and sending rpc    *
- * queries and interpreting responses.  The actual scan engine used    *
- * for rpc grinding is pos_scan (which is not in this file)            *
- *                                                                     *
- ***********************************************************************
- *  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  *
- *  program is free software; you can redistribute it and/or modify    *
- *  it under the terms of the GNU General Public License as published  *
- *  by the Free Software Foundation; Version 2.  This guarantees your  *
- *  right to use, modify, and redistribute this software under certain *
- *  conditions.  If this license is unacceptable to you, we may be     *
- *  willing to sell alternative licenses (contact sales@insecure.com). *
- *                                                                     *
- *  If you received these files with a written license agreement       *
- *  stating terms other than the (GPL) terms above, then that          *
- *  alternative license agreement takes precendence over this comment. *
- *                                                                     *
- *  Source is provided to this software because we believe users have  *
- *  a right to know exactly what a program is going to do before they  *
- *  run it.  This also allows you to audit the software for security   *
- *  holes (none have been found so far).                               *
- *                                                                     *
- *  Source code also allows you to port Nmap to new platforms, fix     *
- *  bugs, and add new features.  You are highly encouraged to send     *
- *  your changes to fyodor@insecure.org for possible incorporation     *
- *  into the main distribution.  By sending these changes to Fyodor or *
- *  one the insecure.org development mailing lists, it is assumed that *
- *  you are offering Fyodor the unlimited, non-exclusive right to      *
- *  reuse, modify, and relicense the code.  This is important because  *
- *  the inability to relicense code has caused devastating problems    *
- *  for other Free Software projects (such as KDE and NASM).  Nmap     *
- *  will always be available Open Source.  If you wish to specify      *
- *  special license conditions of your contributions, just say so      *
- *  when you send them.                                                *
- *                                                                     *
- *  This program is distributed in the hope that it will be useful,    *
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of     *
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  *
- *  General Public License for more details (                          *
- *  http://www.gnu.org/copyleft/gpl.html ).                            *
- *                                                                     *
- ***********************************************************************/
+/***************************************************************************
+ * rpc.cc -- Functions related to the RPCGrind (-sR) facility of Nmap.     *
+ * This includes reading the nmap-rpc services file and sending rpc        *
+ * queries and interpreting responses.  The actual scan engine used for    *
+ * rpc grinding is pos_scan (which is not in this file)                    *
+ *                                                                         *
+ ***********************IMPORTANT NMAP LICENSE TERMS************************
+ *                                                                         *
+ * The Nmap Security Scanner is (C) 1995-2003 Insecure.Com LLC. This       *
+ * program is free software; you may redistribute and/or modify it under   *
+ * the terms of the GNU General Public License as published by the Free    *
+ * Software Foundation; Version 2.  This guarantees your right to use,     *
+ * modify, and redistribute this software under certain conditions.  If    *
+ * you wish to embed Nmap technology into proprietary software, we may be  *
+ * willing to sell alternative licenses (contact sales@insecure.com).      *
+ * Many security scanner vendors already license Nmap technology such as   *
+ * our remote OS fingerprinting database and code.                         *
+ *                                                                         *
+ * Note that the GPL places important restrictions on "derived works", yet *
+ * it does not provide a detailed definition of that term.  To avoid       *
+ * misunderstandings, we consider an application to constitute a           *
+ * "derivative work" for the purpose of this license if it does any of the *
+ * following:                                                              *
+ * o Integrates source code from Nmap                                      *
+ * o Reads or includes Nmap copyrighted data files, such as                *
+ *   nmap-os-fingerprints or nmap-service-probes.                          *
+ * o Executes Nmap                                                         *
+ * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Links to a library or executes a program that does any of the above   *
+ *                                                                         *
+ * The term "Nmap" should be taken to also include any portions or derived *
+ * works of Nmap.  This list is not exclusive, but is just meant to        *
+ * clarify our interpretation of derived works with some common examples.  *
+ * These restrictions only apply when you actually redistribute Nmap.  For *
+ * example, nothing stops you from writing and selling a proprietary       *
+ * front-end to Nmap.  Just distribute it by itself, and point people to   *
+ * http://www.insecure.org/nmap/ to download Nmap.                         *
+ *                                                                         *
+ * We don't consider these to be added restrictions on top of the GPL, but *
+ * just a clarification of how we interpret "derived works" as it applies  *
+ * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
+ * Torvalds has announced his interpretation of how "derived works"        *
+ * applies to Linux kernel modules.  Our interpretation refers only to     *
+ * Nmap - we don't speak for any other GPL products.                       *
+ *                                                                         *
+ * If you have any questions about the GPL licensing restrictions on using *
+ * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
+ * we also offer alternative license to integrate Nmap into proprietary    *
+ * applications and appliances.  These contracts have been sold to many    *
+ * security vendors, and generally include a perpetual license as well as  *
+ * providing for priority support and updates as well as helping to fund   *
+ * the continued development of Nmap technology.  Please email             *
+ * sales@insecure.com for further information.                             *
+ *                                                                         *
+ * If you received these files with a written license agreement or         *
+ * contract stating terms other than the (GPL) terms above, then that      *
+ * alternative license agreement takes precedence over these comments.     *
+ *                                                                         *
+ * Source is provided to this software because we believe users have a     *
+ * right to know exactly what a program is going to do before they run it. *
+ * This also allows you to audit the software for security holes (none     *
+ * have been found so far).                                                *
+ *                                                                         *
+ * Source code also allows you to port Nmap to new platforms, fix bugs,    *
+ * and add new features.  You are highly encouraged to send your changes   *
+ * to fyodor@insecure.org for possible incorporation into the main         *
+ * distribution.  By sending these changes to Fyodor or one the            *
+ * Insecure.Org development mailing lists, it is assumed that you are      *
+ * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
+ * to reuse, modify, and relicense the code.  Nmap will always be          *
+ * available Open Source, but this is important because the inability to   *
+ * relicense code has caused devastating problems for other Free Software  *
+ * projects (such as KDE and NASM).  We also occasionally relicense the    *
+ * code to third parties as discussed above.  If you wish to specify       *
+ * special license conditions of your contributions, just say so when you  *
+ * send them.                                                              *
+ *                                                                         *
+ * This program is distributed in the hope that it will be useful, but     *
+ * WITHOUT ANY WARRANTY; without even the implied warranty of              *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
+ * General Public License for more details at                              *
+ * http://www.gnu.org/copyleft/gpl.html .                                  *
+ *                                                                         *
+ ***************************************************************************/
 
-/* $Id: nmap_rpc.cc,v 1.2 2002/08/25 01:56:10 fyodor Exp $ */
+/* $Id: nmap_rpc.cc,v 1.13 2003/09/20 09:03:00 fyodor Exp $ */
 
 
 #include "nmap_rpc.h"
@@ -168,14 +208,14 @@ int send_rpc_query(const struct in_addr *target_host, unsigned short portno,
      fatal("Done");  */
 
   rpch = (struct rpc_hdr *) ((char *)rpch_buf + sizeof(unsigned long));
-  bzero(rpch, sizeof(struct rpc_hdr));
+  memset(rpch, 0, sizeof(struct rpc_hdr));
 
 
   while(rpc_xid_base == (unsigned long) -1)
     rpc_xid_base = (unsigned long) get_random_uint();
   
   if (o.debugging > 1) {
-    printf("Sending RPC probe for program %li to %hu/%s -- scan_offset=%d trynum=%d xid=%lX\n", program, portno, (ipproto == IPPROTO_TCP)? "tcp" : "udp", scan_offset, trynum, rpc_xid_base + ((portno & 0x3FFF) << 16) + (trynum << 30) +  scan_offset);
+    printf("Sending RPC probe for program %li to %hu/%s -- scan_offset=%d trynum=%d xid=%lX\n", program, portno, proto2ascii(ipproto), scan_offset, trynum, rpc_xid_base + ((portno & 0x3FFF) << 16) + (trynum << 30) +  scan_offset);
   }
 
   /* First we check whether we have to create a new connection -- we 
@@ -195,7 +235,7 @@ int send_rpc_query(const struct in_addr *target_host, unsigned short portno,
   last_target_host.s_addr = target_host->s_addr;
   last_portno = portno;
   
-  bzero(&sock, sizeof(sock));
+  memset(&sock, 0, sizeof(sock));
   sock.sin_family = AF_INET;
   sock.sin_addr.s_addr = target_host->s_addr;
   sock.sin_port = htons(portno);
@@ -247,7 +287,7 @@ int send_rpc_query(const struct in_addr *target_host, unsigned short portno,
 	hdump((unsigned char *) rpch, sizeof(struct rpc_hdr));
       res = sendto(udp_rpc_socket, (char *)rpch, sizeof(struct rpc_hdr), 0,
 		   (struct sockaddr *) &sock, sizeof(struct sockaddr_in));
-    } while(res == -1 && (errno == EINTR || errno == ENOBUFS));
+    } while(res == -1 && (socket_errno() == EINTR || socket_errno() == ENOBUFS));
     if (res == -1) {
       if (o.debugging) {
 	gh_perror("Sendto in send_rpc_query");
@@ -260,7 +300,7 @@ int send_rpc_query(const struct in_addr *target_host, unsigned short portno,
     /* TCP socket */
     /* 0x80000000 means only 1 record marking */
     *(unsigned long *)rpch_buf = htonl(sizeof(struct rpc_hdr) | 0x80000000);
-    res = Write(tcp_rpc_socket, rpch_buf, sizeof(struct rpc_hdr) + sizeof(unsigned long));
+    res = Send(tcp_rpc_socket, rpch_buf, sizeof(struct rpc_hdr) + sizeof(unsigned long), 0);
     if (res == -1) {
       if (o.debugging) {
 	gh_perror("Write in send_rpc_query");
@@ -287,7 +327,9 @@ int rpc_are_we_done(char *msg, int msg_len, Target *target,
     /* This is not a valid reply -- we kill the port 
        (from an RPC perspective) */ 
     if (o.debugging > 1) {
-      printf("Port %hu/%s labelled NON_RPC because of invalid sized message (%d)\n", rsi->rpc_current_port->portno, (rsi->rpc_current_port->proto == IPPROTO_TCP)? "TPC" : "UDP", msg_len);
+      printf("Port %hu/%s labelled NON_RPC because of invalid sized message (%d)\n", 
+	     rsi->rpc_current_port->portno, 
+	     proto2ascii(rsi->rpc_current_port->proto, true), msg_len);
     }
     rsi->rpc_status = RPC_STATUS_NOT_RPC;
     ss->numqueries_outstanding = 0;
@@ -300,7 +342,7 @@ int rpc_are_we_done(char *msg, int msg_len, Target *target,
   if (((scan_offset >> 16) & 0x3FFF) != (unsigned long) (rsi->rpc_current_port->portno & 0x3FFF)) {
     /* Doh -- this doesn't seem right */
     if (o.debugging > 1) {
-      printf("Port %hu/%s labelled NON_RPC because ((scan_offset >> 16) & 0x3FFF) is %li\n", rsi->rpc_current_port->portno, (rsi->rpc_current_port->proto == IPPROTO_TCP)? "TPC" : "UDP", ((scan_offset >> 16) & 0x3FFF));
+      printf("Port %hu/%s labelled NON_RPC because ((scan_offset >> 16) & 0x3FFF) is %li\n", rsi->rpc_current_port->portno, proto2ascii(rsi->rpc_current_port->proto, true), ((scan_offset >> 16) & 0x3FFF));
     }
     rsi->rpc_status = RPC_STATUS_NOT_RPC;
     ss->numqueries_outstanding = 0;
@@ -315,12 +357,12 @@ int rpc_are_we_done(char *msg, int msg_len, Target *target,
     return 1;
   }
   if (ntohl(rpc_pack->type_msg) != RPC_MSG_REPLY) {
-    error("Strange -- RPC type is %d shoulb be RPC_MSG_REPLY (1)", ntohl(rpc_pack->type_msg));
+    error("Strange -- RPC type is %lu should be RPC_MSG_REPLY (1)", (unsigned long) ntohl(rpc_pack->type_msg));
     return 0;
   }
   if (ntohl(rpc_pack->auth_flavor) != 0 /* AUTH_NULL */ ||
       ntohl(rpc_pack->opaque_length != 0)) {
-    error("Strange -- auth flavor/opaque_length are %d/%d should generally be 0/0", rpc_pack->auth_flavor, rpc_pack->opaque_length);
+    error("Strange -- auth flavor/opaque_length are %lu/%lu should generally be 0/0", rpc_pack->auth_flavor, rpc_pack->opaque_length);
     rsi->rpc_status = RPC_STATUS_NOT_RPC;
     ss->numqueries_outstanding = 0;
     return 1;
@@ -379,13 +421,15 @@ int rpc_are_we_done(char *msg, int msg_len, Target *target,
   if (ntohl(rpc_pack->accept_stat) == PROG_UNAVAIL) {
     current->state = PORT_CLOSED;
     if (o.debugging > 1) {
-      error("Port %hu/%s claims that it is not RPC service %li", rsi->rpc_current_port->portno, (rsi->rpc_current_port->proto == IPPROTO_TCP)? "TCP" : "UDP",  current->portno);
+      error("Port %hu/%s claims that it is not RPC service %li", 
+	    rsi->rpc_current_port->portno, 
+	    proto2ascii(rsi->rpc_current_port->proto, true),  current->portno);
     }
     rsi->valid_responses_this_port++;
     return 0;
   } else if (ntohl(rpc_pack->accept_stat) == PROG_MISMATCH) {
     if (o.debugging > 1) {
-      error("Port %hu/%s claims IT IS RPC service %li", rsi->rpc_current_port->portno, (rsi->rpc_current_port->proto == IPPROTO_TCP)? "TCP" : "UDP",  current->portno);
+      error("Port %hu/%s claims IT IS RPC service %li", rsi->rpc_current_port->portno, proto2ascii(rsi->rpc_current_port->proto, true),  current->portno);
     }
     current->state = PORT_OPEN;
     rsi->rpc_status = RPC_STATUS_GOOD_PROG;
@@ -420,7 +464,7 @@ struct timeval tv;
 int res;
 static char readbuf[512];
 struct sockaddr_in from;
-NET_SIZE_T fromlen = sizeof(struct sockaddr_in);
+recvfrom6_t fromlen = sizeof(struct sockaddr_in);
 char *current_msg;
 unsigned long current_msg_len;
  
@@ -460,7 +504,7 @@ unsigned long current_msg_len;
    sres = select(max_sd + 1, &fds_r, NULL, NULL, &tv);
    if (!sres)
      break;
-   if (sres == -1 && errno == EINTR)
+   if (sres == -1 && socket_errno() == EINTR)
      continue;
    if (udp_rpc_socket >= 0 && FD_ISSET(udp_rpc_socket, &fds_r)) {
      res = recvfrom(udp_rpc_socket, readbuf, sizeof(readbuf), 0, (struct sockaddr *) &from, &fromlen);
@@ -489,14 +533,14 @@ unsigned long current_msg_len;
      }
    } else if (tcp_rpc_socket >= 0 && FD_ISSET(tcp_rpc_socket, &fds_r)) {
      do {     
-       res = read(tcp_rpc_socket, readbuf + tcp_readlen, sizeof(readbuf) - tcp_readlen);
-     } while(res == -1 && errno == EINTR);
+       res = recv(tcp_rpc_socket, readbuf + tcp_readlen, sizeof(readbuf) - tcp_readlen, 0);
+     } while(res == -1 && socket_errno() == EINTR);
      if (res <= 0) {
        if (o.debugging) {
 	 if (res == -1)
 	   gh_perror("Failed to read() from tcp rpc socket in get_rpc_results");
 	 else {
-	   error("Lamer on port %li closed RPC socket on me in get_rpc_results", rsi->rpc_current_port->portno);
+	   error("Lamer on port %u closed RPC socket on me in get_rpc_results", rsi->rpc_current_port->portno);
 	 }
        }
        ss->numqueries_outstanding = 0;
@@ -510,7 +554,10 @@ unsigned long current_msg_len;
        /* This is suspiciously small -- I'm assuming this is not the first
 	  part of a valid RPC packet */
        if (o.debugging > 1) {
-	 printf("Port %hu/%s labelled NON_RPC because tcp_readlen is %d (should be at least 28)\n", rsi->rpc_current_port->portno, (rsi->rpc_current_port->proto == IPPROTO_TCP)? "TCP" : "UDP", tcp_readlen);
+	 printf("Port %hu/%s labelled NON_RPC because tcp_readlen is %d (should be at least 28)\n", 
+		rsi->rpc_current_port->portno, 
+		proto2ascii(rsi->rpc_current_port->proto, true), 
+		(int) tcp_readlen);
        }
        ss->numqueries_outstanding = 0;
        rsi->rpc_status = RPC_STATUS_NOT_RPC;
@@ -521,7 +568,9 @@ unsigned long current_msg_len;
 						     
      if (current_msg_len > tcp_readlen - 4) {
        if (o.debugging > 1) {
-	 printf("Port %hu/%s labelled NON_RPC because current_msg_len is %li while tcp_readlen is %d\n", rsi->rpc_current_port->portno, (rsi->rpc_current_port->proto == IPPROTO_TCP)? "TCP" : "UDP", current_msg_len, tcp_readlen);
+	 printf("Port %hu/%s labelled NON_RPC because current_msg_len is %li while tcp_readlen is %d\n", rsi->rpc_current_port->portno, 
+		proto2ascii(rsi->rpc_current_port->proto, true), 
+		current_msg_len, (int) tcp_readlen);
        }
        ss->numqueries_outstanding = 0;
        rsi->rpc_status = RPC_STATUS_NOT_RPC;
@@ -549,7 +598,10 @@ unsigned long current_msg_len;
        if (current_msg_len < 24 || current_msg_len > 32) {
 	 ss->numqueries_outstanding = 0;
 	 if (o.debugging > 1) {
-	   printf("Port %hu/%s labelled NON_RPC because current_msg_len is %li\n", rsi->rpc_current_port->portno, (rsi->rpc_current_port->proto == IPPROTO_TCP)? "TCP" : "UDP", current_msg_len);
+	   printf("Port %hu/%s labelled NON_RPC because current_msg_len is %li\n", 
+		  rsi->rpc_current_port->portno, 
+		  proto2ascii(rsi->rpc_current_port->proto, true), 
+		  current_msg_len);
 	 }
 	 rsi->rpc_status = RPC_STATUS_NOT_RPC;
 	 return;

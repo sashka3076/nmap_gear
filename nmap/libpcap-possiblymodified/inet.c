@@ -34,7 +34,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /CVS/nmap/libpcap-possiblymodified/inet.c,v 1.2 2002/12/18 06:10:07 fyodor Exp $ (LBL)";
+    "@(#) $Header: /CVS/nmap/libpcap-possiblymodified/inet.c,v 1.3 2003/09/20 09:03:01 fyodor Exp $ (LBL)";
 #endif
 
 #ifdef HAVE_CONFIG_H
@@ -50,8 +50,8 @@ static const char rcsid[] =
 #endif
 #include <sys/time.h>				/* concession to AIX */
 
-struct mbuf;
-struct rtentry;
+struct mbuf;		/* Squelch compiler warnings on some platforms for */
+struct rtentry;		/* declarations in <net/if.h> */
 #include <net/if.h>
 #include <netinet/in.h>
 

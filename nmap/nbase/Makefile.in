@@ -10,8 +10,7 @@ AR = ar
 RANLIB = @RANLIB@
 CCOPT = 
 DEFS = @DEFS@ -DNCRACK_VERSION=\"$(NCRACK_VERSION)\" -DHAVE_CONFIG_H=1
-CFLAGS = @CFLAGS@ -g $(CCOPT) $(GLIB_CFLAGS) $(DEFS) $(INCLS)
-# CFLAGS = -g -Wall $(DEFS) $(INCLS)
+CFLAGS = @CFLAGS@ $(CCOPT) $(GLIB_CFLAGS) $(DEFS) $(INCLS)
 STATIC = 
 LDFLAGS = @LDFLAGS@ $(STATIC)
 LIBS =  @LIBS@ 
@@ -32,10 +31,19 @@ $(TARGET): $(DEPS) $(OBJS)
 	$(RANLIB) $@
 
 clean:
-	rm -f $(OBJS) $(TARGET) config.cache config.log config.status
+	rm -f $(OBJS) $(TARGET) config.cache config.log
 
 depend:
 	$(MAKEDEPEND) $(INCLS) -s "# DO NOT DELETE" -- $(DEFS) -- $(SRCS)
+
+configure: configure.ac
+	autoconf
+
+Makefile: Makefile.in config.status
+	./config.status
+
+config.status: configure
+	./config.status --recheck
 
 .cc.o:
 	$(CC) -c $(CFLAGS) $*.cc

@@ -1,4 +1,5 @@
-# $Id: nmap-rpc,v 1.11 2002/07/10 08:12:39 fyodor Exp $
+# Known RPC numbers Nmap uses for RPC grinding -*- mode: fundamental; -*-
+# $Id: nmap-rpc,v 1.12 2003/08/30 20:24:14 fyodor Exp $
 # This was created by Vik Bajaj <vbajaj@sas.upenn.edu> with help
 # from various members of the nmap-hackers list.  
 # To join nmap-hackers send mail to nmap-hackers-subscribe@insecure.org
@@ -17,9 +18,9 @@
 #
 # ident "@(#)rpc        1.11    95/07/14 SMI"   /* SVr4.0 1.2   */
 #
-# $Date: 2002/07/10 08:12:39 $
+# $Date: 2003/08/30 20:24:14 $
 #
-# $Revision: 1.11 $
+# $Revision: 1.12 $
 #
 # Master RPC program number data base (/etc/rpc).
 #

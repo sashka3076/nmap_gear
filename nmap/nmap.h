@@ -1,49 +1,89 @@
 
-/***********************************************************************
- * nmap.h -- Currently handles some of Nmap's port scanning            *
- * features as well as the command line user interface.  Note that the *
- * actual main() function is in main.c                                 *
- *                                                                     *
- ***********************************************************************
- *  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  *
- *  program is free software; you can redistribute it and/or modify    *
- *  it under the terms of the GNU General Public License as published  *
- *  by the Free Software Foundation; Version 2.  This guarantees your  *
- *  right to use, modify, and redistribute this software under certain *
- *  conditions.  If this license is unacceptable to you, we may be     *
- *  willing to sell alternative licenses (contact sales@insecure.com). *
- *                                                                     *
- *  If you received these files with a written license agreement       *
- *  stating terms other than the (GPL) terms above, then that          *
- *  alternative license agreement takes precendence over this comment. *
- *                                                                     *
- *  Source is provided to this software because we believe users have  *
- *  a right to know exactly what a program is going to do before they  *
- *  run it.  This also allows you to audit the software for security   *
- *  holes (none have been found so far).                               *
- *                                                                     *
- *  Source code also allows you to port Nmap to new platforms, fix     *
- *  bugs, and add new features.  You are highly encouraged to send     *
- *  your changes to fyodor@insecure.org for possible incorporation     *
- *  into the main distribution.  By sending these changes to Fyodor or *
- *  one the insecure.org development mailing lists, it is assumed that *
- *  you are offering Fyodor the unlimited, non-exclusive right to      *
- *  reuse, modify, and relicense the code.  This is important because  *
- *  the inability to relicense code has caused devastating problems    *
- *  for other Free Software projects (such as KDE and NASM).  Nmap     *
- *  will always be available Open Source.  If you wish to specify      *
- *  special license conditions of your contributions, just say so      *
- *  when you send them.                                                *
- *                                                                     *
- *  This program is distributed in the hope that it will be useful,    *
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of     *
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  *
- *  General Public License for more details (                          *
- *  http://www.gnu.org/copyleft/gpl.html ).                            *
- *                                                                     *
- ***********************************************************************/
+/***************************************************************************
+ * nmap.h -- Currently handles some of Nmap's port scanning features as    *
+ * well as the command line user interface.  Note that the actual main()   *
+ * function is in main.c                                                   *
+ *                                                                         *
+ ***********************IMPORTANT NMAP LICENSE TERMS************************
+ *                                                                         *
+ * The Nmap Security Scanner is (C) 1995-2003 Insecure.Com LLC. This       *
+ * program is free software; you may redistribute and/or modify it under   *
+ * the terms of the GNU General Public License as published by the Free    *
+ * Software Foundation; Version 2.  This guarantees your right to use,     *
+ * modify, and redistribute this software under certain conditions.  If    *
+ * you wish to embed Nmap technology into proprietary software, we may be  *
+ * willing to sell alternative licenses (contact sales@insecure.com).      *
+ * Many security scanner vendors already license Nmap technology such as   *
+ * our remote OS fingerprinting database and code.                         *
+ *                                                                         *
+ * Note that the GPL places important restrictions on "derived works", yet *
+ * it does not provide a detailed definition of that term.  To avoid       *
+ * misunderstandings, we consider an application to constitute a           *
+ * "derivative work" for the purpose of this license if it does any of the *
+ * following:                                                              *
+ * o Integrates source code from Nmap                                      *
+ * o Reads or includes Nmap copyrighted data files, such as                *
+ *   nmap-os-fingerprints or nmap-service-probes.                          *
+ * o Executes Nmap                                                         *
+ * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Links to a library or executes a program that does any of the above   *
+ *                                                                         *
+ * The term "Nmap" should be taken to also include any portions or derived *
+ * works of Nmap.  This list is not exclusive, but is just meant to        *
+ * clarify our interpretation of derived works with some common examples.  *
+ * These restrictions only apply when you actually redistribute Nmap.  For *
+ * example, nothing stops you from writing and selling a proprietary       *
+ * front-end to Nmap.  Just distribute it by itself, and point people to   *
+ * http://www.insecure.org/nmap/ to download Nmap.                         *
+ *                                                                         *
+ * We don't consider these to be added restrictions on top of the GPL, but *
+ * just a clarification of how we interpret "derived works" as it applies  *
+ * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
+ * Torvalds has announced his interpretation of how "derived works"        *
+ * applies to Linux kernel modules.  Our interpretation refers only to     *
+ * Nmap - we don't speak for any other GPL products.                       *
+ *                                                                         *
+ * If you have any questions about the GPL licensing restrictions on using *
+ * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
+ * we also offer alternative license to integrate Nmap into proprietary    *
+ * applications and appliances.  These contracts have been sold to many    *
+ * security vendors, and generally include a perpetual license as well as  *
+ * providing for priority support and updates as well as helping to fund   *
+ * the continued development of Nmap technology.  Please email             *
+ * sales@insecure.com for further information.                             *
+ *                                                                         *
+ * If you received these files with a written license agreement or         *
+ * contract stating terms other than the (GPL) terms above, then that      *
+ * alternative license agreement takes precedence over these comments.     *
+ *                                                                         *
+ * Source is provided to this software because we believe users have a     *
+ * right to know exactly what a program is going to do before they run it. *
+ * This also allows you to audit the software for security holes (none     *
+ * have been found so far).                                                *
+ *                                                                         *
+ * Source code also allows you to port Nmap to new platforms, fix bugs,    *
+ * and add new features.  You are highly encouraged to send your changes   *
+ * to fyodor@insecure.org for possible incorporation into the main         *
+ * distribution.  By sending these changes to Fyodor or one the            *
+ * Insecure.Org development mailing lists, it is assumed that you are      *
+ * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
+ * to reuse, modify, and relicense the code.  Nmap will always be          *
+ * available Open Source, but this is important because the inability to   *
+ * relicense code has caused devastating problems for other Free Software  *
+ * projects (such as KDE and NASM).  We also occasionally relicense the    *
+ * code to third parties as discussed above.  If you wish to specify       *
+ * special license conditions of your contributions, just say so when you  *
+ * send them.                                                              *
+ *                                                                         *
+ * This program is distributed in the hope that it will be useful, but     *
+ * WITHOUT ANY WARRANTY; without even the implied warranty of              *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
+ * General Public License for more details at                              *
+ * http://www.gnu.org/copyleft/gpl.html .                                  *
+ *                                                                         *
+ ***************************************************************************/
 
-/* $Id: nmap.h,v 1.89 2002/12/25 04:08:15 fyodor Exp $ */
+/* $Id: nmap.h,v 1.100 2003/09/11 02:12:57 fyodor Exp $ */
 
 #ifndef NMAP_H
 #define NMAP_H
@@ -61,6 +101,10 @@
 #include "nmap_winconfig.h"
 #endif /* WIN32 */
 #endif /* HAVE_CONFIG_H */
+
+#ifdef __amigaos__
+#include "nmap_amigaos.h"
+#endif
 
 #include <nbase.h>
 
@@ -238,6 +282,8 @@ void *realloc();
 #define DEFAULT_TCP_PROBE_PORT 80 /* The port TCP probes go to if unspecified
 				      by user -- uber hackers change this
 				      to 113 */
+#define DEFAULT_UDP_PROBE_PORT 31338 /* The port UDP probes (esp. "ping" probes) go to if unspecified
+				     by user */
 
 #define MAX_DECOYS 128 /* How many decoys are allowed? */
 
@@ -259,7 +305,7 @@ void *realloc();
 /* Number of hosts we pre-ping and then scan.  We do a lot more if
    randomize_hosts is set.  Every one you add to this leads to ~1K of
    extra always-resident memory in nmap */
-#define HOST_GROUP_SZ 256
+#define HOST_GROUP_SZ 1024
 
 /* DO NOT change stuff after this point */
 #define UC(b)   (((int)b)&0xff)
@@ -280,6 +326,7 @@ void *realloc();
 #define PINGTYPE_TCP_USE_SYN 64
 #define PINGTYPE_RAWTCP 128
 #define PINGTYPE_CONNECTTCP 256
+#define PINGTYPE_UDP  512
 
 /* TCP/IP ISN sequence prediction classes */
 #define SEQ_UNKNOWN 0
@@ -321,48 +368,11 @@ void *realloc();
 #endif
 #endif /* BSDFIX */
 
-/* Funny story about this one in /usr/include/apache/ap_config.h */
-#if defined(AIX)
-#  if AIX >= 42
-#    define NET_SIZE_T size_t
-#  endif
-#elif defined(LINUX)
-#  if defined(__GLIBC__) && (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ > 0))
-#  define NET_SIZE_T socklen_t
-#  endif
-#elif defined(SEQUENT)
-#  if SEQUENT < 44
-#    define NO_KILLPG 1
-#    define NET_SIZE_T int
-#  endif
-#  if SEQUENT >= 44
-#    undef NO_KILLPG
-#    define NET_SIZE_T size_t
-#  endif
-#elif defined(SVR4)
-#  define NET_SIZE_T size_t
-#elif defined(UW)
-#  define NET_SIZE_T size_t
-#elif defined(__FreeBSD__)
-  /* XXX: Apache didn't have this one,
-          so watch it be wrong :)... */
-#  define NET_SIZE_T size_t
-#elif defined(OPENBSD)
-#  define NET_SIZE_T socklen_t
-#elif defined(OS390)
-#  define NET_SIZE_T size_t
-#elif defined(SOLARIS)
-#  define NET_SIZE_T socklen_t
-#elif defined(WIN32)
-#  define NET_SIZE_T int
-#endif
-
-#ifndef NET_SIZE_T
-#  define NET_SIZE_T int
+#ifndef recvfrom6_t
+#  define recvfrom6_t int
 #endif
 
 /********************** LOCAL INCLUDES *****************************/
-
 
 #include "output.h"
 #include "portlist.h"
@@ -376,6 +386,7 @@ void *realloc();
 #include "targets.h"
 #include "Target.h"
 #include "TargetGroup.h"
+#include "service_scan.h"
 
 /***********************STRUCTURES**********************************/
 
@@ -408,7 +419,7 @@ int recvtime(int sd, char *buf, int len, int seconds);
 int isup(struct in_addr target);
 int listen_icmp(int icmpsock, unsigned short outports[],
 		unsigned short numtries[], int *num_out,
-		struct in_addr target, portlist *ports);
+		struct in_addr target, PortList *ports);
 
 /* Renamed main so that interactive mode could preprocess when neccessary */
 int nmap_main(int argc, char *argv[]);

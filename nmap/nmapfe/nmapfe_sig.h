@@ -1,47 +1,87 @@
 
-/***********************************************************************/
-/* nmapfe_sig.c -- Signal handlers for NmapFE                          */
-/*                                                                     */
-/***********************************************************************/
-/*  The Nmap Security Scanner is (C) 1995-2001 Insecure.Com LLC. This  */
-/*  program is free software; you can redistribute it and/or modify    */
-/*  it under the terms of the GNU General Public License as published  */
-/*  by the Free Software Foundation; Version 2.  This guarantees your  */
-/*  right to use, modify, and redistribute this software under certain */
-/*  conditions.  If this license is unacceptable to you, we may be     */
-/*  willing to sell alternative licenses (contact sales@insecure.com). */
-/*                                                                     */
-/*  If you received these files with a written license agreement       */
-/*  stating terms other than the (GPL) terms above, then that          */
-/*  alternative license agreement takes precendence over this comment. */
-/*                                                                     */
-/*  Source is provided to this software because we believe users have  */
-/*  a right to know exactly what a program is going to do before they  */
-/*  run it.  This also allows you to audit the software for security   */
-/*  holes (none have been found so far).                               */
-/*                                                                     */
-/*  Source code also allows you to port Nmap to new platforms, fix     */
-/*  bugs, and add new features.  You are highly encouraged to send     */
-/*  your changes to fyodor@insecure.org for possible incorporation     */
-/*  into the main distribution.  By sending these changes to Fyodor or */
-/*  one the insecure.org development mailing lists, it is assumed that */
-/*  you are offering Fyodor the unlimited, non-exclusive right to      */
-/*  reuse, modify, and relicense the code.  This is important because  */
-/*  the inability to relicense code has caused devastating problems    */
-/*  for other Free Software projects (such as KDE and NASM).  Nmap     */
-/*  will always be available Open Source.  If you wish to specify      */
-/*  special license conditions of your contributions, just say so      */
-/*  when you send them.                                                */
-/*                                                                     */
-/*  This program is distributed in the hope that it will be useful,    */
-/*  but WITHOUT ANY WARRANTY; without even the implied warranty of     */
-/*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU  */
-/*  General Public License for more details (                          */
-/*  http://www.gnu.org/copyleft/gpl.html ).                            */
-/*                                                                     */
-/***********************************************************************/
+/***************************************************************************
+ * nmapfe_sig.h -- Signal handlers for NmapFE                              *
+ *                                                                         *
+ ***********************IMPORTANT NMAP LICENSE TERMS************************
+ *                                                                         *
+ * The Nmap Security Scanner is (C) 1995-2003 Insecure.Com LLC. This       *
+ * program is free software; you may redistribute and/or modify it under   *
+ * the terms of the GNU General Public License as published by the Free    *
+ * Software Foundation; Version 2.  This guarantees your right to use,     *
+ * modify, and redistribute this software under certain conditions.  If    *
+ * you wish to embed Nmap technology into proprietary software, we may be  *
+ * willing to sell alternative licenses (contact sales@insecure.com).      *
+ * Many security scanner vendors already license Nmap technology such as   *
+ * our remote OS fingerprinting database and code.                         *
+ *                                                                         *
+ * Note that the GPL places important restrictions on "derived works", yet *
+ * it does not provide a detailed definition of that term.  To avoid       *
+ * misunderstandings, we consider an application to constitute a           *
+ * "derivative work" for the purpose of this license if it does any of the *
+ * following:                                                              *
+ * o Integrates source code from Nmap                                      *
+ * o Reads or includes Nmap copyrighted data files, such as                *
+ *   nmap-os-fingerprints or nmap-service-probes.                          *
+ * o Executes Nmap                                                         *
+ * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Links to a library or executes a program that does any of the above   *
+ *                                                                         *
+ * The term "Nmap" should be taken to also include any portions or derived *
+ * works of Nmap.  This list is not exclusive, but is just meant to        *
+ * clarify our interpretation of derived works with some common examples.  *
+ * These restrictions only apply when you actually redistribute Nmap.  For *
+ * example, nothing stops you from writing and selling a proprietary       *
+ * front-end to Nmap.  Just distribute it by itself, and point people to   *
+ * http://www.insecure.org/nmap/ to download Nmap.                         *
+ *                                                                         *
+ * We don't consider these to be added restrictions on top of the GPL, but *
+ * just a clarification of how we interpret "derived works" as it applies  *
+ * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
+ * Torvalds has announced his interpretation of how "derived works"        *
+ * applies to Linux kernel modules.  Our interpretation refers only to     *
+ * Nmap - we don't speak for any other GPL products.                       *
+ *                                                                         *
+ * If you have any questions about the GPL licensing restrictions on using *
+ * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
+ * we also offer alternative license to integrate Nmap into proprietary    *
+ * applications and appliances.  These contracts have been sold to many    *
+ * security vendors, and generally include a perpetual license as well as  *
+ * providing for priority support and updates as well as helping to fund   *
+ * the continued development of Nmap technology.  Please email             *
+ * sales@insecure.com for further information.                             *
+ *                                                                         *
+ * If you received these files with a written license agreement or         *
+ * contract stating terms other than the (GPL) terms above, then that      *
+ * alternative license agreement takes precedence over these comments.     *
+ *                                                                         *
+ * Source is provided to this software because we believe users have a     *
+ * right to know exactly what a program is going to do before they run it. *
+ * This also allows you to audit the software for security holes (none     *
+ * have been found so far).                                                *
+ *                                                                         *
+ * Source code also allows you to port Nmap to new platforms, fix bugs,    *
+ * and add new features.  You are highly encouraged to send your changes   *
+ * to fyodor@insecure.org for possible incorporation into the main         *
+ * distribution.  By sending these changes to Fyodor or one the            *
+ * Insecure.Org development mailing lists, it is assumed that you are      *
+ * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
+ * to reuse, modify, and relicense the code.  Nmap will always be          *
+ * available Open Source, but this is important because the inability to   *
+ * relicense code has caused devastating problems for other Free Software  *
+ * projects (such as KDE and NASM).  We also occasionally relicense the    *
+ * code to third parties as discussed above.  If you wish to specify       *
+ * special license conditions of your contributions, just say so when you  *
+ * send them.                                                              *
+ *                                                                         *
+ * This program is distributed in the hope that it will be useful, but     *
+ * WITHOUT ANY WARRANTY; without even the implied warranty of              *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
+ * General Public License for more details at                              *
+ * http://www.gnu.org/copyleft/gpl.html .                                  *
+ *                                                                         *
+ ***************************************************************************/
 
-/* $Id: nmapfe_sig.h,v 1.12 2001/06/04 09:40:50 fyodor Exp $ */
+/* $Id: nmapfe_sig.h,v 1.16 2003/09/11 02:12:58 fyodor Exp $ */
 
 /* Original Author: Zach
  * Mail: key@aye.net
@@ -60,100 +100,44 @@
 #error "Your system does not appear to have GTK (www.gtk.org) installed.  Thus the Nmap X Front End will not compile.  You should still be able to use Nmap the normal way (via text console).  GUIs are for wimps anyway :)"
 #endif
 
-void
-on_delete_event                        (GtkWidget     *widget,
-                                        GdkEvent      *event,
-                                        gpointer      data);
-
 
 #include <gtk/gtk.h>
 #include <nbase.h>
 
 #include "nmapfe_error.h"
 
-void build_tree(char *buf);
-void stop_scan();
-gint read_data(gpointer data);
-void entry_toggle_checkbox (GtkWidget *entry, GtkWidget *checkbox);
-void validate_option_change(GtkWidget *target_option, char *ignored);
-void display_nmap_command_callback(GtkWidget *target_option, char *ignored);
-void display_nmap_command();
-void scan_options(GtkWidget *widget, int *the_option);
-char *build_command();
+gboolean stop_scan();
+void print_line(GtkText *gtktext, char *line);
 void kill_output();
+gint read_data(gpointer data);
+
+void entry_toggle_checkbox (GtkWidget *entry, GtkWidget *checkbox);
+void entry_toggle_ping_checkbox(GtkWidget *entry, GtkWidget *checkbox);
+
+void mainMenu_fcb(int *variable, guint action, GtkWidget *w);
+void scanType_changed_fcb(int *variable, guint action, GtkWidget *w);
+void throttleType_changed_fcb(int *variable, guint action, GtkWidget *w);
+void resolveType_changed_fcb(int *variable, guint action, GtkWidget *w);
+void protportType_changed_fcb(int *variable, guint action, GtkWidget *w);
+void verboseType_changed_fcb(int *variable, guint action, GtkWidget *w);
+void outputFormatType_changed_fcb(int *variable, guint action, GtkWidget *w);
+
+void pingButton_toggled_cb(GtkWidget *ping_button, void *ignored);
+void toggle_button_set_sensitive_cb(GtkWidget *master, GtkWidget *slave);
+void validate_file_change(GtkWidget *button, void *ignored);
+void validate_option_change(GtkWidget *target_option, void *ignored);
+void browseButton_pressed_cb(GtkWidget *widget, GtkWidget *text);
+void display_nmap_command_cb(GtkWidget *target_option, void *ignored);
+void display_nmap_command();
+char *build_command();
+
 int execute(char *command);
-void func_start_scan();
-void on_done_clicked(GtkButton *button, GtkWidget *widget);
-void on_cancel_clicked(GtkButton *button, GtkWidget *widget);
-void on_machine_activate();
-void on_rpc_activate (GtkMenuItem *menuitem, gpointer user_data);
 
-void
-on_start_scan_clicked                  (GtkButton       *button,
-                                        GtkWidget        *entry);
+void scanButton_toggled_cb(GtkButton *button, void *ignored);
 
-void on_verb_activate			(GtkMenuItem	*menuitem, gpointer user_data);
+void exitNmapFE_cb(GtkButton *button, void *ignored);
 
-void on_Append_activate			(GtkMenuItem	*menuitem, gpointer user_data);
-
-void
-on_exit_me_clicked                        (GtkButton       *button,
-									gpointer	user_data);
-
-void
-on_About_activate                      (GtkMenuItem     *menuitem,
-                                        GtkWidget        *about);
-
-void
-on_Close_activate                      (GtkMenuItem     *menuitem,
-                                        gpointer         user_data);
-
-void
-on_about_ok_clicked                    (GtkButton       *button,
-								GtkWidget	*about);
-
-void
-on_help_ok_clicked                    (GtkButton       *button,
-								GtkWidget	*help);
-
-void
-on_Save_Log_activate                   (GtkMenuItem     *menuitem,
-                                        gpointer         user_data);
-
-void
-on_Open_Log_activate                   (GtkMenuItem     *menuitem,
-                                        gpointer         user_data);
-
-void
-on_Help_Main_activate                  (GtkMenuItem     *menuitem,
-                                        gpointer         user_data);
-
-void
-on_Help_activate                       (GtkMenuItem     *menuitem,
-                                        GtkWidget        *help);
-void
-on_View_Main_activate                  (GtkMenuItem     *menuitem,
-                                        gpointer         user_data);
-                                        
-void on_Trad_activate                  (GtkMenuItem *menuitem, GtkWidget *trad);
-void on_CTrad_activate                  (GtkMenuItem *menuitem, GtkWidget *ctrad);
-void on_Tree_activate                  (GtkMenuItem *menuitem, GtkWidget *tree);
-
-void
-on_Start_Scan_activate                       (GtkMenuItem     *menuitem,
-                                        gpointer         user_data);
-
-void
-on_Get_Nmap_Version_activate           (GtkMenuItem     *menuitem,
-                                        gpointer         user_data);
-
-void
-on_ok_button1_clicked                  (GtkButton       *button,
-                                        GtkWidget	 *window);
-
-void
-on_cancel_button1_clicked              (GtkButton       *button,
-                                        GtkWidget         *window);
+void okButton_clicked_cb(GtkWidget *window, GtkButton *button);
 
 /* A few functions that should be in a util file (in fact, they should
    share the same util file Nmap uses IMHO */
