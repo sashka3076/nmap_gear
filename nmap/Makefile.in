@@ -1,0 +1,221 @@
+NMAP_VERSION = 2.54BETA32
+NMAP_NAME= nmap
+NMAP_URL= www.insecure.org/nmap/
+NMAP_PLATFORM=@host@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+bindir = @bindir@
+sbindir = @sbindir@
+mandir = @mandir@
+srcdir = @srcdir@
+nmapdatadir = @datadir@/nmap
+deskdir = $(prefix)/share/gnome/apps/Utilities
+
+NBASEDIR=@NBASEDIR@
+CC = @CC@
+CCOPT = 
+LIBPCAPDIR = @libpcapdir@
+INCLS = -I$(LIBPCAPDIR) 
+DEFS = @DEFS@ -DNMAP_VERSION=\"$(NMAP_VERSION)\" -DNMAP_NAME=\"$(NMAP_NAME)\" -DNMAP_URL=\"$(NMAP_URL)\" -DNMAP_PLATFORM=\"$(NMAP_PLATFORM)\" -DNMAPDATADIR=\"$(nmapdatadir)\"
+CFLAGS = -g @CFLAGS@ $(CCOPT) $(DEFS) $(INCLS)
+# CFLAGS = -g -Wall $(DEFS) $(INCLS)
+STATIC = 
+LDFLAGS = @LDFLAGS@ $(STATIC)
+LIBS =  @LIBS@ -lpcap
+# LIBS =  -lefence @LIBS@ -lpcap
+# LIBS =  -lrmalloc @LIBS@ -lpcap
+SHTOOL = ./shtool
+INSTALL = $(SHTOOL) install 
+MAKEDEPEND = @MAKEDEPEND@
+RPMTDIR=$(HOME)/rpmdir
+
+TARGET = nmap
+
+SRCS = nmap.c targets.c tcpip.c nmap_error.c utils.c idle_scan.c osscan.c output.c scan_engine.c timing.c charpool.c services.c protocols.c nmap_rpc.c portlist.c @COMPAT_SRCS@
+
+OBJS = nmap.o targets.o tcpip.o nmap_error.o utils.o idle_scan.o osscan.o output.o scan_engine.o timing.o charpool.o services.o protocols.o nmap_rpc.o portlist.o @COMPAT_OBJS@
+
+DEPS = nmap.h nmap_error.h targets.h idle_scan.h osscan.h output.h scan_engine.h timing.h tcpip.h utils.h global_structures.h charpool.h services.h protocols.h nmap_rpc.h portlist.h
+
+all: $(TARGET) nmapfe/nmapfe
+
+$(TARGET): $(DEPS) @PCAP_DEPENDS@ $(NBASEDIR)/libnbase.a $(OBJS)
+	@echo Compiling nmap
+	rm -f $@
+	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
+
+$(LIBPCAPDIR)/libpcap.a: $(LIBPCAPDIR)/Makefile
+	@echo Compiling libpcap; cd $(LIBPCAPDIR); $(MAKE)
+
+$(NBASEDIR)/libnbase.a: $(NBASEDIR)/Makefile
+	@echo Compiling libnbase;
+	cd $(NBASEDIR); $(MAKE)
+
+#$(LIBPCAPDIR)/Makefile:
+#	@echo Configuring libpcap; cd $(LIBPCAPDIR); ./configure
+
+nmapfe/nmapfe: 
+	@echo "FAILURES HERE ARE OK -- THEY JUST MEAN YOU CANNOT USE nmapfe"
+#	-rm -f nmapfe/Makefile
+#	-cd nmapfe; ./configure;
+	-cd nmapfe; test -f Makefile && $(MAKE) VERSION=0.$(NMAP_VERSION) STATIC=$(STATIC);
+	@echo "END OF SECTION WHERE FAILURES ARE OK"
+
+# This target is just for me ... don't you get any ideas --Fyodor
+distro: 
+	autoconf
+	rm -f config.cache
+	./configure
+	cd $(LIBPCAPDIR) && ./configure
+	$(MAKE) clean
+	$(MAKE)
+	./nmap -h > /dev/null    #Make sure nmap exists
+	rm -f docs/nmap.usage.txt	
+	./nmap -h > docs/nmap.usage.txt 
+	rm -f docs/nmap_manpage.html
+# nodepage option is included in man2html because of bug in that program which causes it to
+# drop lines if you let it try to delete page breaks
+	nroff -man docs/nmap.1 | man2html -nodepage -title 'Nmap network security scanner man page' > docs/nmap_manpage.html
+	nroff -man docs/nmap_spanish.1 | man2html -nodepage -title 'Nmap network security scanner man page (Spanish translation)' > docs/nmap_manpage-es.html
+	nroff -man docs/nmap_italian.1 | man2html -nodepage -title 'Nmap network security scanner man page (Italian translation)' > docs/nmap_manpage-it.html
+	nroff -man docs/nmap_portuguese.1 | man2html -nodepage -title 'Nmap network security scanner man page (Portuguese translation)' > docs/nmap_manpage-pt.html
+	nroff -Tlatin1 -man docs/nmap_lithuanian.1 | man2html -nodepage -title 'Nmap network security scanner man page (Lithuanian translation)' > docs/nmap_manpage-lt.html
+# We need a content-type for the Lithuanian version
+	sr '<HEAD>' '<HEAD><META http-equiv="Content-Type" content="text/html; charset=windows-1257">' docs/nmap_manpage-lt.html
+	rm -rf /usr/tmp/nmap-$(NMAP_VERSION)
+	mkdir /usr/tmp/nmap-$(NMAP_VERSION)
+# Make the RPM .spec file
+	sed -e s/\@VERSION\@/$(NMAP_VERSION)/g nmap.spec.in > nmap-$(NMAP_VERSION)-1.spec
+	$(MAKE) clean
+	rm -f $(LIBPCAPDIR)/config.cache $(LIBPCAPDIR)/Makefile
+	unix2dos README-WIN32
+	cp -ra $(SRCS) $(DEPS) nmap-os-fingerprints \
+	nmapfe.desktop nmap-services nmap-rpc nmap-protocols \
+	configure.in config.h.in nmap_winconfig.h Makefile.in configure \
+        $(SHTOOL) install-sh config.guess nmap-$(NMAP_VERSION)-1.spec \
+            config.sub INSTALL README-WIN32 COPYING CHANGELOG HACKING \
+            /usr/tmp/nmap-$(NMAP_VERSION)
+	$(SHTOOL) mkdir /usr/tmp/nmap-$(NMAP_VERSION)/mswin32
+	cd mswin32; cp -ra *.[hHcC] ARPA NET NETINET RPC icon1.ico \
+                    ifaddrlist.h lib libpcap-note.txt nmap.dsp \
+                    nmap.dsw nmap.rc winip \
+                    /usr/tmp/nmap-$(NMAP_VERSION)/mswin32
+	$(SHTOOL) mkdir /usr/tmp/nmap-$(NMAP_VERSION)/$(LIBPCAPDIR)
+	cd $(LIBPCAPDIR); cp -ra CHANGES CREDITS CVS FILES INSTALL LICENSE \
+            Makefile.in NMAP_MODIFICATIONS README README.aix README.linux \
+            SUNOS4 TODO VERSION aclocal.m4 bpf bpf_dump.c bpf_image.c \
+            config.h.in configure configure.in etherent.c ethertype.h \
+            gencode.c gencode.h grammar.c grammar.y \
+            inet.c lbl llc.h mkdep nametoaddr.c nlpid.h \
+            optimize.c pcap-bpf.c pcap-dlpi.c pcap-enet.c pcap-int.h \
+            pcap-linux.c pcap-namedb.h pcap-nit.c pcap-nit.h pcap-null.c \
+            pcap-pf.c pcap-pf.h pcap-snit.c pcap-snoop.c pcap.3 pcap.c \
+            pcap.h ppp.h savefile.c scanner.c scanner.l sll.h tokdefs.h \
+            /usr/tmp/nmap-$(NMAP_VERSION)/$(LIBPCAPDIR)
+
+	$(SHTOOL) mkdir /usr/tmp/nmap-$(NMAP_VERSION)/docs
+	cd docs; cp -ra README copying.html nmap-fingerprinting-article.txt \
+                    nmap.1 nmap.deprecated.txt nmap.usage.txt nmap_doc.html \
+                    nmap_manpage-es.html nmap_manpage-fr.html \
+                    nmap_manpage-lt.html nmap_manpage-ru.html \
+	            nmap_manpage-it.html nmap_manpage.html \
+                    nmap_spanish.1 nmap_lithuanian.1 nmap_italian.1 \
+                    nmap_portuguese.1 nmapfe.1 \
+	            xnmap.1 nmap.dtd \
+                    /usr/tmp/nmap-$(NMAP_VERSION)/docs
+	$(SHTOOL) mkdir /usr/tmp/nmap-$(NMAP_VERSION)/nmapfe
+	cd nmapfe; cp -ra Makefile.in aclocal.m4 configure configure.in \
+	              nmapfe.c nmapfe.h nmapfe_sig.c nmapfe_sig.h \
+	              nmapfe_error.c nmapfe_error.h NmapFE.dsp nmapfe.dsw \
+	              /usr/tmp/nmap-$(NMAP_VERSION)/nmapfe
+	$(SHTOOL) mkdir /usr/tmp/nmap-$(NMAP_VERSION)/nbase
+	cd $(NBASEDIR); cp -ra Makefile.in aclocal.m4 configure configure.in \
+	             nbase_config.h.in \
+                     *.c *.h CHANGELOG /usr/tmp/nmap-$(NMAP_VERSION)/nbase
+
+	rm -f /usr/tmp/nmap-$(NMAP_VERSION)/nbase/nbase_config.h 
+# Kill the CVS crap
+	find /usr/tmp/nmap-$(NMAP_VERSION) -type d -name CVS | xargs rm -rf
+	find /usr/tmp/nmap-$(NMAP_VERSION) -exec chmod go=u-w '{}' \;
+	cd /usr/tmp; \
+	tar czf nmap-$(NMAP_VERSION).tgz nmap-$(NMAP_VERSION)
+# Make the actual RPM
+	rpm -ta /usr/tmp/nmap-$(NMAP_VERSION).tgz
+	cp -f $(RPMTDIR)/RPMS/i386/nmap-$(NMAP_VERSION)-1.i386.rpm /usr/tmp
+	cp -f $(RPMTDIR)/RPMS/i386/nmap-frontend-0.$(NMAP_VERSION)-1.i386.rpm /usr/tmp
+	cp -f $(RPMTDIR)/SRPMS/nmap-$(NMAP_VERSION)-1.src.rpm /usr/tmp
+	rm -rf /usr/tmp/nmap-$(NMAP_VERSION)
+
+# For distributing the binary
+static: 	
+	cd $(LIBPCAPDIR); $(MAKE)
+	$(CC) $(CFLAGS) -static $(LDFLAGS) -o nmap.linux.bin  $(SRCS) $(LIBS)
+	strip nmap.linux.bin
+
+clean: @PCAP_CLEAN@ nmapfe_clean nbase_clean my_clean
+
+my_clean:
+	rm -f $(OBJS) $(TARGET) config.cache
+pcap_clean:
+	cd $(LIBPCAPDIR); $(MAKE) clean
+nmapfe_clean:
+	cd nmapfe; $(MAKE) clean
+nbase_clean:
+	cd $(NBASEDIR); $(MAKE) clean
+pcap_dist_clean:
+	cd $(LIBPCAPDIR); $(MAKE) distclean
+
+distclean: my_clean my_distclean @PCAP_DIST_CLEAN@
+my_distclean:
+	rm -f Makefile Makefile.bak config.h stamp-h stamp-h.in \
+	         config.cache config.log config.status
+
+depend:
+	$(MAKEDEPEND) $(INCLS) -s "# DO NOT DELETE" -- $(DEFS) -- $(SRCS)
+
+install: $(TARGET)
+	$(SHTOOL) mkdir -f -p -m 755 $(bindir) $(mandir)/man1 $(nmapdatadir) $(deskdir)
+	$(INSTALL) -c -m 755 nmap $(bindir)/nmap
+	@echo "If the next command fails -- you cannot use the X front end"
+	-test -f nmapfe/nmapfe && $(INSTALL) -c -m 755 nmapfe/nmapfe $(bindir)/nmapfe && $(SHTOOL) mkln -f -s $(bindir)/nmapfe $(bindir)/xnmap && $(INSTALL) -c -m 644 nmapfe.desktop $(deskdir)/nmapfe.desktop && $(INSTALL) -c -m 644 docs/nmapfe.1 $(mandir)/man1/nmapfe.1 && $(INSTALL) -c -m 644 docs/xnmap.1 $(mandir)/man1/xnmap.1
+	$(INSTALL) -c -m 644 docs/$(TARGET).1 $(mandir)/man1/$(TARGET).1
+	$(INSTALL) -c -m 644 nmap-os-fingerprints  $(nmapdatadir)/nmap-os-fingerprints
+	$(INSTALL) -c -m 644 nmap-services  $(nmapdatadir)/nmap-services
+	$(INSTALL) -c -m 644 nmap-protocols  $(nmapdatadir)/nmap-protocols
+	$(INSTALL) -c -m 644 nmap-rpc  $(nmapdatadir)/nmap-rpc
+
+uninstall:
+	rm -f $(bindir)/$(TARGET) $(bindir)/nmapfe $(bindir)/xnmap
+	rm -f $(deskdir)/nmapfe.desktop $(mandir)/man1/nmapfe.1
+	rm -f $(mandir)/man1/xnmap.1 $(mandir)/man1/nmap.1
+	rm -rf $(nmapdatadir) 
+	rm -f $(bindir)/$(TARGET)
+
+${srcdir}/configure: configure.in 
+	cd ${srcdir} && autoconf
+
+# autoheader might not change config.h.in, so touch a stamp file.
+${srcdir}/config.h.in: stamp-h.in
+${srcdir}/stamp-h.in: configure.in acconfig.h \
+	config.h.top config.h.bot
+	cd ${srcdir} && autoheader
+	echo timestamp > ${srcdir}/stamp-h.in
+
+config.h: stamp-h
+stamp-h: config.h.in config.status
+	./config.status
+
+Makefile: Makefile.in config.status
+	./config.status
+
+config.status: configure
+	./config.status --recheck
+
+# DO NOT DELETE -- Needed by makedepend
+
+
+
+
+
+
+

@@ -1,0 +1,50 @@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+bindir = @bindir@
+sbindir = @sbindir@
+mandir = @mandir@
+srcdir = @srcdir@
+
+CC = @CC@
+AR = ar
+RANLIB = @RANLIB@
+CCOPT = 
+DEFS = @DEFS@ -DNCRACK_VERSION=\"$(NCRACK_VERSION)\" -DHAVE_CONFIG_H=1
+CFLAGS = @CFLAGS@ -g $(CCOPT) $(GLIB_CFLAGS) $(DEFS) $(INCLS)
+# CFLAGS = -g -Wall $(DEFS) $(INCLS)
+STATIC = 
+LDFLAGS = @LDFLAGS@ $(STATIC)
+LIBS =  @LIBS@ 
+SHTOOL = ./shtool
+INSTALL = $(SHTOOL) install 
+MAKEDEPEND = @MAKEDEPEND@
+
+TARGET = libnbase.a
+
+OBJS = @LIBOBJS@
+
+all: $(TARGET) 
+
+$(TARGET): $(DEPS) $(OBJS)
+	@echo Compiling libnbase
+	rm -f $@
+	$(AR) cr $@ $(OBJS)
+	$(RANLIB) $@
+
+clean:
+	rm -f $(OBJS) $(TARGET) config.cache config.log config.status
+
+depend:
+	$(MAKEDEPEND) $(INCLS) -s "# DO NOT DELETE" -- $(DEFS) -- $(SRCS)
+
+.cc.o:
+	$(CC) -c $(CFLAGS) $*.cc
+
+# DO NOT DELETE -- Needed by makedepend
+
+
+
+
+
+
+
