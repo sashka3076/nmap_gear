@@ -1,6 +1,6 @@
 Name: nmap
 Version: 3.51
-Release: alt0.3
+Release: alt0.3.1
 Serial: 20020501
 
 Summary: Network exploration tool and security scanner
@@ -103,6 +103,9 @@ export ac_cv_header_libiberty_h=no
 %_iconsdir/*
 
 %changelog
+* Mon May 10 2004 ALT QA Team Robot <qa-robot@altlinux.org> 20020501:3.51-alt0.3.1
+- Rebuilt with openssl-0.9.7d.
+
 * Tue Apr 20 2004 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 20020501:3.51-alt0.3
 - 3.51-TEST3
 - Updated alt-drop_priv.patch
