@@ -1,6 +1,6 @@
 
 /***************************************************************************
- * utils.c -- Simple utility functions performing misc. tasks for Nsock    *
+ * utils.h -- Simple utility functions performing misc. tasks for Nsock    *
  *                                                                         *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
@@ -13,6 +13,15 @@
  * may be willing to sell alternative licenses (contact                    *
  * sales@insecure.com ).                                                   *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         * 
  * If you received these files with a written license agreement stating    *
  * terms other than the (GPL) terms above, then that alternative license   *
  * agreement takes precedence over this comment.                          *
@@ -44,5 +53,59 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: utils.c,v 1.9 2004/03/12 01:50:59 fyodor Exp $ */
+/* $Id: nsock_utils.h,v 1.2 2004/08/29 09:12:05 fyodor Exp $ */
+#ifndef UTILS_H
+#define UTILS_H
 
+#ifdef HAVE_CONFIG_H
+#include "nsock_config.h"
+#include "nbase_config.h"
+#endif
+
+#ifdef WIN32
+#include "nbase_winconfig.h"
+#endif
+
+#include <stdlib.h>
+#if HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
+#ifndef MAX
+#define MAX(x,y) (((x)>(y))?(x):(y))
+#endif
+#ifndef MIN
+#define MIN(x,y) (((x)<(y))?(x):(y))
+#endif
+#ifndef MYABS
+#define MYABS(x) (((x) >= 0)?(x):(-x))
+#endif
+#ifndef FALSE
+#define FALSE 0
+#endif
+#ifndef TRUE
+#define TRUE 1
+#endif
+
+#define NIPQUAD(addr) \
+        (((addr) >> 0)  & 0xff), \
+        (((addr) >> 8)  & 0xff), \
+        (((addr) >> 16) & 0xff), \
+        (((addr) >> 24) & 0xff)
+
+
+/* Timeval subtraction in microseconds */
+#define TIMEVAL_SUBTRACT(a,b) (((a).tv_sec - (b).tv_sec) * 1000000 + (a).tv_usec - (b).tv_usec)
+/* Timeval subtract in milliseconds */
+#define TIMEVAL_MSEC_SUBTRACT(a,b) ((((a).tv_sec - (b).tv_sec) * 1000) + ((a).tv_usec - (b).tv_usec) / 1000)
+/* Timeval subtract in seconds; truncate towards zero */
+#define TIMEVAL_SEC_SUBTRACT(a,b) ((a).tv_sec - (b).tv_sec + (((a).tv_usec < (b).tv_usec) ? - 1 : 0))
+/* Timeval subtract in milliseconds */
+#define TIMEVAL_NSEC_SUBTRACT(a,b) ((((a).tv_sec - (b).tv_sec) * 1000) + ((a).tv_usec - (b).tv_usec) / 1000)
+/* assign one timeval to another timeval plus some msecs: a = b + msecs */
+#define TIMEVAL_MSEC_ADD(a, b, msecs) (a).tv_sec = (b).tv_sec + ((msecs) / 1000); (a).tv_usec = (b).tv_usec + ((msecs) % 1000) * 1000; (a).tv_sec += (a).tv_usec / 1000000; (a).tv_usec %= 1000000
+/* timeval a = timeval b + nsecs nanoseconds.  If you want to += the time
+   onto a single timeval, pass the same timeval as a and b */
+#define TIMEVAL_NSEC_ADD(a, b, nsecs) (a).tv_sec = (b).tv_sec + ((nsecs) / 1000); (a).tv_usec = (b).tv_usec + ((nsecs) % 1000) * 1000; (a).tv_sec += (a).tv_usec / 1000000; (a).tv_usec %= 1000000
+
+#endif

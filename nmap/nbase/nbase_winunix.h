@@ -24,8 +24,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -52,8 +55,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -79,23 +91,26 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_winunix.h,v 1.7 2004/07/07 08:02:15 fyodor Exp $ */
+/* $Id: nbase_winunix.h,v 1.11 2004/08/29 09:12:04 fyodor Exp $ */
 
 #ifndef NBASE_WINUNIX_H
 #define NBASE_WINUNIX_H
 
 #define _INC_ERRNO  /* supress errno.h */
+#define _ERRNO_H_ /* Also for errno.h suppresion */
 
-//	Supress winsock.h
+/* Supress winsock.h */
 #define _WINSOCKAPI_
+#define WIN32_LEAN_AND_MEAN
 
 #include <windows.h>
 #include <winsock2.h>
-/* #include <ws2tcpip.h> // IPv6 stuff */
+/* #include <ws2tcpip.h> */ /* IPv6 stuff */
 #include <time.h>
 #include <iptypes.h>
 #include <stdlib.h>
@@ -105,37 +120,40 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <process.h>
-//#include <errno.h>
 #include <limits.h>
 #include <WINCRYPT.H>
 #include <math.h>
-//#include <packet_types.h>
 
+#ifndef HAVE_U_INT8_T
+#define HAVE_U_INT8_T
 typedef unsigned char u_int8_t;
+#endif
+
+#ifndef HAVE_U_INT16_T
+#define HAVE_U_INT16_T
 typedef unsigned short u_int16_t;
+#endif
 
+#ifndef HAVE_U_INT32_T
+#define HAVE_U_INT32_T
 typedef unsigned long u_int32_t;
-typedef unsigned int ssize_t;
+#endif
 
-//#define HAVE_STRUCT_IP
-//#define HAVE_STRUCT_ICMP
+#ifndef _SSIZE_T_
+typedef unsigned int ssize_t;
+#endif
 
 #define SIOCGIFCONF     0x8912          /* get iface list */
 
 #ifndef GLOBALS
 #define GLOBALS 1
 
-//extern struct interface_info global_adapter;
 #endif
 
 /* Disables VC++ warning:
   "integral size mismatch in argument; conversion supplied".  Perhaps
   I should try to fix this with casts at some point */
-// #pragma warning(disable: 4761)
-
-/* #define signal(x,y) ((void)0)	// ignore for now
-                                // later release may set console handlers
-*/
+/* #pragma warning(disable: 4761) */
 
 extern struct winops wo;
 

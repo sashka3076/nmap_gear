@@ -14,6 +14,15 @@
  * may be willing to sell alternative licenses (contact                    *
  * sales@insecure.com ).                                                   *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         * 
  * If you received these files with a written license agreement stating    *
  * terms other than the (GPL) terms above, then that alternative license   *
  * agreement takes precedence over this comment.                          *
@@ -45,7 +54,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_core.c,v 1.18 2004/03/12 01:50:58 fyodor Exp $ */
+/* $Id: nsock_core.c,v 1.21 2004/08/29 09:12:05 fyodor Exp $ */
 
 #include "nsock_internal.h"
 #include "gh_list.h"
@@ -86,6 +95,7 @@ static int wait_for_events(mspool *ms, int msec_timeout) {
 
   int event_msecs; /* Msecs before an event goes off */
   int combined_msecs;
+  int sock_err = 0;
   struct timeval select_tv;
   struct timeval *select_tv_p;
 
@@ -130,10 +140,10 @@ static int wait_for_events(mspool *ms, int msec_timeout) {
     ms->mioi.results_left = select(ms->mioi.max_sd + 1, &ms->mioi.fds_results_r, &ms->mioi.fds_results_w, &ms->mioi.fds_results_x, select_tv_p);
     gettimeofday(&nsock_tod, NULL); /* Who knows how long select sat around for */
 
-  } while (ms->mioi.results_left == -1 && socket_errno() == EINTR);
+  } while (ms->mioi.results_left == -1 && (sock_err = socket_errno()) == EINTR);
   
-  if (ms->mioi.results_left == -1 && socket_errno() != EINTR) {
-    ms->errnum = socket_errno();
+  if (ms->mioi.results_left == -1 && sock_err != EINTR) {
+    ms->errnum = sock_err;
     return -1;
   }
  

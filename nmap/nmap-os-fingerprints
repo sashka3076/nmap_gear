@@ -1,5 +1,5 @@
 # Nmap OS Fingerprint List. -*- mode: fundamental; -*-
-# $Id: nmap-os-fingerprints,v 1.131 2004/07/07 06:08:09 fyodor Exp $ 
+# $Id: nmap-os-fingerprints,v 1.134 2004/08/18 19:58:09 fyodor Exp $ 
 #
 # Contributions to this database are welcome.  If Nmap obtains a new
 # fingerprint (and test conditions are favorable), it will print out a
@@ -2268,7 +2268,7 @@ T7(DF=N%W=0%ACK=O|S%Flags=AR%Ops=)
 PU(DF=N%TOS=0%IPLEN=38%RIPTL=148%RID=E%RIPCK=E%UCK=F%ULEN=134%DAT=E)
 
 Fingerprint Cisco 7200 router running IOS 12.1(14)E6
-Class Cisco | IOS | 12.X | router   
+Class Cisco | IOS | 12.X | router
 TSeq(Class=TR%gcd=<6%IPID=Z%TS=U)
 T1(DF=N%W=1020%ACK=S++%Flags=AS%Ops=ME)
 T2(Resp=N)
@@ -10704,7 +10704,7 @@ PU(Resp=N)
 
 # Cisco 350 Access Point, software rev 12.02T1
 # Accelerated Networks VoDSL - But what sort of device?
-Fingerprint SonicWall SOHO firewall, Enterasys Matrix E1, or Accelerated Networks VoDSL, or Cisco 360 Access Point
+Fingerprint SonicWall SOHO firewall, Enterasys Matrix E1, or Accelerated Networks VoDSL, or Cisco 350 Access Point
 Class SonicWall | embedded || firewall
 Class Enterasys | embedded || switch
 Class Cisco | embedded || WAP
@@ -11902,8 +11902,11 @@ T6(Resp=Y%DF=N%W=0%ACK=O%Flags=R%Ops=)
 T7(Resp=Y%DF=N%W=0%ACK=S%Flags=AR%Ops=)
 PU(DF=N%TOS=0%IPLEN=38%RIPTL=148%RIPCK=E%UCK=0%ULEN=134%DAT=E)
 
+# Sun SunOS 4.1.1 - 4.1.4 (or derivative), or GatorBox CS LocalTalk/Ethernet bridge
+# GatorBox CS LocalTalk/Ethernet bridge running GatorShare version 3.0.3 (build X4) software
 Fingerprint Sun SunOS 4.1.1 - 4.1.4 (or derivative)
 Class Sun | SunOS || general purpose
+Class Gatorbox | GatorShare || bridge
 TSeq(Class=64K)
 T1(DF=N%W=1000|2000|6000|C000%ACK=S++%Flags=AS%Ops=|M)
 T2(Resp=N)
@@ -12805,8 +12808,9 @@ T7(Resp=N)
 PU(DF=N%TOS=0|20%IPLEN=B0%RIPTL=148%RID=E%RIPCK=E%UCK=E%ULEN=134%DAT=E)
 
 # Windows Server 2003, build 3790
-Fingerprint Microsoft Windows Server 2003
+Fingerprint Microsoft Windows Server 2003 or XP SP2
 Class Microsoft | Windows | 2003/.NET | general purpose
+Class Microsoft | Windows | NT/2K/XP | general purpose
 TSeq(Class=TR%gcd=<6)
 T1(DF=Y%W=FC94|FFFF%ACK=S++%Flags=AS%Ops=MNWNNT)
 T2(Resp=Y%DF=N%W=0%ACK=S%Flags=AR%Ops=)
@@ -13507,6 +13511,19 @@ T5(DF=N%W=0%ACK=S++%Flags=AR%Ops=)
 T6(DF=N%W=0%ACK=O%Flags=R%Ops=)
 T7(DF=N%W=0%ACK=S++%Flags=AR%Ops=)
 PU(DF=N%TOS=0%IPLEN=38%RIPTL=148%RID=E%RIPCK=E%UCK=E%ULEN=134%DAT=E)
+
+Fingerprint Microsoft Windows XP SP2
+Class Microsoft | Windows | NT/2K/XP | general purpose
+TSeq(Class=TR%gcd=<6%IPID=I)
+T1(DF=Y%W=FFAF%ACK=S++%Flags=AS%Ops=MNWNNT)
+T2(Resp=Y%DF=N%W=0%ACK=S%Flags=AR%Ops=)
+T3(Resp=Y%DF=Y%W=FFAF%ACK=S++%Flags=AS%Ops=MNWNNT)
+T4(DF=N%W=0%ACK=O%Flags=R%Ops=)
+T5(DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+T6(DF=N%W=0%ACK=O%Flags=R%Ops=)
+T7(DF=N%W=0%ACK=S++%Flags=AR%Ops=)
+PU(DF=N%TOS=0%IPLEN=B0%RIPTL=148%RID=E%RIPCK=E%UCK=E%ULEN=134%DAT=E)
+
 
 Fingerprint Microsoft Xbox (modified) running evolutionX
 Class Microsoft | embedded || game console

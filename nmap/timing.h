@@ -27,8 +27,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -55,8 +58,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -82,17 +94,22 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: timing.h,v 1.8 2004/03/12 01:59:04 fyodor Exp $ */
+/* $Id: timing.h,v 1.11 2004/08/29 09:12:04 fyodor Exp $ */
 
 #ifndef NMAP_TIMING_H
 #define NMAP_TIMING_H
 
 #include "tcpip.h"
 #include "global_structures.h"
+
+/* Call this function on a newly allocated struct timeout_info to
+   initialize the values appropriately */
+void initialize_timeout_info(struct timeout_info *to);
 
 /* Same as adjust_timeouts(), except this one allows you to specify
  the receive time too (which could be because it was received a while
@@ -111,6 +128,36 @@ void adjust_timeouts(struct timeval sent, struct timeout_info *to);
    time than o.send_delay.  If it is passed a non-null tv, the POST-SLEEP
    time is recorded in it */
 void enforce_scan_delay(struct timeval *tv);
+
+class ScanProgressMeter {
+ public:
+  /* A COPY of stypestr is made and saved for when stats are printed */
+  ScanProgressMeter(char *stypestr);
+  ~ScanProgressMeter();
+/* Decides whether a timing report is likely to even be
+   printed.  There are stringint limitations on how often they are
+   printed, as well as the verbosity level that must exist.  So you
+   might as well check this before spending much time computing
+   progress info.  now can be NULL if caller doesn't have the current
+   time handy.  Just because this function returns true does not mean
+   that the next printStatsIfNeccessary will always print something.
+   It depends on whether time estimates have changed, which this func
+   doesn't even know about. */
+  bool mayBePrinted(const struct timeval *now);
+
+/* Prints an estimate of when this scan will complete.  It only does
+   so if mayBePrinted() is true, and it seems reasonable to do so
+   because the estimate has changed significantly.  Returns whether
+   or not a line was printed.*/
+  bool printStatsIfNeccessary(double perc_done, const struct timeval *now);
+
+  struct timeval begin; /* When this ScanProgressMeter was instantiated */
+ private:
+  struct timeval last_print_test; /* Last time printStatsIfNeccessary was called */
+  struct timeval last_print; /* The most recent time the ETC was printed */
+  struct timeval last_est; /* The latest PRINTED estimate */
+  char *scantypestr;
+};
 
 #endif /* NMAP_TIMING_H */
 

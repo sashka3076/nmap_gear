@@ -1,5 +1,5 @@
 Name: nmap
-Version: 3.55
+Version: 3.70
 Release: alt1
 Serial: 20020501
 
@@ -15,9 +15,9 @@ Source1: nmapfe.menu
 Source2: nmapfe.xpm
 
 Patch1: nmap-3.55-alt-glibc.patch
-Patch2: nmap-3.55-alt-autoheader.patch
+Patch2: nmap-3.70-alt-autoheader.patch
 Patch3: nmap-3.55-alt-owl-libpcap.patch
-Patch4: nmap-3.55-alt-drop_priv.patch
+Patch4: nmap-3.70-alt-drop_priv.patch
 
 PreReq: libpcap >= 2:0.7.2-alt2, chrooted-resolv
 
@@ -104,6 +104,10 @@ bzip2 -9fk CHANGELOG
 %_iconsdir/*
 
 %changelog
+* Wed Sep 01 2004 Aleksandr Blokhin 'Sass' <sass@altlinux.ru> 20020501:3.70-alt1
+- 3.70
+- Updated drop_priv.patch & autoheader.patch
+
 * Fri Jul 16 2004 Dmitry V. Levin <ldv@altlinux.org> 20020501:3.55-alt1
 - Updated to 3.55.
 - Rediffed patches.

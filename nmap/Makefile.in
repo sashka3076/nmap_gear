@@ -1,4 +1,4 @@
-NMAP_VERSION = 3.55
+NMAP_VERSION = 3.70
 NMAP_NAME= nmap
 NMAP_URL= http://www.insecure.org/nmap/
 NMAP_PLATFORM=@host@
@@ -131,7 +131,7 @@ distro:
         config.h.in aclocal.m4 nmap_winconfig.h Makefile.in \
 	configure $(SHTOOL) install-sh config.guess \
 	nmap-$(NMAP_VERSION)-1.spec config.sub INSTALL README-WIN32 COPYING \
-	CHANGELOG HACKING /usr/tmp/nmap-$(NMAP_VERSION)
+	COPYING.OpenSSL CHANGELOG HACKING /usr/tmp/nmap-$(NMAP_VERSION)
 
 	$(SHTOOL) mkdir /usr/tmp/nmap-$(NMAP_VERSION)/mswin32
 	cd mswin32; cp -ra *.[hHcC] *.cc ARPA NET NETINET RPC icon1.ico \
@@ -140,24 +140,38 @@ distro:
                     /usr/tmp/nmap-$(NMAP_VERSION)/mswin32
 
 	$(SHTOOL) mkdir /usr/tmp/nmap-$(NMAP_VERSION)/$(LIBPCAPDIR)
-	cd $(LIBPCAPDIR); cp -ra acconfig.h aclocal.m4 arcnet.h bpf \
-                          bpf_dump.c bpf_filter.c bpf_image.c CHANGES \
-                          config.guess config.h.in config.sub configure \
-                          configure.ac CREDITS etherent.c ethertype.h FILES \
-                          gencode.c gencode.h grammar.c grammar.y inet.c \
-                          install-sh INSTALL.txt lbl LICENSE llc.h \
-                          Makefile.in mkdep nametoaddr.c net nlpid.h \
-                          NMAP_MODIFICATIONS optimize.c pcap.3 pcap-bpf.c \
-                          pcap.c pcap-dlpi.c pcap-enet.c pcap.h pcap-int.h \
-                          pcap-linux.c pcap-namedb.h pcap-nit.c pcap-nit.h \
-                          pcap-null.c pcap-pf.c pcap-pf.h pcap-snit.c \
-                          pcap-snoop.c ppp.h README README.aix README.linux \
-                          README.tru64 savefile.c scanner.c scanner.l sll.h \
-                          SUNOS4 TODO tokdefs.h VERSION \
-                          /usr/tmp/nmap-$(NMAP_VERSION)/$(LIBPCAPDIR)
+	cd $(LIBPCAPDIR); cp -ra --parents SUNOS4/nit_if.o.sparc \
+           SUNOS4/nit_if.o.sun3 SUNOS4/nit_if.o.sun4c.4.0.3c CHANGES \
+           CREDITS FILES INSTALL.txt LICENSE Makefile.in \
+           NMAP_MODIFICATIONS README README.aix README.linux \
+           README.tru64 TODO VERSION acconfig.h aclocal.m4 \
+           arcnet.h bpf_dump.c bpf_image.c config.guess config.h.in \
+           config.sub configure configure.ac etherent.c ethertype.h gencode.c \
+           gencode.h grammar.y inet.c install-sh llc.h mkdep nametoaddr.c \
+           nlpid.h optimize.c pcap-bpf.c pcap-dlpi.c pcap-enet.c pcap-int.h \
+           pcap-linux.c pcap-namedb.h pcap-nit.c pcap-nit.h pcap-null.c \
+           pcap-pf.c pcap-pf.h pcap-snit.c pcap-snoop.c pcap.3 pcap.c pcap.h \
+           ppp.h savefile.c scanner.c scanner.l sll.h tokdefs.h \
+           bpf/net/bpf_filter.c bpf/net/bpf.h lbl/os-aix4.h lbl/os-osf4.h \
+           lbl/os-solaris2.h lbl/os-sunos4.h lbl/os-ultrix4.h lbl/os-hpux11.h \
+           lbl/os-osf5.h atmuni31.h config.h fad-getad.c fad-gifc.c \
+           fad-glifc.c fad-null.c fad-win32.c pcap-bpf.h pcap-dag.c \
+           pcap-dag.h version.h grammar.c pcap-stdinc.h pcap-win32.c pf.h \
+           rawss7.h README.dag README.hpux README.Win32 snprintf.c \
+           sunatmpos.h Win32/Include/addrinfo.h Win32/Include/Gnuc.h \
+           Win32/Include/arpa/nameser.h Win32/Include/net/if.h \
+           Win32/Include/net/netdb.h Win32/Include/net/paths.h \
+           Win32/Include/bittypes.h Win32/Include/cdecl_ext.h \
+           Win32/Include/inetprivate.h Win32/Include/ip6_misc.h \
+           Win32/Include/sockstorage.h Win32/Prj/libpcap.dsp \
+           Win32/Prj/libpcap.dsw Win32/Src/getnetbynm.c Win32/Src/ffs.c \
+           Win32/Src/getaddrinfo.c Win32/Src/getnetent.c Win32/Src/getopt.c \
+           Win32/Src/getservent.c Win32/Src/inet_aton.c Win32/Src/inet_net.c \
+           Win32/Src/inet_pton.c /usr/tmp/nmap-$(NMAP_VERSION)/$(LIBPCAPDIR)
 
 	$(SHTOOL) mkdir /usr/tmp/nmap-$(NMAP_VERSION)/docs
-	cd docs; cp -ra README copying.html nmap-fingerprinting-article.txt \
+	cd docs; cp -ra README \
+                    nmap-fingerprinting-article.txt \
                     nmap.deprecated.txt nmap.usage.txt nmap_doc.html \
                     nmap_manpage-de.html nmap_manpage-es.html \
                     nmap_manpage-fr.html nmap_manpage-it.html \
@@ -203,7 +217,7 @@ distro:
                             nsock_event.c nsock_internal.h nsock_iod.c \
                             nsock_pool.c nsock_read.c nsock_ssl.h \
                             nsock_ssl.c nsock_timers.c \
-                            nsock_write.c utils.c utils.h \
+                            nsock_write.c nsock_utils.c nsock_utils.h \
                             /usr/tmp/nmap-$(NMAP_VERSION)/nsock/src/
 
 	rm -f /usr/tmp/nmap-$(NMAP_VERSION)/nbase/nbase_config.h 
@@ -222,7 +236,7 @@ distro:
 # Update the web site
 web:
 	test x$(wroot) != x
-	cp -a CHANGELOG HACKING COPYING INSTALL $(DATAFILES) README-WIN32 mswin32/nmap_performance.reg $(wroot)/nmap/data
+	cp -a CHANGELOG HACKING COPYING COPYING.OpenSSL INSTALL $(DATAFILES) README-WIN32 mswin32/nmap_performance.reg $(wroot)/nmap/data
 	cd docs && cp -a nmap_manpage*.html nmap*.1 xnmap.1 nmap.usage.txt nmap.dtd $(wroot)/nmap/data/
 	scripts/produceosclasschoosebox.pl nmap-os-fingerprints > $(wroot)/nmap/data/os-classes.txt
 	find $(wroot)/nmap/data/ -type f -exec chmod 644 '{}' \;

@@ -26,8 +26,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -54,8 +57,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -81,192 +93,1909 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: scan_engine.cc,v 1.30 2004/07/04 05:14:15 fyodor Exp $ */
+/* $Id: scan_engine.cc,v 1.46 2004/08/29 09:12:03 fyodor Exp $ */
 
 #include "scan_engine.h"
 #include "timing.h"
 #include "NmapOps.h"
+#include <list>
 
 extern NmapOps o;
+class UltraScanInfo;
+
+struct ultra_scan_performance_vars {
+  int low_cwnd;  /* The lowest cwnd (congestion window) allowed */
+  int host_initial_cwnd; /* Initial congestion window for ind. hosts */
+  int group_initial_cwnd; /* Initial congestion window for all hosts as a group */
+  int max_cwnd; /* I should never have more than this many probes
+		   outstanding */
+  int quick_incr; /* How many probes are incremented for each response
+		     in quick start mode */
+  int cc_incr; /* How many probes are incremented per (roughly) rtt in 
+		  congestion control mode */
+  int initial_ccthresh;
+  /* When a successful ping response comes back, it counts as this many
+     "normal" responses, because the fact that pings are neccessary means
+     we aren't getting much input. */
+  int ping_magnifier;
+/* Try to send a scanping if no response has been received from a target host
+   in this many usecs */
+  int pingtime; 
+  double group_drop_cwnd_divisor; /* all-host group cwnd divided by this
+				     value if any packet drop occurs */
+  double group_drop_ccthresh_divisor; /* used to drop the group ccthresh when
+					 any drop occurs */
+  double host_drop_ccthresh_divisor; /* used to drop the host ccthresh when
+					 any drop occurs */
+  int tryno_cap; /* The maximum trynumber (starts at zero) allowed */
+};
+
+/* Some of the algorithms used here are TCP congestion control
+   techniques from RFC2581. */
+struct ultra_timing_vals {
+  double cwnd; /* Congestion window - in probes */
+  int ccthresh; /* The threshold after which mode is changed from QUICK_START
+		   to CONGESTION_CONTROL */
+  int num_updates; /* Number of updates to this utv (generally packet receipts ) */
+  /* Last time values were adjusted for a drop (you usually only want
+     to adjust again based on probes sent after that adjustment so a
+     sudden batch of drops doesn't destroy timing.  Init to now */
+  struct timeval last_drop; 
+};
+
+class ConnectProbe {
+public:
+  ConnectProbe();
+  ~ConnectProbe();
+  int sd; /* Socket descriptor used for connection.  -1 if not valid. */
+private:
+};
+
+/* At least for now, I'll just use this like a struct and access
+   all the data members directly */
+class UltraProbe {
+public:
+  UltraProbe();
+  ~UltraProbe();
+  enum UPType { UP_UNSET, UP_IP, UP_CONNECT, UP_RPC } type; /* The type of probe this is */
+  /* Sets this UltraProbe as type UP_IP and creates & initializes the internal
+     IPProbe */
+  int setIP(u8 *ippacket, u32 iplen);
+  /* Sets this UltraProbe as type UP_CONNECT, preparing to connect to given
+   port number*/
+  void setConnect(u16 portno);
+  IPProbe *IP; /* filled out if type == UP_IP */
+  ConnectProbe *CP; /* Filled out if type == UP_CONNECT */
+  unsigned int tryno; /* Try (retransmission) number of this probe */
+  u16 portno(); /* The TCP or UDP dest port of this probe */
+/* If true, probe is considered no longer active due to timeout, but it
+   may be kept around a while, just in case a reply comes late */
+  bool timedout;
+/* A packet may be timedout for a while before being retransmitted due to
+   packet sending rate limitations */
+  bool retransmitted; 
+  struct timeval sent;
+  /* Time the previous probe was sent, if this is a retransmit (tryno > 0) */
+  struct timeval prevSent; 
+  bool isPing() { return pingseq > 0; }
+  unsigned int pingseq; /* 0 if this is not a scanping. Otherwise a posative ping seq#. */
+private:
+  u16 myPortno;
+};
+
+/* Global info for the connect scan */
+class ConnectScanInfo {
+public:
+  ConnectScanInfo();
+  ~ConnectScanInfo();
+
+/* Watch a socket descriptor (add to fd_sets and maxValidSD).  Returns
+   true if the SD was absent from the list, false if you tried to
+   watch an SD that was already being watched. */
+  bool watchSD(int sd); 
+
+  /* Clear SD from the fd_sets and maxValidSD.  Returns true if the SD
+   was in the list, false if you tried to clear an sd that wasn't
+   there in the first place. */
+  bool clearSD(int sd); 
+  int maxValidSD; /* The maximum socket descriptor in any of the fd_sets */
+  fd_set fds_read;
+  fd_set fds_write;
+  fd_set fds_except;
+  int numSDs; /* Number of socket descriptors being watched */
+  int maxSocketsAllowed; /* No more than this many sockets may be created @once */
+private:
+};
+
+/* These are ultra_scan() statistics for the whole group of Targets */
+class GroupScanStats {
+public:
+  struct timeval timeout; /* The time at which we abort the scan */
+  /* Most recent host tested for sendability */
+  struct sockaddr_storage latestip; 
+  GroupScanStats(UltraScanInfo *UltraSI);
+  ~GroupScanStats();
+  /* Returns true if the GLOBAL system says that sending is OK. */
+  bool sendOK(); 
+  /* Total # of probes outstanding (active) for all Hosts */
+  int num_probes_active; 
+  UltraScanInfo *USI; /* The USI which contains this GSS.  Use for at least
+			 getting the current time w/o gettimeofday() */
+  struct ultra_timing_vals timing;
+  struct timeout_info to; /* Group-wide packet rtt/timeout info */
+  int numtargets; /* Total # of targets scanned -- includes finished and incomplete hosts */
+  int numports; /* Number of ports scanned on each host */
+  /* The last time waitForResponses finished (initialized to GSS creation time */
+  int probes_sent; /* Number of probes sent in total.  This DOES include pings and retransmissions */
+  struct timeval last_wait; 
+  int probes_sent_at_last_wait;
+  // number of hosts that timed out during scan, or were already timedout
+  int num_hosts_timedout;
+  struct ConnectScanInfo *CSI;
+private:
+};
+
+struct send_delay_nfo {
+  unsigned int delayms; /* Milliseconds to delay between probes */
+  /* The number of successful and dropped probes since the last time delayms
+     was changed */
+  unsigned int goodRespSinceDelayChanged;
+  unsigned int droppedRespSinceDelayChanged;
+  struct timeval last_boost; /* Most recent time of increase to delayms.  Init to creation time. */
+};
+
+/* To test for rate limiting, there is a delay in sending the first packet
+   of a certain retransmission number.  These values help track that. */
+struct rate_limit_detection_nfo {
+  unsigned int max_tryno_sent; /* What is the max tryno we have sent so far (starts at 0) */
+  bool rld_waiting; /* Are we currently waiting due to RLD? */
+  struct timeval rld_waittime; /* if RLD waiting, when can we send? */
+};
+
+/* The ultra_scan() statistics that apply to individual target hosts in a 
+   group */
+class HostScanStats {
+public:
+  Target *target; /* A copy of the Target that these stats refer to. */
+  HostScanStats(Target *t, UltraScanInfo *UltraSI);
+  ~HostScanStats();
+  int freshPortsLeft(); /* Returns the number of ports remaining to probe */
+  int next_portidx; /* Index of the next port to probe in the relevent
+		       ports array in USI.ports */
+
+  /* How long I am currently willing to wait for a probe response
+     before considering it timed out.  Uses the host values from
+     target if they are available, otherwise from gstats.  Results
+     returned in MICROseconds.  */
+  unsigned long probeTimeout();
+
+  /* How long I'll wait until completely giving up on a probe.
+     Timedout probes are often marked as such (and sometimes
+     considered a drop), but kept in the list juts in case they come
+     really late.  But after probeExpire(), I don't waste time keeping
+     them around. Givein in MICROseconds */
+  unsigned long probeExpire();
+/* Returns OK if sending a new probe to this host is OK (to avoid
+   flooding). If when is non-NULL, fills it with the time that sending
+   will be OK assuming no pending probes are resolved by responses
+   (call it again if they do).  when will become now if it returns
+   true. */
+  bool sendOK(struct timeval *when); 
+
+/* If there are pending probe timeouts, fills in when with the time of
+   the earliest one and returns true.  Otherwise returns false and
+   puts now in when. */
+  bool HostScanStats::nextTimeout(struct timeval *when);
+  UltraScanInfo *USI; /* The USI which contains this HSS */
+
+  /* Removes a probe from probes_outstanding, adjusts HSS and USS
+     active probe stats accordingly, then deletes the probe. */
+  void destroyOutstandingProbe(list<UltraProbe *>::iterator probeI);
+
+  /* Mark an outstanding probe as timedout.  Adjusts stats
+     accordingly.  For connect scans, this closes the socket. */
+  void markProbeTimedout(list<UltraProbe *>::iterator probeI);
+
+  /* New (active) probes are appended to the end of this list.  When a
+     host times out, it will be marked as such, but may hang around on
+     the list for a while just in case a response comes in.  So use
+     num_probes_active to learn how many active (not timed out) probes
+     are outstanding.  Probes on the bench (reached the current
+     maximum tryno and expired) are not counted in
+     probes_outstanding.  */
+  list<UltraProbe *> probes_outstanding;
+  /* The number of probes in probes_outstanding, minus the inactive (timed out) ones */
+  unsigned int num_probes_active;
+  /* Probes timed out but not yet retransmitted because of congestion
+     control limits or because more retransmits may not be
+     neccessary.  Note that probes on probe_bench are not included
+     in this value. */
+  unsigned int num_probes_waiting_retransmit;
+  unsigned int num_probes_outstanding() { return probes_outstanding.size(); }
+
+  /* The bench is for probes that have met the current maximum tryno,
+     and are on ice until that tryno increases (so we can retransmit
+     again), or solidifies (so we can mark the port firewalled or
+     whatever). */
+  list<UltraProbe *> probe_bench;
+  unsigned int bench_tryno; /* # tryno of probes on the bench */
+  /* Moves the given probe from the probes_outstanding list, to
+     probe_bench, and decrements num_probes_waiting_retransmit accordingly */
+  void moveProbeToBench(list<UltraProbe *>::iterator probeI);
+/* Clears the bench -- returning all of its members to probes_outstanding */
+  void HostScanStats::clearBench();
+  bool completed(); /* Whether or not the scan of this Target has completed */
+
+  /* This function provides the proper cwnd and ccthresh to use.  It
+     may differ from versions in timing member var because when no
+     responses have been received for this host, may look at others in
+     the group.  For CHANGING this host's timing, use the timing
+     memberval instead. */
+  void getTiming(struct ultra_timing_vals *tmng);
+  struct ultra_timing_vals timing;
+  /* The most recently received probe response time -- initialized to scan start time. */
+  struct timeval lastrcvd;
+  struct timeval lastping_sent; /* The time the most recent ping was sent (initialized to scan begin time) */
+  struct timeval lastprobe_sent; /* Most recent probe send (including pings) by host.  Init to scan begin time. */
+  /* A valid portnumber for sending scanpings.  -1 if none yet found */
+  int pingport;
+  int pingportstate; /* PORT_UNKNOWN if no pingport yet found */
+  /* gives the maximum try number (try numbers start at zero and
+     increments for each retransmission) that may be used, based on
+     the scan type, observed network reliability, timing mode, etc.
+     This may change during the scan based on network traffic.  If
+     capped is not null, it will be filled with true if the tryno is
+     at its upper limit.  That often calls for a warning to be issued,
+     and marking of remaining timedout ports firewalled or whatever is
+     appropriate.  If mayincrease is non-NULL, it is set to whether
+     the allowedTryno may increase again.  If it is false, any probes
+     which have reached the given limit may be dealth with. */
+  unsigned int allowedTryno(bool *capped, bool *mayincrease);
+
+
+  /* Provides the next ping sequence number.  This starts at one, goes
+   up to 255, then wraps around back to 1.  If inc is true, it is
+   incremented.  Otherwise you just get a peek at what the next one
+   will be. */
+  u8 nextPingSeq(bool inc=true) {
+    u8 ret = nxtpseq;
+    if (inc) {
+      nxtpseq++;
+      if (nxtpseq == 0) nxtpseq++;
+    }
+    return ret;
+  }
+  /* This is the highest try number that has produced useful results
+     (such as port status change). */
+  unsigned int max_successful_tryno;
+  /* This starts as true because tryno may increase based on results, but
+     it becomes false if it becomes clear that tryno will not increase 
+     further during the scan */
+  bool tryno_mayincrease;
+  int ports_finished; /* The number of ports of this host that have been determined */
+  int numprobes_sent; /* Number of port probes (not counting pings, but counting retransmits) sent to this host */
+  int numpings_sent;
+  /* Boost the scan delay for this host, usually because too many packet
+     drops were detected. */
+  void boostScanDelay();
+  struct send_delay_nfo sdn;
+  struct rate_limit_detection_nfo rld;
+
+private:
+  u8 nxtpseq; /* the next scanping sequence number to use */
+};
+
+class UltraScanInfo {
+public:
+  UltraScanInfo();
+  UltraScanInfo(vector<Target *> &Targets, struct scan_lists *pts, stype scantype) { Init(Targets, pts, scantype); }
+  ~UltraScanInfo();
+  /* Must call Init if you create object with default constructor */
+  void Init(vector<Target *> &Targets, struct scan_lists *pts, stype scantp);
+
+  /* Consults with the group stats, and the hstats for every
+     incomplete hosts to determine whether any probes may be sent.
+     Returns true if they can be sent immediately.  If when is non-NULL,
+     it is filled with the next possible time that probes can be sent
+     (which will be now, if the function returns true */
+  bool sendOK(struct timeval *tv);
+  stype scantype;
+  bool tcp_scan; /* scantype is a type of TCP scan */
+  bool udp_scan;
+  bool icmp_scan;
+  bool prot_scan;
+  struct timeval now; /* Updated after potentially meaningful delays.  This can
+			 be used to save a call to gettimeofday() */
+  GroupScanStats *gstats;
+  struct ultra_scan_performance_vars perf;
+  /* A circular buffer of the incompleteHosts.  nextIncompleteHost() gives
+     the next one.  The first time it is called, it will give the
+     first host in the list.  If incompleteHosts is empty, returns
+     NULL. */
+  HostScanStats *nextIncompleteHost();
+  /* Removes any hosts that have completed their scans from the incompleteHosts
+     list.  Returns the number of hosts removed. */
+  int removeCompletedHosts();
+  /* Find a HostScanStats by IP its address in the incomplete list.
+     Returns NULL if none are found. */
+  HostScanStats *findIncompleteHost(struct sockaddr_storage *ss);
+
+  unsigned int numIncompleteHosts() { return incompleteHosts.size(); }
+  unsigned int numInitialHosts() { return numInitialTargets; }
+  /* Any function which messes with (removes elements from)
+     incompleteHosts may have to manipulate nextI */
+  list<HostScanStats *> incompleteHosts;
+
+  ScanProgressMeter *SPM;
+  struct scan_lists *ports;
+  int rawsd; /* raw socket descriptor */
+  pcap_t *pd;
+
+  u32 seqmask; /* This mask value is used to encode values in sequence 
+		  numbers.  It is set randomly in UltraScanInfo::Init() */
+private:
+
+  unsigned int numInitialTargets;
+  list<HostScanStats *>::iterator nextI;
+
+};
 
 #ifdef __amigaos__
 extern void CloseLibs(void);
 #endif
 
+/* Whether this is storing timing stats for a whole group or an
+   individual host */
+enum ultra_timing_type { TIMING_HOST, TIMING_GROUP };
+/* Initialize the ultra_timing_vals structure timing.  The utt must be
+   TIMING_HOST or TIMING_GROUP.  If you happen to have the current
+   time handy, pass it as now, otherwise pass NULL */
+static void init_ultra_timing_vals(ultra_timing_vals *timing, 
+				   enum ultra_timing_type utt, 
+				   int num_hosts_in_group, 
+				   struct ultra_scan_performance_vars *perf,
+				   struct timeval *now);
+/* Adjust various timing variables based on pcket receipt.  Pass
+   rcvdtime = NULL if you have given up on a probe and want to count
+   this as a DROPPED PACKET */
+void ultrascan_adjust_times(UltraScanInfo *USI, HostScanStats *hss, 
+		       UltraProbe *probe, struct timeval *rcvdtime);
 /*  predefined filters -- I need to kill these globals at some pont. */
 extern unsigned long flt_dsthost, flt_srchost;
 extern unsigned short flt_baseport;
 
+ConnectProbe::ConnectProbe() {
+  sd = -1;
+}
 
-/* Does the appropriate stuff when the port we are looking at is found
-   to be open trynum is the try number that was successful 
-   I USE CURRENT->STATE TO DETERMINE WHETHER THE PORT IS OPEN
-   OR FIREWALLED */
-static void posportupdate(Target *target, struct portinfo *current, 
-		   struct timeval *rcvdtime, int trynum, struct portinfo *scan,
-		   struct scanstats *ss ,stype scantype, int newstate,
-		   struct portinfolist *pil, struct connectsockinfo *csi) {
-  static int tryident = -1;
-  static u32 lasttarget = 0;
-  struct sockaddr_in mysock;
-  recvfrom6_t sockaddr_in_len = sizeof(SA);
+ConnectProbe::~ConnectProbe() {
+  if (sd > 0) close(sd);
+  sd = -1;
+}
+
+UltraProbe::UltraProbe() {
+  type = UP_UNSET;
+  IP = NULL;
+  CP = NULL;
+  tryno = 0;
+  timedout = false;
+  retransmitted = false;
+  pingseq = 0;
+  myPortno = 0;
+  memset(&sent, 0, sizeof(prevSent));
+  memset(&prevSent, 0, sizeof(prevSent));
+}
+
+UltraProbe::~UltraProbe() {
+  delete IP;
+  delete CP;
+}
+
+ /* Sets this UltraProbe as type UP_IP and creates & initializes the internal
+     IPProbe */
+int UltraProbe::setIP(u8 *ippacket, u32 iplen) {
   int i;
-  char owner[32];
-  struct timeval tv;
+  type = UP_IP;
+  IP = new IPProbe;
+  i = IP->storePacket(ippacket, iplen);
+  if (IP->ipv4->ip_p == IPPROTO_TCP && IP->tcp) {
+    myPortno = ntohs(IP->tcp->th_dport);
+  } else if (IP->ipv4->ip_p == IPPROTO_UDP && IP->udp) {
+    myPortno = ntohs(IP->udp->uh_dport);
+  }
+  return i;
+}
 
-  if (tryident == -1 || target->v4host().s_addr != lasttarget) 
-    tryident = o.identscan;
-  lasttarget = target->v4host().s_addr;
-  owner[0] = '\0';
-  if (current->state != PORT_OPEN && current->state != PORT_CLOSED &&
-      current->state != PORT_FIREWALLED && current->state != PORT_TESTING) {
-    if (o.debugging) error("Whacked packet to port %lu passed to posportupdate with state %s (%d)\n", current->portno, statenum2str(current->state), current->state);
-    return;
+/* Sets this UltraProbe as type UP_CONNECT, preparing to connect to given
+   port number*/
+void UltraProbe::setConnect(u16 portno) {
+  type = UP_CONNECT;
+  CP = new ConnectProbe();
+  myPortno = portno;
+}
+
+/* The TCP or UDP dest port of this probe */
+u16 UltraProbe::portno() {
+  return myPortno;
+}
+
+ConnectScanInfo::ConnectScanInfo() {
+  maxValidSD = -1;
+  numSDs = 0;
+  maxSocketsAllowed = (o.max_parallelism)? o.max_parallelism : MAX(5, max_sd() - 4);
+  FD_ZERO(&fds_read);
+  FD_ZERO(&fds_write);
+  FD_ZERO(&fds_except);
+}
+
+/* Nothing really to do here. */
+ConnectScanInfo::~ConnectScanInfo() {}
+
+/* Watch a socket descriptor (add to fd_sets and maxValidSD).  Returns
+   true if the SD was absent from the list, false if you tried to
+   watch an SD that was already being watched. */
+bool ConnectScanInfo::watchSD(int sd) {
+  assert(sd >= 0);
+  if (!FD_ISSET(sd, &fds_read)) {
+    FD_SET(sd, &fds_read);
+    FD_SET(sd, &fds_write);
+    FD_SET(sd, &fds_except);
+    numSDs++;
+    if (sd > maxValidSD)
+      maxValidSD = sd;
+  } else return false;
+  return true;
+}
+
+/* Clear SD from the fd_sets and maxValidSD.  Returns true if the SD
+   was in the list, false if you tried to clear an sd that wasn't
+   there in the first place. */
+bool ConnectScanInfo::clearSD(int sd) {
+  assert(sd >= 0);
+  if (FD_ISSET(sd, &fds_read)) {
+    FD_CLR(sd, &fds_read);
+    FD_CLR(sd, &fds_write);
+    FD_CLR(sd, &fds_except);
+    assert(numSDs > 0);
+    numSDs--;
+    if (sd == maxValidSD)
+      maxValidSD--;
+  } else return false;
+  return true;
+}
+
+GroupScanStats::GroupScanStats(UltraScanInfo *UltraSI) {
+  memset(&latestip, 0, sizeof(latestip));
+  memset(&timeout, 0, sizeof(timeout));
+  USI = UltraSI;
+  init_ultra_timing_vals(&timing, TIMING_GROUP, USI->numIncompleteHosts(), &(USI->perf), &USI->now);
+  initialize_timeout_info(&to);
+  num_probes_active = 0;
+  numtargets = USI->numIncompleteHosts(); // They are all incomplete at the beginning
+  if (USI->tcp_scan) {
+    numports = USI->ports->tcp_count;
+  } else if (USI->udp_scan) {
+    numports = USI->ports->udp_count;
+  } else if (USI->prot_scan) {
+    numports = USI->ports->prot_count;
+  } else assert(0); /* TODO: RPC scan and maybe ping */
+  
+  if (USI->scantype == CONNECT_SCAN)
+    CSI = new ConnectScanInfo;
+  else CSI = NULL;
+  probes_sent = probes_sent_at_last_wait = 0;
+  gettimeofday(&last_wait, NULL);
+  num_hosts_timedout = 0;
+}
+
+GroupScanStats::~GroupScanStats() {
+  delete CSI;
+}
+
+  /* Returns true if the GLOBAL system says that sending is OK.*/
+bool GroupScanStats::sendOK() {
+
+  if (USI->scantype == CONNECT_SCAN && CSI->numSDs >= CSI->maxSocketsAllowed)
+    return false;
+
+  /* We need to stop sending if it has been a long time since
+     the last listen call, at least for systems such as Windoze that
+     don't give us a proper pcap time.  Also for connect scans, since
+     we don't get an exact response time with them either. */
+  if (USI->scantype == CONNECT_SCAN || !pcap_recv_timeval_valid()) {
+    int to_ms = (int) MAX(to.srtt * .75 / 1000, 20);
+    if (TIMEVAL_MSEC_SUBTRACT(USI->now, last_wait) > to_ms)
+      return false;
   }
 
-  /* Lets do the timing stuff */
-  if (trynum > -1) {
-    if (!rcvdtime) {
-      gettimeofday(&tv, NULL);
-      rcvdtime = &tv;
-    }
-    adjust_timeouts2(&(current->sent[trynum]), rcvdtime, &(target->to));
-    target->firewallmode.responsive_ports++; 
+  /* There are good arguments for limiting the number of probes sent
+     between waits even when we do get appropriate receive times.  For
+     example, overflowing the pcap receive buffer with responses is no
+     fun.  On one of my Linux boxes, it seems to hold about 113
+     responses when I scan localhost.  And half of those are the @#$#
+     sends being received.  I think I'll put a limit of 50 sends per
+     wait */
+  if (USI->gstats->probes_sent - USI->gstats->probes_sent_at_last_wait >= 50)
+    return false;
+
+  /* When there is only one target left, let the host congestion
+     stuff deal with it. */
+  if (USI->numIncompleteHosts() == 1)
+    return true;
+
+  if (timing.cwnd >= num_probes_active + 0.5)
+    return true;
+
+  return false;
+}
+
+HostScanStats::HostScanStats(Target *t, UltraScanInfo *UltraSI) { 
+  target = t; 
+  USI=UltraSI; 
+  next_portidx = 0; 
+  num_probes_active = 0; 
+  num_probes_waiting_retransmit = 0;
+  lastping_sent = lastprobe_sent = lastrcvd = USI->now;
+  pingport = -1;
+  pingportstate = PORT_UNKNOWN;
+  nxtpseq = 1;
+  max_successful_tryno = 0;
+  tryno_mayincrease = true;
+  ports_finished = 0;
+  numprobes_sent = 0;
+  numpings_sent = 0;
+  init_ultra_timing_vals(&timing, TIMING_HOST, 1, &(USI->perf), &USI->now);
+  bench_tryno = 0;
+  memset(&sdn, 0, sizeof(sdn));
+  sdn.last_boost = USI->now;
+  sdn.delayms = o.scan_delay;
+  rld.max_tryno_sent = 0;
+  rld.rld_waiting = false;
+  rld.rld_waittime = USI->now;
+}
+
+HostScanStats::~HostScanStats() {
+  list<UltraProbe *>::iterator probeI, next;
+
+/* Move any hosts from the bench to probes_outstanding for easier deletion  */
+  clearBench(); 
+  for(probeI = probes_outstanding.begin(); probeI != probes_outstanding.end(); 
+      probeI = next) {
+    next = probeI;
+    next++;
+    destroyOutstandingProbe(probeI);
   }
-  /* If a non-zero trynum finds a port that hasn't been discovered, the
-   earlier packets(s) were probably dropped.  So we decrease our 
-   numqueries_ideal, otherwise we increase it slightly */
-  if (trynum == 0) {
-    ss->numqueries_ideal = MIN(ss->numqueries_ideal + (ss->packet_incr/ss->numqueries_ideal), ss->max_width);
-  } else if (trynum != -1) {
-    /* I don't want to decrease numqueries in the case port was
-       already determined to be open since sometimes the target box
-       ignores our RSTs and continues to resend SYN|ACK.  If this is
-       for a try #2 (eg there was one real drop), we would keep
-       getting whacked at every resend :(.  Even in a "legitimate"
-       case here where the port is OPEN, the problem is probably not
-       waiting long enough rather than a dropped packet -- and the
-       adjust_timeouts() above will deal w/that.  Note that
-       adjust_timeouts also was able to handle the bogus resends OK
-       because the timing was so bogus */
-    if (!ss->alreadydecreasedqueries && current->state != PORT_OPEN) {
-      double oldideal = ss->numqueries_ideal;
-      ss->alreadydecreasedqueries = 1;
-      ss->numqueries_ideal *= ss->fallback_percent;
-      if (target->firewallmode.active)
-	ss->numqueries_ideal *= ss->fallback_percent; /* We need to act 
-							 forcefully on what 
-							 little info we have */
-      ss->numqueries_ideal = MAX(ss->min_width, ss->numqueries_ideal);
-      if (o.debugging && (ss->numqueries_ideal != oldideal)) 
-	log_write(LOG_STDOUT, "Apparent packet loss -- reducing numqueries_ideal from %.3f to %.3f\n", oldideal, ss->numqueries_ideal);      
+  assert(probe_bench.empty());
+}
+
+/* How long I am currently willing to wait for a probe response before
+   considering it timed out.  Uses the host values from target if they
+   are available, otherwise from gstats.  Results returned in
+   MICROseconds.  */
+unsigned long HostScanStats::probeTimeout() {
+  if (target->to.srtt > 0) {
+    /* We have at least one timing value to use.  Good enough, I suppose */
+    return target->to.timeout;
+  } else if (USI->gstats->to.srtt > 0) {
+    /* OK, we'll use this one instead */
+    return USI->gstats->to.timeout;
+  } else {
+    return target->to.timeout; /* It comes with a default */
+  }
+}
+
+  /* How long I'll wait until completely giving up on a probe.
+     Timedout probes are often marked as such (and sometimes
+     considered a drop), but kept in the list juts in case they come
+     really late.  But after probeExpire(), I don't waste time keeping
+     them around. Givein in MICROseconds */
+unsigned long HostScanStats::probeExpire() {
+  if (USI->scantype == CONNECT_SCAN)
+    return probeTimeout(); /* timedout probes close socket -- late resp. impossible */
+  return MIN(10000000, probeTimeout() * 10);
+}
+
+/* Returns OK if sending a new probe to this host is OK (to avoid
+   flooding). If when is non-NULL, fills it with the time that sending
+   will be OK assuming no pending probes are resolved by responses
+   (call it again if they do).  when will become now if it returns
+   true. */
+bool HostScanStats::sendOK(struct timeval *when) {
+  struct ultra_timing_vals tmng;
+  int packTime;
+  list<UltraProbe *>::iterator probeI;
+  struct timeval probe_to, earliest_to, sendTime;
+  long tdiff;
+
+  if (target->timedOut(&USI->now) || completed()) {
+    if (when) *when = USI->now;
+    return false;
+  }
+
+  if (rld.rld_waiting) {
+    packTime = TIMEVAL_MSEC_SUBTRACT(rld.rld_waittime, USI->now);
+    if (packTime <= 0) {
+      if (when) *when = USI->now;
+      return true;
+    }
+    if (when) *when = rld.rld_waittime;
+    return false;
+  }
+
+  if (sdn.delayms) {
+    packTime = TIMEVAL_MSEC_SUBTRACT(USI->now, lastprobe_sent);
+    if (packTime < (int) sdn.delayms) {
+      if (when) { TIMEVAL_MSEC_ADD(*when, lastprobe_sent, sdn.delayms); }
+      return false;
     }
   }
 
-  /* Collect IDENT info if requested */
-  if (newstate == PORT_OPEN && scantype == CONNECT_SCAN && tryident) {
-    if (getsockname(current->sd[trynum], (SA *) &mysock,
-		    &sockaddr_in_len )) {
-      pfatal("getsockname");
-    }
-    if (getidentinfoz(target->v4host(), ntohs(mysock.sin_port), current->portno, owner, sizeof(owner)) == -1)
-      tryident = 0;
+  getTiming(&tmng);
+  if (tmng.cwnd >= num_probes_active + .5 && 
+      (freshPortsLeft() || num_probes_waiting_retransmit)) {
+    if (when) *when = USI->now;
+    return true;
   }
 
-  /* Now we convert current->state to state by making whatever adjustments
-   are neccessary */
-  switch(current->state) {
-  case PORT_OPEN:
-    return; /* Whew!  That was easy! */
-    break;
-  case PORT_FRESH:
-    fprintf(stderr, "Fresh port %lu passed to posportupdate!\n", current->portno);
-    return;
-    break;
-  case PORT_CLOSED:
-    if (newstate == PORT_CLOSED)
-      return; /* Closed -> Closed is not important and can cause some 
-		 dup port problems */
-    ss->changed++;
-    current->state = newstate;
-    break;
-  case PORT_TESTING:
-    /* If the newstate is FIREWALLED, nothing really "changed" since the
-       default if there is no responses is to put the port into the firewalled
-       state.  OK, OK, I don't know if this justification completely holds 
-       water, but the shortcut of not updating change can save us a LOT of 
-       time in cases of infrequent host unreachable packets (for example).  
-       In that case, a few unreachables during each scan run causes the changed
-       flag to be set and we need to try again.  Eventually the systems notices
-       all the tries and starts increasing senddelay() and we are in even 
-       worse shape */
-    if (newstate != PORT_FIREWALLED)
-      ss->changed++;
-    if (scantype == SYN_SCAN)
-      ss->numqueries_outstanding--;
-    else {
-      for(i=0; i <= current->trynum; i++)
-	if (current->sd[i] > -1) {
-	  csi->socklookup[current->sd[i]] = NULL;
-	  FD_CLR(current->sd[i], &(csi->fds_read));
-	  FD_CLR(current->sd[i], &(csi->fds_write));
-	  FD_CLR(current->sd[i], &(csi->fds_except));
-	  if (current->sd[i] == csi->maxsd)
-	    csi->maxsd--;
-	  close(current->sd[i]);
-	  current->sd[i] = -1;
-	  ss->numqueries_outstanding--;
-	}
+  if (!when)
+    return false;
+
+  TIMEVAL_MSEC_ADD(earliest_to, USI->now, 10000);
+
+  // Any timeouts coming up?
+  for(probeI = probes_outstanding.begin(); probeI != probes_outstanding.end();
+      probeI++) {
+    if (!(*probeI)->timedout) {
+      TIMEVAL_MSEC_ADD(probe_to, (*probeI)->sent, probeTimeout() / 1000);
+      if (TIMEVAL_SUBTRACT(probe_to, earliest_to) < 0) {
+	earliest_to = probe_to;
+      }
     }
-    /* Now we delete the port from the testinglist */
-    if (current == pil->testinglist)
-      pil->testinglist = (current->next >= 0)? &scan[current->next] : NULL;
-    if (current->next >= 0)  scan[current->next].prev = current->prev;
-    if (current->prev >= 0)  scan[current->prev].next = current->next;
+  }
+
+  // Will any scan delay affect this?
+  if (sdn.delayms) {    
+    TIMEVAL_MSEC_ADD(sendTime, lastprobe_sent, sdn.delayms);
+    if (TIMEVAL_MSEC_SUBTRACT(sendTime, USI->now) < 0)
+      sendTime = USI->now;
+    tdiff = TIMEVAL_MSEC_SUBTRACT(earliest_to, sendTime);
+    
+    /* Timeouts previous to the sendTime requirement are pointless,
+       and those later than sendTime are not needed if we can send a
+       new packet at sendTime */
+    if (tdiff < 0) {
+      earliest_to = sendTime;
+    } else {
+      getTiming(&tmng);
+      if (tdiff > 0 && tmng.cwnd > num_probes_active + .5) {
+	earliest_to = sendTime;
+      }
+    }
+  }
+
+  *when = earliest_to;
+  return false;
+}
+
+/* If there are pending probe timeouts, fills in when with the time of
+   the earliest one and returns true.  Otherwise returns false and
+   puts now in when. */
+bool HostScanStats::nextTimeout(struct timeval *when) {
+  struct timeval probe_to, earliest_to;
+  list<UltraProbe *>::iterator probeI;
+  bool firstgood = true;
+
+  assert(when);
+  memset(&probe_to, 0, sizeof(probe_to));
+  memset(&earliest_to, 0, sizeof(earliest_to));
+
+  for(probeI = probes_outstanding.begin(); probeI != probes_outstanding.end();
+      probeI++) {
+    if (!(*probeI)->timedout) {
+      TIMEVAL_ADD(probe_to, (*probeI)->sent, probeTimeout());
+      if (firstgood || TIMEVAL_SUBTRACT(probe_to, earliest_to) < 0) {
+	earliest_to = probe_to;
+	firstgood = false;
+      }
+    }
+  }
+
+  *when = (firstgood)? USI->now : earliest_to;
+  return (firstgood)? false : true;
+}
+
+  /* gives the maximum try number (try numbers start at zero and
+     increments for each retransmission) that may be used, based on
+     the scan type, observed network reliability, timing mode, etc.
+     This may change during the scan based on network traffic.  If
+     capped is not null, it will be filled with true if the tryno is
+     at its upper limit.  That often calls for a warning to be issued,
+     and marking of remaining timedout ports firewalled or whatever is
+     appropriate.  If mayincrease is non-NULL, it is set to whether
+     the allowedTryno may increase again.  If it is false, any probes
+     which have reached the given limit may be dealth with. */
+unsigned int HostScanStats::allowedTryno(bool *capped, bool *mayincrease) {
+  list<UltraProbe *>::iterator probeI;
+  UltraProbe *probe = NULL;
+  bool allfinished = true;
+  unsigned int maxval = 0;
+
+  /* TODO: This should perhaps differ by scan type. */
+  maxval = MAX(1, max_successful_tryno + 1);
+  if (maxval > (unsigned int) USI->perf.tryno_cap) {
+    if (capped) *capped = true;
+    maxval = USI->perf.tryno_cap;
+    tryno_mayincrease = false; /* It never exceeds the cap */
+  } else if (capped) *capped = false;
+
+  /* Decide if the tryno can possibly increase.  */
+  if (tryno_mayincrease && num_probes_active == 0 && freshPortsLeft() == 0) {
+    /* If every outstanding probe is timedout and at maxval, then no further
+       retransmits are neccessary. */
+    for(probeI = probes_outstanding.begin(); 
+	probeI != probes_outstanding.end(); probeI++) {
+      probe = *probeI;
+      assert(probe->timedout);
+      if (!probe->retransmitted && !probe->isPing() && probe->tryno < maxval) {
+	/* Needs at least one more retransmit. */
+	allfinished = false;
+	break;
+      }
+    }
+    if (allfinished)
+      tryno_mayincrease = false;
+  }
+
+  if (mayincrease)
+    *mayincrease = tryno_mayincrease;
+  
+  return maxval;
+}
+
+
+UltraScanInfo::UltraScanInfo() {
+}
+
+UltraScanInfo::~UltraScanInfo() {
+  while(!incompleteHosts.empty()) {
+    delete incompleteHosts.front();
+    incompleteHosts.pop_front();
+  }
+  delete gstats;
+  delete SPM;
+  if (rawsd >= 0) { close(rawsd); rawsd = -1; }
+  if (pd) { pcap_close(pd); pd = NULL; }
+}
+
+ /* A circular buffer of the incompleteHosts.  nextIncompleteHost() gives
+     the next one.  The first time it is called, it will give the
+     first host in the list.  If incompleteHosts is empty, returns
+     NULL. */
+HostScanStats *UltraScanInfo::nextIncompleteHost() {
+  HostScanStats *nxt;
+
+  if (incompleteHosts.empty())
+    return NULL;
+
+  nxt = *nextI;
+  nextI++;
+  if (nextI == incompleteHosts.end())
+    nextI = incompleteHosts.begin();
+
+  return nxt;
+}
+
+/* This is the function for tuning the major values that affect
+   scan performance */
+static void init_perf_values(struct ultra_scan_performance_vars *perf) {
+  memset(perf, 0, sizeof(*perf));
+  /* TODO: I should revisit these values for tuning.  They should probably
+     at least be affected by -T. */
+  perf->low_cwnd = MAX(o.min_parallelism, 1);
+  perf->max_cwnd = o.max_parallelism? o.max_parallelism : 300;
+  perf->group_initial_cwnd = box(o.min_parallelism, perf->max_cwnd, 10);
+  perf->host_initial_cwnd = perf->group_initial_cwnd;
+  perf->quick_incr = 1;
+  perf->cc_incr = 1;
+  perf->initial_ccthresh = 50;
+  perf->ping_magnifier = 3;
+  perf->pingtime = 5000000;
+  perf->group_drop_cwnd_divisor = 2.0;
+  perf->group_drop_ccthresh_divisor = (o.timing_level < 4)? 2.0 : 1.5;
+  perf->host_drop_ccthresh_divisor = (o.timing_level < 4)? 2.0 : 1.5;
+  perf->tryno_cap = 12;
+}
+
+/* Order of initializations in this function CAN BE IMPORTANT, so be careful
+ mucking with it. */
+void UltraScanInfo::Init(vector<Target *> &Targets, struct scan_lists *pts, stype scantp) {
+  unsigned int targetno = 0;
+  HostScanStats *hss;
+  int num_timedout = 0;
+
+  gettimeofday(&now, NULL);
+  init_perf_values(&perf);
+
+  for(targetno = 0; targetno < Targets.size(); targetno++) {
+    if (!Targets[targetno]->timedOut(&now)) {
+      hss = new HostScanStats(Targets[targetno], this);
+      incompleteHosts.push_back(hss);
+    } else num_timedout++;
+  }
+  numInitialTargets = Targets.size();
+
+  ports = pts;
+
+  nextI = incompleteHosts.begin();
+
+
+  seqmask = get_random_u32();
+  scantype = scantp;
+  SPM = new ScanProgressMeter(scantype2str(scantype));
+  tcp_scan = udp_scan = icmp_scan = prot_scan = false;
+  switch(scantype) {
+  case ACK_SCAN:
+  case CONNECT_SCAN:
+  case FIN_SCAN:
+  case MAIMON_SCAN:
+  case NULL_SCAN:
+  case SYN_SCAN:
+  case WINDOW_SCAN:
+  case XMAS_SCAN:
+    tcp_scan = true;
     break;
-  case PORT_FIREWALLED:
-    if (newstate != PORT_FIREWALLED)
-      ss->changed++;
-    if (current == pil->firewalled)
-      pil->firewalled = (current->next >= 0)? &scan[current->next] : NULL;
-    if (current->next >= 0)  scan[current->next].prev = current->prev;
-    if (current->prev >= 0)  scan[current->prev].next = current->next;
+  case UDP_SCAN:
+    udp_scan = true;
+    break;
+  case IPPROT_SCAN:
+    prot_scan = true;
     break;
   default:
-    fatal("Unexpected port state: %d\n", current->state);
     break;
-  } 
-  current->state = newstate;
-  current->next = -1;
-  current->prev = -1;
-  target->ports.addPort(current->portno, IPPROTO_TCP, owner, newstate);
+    /* TODO: Worry about ping scanning if I do that */
+  }
+  gstats = new GroupScanStats(this); /* Peeks at several elements in USI - careful of order */
+  gstats->num_hosts_timedout += num_timedout;
+  pd = NULL;
+  if ((tcp_scan || udp_scan || prot_scan) && scantype != CONNECT_SCAN) {
+    /* Initialize a raw socket */
+    if ((rawsd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0 )
+      pfatal("socket troubles in UltraScanInfo::Init");
+    /* We do not wan't to unblock the socket since we want to wait 
+       if kernel send buffers fill up rather than get ENOBUF, and
+       we won't be receiving on the socket anyway 
+       unblock_socket(rawsd);*/
+    broadcast_socket(rawsd);
+#ifndef WIN32
+    sethdrinclude(rawsd); 
+#endif
+  } else rawsd = -1;
+
+}
+
+  /* Consults with the group stats, and the hstats for every
+     incomplete hosts to determine whether any probes may be sent.
+     Returns true if they can be sent immediately.  If when is
+     non-NULL, it is filled with the next possible time that probes
+     can be sent, assuming no probe responses are received (call it
+     again if they are).  when will be now, if the function returns
+     true */
+bool UltraScanInfo::sendOK(struct timeval *when) {
+  struct timeval lowhtime, tmptv;
+  list<HostScanStats *>::iterator host;
+  bool ggood = false;
+  bool hgood = false;
+  bool thisHostGood = false;
+  bool foundgood = false;
+  ggood = gstats->sendOK();
+
+  if (!ggood) {
+    if (when) {
+      TIMEVAL_MSEC_ADD(lowhtime, now, 1000); 
+      // Can't do anything until global is OK - means packet receipt
+      // or probe timeout.
+      for(host = incompleteHosts.begin(); host != incompleteHosts.end(); 
+	  host++) {
+	if ((*host)->nextTimeout(&tmptv)) {
+	  if (TIMEVAL_SUBTRACT(tmptv, lowhtime) < 0)
+	    lowhtime = tmptv;
+	}
+      }
+      *when = lowhtime;
+    }
+  } else {
+    for(host = incompleteHosts.begin(); host != incompleteHosts.end(); host++) {
+      thisHostGood = (*host)->sendOK(&tmptv);
+      if (ggood && thisHostGood) {
+	lowhtime = tmptv;
+	hgood = true;
+	foundgood = true;
+	break;
+      }
+      
+      if (!foundgood || TIMEVAL_SUBTRACT(lowhtime, tmptv) > 0) {
+	lowhtime = tmptv;
+	foundgood = true;
+      }
+    }
+    
+    assert(foundgood);
+  }
+  
+  if (TIMEVAL_MSEC_SUBTRACT(lowhtime, now) < 0)
+    lowhtime = now;
+
+  if (when) *when = lowhtime;
+
+  return (TIMEVAL_MSEC_SUBTRACT(lowhtime, now) == 0)? true : false;
+}
+
+/* Find a HostScanStats by IP its address in the incomplete list.  Returns NULL if
+ none are found. */
+HostScanStats *UltraScanInfo::findIncompleteHost(struct sockaddr_storage *ss) {
+  list<HostScanStats *>::iterator hss;
+  struct sockaddr_in *sin = (struct sockaddr_in *) ss;
+
+  if (sin->sin_family != AF_INET)
+    fatal("UltraScanInfo::findIncompleteHost passed a non IPv4 address");
+
+  for(hss = incompleteHosts.begin(); hss != incompleteHosts.end(); hss++) {
+    if ((*hss)->target->v4hostip()->s_addr == sin->sin_addr.s_addr)
+      return *hss;
+  }
+  return NULL;
+}
+
+  /* Removes any hosts that have completed their scans from the incompleteHosts
+     list.  Returns the number of hosts removed. */
+int UltraScanInfo::removeCompletedHosts() {
+  list<HostScanStats *>::iterator hostI, nxt;
+  HostScanStats *hss = NULL;
+  int hostsRemoved = 0;
+  bool timedout = false;
+  for(hostI = incompleteHosts.begin(); hostI != incompleteHosts.end();
+      hostI = nxt) {
+    nxt = hostI;
+    nxt++;
+    hss = *hostI;
+    timedout = hss->target->timedOut(&now);
+    if (hss->completed() || timedout) {
+      /* A host to remove!  First adjust nextI appropriately */
+      if (nextI == hostI && incompleteHosts.size() > 1) {
+	nextI++;
+	if (nextI == incompleteHosts.end())
+	  nextI = incompleteHosts.begin();
+      }
+      if (o.verbose) {
+	int remain = incompleteHosts.size() - 1;
+	if (remain && !timedout)
+	  log_write(LOG_STDOUT, "Completed %s against %s in %.2fs (%d %s)\n",
+		    scantype2str(scantype), hss->target->targetipstr(), 
+		    TIMEVAL_MSEC_SUBTRACT(now, SPM->begin) / 1000.0, remain, 
+		    (remain == 1)? "host left" : "hosts left");
+	else if (timedout)
+	  log_write(LOG_STDOUT, "%s timed out during %s (%d %s)\n",
+		    hss->target->targetipstr(), scantype2str(scantype), remain,
+		    (remain == 1)? "host left" : "hosts left");
+      }
+      incompleteHosts.erase(hostI);
+      hostsRemoved++;
+      if (timedout) gstats->num_hosts_timedout++;
+      hss->target->stopTimeOutClock(&now);
+      delete hss;
+    }
+  }
+  return hostsRemoved;
+}
+
+/* Determines an ideal number of hosts to be scanned (port scan, os
+   scan, version detection, etc.) in parallel after the ping scan is
+   completed.  This is a balance between efficiency (more hosts in
+   parallel often reduces scan time per host) and results latency (you
+   need to wait for all hosts to finish before Nmap can spit out the
+   results).  Memory consumption usually also increases with the
+   number of hosts scanned in parallel, though rarely to significant
+   levels. */
+int determineScanGroupSize(int hosts_scanned_so_far, 
+			   struct scan_lists *ports) {
+  int groupsize = 10;
+
+  if (o.UDPScan())
+    groupsize = 50;
+  else if (o.TCPScan()) {
+    groupsize = MAX(500 / ports->tcp_count, 20);
+    if (ports->tcp_count > 1000 && hosts_scanned_so_far == 0 && 
+	o.timing_level < 4)
+      groupsize = 5; // Give quick results for the very first batch
+  }
+
+  groupsize = box(o.minHostGroupSz(), o.maxHostGroupSz(), groupsize);
+
+  return groupsize;
+}
+
+/* Initialize the ultra_timing_vals structure timing.  The utt must be
+   TIMING_HOST or TIMING_GROUP.  If you happen to have the current
+   time handy, pass it as now, otherwise pass NULL */
+static void init_ultra_timing_vals(ultra_timing_vals *timing, 
+				   enum ultra_timing_type utt, 
+				   int num_hosts_in_group, 
+				   struct ultra_scan_performance_vars *perf,
+				   struct timeval *now) {
+  timing->cwnd = (utt == TIMING_HOST)? perf->host_initial_cwnd : perf->group_initial_cwnd;
+  timing->ccthresh = perf->initial_ccthresh; /* Will be reduced if any packets are dropped anyway */
+  timing->num_updates = 0;
+  if (now)
+    timing->last_drop = *now;
+  else gettimeofday(&timing->last_drop, NULL);
+}
+
+
+/* Returns the next target port to try for a host.  If there are no more 
+   remaining, returns -1. */
+static int get_next_target_port(UltraScanInfo *USI, HostScanStats *hss) {
+  if (USI->tcp_scan) {
+    if (hss->next_portidx >= USI->ports->tcp_count)
+      return -1;
+    return USI->ports->tcp_ports[hss->next_portidx++];
+  } else if (USI->udp_scan) {
+    if (hss->next_portidx >= USI->ports->udp_count)
+      return -1;
+    return USI->ports->udp_ports[hss->next_portidx++];
+  } else if (USI->prot_scan) {
+    if (hss->next_portidx >= USI->ports->prot_count)
+      return -1;
+    return USI->ports->prots[hss->next_portidx++];
+  }
+  assert(0); /* TODO: need to handle other protocols */
+  return -1;
+}
+
+/* Returns the number of ports remaining to probe */
+int HostScanStats::freshPortsLeft() {
+  if (USI->tcp_scan) {
+    if (next_portidx >= USI->ports->tcp_count)
+      return 0;
+    return USI->ports->tcp_count - next_portidx;
+  } else if (USI->udp_scan) {
+    if (next_portidx >= USI->ports->udp_count)
+      return 0;
+    return USI->ports->udp_count - next_portidx;
+  } else if (USI->prot_scan) {
+    if (next_portidx >= USI->ports->prot_count)
+      return 0;
+    return USI->ports->prot_count - next_portidx;
+  }
+  assert(0);
+  return 0;
+}
+
+  /* Removes a probe from probes_outstanding, adjusts HSS and USS
+     active probe stats accordingly, then deletes the probe. */
+void HostScanStats::destroyOutstandingProbe(list<UltraProbe *>::iterator probeI) {
+  struct UltraProbe *probe = *probeI;
+  assert(!probes_outstanding.empty());
+  if (!probe->timedout) {
+    assert(num_probes_active > 0);
+    num_probes_active--;
+    assert(USI->gstats->num_probes_active > 0);
+    USI->gstats->num_probes_active--;
+  }
+
+  if (!probe->isPing() && probe->timedout && !probe->retransmitted) {
+    assert(num_probes_waiting_retransmit > 0);
+    num_probes_waiting_retransmit--;
+  }
+
+    /* Remove it from scan watch lists, if it exists on them. */
+  if (probe->type == UltraProbe::UP_CONNECT && probe->CP->sd > 0)
+    USI->gstats->CSI->clearSD(probe->CP->sd);
+
+  probes_outstanding.erase(probeI);
+  delete probe;
+}
+
+ /* Mark an outstanding probe as timedout.  Adjusts stats
+     accordingly.  For connect scans, this closes the socket. */
+void HostScanStats::markProbeTimedout(list<UltraProbe *>::iterator probeI) {
+  UltraProbe *probe = *probeI;
+  assert(!probe->timedout);
+  assert(!probe->retransmitted);
+  probe->timedout = true;
+  assert(num_probes_active > 0);
+  num_probes_active--;
+  assert(USI->gstats->num_probes_active > 0);
+  USI->gstats->num_probes_active--;
+  if (probe->isPing()) {
+    ultrascan_adjust_times(USI, this, probe, NULL);
+    /* I'll leave it in the queue in case some response ever does
+       come */
+  } else num_probes_waiting_retransmit++;
+
+  if (probe->type == UltraProbe::UP_CONNECT && probe->CP->sd >= 0 ) {
+    /* Free the socket as that is a valuable resource, though it is a shame
+       late responses will not be permitted */
+    USI->gstats->CSI->clearSD(probe->CP->sd);
+    close(probe->CP->sd);
+    probe->CP->sd = -1;
+  }
+}
+
+bool HostScanStats::completed() {
+  return num_probes_active == 0 && num_probes_waiting_retransmit == 0 && 
+    probe_bench.empty() && freshPortsLeft() == 0;
+}
+
+/* Encode the trynum into a 32-bit value.  A simple checksum is also included
+   to verify whether a received version is correct. */
+static u32 seq32_encode(UltraScanInfo *USI, unsigned int trynum, 
+			unsigned int pingseq) {
+  u32 seq = 0;
+  u16 nfo;
+
+  /* We'll let pingseq and trynum each be 8 bits */
+  nfo = (pingseq << 8) + trynum;
+  seq = (nfo << 16) + nfo; /* Mirror the data to ensure it is reconstructed correctly */
+  /* Obfuscate it a little */
+  seq = seq ^ USI->seqmask;
+  return seq;
+}
+
+/* This function provides the proper cwnd and ccthresh to use.  It may
+   differ from versions in timing member var because when no responses
+   have been received for this host, may look at others in the group.
+   For CHANGING this host's timing, use the timing memberval
+   instead. */
+void HostScanStats::getTiming(struct ultra_timing_vals *tmng) {
+  assert(tmng);
+
+  /* Use the per-host value if a pingport has been found or very few probes
+     have been sent */
+  if (pingport != -1 || numprobes_sent < 80) {
+    *tmng = timing;
+    return;
+  }
+
+  /* Otherwise, use the global cwnd stats if it has sufficient responses */
+  if (USI->gstats->timing.num_updates > 1) {
+    *tmng = USI->gstats->timing;
+    return;
+  }
+
+  /* Last resort is to use canned values */
+  tmng->cwnd = USI->perf.host_initial_cwnd;
+  tmng->ccthresh = USI->perf.initial_ccthresh;
+  tmng->num_updates = 0;
   return;
 }
 
-/* Grab results from a connect() scan (eg check all the non-blocking
-   outstanding connect requests for completion.  */
-static int get_connect_results(Target *target, 
-			       struct portinfo *scan, 
-			       struct scanstats *ss, struct portinfolist *pil, 
-			       int *portlookup, u32 *sequences, 
-			       struct connectsockinfo *csi) {
+  /* Boost the scan delay for this host, usually because too many packet
+     drops were detected. */
+void HostScanStats::boostScanDelay() {
+  if (sdn.delayms == 0)
+    sdn.delayms = (USI->udp_scan)? 50 : 5; // In many cases, a pcap wait takes a minimum of 80ms, so this matters little :(
+  else sdn.delayms = MIN(sdn.delayms * 2, 1000);
+  sdn.last_boost = USI->now;
+  sdn.droppedRespSinceDelayChanged = 0;
+  sdn.goodRespSinceDelayChanged = 0;
+}
+
+/* Clears the bench -- returning all of its members to probes_outstanding */
+void HostScanStats::clearBench() {
+  if (probe_bench.empty()) return;
+  num_probes_waiting_retransmit += probe_bench.size();
+  probes_outstanding.splice(probes_outstanding.begin(), probe_bench);
+  bench_tryno = 0;
+}
+
+ /* Moves the given probe from the probes_outstanding list, to
+     probe_bench, and decrements num_probes_waiting_retransmit
+     accordingly */
+void HostScanStats::moveProbeToBench(list<UltraProbe *>::iterator probeI) {
+  bench_tryno = (*probeI)->tryno;
+  probe_bench.push_back(*probeI);
+  probes_outstanding.erase(probeI);
+  num_probes_waiting_retransmit--;
+}
+
+/* Undoes seq32_encode.  Returns true if the checksum is correct and
+   thus trynum was decoded properly.  In that case, trynum (if not
+   null) is filled with the decoded value.  If pingseq is not null, it
+   is filled with the scanping sequence number, which is 0 if this is
+   not a ping. */
+
+static bool seq32_decode(UltraScanInfo *USI, u32 seq, unsigned int *trynum,
+			 unsigned int *pingseq) {
+  if (trynum) *trynum = 0;
+  if (pingseq) *pingseq = 0;
+
+  /* Undo the mask xor */
+  seq = seq ^ USI->seqmask;
+  /* Check that both sides are the same */
+  if ((seq >> 16) != (seq & 0xFFFF))
+    return false;
+
+  if (trynum) 
+    *trynum = seq & 0xFF;
+
+  if (pingseq)
+    *pingseq = (seq & 0xFF00) >> 8;
+
+  return true;
+}
+
+/* Sometimes the trynumber and/or pingseq are stored in a source
+   portnumber of probes instead.  This takes a port number in HOST
+   BYTE ORDER.  Returns true if the numbers seem reasonable, false if
+   they are bogus. */
+bool sport_decode(UltraScanInfo *USI, u16 portno, unsigned int *trynum, 
+		  unsigned int *pingseq) {
+  int tryval;
+  tryval = portno - o.magic_port;
+  if (tryval <= USI->perf.tryno_cap) {
+    if (pingseq) *pingseq = 0;
+    if (trynum) *trynum = tryval;
+  } else {
+    if (pingseq) *pingseq = tryval - USI->perf.tryno_cap;
+    if (trynum) *trynum = 0;
+  }
+  if (tryval > USI->perf.tryno_cap + 256)
+    return false;
+  return true;
+}
+
+/* Adjust various timing variables based on pcket receipt.  Pass
+   rcvdtime = NULL if you have given up on a probe and want to count
+   this as a DROPPED PACKET */
+void ultrascan_adjust_times(UltraScanInfo *USI, HostScanStats *hss, 
+		       UltraProbe *probe, struct timeval *rcvdtime) {
+
+  int ping_magnifier = (probe->isPing())? USI->perf.ping_magnifier : 1;
+
+  /* Adjust timing */
+  if (rcvdtime) {
+    adjust_timeouts2(&(probe->sent), rcvdtime, &(hss->target->to));
+    adjust_timeouts2(&(probe->sent), rcvdtime, &(USI->gstats->to));
+  
+    hss->lastrcvd = *rcvdtime;
+  }
+
+  hss->timing.num_updates++;
+  USI->gstats->timing.num_updates++;
+
+  /* Adjust window */
+  if (probe->tryno > 0 || !rcvdtime) {
+    /* A previous probe must have been lost ... */
+    if (o.debugging > 1)
+      printf("Ultrascan DROPPED %sprobe packet to %s:%hi detected\n", probe->isPing()? "PING " : "", hss->target->targetipstr(), probe->portno());
+    // Drops often come in big batches, but we only want one decrease per batch.
+    if (TIMEVAL_SUBTRACT(probe->sent, hss->timing.last_drop) > 0) {
+      hss->timing.cwnd = USI->perf.low_cwnd;
+      hss->timing.ccthresh = (int) MAX(hss->num_probes_active / USI->perf.host_drop_ccthresh_divisor, 2);
+      hss->timing.last_drop = USI->now;
+    }
+    if (TIMEVAL_SUBTRACT(probe->sent, USI->gstats->timing.last_drop) > 0) {
+      USI->gstats->timing.cwnd = MAX(USI->perf.low_cwnd, USI->gstats->timing.cwnd / USI->perf.group_drop_cwnd_divisor);
+      USI->gstats->timing.ccthresh = (int) MAX(USI->gstats->num_probes_active / USI->perf.group_drop_ccthresh_divisor, 2);
+      USI->gstats->timing.last_drop = USI->now;
+    }
+  } else {
+    /* Good news -- got a response to first try.  Increase window as 
+       appropriate.  */
+    if (hss->timing.cwnd <= hss->timing.ccthresh) {
+      /* In quick start mode */
+      hss->timing.cwnd += ping_magnifier * USI->perf.quick_incr;
+    } else {
+      /* Congestion control mode */
+      hss->timing.cwnd += ping_magnifier * USI->perf.cc_incr / hss->timing.cwnd;
+    }
+    if (hss->timing.cwnd > USI->perf.max_cwnd)
+      hss->timing.cwnd = USI->perf.max_cwnd;
+
+    if (USI->gstats->timing.cwnd <= USI->gstats->timing.ccthresh) {
+      /* In quick start mode */
+      USI->gstats->timing.cwnd += ping_magnifier * USI->perf.quick_incr;
+    } else {
+      /* Congestion control mode */
+      USI->gstats->timing.cwnd += ping_magnifier * USI->perf.cc_incr / USI->gstats->timing.cwnd;
+    }
+    if (USI->gstats->timing.cwnd > USI->perf.max_cwnd)
+      USI->gstats->timing.cwnd = USI->perf.max_cwnd;
+  }
+
+  /* If packet drops are particularly bad, enforce a delay between
+     packet sends (useful for cases such as UDP scan where responses
+     are frequently rate limited by dest machines or firewalls) */
+
+  /* First we decide whether this packet counts as a drop for send
+     delay calculation purposes.  This statement means if (a ping since last boost failed, or the previous packet was both sent after the last boost and dropped) */
+  if ((!rcvdtime && TIMEVAL_SUBTRACT(probe->sent, hss->sdn.last_boost) > 0) ||
+      (probe->tryno > 0 && TIMEVAL_SUBTRACT(probe->prevSent, hss->sdn.last_boost) > 0)) {
+    hss->sdn.droppedRespSinceDelayChanged++;
+    //    printf("SDELAY: increasing drops to %d (good: %d; tryno: %d, sent: %.4fs; prevSent: %.4fs, last_boost: %.4fs\n", hss->sdn.droppedRespSinceDelayChanged, hss->sdn.goodRespSinceDelayChanged, probe->tryno, o.TimeSinceStartMS(&probe->sent) / 1000.0, o.TimeSinceStartMS(&probe->prevSent) / 1000.0, o.TimeSinceStartMS(&hss->sdn.last_boost) / 1000.0);
+  } else if (rcvdtime) {
+    hss->sdn.goodRespSinceDelayChanged++;
+    //    printf("SDELAY: increasing good to %d (bad: %d)\n", hss->sdn.goodRespSinceDelayChanged, hss->sdn.droppedRespSinceDelayChanged);
+  }
+
+  /* Now change the send delay if neccessary */
+  unsigned int oldgood = hss->sdn.goodRespSinceDelayChanged;
+  unsigned int oldbad = hss->sdn.droppedRespSinceDelayChanged;
+  double threshold = (o.timing_level >= 4)? 0.40 : 0.30;
+  if (oldbad > 10 && (oldbad / ((double) oldbad + oldgood) > threshold)) {
+    unsigned int olddelay = hss->sdn.delayms;
+    hss->boostScanDelay();
+    if (o.verbose && hss->sdn.delayms != olddelay)
+      printf("Increasing send delay for %s from %d to %d due to %d out of %d dropped probes since last increase.\n", 
+	     hss->target->targetipstr(), olddelay, hss->sdn.delayms, oldbad, 
+	     oldbad + oldgood);
+  }
+}
+
+/* Called when a ping response is discovered. */
+static void ultrascan_ping_update(UltraScanInfo *USI, HostScanStats *hss, 
+				  list<UltraProbe *>::iterator probeI,
+				  struct timeval *rcvdtime) {
+  ultrascan_adjust_times(USI, hss, *probeI, rcvdtime);
+  hss->destroyOutstandingProbe(probeI);
+}
+
+/* This function is called when a new status is determined for a port.
+   the port in the probeI of host hss is now in newstate.  This function
+   needs to update timing information, other stats, and the Nmap port
+   state table as appropriate.  If rcvdtime is NULL, packet stats are
+   not updated. */
+static void ultrascan_port_update(UltraScanInfo *USI, HostScanStats *hss, 
+				  list<UltraProbe *>::iterator probeI,
+				  int newstate, struct timeval *rcvdtime) {
+  Port *currentp;
+  UltraProbe *probe;
+  u16 portno;
+  u8 proto = 0;
+  int oldstate = PORT_TESTING;
+  bool swappingport = false;
+  bool remove_probe = false; /* Whether to remove probe from outstanding list */
+  /* Whether no response means a port is open */
+  bool noresp_open_scan = USI->scantype == FIN_SCAN || 
+    USI->scantype == XMAS_SCAN || USI->scantype == MAIMON_SCAN || 
+    USI->scantype == NULL_SCAN || USI->scantype == UDP_SCAN || 
+    USI->scantype == IPPROT_SCAN;
+
+  probe = *probeI;
+
+  if (rcvdtime) ultrascan_adjust_times(USI, hss, probe, rcvdtime);
+
+  if (probe->type == UltraProbe::UP_IP) {
+    if (USI->prot_scan)
+      proto = IPPROTO_IP;
+    else proto = probe->IP->ipv4->ip_p;
+  } else if (probe->type == UltraProbe::UP_CONNECT) {
+    proto = IPPROTO_TCP;
+  } else assert(0); /* TODO: any other scan types */
+
+  if (USI->scantype == IPPROT_SCAN)
+    portno = probe->IP->ipv4->ip_p;
+  else portno = probe->portno();
+
+  /* First figure out the current state */
+  currentp = hss->target->ports.lookupPort(portno, proto);
+  if (!currentp) {
+    oldstate = PORT_TESTING;
+    hss->ports_finished++;
+  }
+  else oldstate = currentp->state;
+
+  /*    printf("TCP port %hi has changed from state %s to %s!\n", portno, statenum2str(oldstate), statenum2str(newstate)); */
+  switch(oldstate) {
+    /* TODO: I need more code here to determine when a state should
+       be overridden, for example PORT_OPEN trumps PORT_FIREWALLED
+       in a SYN scan, but not neccessarily for UDP scan */
+  case PORT_TESTING:
+    /* Brand new port -- add it to the list */
+    hss->target->ports.addPort(portno, proto, NULL, newstate);
+    remove_probe = true;
+    break;
+  case PORT_OPEN:
+    if (newstate != PORT_OPEN) {
+      if (noresp_open_scan) {
+	hss->target->ports.addPort(portno, proto, NULL, newstate);
+      } /* Otherwise The old open takes precendence */
+    }
+    remove_probe = true;
+    break;
+  case PORT_CLOSED:
+    if (newstate != PORT_CLOSED) {
+      if (!noresp_open_scan && newstate != PORT_FILTERED)
+	hss->target->ports.addPort(portno, proto, NULL, newstate);
+    }
+    remove_probe = true;
+    break;
+  case PORT_FILTERED:
+    if (newstate != PORT_FILTERED) {
+      if (!noresp_open_scan || newstate != PORT_OPEN)
+	hss->target->ports.addPort(portno, proto, NULL, newstate);
+    }
+    remove_probe = true;
+    break;
+  case PORT_OPENFILTERED:
+    if (newstate != PORT_OPENFILTERED) {
+      hss->target->ports.addPort(portno, proto, NULL, newstate);
+    }
+    remove_probe = true;
+    break;
+  default:
+    fatal("Unexpected port state: %d\n", oldstate);
+    break;
+  }
+
+  /* Consider changing the ping port */
+  if (hss->pingportstate != newstate) {
+    /* TODO: UDP scan and such will have different preferences -- add them */
+    if (noresp_open_scan) {
+      if (newstate == PORT_CLOSED || (hss->pingportstate == PORT_UNKNOWN && newstate == PORT_FILTERED))
+	swappingport = true;
+    } else {
+      if (hss->pingportstate == PORT_UNKNOWN && 
+	  (newstate == PORT_OPEN || newstate == PORT_CLOSED || newstate == PORT_UNFILTERED))
+	swappingport = true;
+      else if (hss->pingportstate == PORT_OPEN && (newstate == PORT_CLOSED || newstate == PORT_UNFILTERED))
+	swappingport = true;
+    }
+
+    if (swappingport) {
+      hss->pingport = portno;
+      hss->pingportstate = newstate;
+    }
+  }
+
+  /* The rcvdtime check is because this func is called that way when
+     we give up on a probe because of too many retransmissions. */
+  if (oldstate != newstate && probe->tryno > hss->max_successful_tryno
+      && rcvdtime) {
+    hss->max_successful_tryno = probe->tryno;
+    if (o.debugging)
+      log_write(LOG_STDOUT, "Increased max_successful_tryno for %s to %d (packet drop)\n", hss->target->targetipstr(), hss->max_successful_tryno);
+    if (hss->max_successful_tryno > ((o.timing_level >= 4)? 4 : 3)) {
+      unsigned int olddelay = hss->sdn.delayms;
+      hss->boostScanDelay();
+      if (o.verbose && hss->sdn.delayms != olddelay) 
+	log_write(LOG_STDOUT, "Increasing send delay for %s from %d to %d due to max_successful_tryno increase to %d\n", 
+		  hss->target->targetipstr(), olddelay, hss->sdn.delayms, 
+		  hss->max_successful_tryno);
+    }
+  }
+
+  if (remove_probe) {
+    hss->destroyOutstandingProbe(probeI);
+  }
+}
+
+
+
+
+/* If this is NOT a ping probe, set pingseq to 0.  Otherwise it will be the
+   ping sequence number (they start at 1).  The probe sent is returned. */
+static UltraProbe *sendConnectScanProbe(UltraScanInfo *USI, HostScanStats *hss,
+					u16 destport, u8 tryno, u8 pingseq) {
+
+  UltraProbe *probe = new UltraProbe();
+  list<UltraProbe *>::iterator probeI;
+  static bool connecterror = false;
+  u16 sport;
+  int rc;
+  int connect_errno = 0;
+  struct sockaddr_storage sock;
+  struct sockaddr_in *sin = (struct sockaddr_in *) &sock;
+#if HAVE_IPV6
+  struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) &sock;
+#endif
+  size_t socklen;
+  ConnectProbe *CP;
+
+  if (pingseq > 0) {
+    if (tryno > 0) assert(0); /* tryno + pingseq not currently supported */
+    sport = o.magic_port_set? o.magic_port : o.magic_port + USI->perf.tryno_cap + pingseq;
+  } else {
+    /* Tunnel tryno instead of pingseq in the src port */
+    sport = o.magic_port_set? o.magic_port : o.magic_port + tryno;
+  }
+
+  probe->tryno = tryno;
+  probe->pingseq = pingseq;
+  /* First build the probe */
+  probe->setConnect(destport);
+  CP = probe->CP;
+  /* Initiate the connection */
+  CP->sd = socket(o.af(), SOCK_STREAM, IPPROTO_TCP);
+  if (CP->sd == 1) pfatal("Socket creation in sendConnectScanProbe");
+  unblock_socket(CP->sd);
+  init_socket(CP->sd);
+  if (hss->target->TargetSockAddr(&sock, &socklen) != 0) {
+    fatal("Failed to get target socket address in pos_scan");
+  }
+  if (sin->sin_family == AF_INET)
+    sin->sin_port = htons(probe->portno());
+#if HAVE_IPV6
+  else sin6->sin6_port = htons(probe->portno());
+#endif
+  hss->lastprobe_sent = probe->sent = USI->now;
+  rc = connect(CP->sd, (struct sockaddr *)&sock, socklen);
+  gettimeofday(&USI->now, NULL);
+  if (rc == -1) connect_errno = socket_errno();
+  PacketTrace::traceConnect(IPPROTO_TCP, (sockaddr *) &sock, socklen, rc, 
+			    connect_errno, &USI->now);
+  /* This counts as probe being sent, so update structures */
+  hss->probes_outstanding.push_back(probe);
+  probeI = hss->probes_outstanding.end();
+  probeI--;
+  USI->gstats->num_probes_active++;
+  hss->num_probes_active++;
+
+  /* It would be convenient if the connect() call would never succeed
+     or permanantly fail here, so related code cood all be localized
+     elsewhere.  But the reality is that connect() MAY be finished now. */
+
+  if (rc != -1) {
+    /* Connection succeeded! */
+    if (probe->isPing()) 
+      ultrascan_ping_update(USI, hss, probeI, &USI->now);
+    else 
+      ultrascan_port_update(USI, hss, probeI, PORT_OPEN, &USI->now);
+    probe = NULL;
+  } else {
+    switch(connect_errno) {
+    case EINPROGRESS:
+    case EAGAIN:
+      USI->gstats->CSI->watchSD(CP->sd);
+      break;
+    default:
+      if (!connecterror) {	
+	connecterror = true;
+	fprintf(stderr, "Strange error from connect (%d):", connect_errno);
+	fflush(stdout);
+	perror(""); /*falling through intentionally*/
+      }
+    case ECONNREFUSED:
+      if (probe->isPing())
+	ultrascan_ping_update(USI, hss, probeI, &USI->now);
+      else 
+	ultrascan_port_update(USI, hss, probeI, PORT_CLOSED, &USI->now);
+      break;
+    }
+  }
+  gettimeofday(&USI->now, NULL);
+  return probe;
+}
+
+
+/* If this is NOT a ping probe, set pingseq to 0.  Otherwise it will be the
+   ping sequence number (they start at 1).  The probe sent is returned. */
+static UltraProbe *sendIPScanProbe(UltraScanInfo *USI, HostScanStats *hss, 
+			    u16 destport, u8 tryno, u8 pingseq) {
+  u8 *packet = NULL;
+  u32 packetlen = 0;
+  UltraProbe *probe = new UltraProbe();
+  int scanflags = 0;
+  int decoy = 0;
+  u32 seq = 0;
+  u16 sport;
+  u16 ipid = get_random_u16();
+
+  if (pingseq > 0) {
+    if (tryno > 0) assert(0); /* tryno + pingseq not currently supported */
+    sport = o.magic_port_set? o.magic_port : o.magic_port + USI->perf.tryno_cap + pingseq;
+  } else {
+    /* Tunnel tryno instead of pingseq in the src port */
+    sport = o.magic_port_set? o.magic_port : o.magic_port + tryno;
+  }
+
+  probe->tryno = tryno;
+  probe->pingseq = pingseq;
+  /* First build the probe */
+  if (USI->tcp_scan) {
+    assert(USI->scantype != CONNECT_SCAN);
+
+    if (o.scanflags != -1) scanflags = o.scanflags;
+    else {
+      switch(USI->scantype) {
+      case SYN_SCAN: scanflags = TH_SYN; break;
+      case ACK_SCAN: scanflags = TH_ACK; break;
+      case XMAS_SCAN: scanflags = TH_FIN|TH_URG|TH_PUSH; break;
+      case NULL_SCAN: scanflags = 0; break;
+      case FIN_SCAN: scanflags = TH_FIN; break;
+      case MAIMON_SCAN: scanflags = TH_FIN|TH_ACK; break;
+      case WINDOW_SCAN: scanflags = TH_ACK; break;
+      default:
+	break;
+      }
+    }
+
+    seq = seq32_encode(USI, tryno, pingseq);
+    for(decoy = 0; decoy < o.numdecoys; decoy++) {
+      packet = build_tcp_raw(&o.decoys[decoy], hss->target->v4hostip(), o.ttl, 
+			     ipid, sport, destport, seq, 0, scanflags, 0, NULL,
+			     0, o.extra_payload, o.extra_payload_length, 
+			     &packetlen);
+      if (decoy == o.decoyturn) {
+	probe->setIP(packet, packetlen);
+	hss->lastprobe_sent = probe->sent = USI->now;
+      }
+      send_ip_packet(USI->rawsd, packet, packetlen);
+      free(packet);
+    }
+  } else if (USI->udp_scan) {
+    for(decoy = 0; decoy < o.numdecoys; decoy++) {
+      packet = build_udp_raw(&o.decoys[decoy], hss->target->v4hostip(), o.ttl, 
+			     sport, destport, ipid, 
+			     o.extra_payload, o.extra_payload_length, 
+			     &packetlen);
+      if (decoy == o.decoyturn) {
+	probe->setIP(packet, packetlen);
+	hss->lastprobe_sent = probe->sent = USI->now;
+      }
+      send_ip_packet(USI->rawsd, packet, packetlen);
+      free(packet);
+    }
+  } else if (USI->prot_scan) {
+    for(decoy = 0; decoy < o.numdecoys; decoy++) {
+      packet = build_ip_raw(&o.decoys[decoy], hss->target->v4hostip(), o.ttl, 
+			     destport, ipid, 
+			     o.extra_payload, o.extra_payload_length, 
+			     &packetlen);
+      if (decoy == o.decoyturn) {
+	probe->setIP(packet, packetlen);
+	hss->lastprobe_sent = probe->sent = USI->now;
+      }
+      send_ip_packet(USI->rawsd, packet, packetlen);
+      free(packet);
+    }
+
+  } else assert(0); /* TODO:  Maybe RPC scan and the like */
+  /* Now that the probe has been sent, add it to the Queue for this host */
+  hss->probes_outstanding.push_back(probe);
+  USI->gstats->num_probes_active++;
+  hss->num_probes_active++;
+
+  gettimeofday(&USI->now, NULL);
+  return probe;
+}
+
+
+static void sendNextScanProbe(UltraScanInfo *USI, HostScanStats *hss) {
+  u16 destport;
+
+  destport = get_next_target_port(USI, hss);
+  hss->numprobes_sent++;
+  USI->gstats->probes_sent++;
+  if (USI->scantype == CONNECT_SCAN)
+    sendConnectScanProbe(USI, hss, destport, 0, 0);
+  else
+    sendIPScanProbe(USI, hss, destport, 0, 0);
+
+}
+
+static void doAnyNewProbes(UltraScanInfo *USI) {
+  HostScanStats *hss;
+  unsigned int unableToSend = 0; /* # of times in a row that hosts were unable to send probe */
+
+  gettimeofday(&USI->now, NULL);
+
+  /* Go through each incomplete target and send a probe if appropriate */
+  while (unableToSend < USI->numIncompleteHosts() && USI->gstats->sendOK()) {
+    hss = USI->nextIncompleteHost();
+    if (!hss) break;
+    if (hss->freshPortsLeft() && hss->sendOK(NULL)) {
+      sendNextScanProbe(USI, hss);
+      unableToSend = 0;
+    } else {
+      unableToSend++;
+    }
+  }
+}
+
+/* Sends a ping probe to the host.  Assumes that caller has already
+   checked that sending is OK w/congestion control and that pingport is
+   available */
+void sendPingProbe(UltraScanInfo *USI, HostScanStats *hss) {
+  if (o.debugging > 1)
+    printf("Ultrascan PING SENT to %s:%hi\n", hss->target->targetipstr(), hss->pingport);
+  if (USI->scantype == CONNECT_SCAN) {
+    sendConnectScanProbe(USI, hss, hss->pingport, 0, hss->nextPingSeq(true));
+  } else if (USI->scantype == RPC_SCAN) {
+    assert(0); /* TODO: fill out */
+  } else {
+    sendIPScanProbe(USI, hss, hss->pingport, 0, hss->nextPingSeq(true));
+  }
+  hss->numpings_sent++;
+  USI->gstats->probes_sent++;
+}
+
+
+
+static void doAnyPings(UltraScanInfo *USI) {
+  list<HostScanStats *>::iterator hostI;
+  HostScanStats *hss = NULL;
+
+  gettimeofday(&USI->now, NULL);
+  for(hostI = USI->incompleteHosts.begin(); 
+      hostI != USI->incompleteHosts.end(); hostI++) {
+    hss = *hostI;
+    if (hss->pingport >= 0 && hss->rld.rld_waiting == false && 
+	TIMEVAL_SUBTRACT(USI->now, hss->lastrcvd) > USI->perf.pingtime && 
+	TIMEVAL_SUBTRACT(USI->now, hss->lastping_sent) > USI->perf.pingtime &&
+	USI->gstats->sendOK() && hss->sendOK(NULL)) {
+      sendPingProbe(USI, hss);
+      hss->lastping_sent = USI->now;
+    }    
+  }
+}
+
+/* Retransmit one probe that has presumably been timed out.  Only does
+   retransmission, does not mark the probe timed out and such. */
+static void retransmitProbe(UltraScanInfo *USI, HostScanStats *hss, 
+			    UltraProbe *probe) {
+  UltraProbe *newProbe = NULL;
+  if (probe->type == UltraProbe::UP_IP) {
+    if (USI->prot_scan)
+      newProbe = sendIPScanProbe(USI, hss, probe->IP->ipv4->ip_p, 
+				 probe->tryno + 1, 0);
+    else if (probe->IP->ipv4->ip_p == IPPROTO_TCP) {
+      newProbe = sendIPScanProbe(USI, hss, probe->portno(), probe->tryno + 1, 
+				 0);
+    } else {
+      assert(probe->IP->ipv4->ip_p == IPPROTO_UDP);
+      newProbe = sendIPScanProbe(USI, hss, probe->portno(), probe->tryno + 1,
+				 0);
+    }
+  } else if (probe->type == UltraProbe::UP_CONNECT) {
+    newProbe = sendConnectScanProbe(USI, hss, probe->portno(), probe->tryno + 1, 0);
+  } else assert(0); /* TODO: Support any other probe types */
+  if (newProbe)
+    newProbe->prevSent = probe->sent;
+  probe->retransmitted = true;
+  assert(hss->num_probes_waiting_retransmit > 0);
+  hss->num_probes_waiting_retransmit--;
+  hss->numprobes_sent++;
+  USI->gstats->probes_sent++;
+}
+
+  /* Go through the ProbeQueue of each host, identify any
+     timed out probes, then try to retransmit them as appropriate */
+static void doAnyRetransmits(UltraScanInfo *USI) {
+  list<HostScanStats *>::iterator hostI;
+  list<UltraProbe *>::iterator probeI;
+  HostScanStats *host = NULL;
+  UltraProbe *probe = NULL;
+  int retrans = 0; /* Number of retransmissions during a loop */
+  unsigned int maxtries;
+
+  gettimeofday(&USI->now, NULL);
+
+  /* Retransmit as permitted by congestion control and tryno limits */
+  while(USI->gstats->sendOK()) {
+    retrans = 0;
+    for(hostI = USI->incompleteHosts.begin(); 
+	hostI != USI->incompleteHosts.end(); hostI++) {
+      host = *hostI;
+      if ((host->num_probes_active > 0 || 
+	   host->num_probes_waiting_retransmit > 0) && host->sendOK(NULL)) {
+	/* Doing the probe list backwards gives a decent efficiency
+	   boost.  Probe retransmissions may be reordered from the
+	   original transmissions, but mixing things up like that can
+	   be beneficial */
+	probeI = host->probes_outstanding.end();
+	maxtries = host->allowedTryno(NULL, NULL);
+	do {
+	  probeI--;
+	  probe = *probeI;
+	  if (probe->timedout && !probe->retransmitted && 
+	      maxtries > probe->tryno && !probe->isPing()) {
+	    /* For rate limit detection, we delay the first time a new tryno
+	       is seen, as long as we are scanning at least 2 ports */
+	    if (probe->tryno + 1 > host->rld.max_tryno_sent && 
+		USI->gstats->numports > 1) {
+	      host->rld.max_tryno_sent = probe->tryno + 1;
+	      host->rld.rld_waiting = true;
+	      TIMEVAL_MSEC_ADD(host->rld.rld_waittime, USI->now, 1000);
+	    } else {
+	      host->rld.rld_waiting = false;
+	      retransmitProbe(USI, host, probe);
+	      retrans++;
+	    }
+	    break; /* I only do one probe per host for now to spread load */
+	  } 
+	} while (probeI != host->probes_outstanding.begin());
+      }
+    }
+    if (retrans == 0) break; /* Went through all hosts -- nothing to send */
+  }
+}
+
+/* Print occasional remaining time estimates, as well as
+   debugging information */
+static void printAnyStats(UltraScanInfo *USI) {
+
+  list<HostScanStats *>::iterator hostI;
+  HostScanStats *hss;
+  struct ultra_timing_vals hosttm;
+
+  /* Print debugging states for each host being scanned */
+  if (o.debugging > 2) {
+    printf("**TIMING STATS**: IP, probes active/freshportsleft/outstanding/retranwait/onbench, cwnd/ccthresh/delay, timeout/srtt/rttvar/\n");
+    printf("   Groupstats (%d/%d incomplete): %d/*/*/*/* %.2f/%d/* %d/%d/%d\n",
+	   USI->numIncompleteHosts(), USI->numInitialHosts(), 
+	   USI->gstats->num_probes_active, USI->gstats->timing.cwnd,
+	   USI->gstats->timing.ccthresh, USI->gstats->to.timeout, 
+	   USI->gstats->to.srtt, USI->gstats->to.rttvar);
+
+    for(hostI = USI->incompleteHosts.begin(); 
+	hostI != USI->incompleteHosts.end(); hostI++) {
+      hss = *hostI;
+      hss->getTiming(&hosttm);
+      printf("   %s: %d/%d/%d/%d/%d %.2f/%d/%d %li/%d/%d\n", hss->target->targetipstr(),
+	     hss->num_probes_active, hss->freshPortsLeft(), 
+	     hss->num_probes_outstanding(), 
+	     hss->num_probes_waiting_retransmit, hss->probe_bench.size(),
+	     hosttm.cwnd, hosttm.ccthresh, hss->sdn.delayms, 
+	     hss->probeTimeout(), hss->target->to.srtt, 
+	     hss->target->to.rttvar);
+    }
+  }
+
+  /* Now time to figure out how close we are to completion ... */
+  if (USI->SPM->mayBePrinted(&USI->now)) {
+    list<HostScanStats *>::iterator hostI;
+    HostScanStats *host = NULL;
+    int maxtries;
+    double thishostpercdone;
+    double avgdone = USI->gstats->numtargets - USI->numIncompleteHosts();
+    /* next for the partially finished hosts */
+    for(hostI = USI->incompleteHosts.begin(); 
+        hostI != USI->incompleteHosts.end(); hostI++) {
+      host = *hostI;
+      maxtries = host->allowedTryno(NULL, NULL) + 1;
+      // This is inexact (maxtries - 1) because of numprobes_sent includes
+      // at least one try of ports_finished.
+      thishostpercdone = host->ports_finished * (maxtries -1) + host->numprobes_sent;
+      thishostpercdone /= maxtries * USI->gstats->numports;
+      if (thishostpercdone >= .9999) thishostpercdone = .9999;
+      avgdone += thishostpercdone;
+    }
+    avgdone /= USI->gstats->numtargets;
+    USI->SPM->printStatsIfNeccessary(avgdone, &USI->now);
+    //    printf("The scan is %.2f%% done!\n", avgdone * 100);
+  }
+}
+
+/* Does a select() call and handles all of the results.  Even if stime
+   is now, it tries a very quick select() just in case.  Returns true
+   if at least one good result (generally a port state change) is
+   found, false if it times out instead */
+static bool do_one_select_round(UltraScanInfo *USI, struct timeval *stime) {
   fd_set fds_rtmp, fds_wtmp, fds_xtmp;
   int selectres;
-  int selectedfound;
+  struct timeval timeout;
+  int timeleft;
+  ConnectScanInfo *CSI = USI->gstats->CSI;
+  int sd;
+  list<HostScanStats *>::iterator hostI;
+  HostScanStats *host;
+  list<UltraProbe *>::iterator probeI, nextProbeI;
+  UltraProbe *probe = NULL;
+  unsigned int listsz;
+  unsigned int probenum;
+  int newstate = PORT_UNKNOWN;
   int optval;
   recvfrom6_t optlen = sizeof(int);
-  struct timeval timeout;
-  int i, sd;
-  int trynum;
-  char buf[2048];
-  struct portinfo *current = NULL;
-  struct timeval tv;
-  int res;
+  char buf[128];
+  int numGoodSD = 0;
 #ifdef LINUX
+  int res;
   struct sockaddr_storage sin,sout;
   struct sockaddr_in *s_in;
   struct sockaddr_in6 *s_in6;
@@ -274,967 +2003,740 @@ static int get_connect_results(Target *target,
   recvfrom6_t soutlen = sizeof(sout);
 #endif
 
-  res = 0;  /* to prevent compiler warning */
   do {
-    fds_rtmp = csi->fds_read;
-    fds_wtmp = csi->fds_write;
-    fds_xtmp = csi->fds_except;
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 20000;
-    selectedfound = 0;
+    timeleft = TIMEVAL_MSEC_SUBTRACT(*stime, USI->now);
+    if (timeleft < 0) timeleft = 0;
+    fds_rtmp = USI->gstats->CSI->fds_read;
+    fds_wtmp = USI->gstats->CSI->fds_write;
+    fds_xtmp = USI->gstats->CSI->fds_except;
+    timeout.tv_sec = timeleft / 1000;
+    timeout.tv_usec = (timeleft % 1000) * 1000;
 
-    /* Insure there is no timeout ... */
-    if (o.host_timeout) {	
-      gettimeofday(&tv, NULL);
-      if (TIMEVAL_MSEC_SUBTRACT(tv, target->host_timeout) >= 0) {
-	target->timedout = 1;
-	return 0;
-      }
+    if (CSI->numSDs)
+      selectres = select(CSI->maxValidSD + 1, &fds_rtmp, &fds_wtmp, 
+			 &fds_xtmp, &timeout);
+    else {
+      /* Apparently Windows returns an WSAEINVAL if you select without watching any SDs.  Lame.  We'll usleep instead in that case */
+      usleep(timeleft * 1000);
+      selectres = 0;
     }
+  } while (selectres == -1 && socket_errno() == EINTR);
 
-    selectres = select(csi->maxsd+1, &fds_rtmp, &fds_wtmp, &fds_xtmp, &timeout);
-    for(sd=0; selectedfound < selectres && sd <= csi->maxsd; sd++) {
-      current = csi->socklookup[sd];
-      if (!current) continue;
-      trynum = -1;
-      if  (FD_ISSET(sd, &fds_rtmp)  || FD_ISSET(sd, &fds_wtmp) || 
-	   FD_ISSET(sd, &fds_xtmp)) {
-	/*      current = csi->socklookup[i];*/
-	for(i=0; i < 3; i++)
-	  if (current->sd[i] == sd) {	
-	    trynum = i;
-	    break;
-	  }
-
-	if (o.debugging > 1 && current != NULL)
-	  log_write(LOG_STDOUT, "portnumber %lu (try %d) selected for", current->portno, trynum);
-	if (FD_ISSET(sd, &fds_rtmp)) {
-	  if (o.debugging > 1) log_write(LOG_STDOUT, " READ");
-	  selectedfound++;
-	}
-	if (FD_ISSET(sd, &fds_wtmp)) {
-	  if (o.debugging > 1) log_write(LOG_STDOUT, " WRITE");
-	  selectedfound++;
-	}
-	if (FD_ISSET(sd, &fds_xtmp)) {
-	  if (o.debugging > 1) log_write(LOG_STDOUT, " EXCEPT");
-	  selectedfound++;
-	}
-	if (o.debugging > 1 && current != NULL)
-	  log_write(LOG_STDOUT, "\n");
-
-	assert(trynum != -1);
-
-	if (getsockopt(sd, SOL_SOCKET, SO_ERROR, (char *) &optval, &optlen) != 0)
+  gettimeofday(&USI->now, NULL);
+  
+  if (selectres == -1)
+    pfatal("select failed in do_one_select_round()");
+  
+  if (!selectres)
+    return false;
+  
+  /* Yay!  Got at least one response back -- loop through outstanding probes
+     and find the relevant ones */
+  for(hostI = USI->incompleteHosts.begin(); 
+      hostI != USI->incompleteHosts.end() && numGoodSD < selectres; hostI++) {
+    host = *hostI;
+    if (host->num_probes_active == 0) continue;
+    
+    nextProbeI = probeI = host->probes_outstanding.end();
+    listsz = host->num_probes_outstanding();
+    if (listsz) nextProbeI--;
+    for(probenum = 0; probenum < listsz && numGoodSD < selectres; probenum++) {
+      probeI = nextProbeI;
+      if (probeI != host->probes_outstanding.begin()) 
+	nextProbeI--;
+      probe = *probeI;
+      assert(probe->type == UltraProbe::UP_CONNECT);
+      sd = probe->CP->sd;
+	/* Let see if anything has happened! */
+      if (sd >= 0 && (FD_ISSET(sd, &fds_rtmp)  || FD_ISSET(sd, &fds_wtmp) || 
+		      FD_ISSET(sd, &fds_xtmp))) {
+	numGoodSD++;
+	newstate = PORT_UNKNOWN;
+	if (getsockopt(sd, SOL_SOCKET, SO_ERROR, (char *) &optval, 
+		       &optlen) != 0)
 	  optval = socket_errno(); /* Stupid Solaris ... */
-
 	switch(optval) {
 	case 0:
 #ifdef LINUX
 	  if (!FD_ISSET(sd, &fds_rtmp)) {
 	    /* Linux goofiness -- We need to actually test that it is writeable */
-	    res = send(current->sd[trynum], "", 0, 0);
-
+	    res = send(sd, "", 0, 0);
+	    
 	    if (res < 0 ) {
 	      if (o.debugging > 1) {
-		log_write(LOG_STDOUT, "Bad port %lu caught by 0-byte write: ", current->portno);
+		log_write(LOG_STDOUT, "Bad port %hi caught by 0-byte write: ", probe->portno());
 		perror("");
 	      }
-	      posportupdate(target, current, NULL, trynum, scan, ss, CONNECT_SCAN, PORT_CLOSED, pil, csi);
+	      newstate = PORT_CLOSED;
 	    } else {
 	      if (getpeername(sd, (struct sockaddr *) &sin, &sinlen) < 0) {
-		pfatal("error in getpeername of connect_results for port %hu", (u16) current->portno);
+		pfatal("error in getpeername of connect_results for port %hu", (u16) probe->portno());
 	      } else {
 		s_in = (struct sockaddr_in *) &sin;
 		s_in6 = (struct sockaddr_in6 *) &sin;
 		if ((o.af() == AF_INET &&
-		    current->portno != ntohs(s_in->sin_port))
+		     probe->portno() != ntohs(s_in->sin_port))
 #ifdef HAVE_IPV6
-		    || (o.af() == AF_INET6 && current->portno != ntohs(s_in6->sin6_port))
+		    || (o.af() == AF_INET6 && probe->portno() != ntohs(s_in6->sin6_port))
 #endif
-) {
-		  error("Mismatch!!!! we think we have port %hu but we really have a different one", (u16) current->portno);
+		    ) {
+		  error("Mismatch!!!! we think we have port %hu but we really have a different one", (u16) probe->portno());
 		}
 	      }
-
+	      
 	      if (getsockname(sd, (struct sockaddr *) &sout, &soutlen) < 0) {
-		pfatal("error in getsockname for port %hu", (u16) current->portno);
-	      }
+		pfatal("error in getsockname for port %hu", (u16) probe->portno());
+		}
 	      s_in = (struct sockaddr_in *) &sout;
 	      s_in6 = (struct sockaddr_in6 *) &sout;
-	      if ((o.af() == AF_INET && htons(s_in->sin_port) == current->portno) 
+	      if ((o.af() == AF_INET && htons(s_in->sin_port) == probe->portno()) 
 #ifdef HAVE_IPV6
-|| (o.af() == AF_INET6 && htons(s_in6->sin6_port) == current->portno)
+		  || (o.af() == AF_INET6 && htons(s_in6->sin6_port) == probe->portno())
 #endif
-) {
+		  ) {
 		/* Linux 2.2 bug can lead to bogus successful connect()ions
 		   in this case -- we treat the port as bogus even though it
 		   is POSSIBLE that this is a real connection */
-		posportupdate(target, current, NULL, trynum, scan, ss, CONNECT_SCAN, PORT_CLOSED, pil, csi);
+		newstate = PORT_CLOSED;
 	      } else {
-		posportupdate(target, current, NULL, trynum, scan, ss, CONNECT_SCAN, PORT_OPEN, pil, csi);
+		newstate = PORT_OPEN;
 	      }
 	    }
 	  } else {
-	    posportupdate(target, current, NULL, trynum, scan, ss, CONNECT_SCAN, PORT_OPEN, pil, csi);
+	    newstate = PORT_OPEN;
 	  }
 #else
-	  posportupdate(target, current, NULL, trynum, scan, ss, CONNECT_SCAN, PORT_OPEN, pil, csi);
+	  newstate = PORT_OPEN;
 #endif
 	  break;
 	case EACCES:
 	  /* Apparently this can be caused by dest unreachable admin
 	     prohibited messages sent back, at least from IPv6
 	     hosts */
-	  posportupdate(target, current, NULL, trynum, scan, ss, CONNECT_SCAN, PORT_FIREWALLED, pil, csi);
-       break;
-
-	case ECONNREFUSED:
-	  posportupdate(target, current, NULL, trynum, scan, ss, CONNECT_SCAN, PORT_CLOSED, pil, csi);
+	  newstate = PORT_FILTERED;
 	  break;
-	case EHOSTUNREACH:
+	case ECONNREFUSED:
+	  newstate = PORT_CLOSED;
+	  break;
+	  case EHOSTUNREACH:
 	case ETIMEDOUT:
 	case EHOSTDOWN:
 	  /* It could be the host is down, or it could be firewalled.  We
 	     will go on the safe side & assume port is closed ... on second
 	     thought, lets go firewalled! and see if it causes any trouble */
-	  posportupdate(target, current, NULL, trynum, scan, ss, CONNECT_SCAN, PORT_FIREWALLED, pil, csi);
+	  newstate = PORT_FILTERED;
 	  break;
 	case ENETDOWN:
 	case ENETUNREACH:
 	case ENETRESET:
 	case ECONNABORTED:
-	  snprintf(buf, sizeof(buf), "Strange SO_ERROR from connection to %s (%d) -- bailing scan", target->targetipstr(), optval);
-	  perror(buf);
-	  return -1;
+	  snprintf(buf, sizeof(buf), "Strange SO_ERROR from connection to %s (%d) -- bailing scan", host->target->targetipstr(), optval);
+	  pfatal(buf);
 	  break;
 	default:
-	  snprintf(buf, sizeof(buf), "Strange read error from %s (%d)", target->targetipstr(), optval);
+	  snprintf(buf, sizeof(buf), "Strange read error from %s (%d)", host->target->targetipstr(), optval);
 	  perror(buf);
 	  break;
 	}
-      } else continue;
+	
+	if (newstate != PORT_UNKNOWN) {
+	  if (probe->isPing())
+	    ultrascan_ping_update(USI, host, probeI, &USI->now);
+	  else
+	    ultrascan_port_update(USI, host, probeI, newstate, &USI->now);
+	}
+      }
     }
-  } while(ss->numqueries_outstanding > 0 && selectres > 0);
-
-  return 0;
+  }
+  return numGoodSD;
 }
 
-/* Grab results for a SYN scan.  We assume the SYNs have already been sent,
-   and we sniff for SYN|ACK or RST packets */
-static void get_syn_results(Target *target, struct portinfo *scan,
-		     struct scanstats *ss, struct portinfolist *pil, 
-		     int *portlookup, pcap_t *pd, u32 *sequences, 
-		     stype scantype) {
+/* ICMP error messages generally return the IP header they were sent
+   with.  That provides the opportunity to look at the IPID to
+   determine which probe the packet matches up with.  Unfortunately,
+   this doesn't always work.  Some systems screw up the IPID in the
+   process of sending, and remote systems can screw it up as well.
+   This function is a "soft" match, that returns true if hey really do
+   match, or if matching seems to be broken for one reason or
+   another.  You can send in HBO or NBO, just as
+   long as the two values are in the same byte order. */
+bool allow_ipid_match(u16 ipid_sent, u16 ipid_rcvd) {
+  static int numvalid = 0;
+  static int numbogus = 0;
 
-  struct ip *ip;
-  unsigned int bytes;
-  struct tcphdr *tcp;
-  int trynum;
-  int newstate = -1;
-  int i;
-  int newport;
-  struct portinfo *current = NULL;
-  struct icmp *icmp;
-  struct ip *ip2;
-  u16 *data;
-  struct timeval start, rcvdtime;
-  int quit = 0;
+  /* TODO: I should check if this applies to more recent Solaris releases */
+  /* These systems seem to hose sent IPID */
+#if defined(SOLARIS) || defined(SUNOS) || defined(IRIX)
+  return true;
+#endif
+
+  if (ipid_sent == ipid_rcvd) {
+    numvalid++;
+    return true;
+  } else numbogus++;
+
+  if (numbogus >= 2 && numvalid == 0)
+    return true; /* Test does not seem to be working */
+
+  /* This test is because sometimes a valid will come by luck */
+  if (numbogus / (numbogus + numvalid) > .8)
+    return true;
+
+  return false;
+
+}
+
+/* Tries to get one *good* (finishes a probe) pcap response by the
+   (absolute) time given in stime.  Even if stime is now, try an
+   ultra-quick pcap read just in case.  Returns true if a "good" result
+   was found, false if it timed out instead. */
+static bool get_pcap_result(UltraScanInfo *USI, struct timeval *stime) {
+  bool goodone = false;
+  bool timedout = false;
+  struct timeval rcvdtime;
+  struct ip *ip = NULL, *ip2 = NULL;
+  struct tcphdr *tcp = NULL;
+  struct icmp *icmp = NULL;
+  udphdr_bsd *udp = NULL;
   struct link_header linkhdr;
+  unsigned int bytes;
+  long to_usec;
+  HostScanStats *hss = NULL;
+  struct sockaddr_in sin;
+  list<UltraProbe *>::iterator probeI;
+  UltraProbe *probe = NULL;
+  IPProbe *ipp;
+  unsigned int trynum = 0;
+  unsigned int pingseq = 0;
+  bool goodseq;
+  int newstate = PORT_UNKNOWN;
+  unsigned int probenum;
+  unsigned int listsz;
+  unsigned int requiredbytes;
 
-  gettimeofday(&start, NULL);
-
-  while (!quit && ss->numqueries_outstanding > 0 && 
-	 ( ip = (struct ip*) readip_pcap(pd, &bytes, target->to.timeout, &rcvdtime, &linkhdr))) {
-    if (bytes < (4 * ip->ip_hl) + 4U)
+  gettimeofday(&USI->now, NULL);
+  
+  do {
+    to_usec = TIMEVAL_SUBTRACT(*stime, USI->now);
+    if (to_usec < 2000) to_usec = 2000;
+    ip = (struct ip *) readip_pcap(USI->pd, &bytes, to_usec, &rcvdtime, &linkhdr);
+    gettimeofday(&USI->now, NULL);
+    if (!ip && TIMEVAL_SUBTRACT(*stime, USI->now) < 0) {
+      timedout = true;
+      break;
+    } else if (!ip)
       continue;
-    current = NULL;
-    trynum = newport = -1;
-    newstate = PORT_UNKNOWN;
-
-    /* Insure there is no timeout ... */
-    if (o.host_timeout) {	
-      if (TIMEVAL_MSEC_SUBTRACT(rcvdtime, target->host_timeout) >= 0) {
-	target->timedout = 1;
-	return;
-      }
+    if (TIMEVAL_SUBTRACT(USI->now, *stime) > 200000) {
+      /* While packets are still being received, I'll be generous and give
+	 an extra 1/5 sec.  But we have to draw the line somewhere */
+      timedout = true;
     }
 
-    /* If this takes at least 1.5 secs and is more than the targets
-       timeout, lets get out of here.  Otherwise stray network packets
-       could cause us trouble. */
-    if ( TIMEVAL_SUBTRACT(rcvdtime, start) > MAX(target->to.timeout, 1500)) {
-      /* Lets quit after we process this packet */
-      quit = 1;
-    }
-
-    setTargetMACIfAvailable(target, &linkhdr, ip, 0);
-
-    if (ip->ip_src.s_addr == target->v4host().s_addr && 
-	ip->ip_p == IPPROTO_TCP) {
-      tcp = (struct tcphdr *) (((char *) ip) + 4 * ip->ip_hl);
-      i = ntohs(tcp->th_dport);
-      if (i < o.magic_port || i > o.magic_port + 15) {
-	if (o.debugging > 1)
-	  error("SYN scan got TCP packet to port %d (magic port is %d) ... ignoring", i, o.magic_port);
+    /* OK, we got a packet.  Let's make sure it is well-formed */
+    if (bytes < 28)
+      continue;
+    if (ip->ip_v != 4)
+      continue;
+      if (ip->ip_hl < 5)
 	continue;
-      }
-      newport = ntohs(tcp->th_sport);
-      /* In case we are scanning localhost and see outgoing packets */
-      /* If only one of SYN, ACK flags are set, we skip it */
-      if (ip->ip_src.s_addr == target->v4source().s_addr && ((tcp->th_flags == TH_ACK) || (tcp->th_flags == TH_SYN))) {
+    if (ip->ip_p == IPPROTO_TCP) {
+      if ((unsigned) ip->ip_hl * 4 + 20 > bytes)
 	continue;
-      }
-      if (portlookup[newport] < 0 || scan[portlookup[newport]].state == PORT_FRESH) {
-	if (o.debugging) {
-	  log_write(LOG_STDOUT, "Strange packet from port %d:\n", ntohs(tcp->th_sport));
-	  readtcppacket((unsigned char *)ip, bytes);
-	}
-	current = NULL;
-	continue;
-      }	      
+      tcp = (struct tcphdr *) ((u8 *) ip + ip->ip_hl * 4);
+      /* Now ensure this host is even in the incomplete list */
+      memset(&sin, 0, sizeof(sin));
+      sin.sin_addr.s_addr = ip->ip_src.s_addr;
+      sin.sin_family = AF_INET;
+      hss = USI->findIncompleteHost((struct sockaddr_storage *) &sin);
+      if (!hss) continue; // Not from a host that interests us
+      setTargetMACIfAvailable(hss->target, &linkhdr, ip, 0);
+      probeI = hss->probes_outstanding.end();
+      listsz = hss->num_probes_outstanding();
+      goodone = false;
 
-      current = &scan[portlookup[newport]];
-      for(i=0; i < 3; i++) {
-	if (MOD_DIFF(sequences[i],ntohl(tcp->th_ack)) < 5)
-	  break;
-      }
-      if (i < 3) trynum = i;
-      else {
-	if (o.debugging) 
-	  log_write(LOG_STDOUT, "Strange ACK number from target: %lX\n", (unsigned long) ntohl(tcp->th_ack));
-	trynum = (current->trynum == 0)? 0 : -1;	    
-      }
-      if (current->trynum < trynum) {
-	if (o.debugging) 	    
-	  error("Received SYN packet implying trynum %d from port %hu even though that port is only on trynum %d (could be from an earlier round)", trynum, newport, current->trynum);
-	trynum = -1;
-      }
-      if (scantype == SYN_SCAN) {
-	if (tcp->th_flags & TH_RST) {
-	  newstate = PORT_CLOSED;
-	} else if ((tcp->th_flags & (TH_SYN|TH_ACK)) == (TH_SYN|TH_ACK)) {
-	  newstate = PORT_OPEN;
-	} else {
-	  if (o.debugging)
-	    error("Received response to SYN scan with unexpected tcp flags: %d\n", tcp->th_flags);
+      for(probenum = 0; probenum < listsz && !goodone; probenum++) {
+	probeI--;
+	probe = *probeI;
+	ipp = probe->IP;
+	goodseq = false; 
+	newstate = PORT_UNKNOWN;
+
+	if (ipp->af != AF_INET || !ipp->tcp)
 	  continue;
+
+	/* Ensure the connection info matches.  No ntohs()-style
+	   conversion necc. b/c all in net bo */
+	if (ipp->tcp->th_dport != tcp->th_sport ||
+	    ipp->tcp->th_sport != tcp->th_dport ||
+	    ipp->ipv4->ip_src.s_addr != ip->ip_dst.s_addr)
+	  continue;
+	
+	if (!o.magic_port_set) {
+	  sport_decode(USI, ntohs(tcp->th_dport), &trynum, &pingseq);
+	  goodseq = true;
+	} else {
+	  /* Let us now try to get the try number from the ACK.  Try
+	     ack-1 because some probes include SYN or FIN packet and
+	     thus call for increment */
+	  goodseq = seq32_decode(USI, ntohl(tcp->th_ack) - 1, &trynum, &pingseq);
+	  if (!goodseq)
+	    goodseq = seq32_decode(USI, ntohl(tcp->th_ack), &trynum, &pingseq);
 	}
-      }
-      else if (scantype == WINDOW_SCAN) {
-	if (tcp->th_flags & TH_RST) {
-	  if (tcp->th_win) {
-	    newstate = PORT_OPEN;
+
+	if (goodseq && pingseq == 0 && trynum < probe->tryno)
+	  continue; /* It must be from a different (previous) probe */
+	else if (goodseq && pingseq > 0 && pingseq != probe->pingseq)
+	  continue; /* Wrong ping probe, apparently */
+	else if (!goodseq) {
+	  /* TODO: I need to do some testing and find out how often this
+	     happens and whether other techniques such as the response seq should
+	     be used in those cases where it happens.  Then I should make this just
+   	     a debugging > X statement. */
+	  if (o.debugging)
+	    printf("Bad Sequence number from host %s.\n", inet_ntoa(ip->ip_src));
+	  /* I'll just assume it is a response to this (most recent) probe. */
+	  if (probe->isPing()) {
+	    pingseq = probe->pingseq;
+	    trynum = 0;
 	  } else {
-	    newstate = PORT_CLOSED;
+	    trynum = probe->tryno;
+	    pingseq = 0;
 	  }
-	} else {
-	  if (o.debugging)
-	    error("Received response to WINDOW scan with unexpected tcp flags: %d\n", tcp->th_flags);
-	  continue;
 	}
-      }
-      else if (scantype == ACK_SCAN) {
-	if (tcp->th_flags & TH_RST) {	  
-	  newstate = PORT_UNFIREWALLED;
+
+	if (probe->isPing()) {
+	  goodone = true;
 	} else {
-	  if (o.debugging)
-	    error("Received response to ACK scan with unexpected tcp flags: %d\n", tcp->th_flags);
-	  continue;
+	  /* Now that response has been matched to a probe, I interpret it */
+	  if (USI->scantype == SYN_SCAN && tcp->th_flags == (TH_SYN|TH_ACK)) {
+	    /* Yeah!  An open port */
+	    newstate = PORT_OPEN;
+	  } else if (tcp->th_flags & TH_RST) {
+	    if (USI->scantype == WINDOW_SCAN ) {
+	      newstate = (tcp->th_win)? PORT_OPEN : PORT_CLOSED;
+	    } else if (USI->scantype == ACK_SCAN) {
+	      newstate = PORT_UNFILTERED;
+	    } else newstate = PORT_CLOSED;
+	  } else {
+	    if (o.debugging)
+	      error("Received scan response with unexpected TCP flags: %d\n", tcp->th_flags);
+	    break;
+	  }
+	  goodone = true;
 	}
-      } else {
-	fatal("Unknown scan type!#$!@#$ passed to get_syn_results!  Please notify fyodor@insecure.org");
       }
     } else if (ip->ip_p == IPPROTO_ICMP) {
-      icmp = (struct icmp *) ((char *)ip + 4 * ip->ip_hl);
-      ip2 = (struct ip *) (((char *) ip) + 4 * ip->ip_hl + 8);
-      if (bytes <= 4 * ip->ip_hl + 28U ||
-	  bytes <= /* IP1len */ 4 * ip->ip_hl + /*ICMPlen */ 8 + 
-	  /* IP2len */ 4 * ip2->ip_hl + 4U /* TCP ports */)
-	{
-	  if (o.debugging) {
-	    error("Icmp message too short (%d bytes)", bytes);
-	  }
-	  continue;
-	}
 
-      /* Lets ensure this packet relates to a packet to the host
-	 we are scanning ... */
-      if (ip2->ip_dst.s_addr != target->v4host().s_addr) {
-	if (o.debugging > 1)
-	  error("Got an ICMP message which does not relate to a packet sent to the host being scanned");
+      if ((unsigned) ip->ip_hl * 4 + 28 > bytes)
+	continue;
+
+      icmp = (struct icmp *) ((char *)ip + 4 * ip->ip_hl);
+
+      if (icmp->icmp_type != 3)
+	continue;
+
+      ip2 = (struct ip *) (((char *) ip) + 4 * ip->ip_hl + 8);
+      requiredbytes = /* IPlen*/ 4 * ip->ip_hl + 
+                      /* ICMPLen */ 8 + 
+                      /* IP2 Len */ 4 * ip2->ip_hl;
+      if (USI->tcp_scan || USI->udp_scan)
+	bytes += 8; /* UDP hdr, or TCP hdr up to seq # */
+      /* prot scan has no headers coming back, so we don't reserve the 
+	 8 xtra bytes */
+      if (bytes < requiredbytes) {
+	if (o.debugging) 
+	  error("Received short ICMP packet (%d bytes)\n", bytes);
 	continue;
       }
+      
+      /* Make sure the protocol is right */
+      if (USI->tcp_scan && ip2->ip_p != IPPROTO_TCP)
+	continue;
 
-      data = (u16 *) ((char *)ip2 + 4 * ip2->ip_hl);
-      /*	    log_write(LOG_STDOUT, "Caught ICMP packet:\n");
-		    hdump(icmp, ntohs(ip->ip_len) - sizeof(struct ip)); */
-      if (icmp->icmp_type == 3) {
-	if (icmp->icmp_code != 0 && icmp->icmp_code != 1 && 
-	    icmp->icmp_code != 2 && 
-	    icmp->icmp_code != 3 && icmp->icmp_code != 13 &&
-	    icmp->icmp_code != 9 && icmp->icmp_code != 10) {
-	  error("Unexpected ICMP type/code 3/%d unreachable packet:", icmp->icmp_code);
-	  hdump((unsigned char *)icmp, ntohs(ip->ip_len) - sizeof(struct ip));
+      if (USI->udp_scan && ip2->ip_p != IPPROTO_UDP)
+	continue;
+
+      /* ensure this packet relates to a packet to the host
+	 we are scanning ... */
+      memset(&sin, 0, sizeof(sin));
+      sin.sin_addr.s_addr = ip2->ip_dst.s_addr;
+      sin.sin_family = AF_INET;
+      hss = USI->findIncompleteHost((struct sockaddr_storage *) &sin);
+      if (!hss) continue; // Not from a host that interests us
+      probeI = hss->probes_outstanding.end();
+      listsz = hss->num_probes_outstanding();
+      goodone = false;
+      /* Find the matching probe */
+      for(probenum = 0; probenum < listsz && !goodone; probenum++) {
+	probeI--;
+	probe = *probeI;
+	ipp = probe->IP;
+	assert(ipp->af == AF_INET);
+	if (ipp->ipv4->ip_p != ip2->ip_p || 
+	    ipp->ipv4->ip_src.s_addr != ip2->ip_src.s_addr || 
+	    ipp->ipv4->ip_dst.s_addr != ip2->ip_dst.s_addr)
 	  continue;
+
+	/* Checking IPID is a little more complex because you can't always count on it */
+	if (!allow_ipid_match(ipp->ipv4->ip_id, ip2->ip_id))
+	  continue;
+
+	if (ip2->ip_p == IPPROTO_TCP && !USI->prot_scan) {
+	  tcp = (struct tcphdr *) ((u8 *) ip2 + ip2->ip_hl * 4);
+	  if (tcp->th_sport != ipp->tcp->th_sport || 
+	      tcp->th_dport != ipp->tcp->th_dport || 
+	      tcp->th_seq != ipp->tcp->th_seq)
+	    continue;
+	} else if (ip2->ip_p == IPPROTO_UDP && !USI->prot_scan) {
+	  /* TOOD: IPID verification */
+	  udp = (udphdr_bsd *) ((u8 *) ip2 + ip->ip_hl * 4);
+	  if (udp->uh_sport != ipp->udp->uh_sport || 
+	      udp->uh_dport != ipp->udp->uh_dport)
+	    continue;
+	} else if (USI->prot_scan) {
+	  /* Nothing to do ... */
+	} else {
+	  assert(0); /* TODO: other scan type */
 	}
-       
-	newport = ntohs(data[1]);
-	if (portlookup[newport] >= 0 && scan[portlookup[newport]].state != PORT_FRESH) {
-	  current = &scan[portlookup[newport]];
-	  trynum = (current->trynum == 0)? 0 : -1;
-	  newstate = PORT_FIREWALLED;
-	} else { 
-	  if (o.debugging) {
-	    error("Illegal ICMP type/code 3/%d unreachable packet:", 
+	
+	if (icmp->icmp_type == 3) {
+	  if (icmp->icmp_code != 0 && icmp->icmp_code != 1 && 
+	      icmp->icmp_code != 2 && 
+	      icmp->icmp_code != 3 && icmp->icmp_code != 13 &&
+	      icmp->icmp_code != 9 && icmp->icmp_code != 10) {
+	    error("Unexpected ICMP type/code 3/%d unreachable packet:", 
 		  icmp->icmp_code);
-	    hdump((unsigned char *)icmp, ntohs(ip->ip_len) - sizeof(struct ip));
+	    hdump((unsigned char *)icmp, ntohs(ip->ip_len) - 
+		  sizeof(struct ip));
+	    break;
 	  }
-	  continue;
-	}	      
+	  switch(icmp->icmp_code) {
+	  case 1: /* Host Unreachable */
+	  case 2: /* protocol unreachable */
+	    if (USI->scantype == IPPROT_SCAN) {
+	      newstate = PORT_CLOSED;
+	    } else
+	      newstate = PORT_FILTERED;
+	    break;
+
+	  case 3: /* Port unreach */
+	    if (USI->scantype == UDP_SCAN && 
+		ipp->ipv4->ip_dst.s_addr == ip->ip_src.s_addr)
+	      newstate = PORT_CLOSED;
+	    else newstate = PORT_FILTERED;
+	    break;
+	  case 9: /* dest. net admin prohibited */
+	  case 10: /* detst host admin prohibited */
+	  case 13: /* communication admin. prohibited */
+	    newstate = PORT_FILTERED;
+	    break;
+
+	  default:
+	    error("Unexpected ICMP type/code 3/%d unreachable packet:", 
+		  icmp->icmp_code);
+	    hdump((unsigned char *)icmp, ntohs(ip->ip_len) - 
+		  sizeof(struct ip));
+	    break;
+	  }
+	  if (newstate == PORT_UNKNOWN) break;
+	  goodone = true;
+	}
       }
-    }
-    /* OK, now we manipulate the port lists and adjust the time */
-    if (current) {
-      posportupdate(target, current, &rcvdtime, trynum, scan, ss, SYN_SCAN, newstate,
-		    pil, NULL);
-      current = NULL;
-      trynum = -1;
-      newstate = PORT_UNKNOWN;
-    }
-  }
-  return;
-}
+    } else if (ip->ip_p == IPPROTO_UDP) {
+      if ((unsigned) ip->ip_hl * 4 + 8 > bytes)
+	continue;
+      udp = (udphdr_bsd *) ((u8 *) ip + ip->ip_hl * 4);
+      /* Search for this host on the incomplete list */
+      memset(&sin, 0, sizeof(sin));
+      sin.sin_addr.s_addr = ip->ip_src.s_addr;
+      sin.sin_family = AF_INET;
+      hss = USI->findIncompleteHost((struct sockaddr_storage *) &sin);
+      if (!hss) continue; // Not from a host that interests us
+      probeI = hss->probes_outstanding.end();
+      listsz = hss->num_probes_outstanding();
+      goodone = false;
 
+      for(probenum = 0; probenum < listsz && !goodone; probenum++) {
+	probeI--;
+	probe = *probeI;
+	ipp = probe->IP;
+	goodseq = false; 
+	newstate = PORT_UNKNOWN;
 
-/* I want to reverse the order of all PORT_TESTING entries in
-   the scan list -- this way if an intermediate router along the
-   way got overloaded and dropped the last X packets, they are
-   likely to get through (and flag us a problem if responsive)
-   if we let them go first in the next round */
-void reverse_testing_order(struct portinfolist *pil, struct portinfo *scanarray) {
-  int currentidx, nextidx;
-  struct portinfo *current;
+	if (ipp->af != AF_INET || !ipp->udp)
+	  continue;
 
-  current = pil->testinglist;
+	/* Ensure the connection info matches.  No ntohs()-style
+	   conversion necc. b/c all in net bo */
+	if (ipp->udp->uh_dport != udp->uh_sport ||
+	    ipp->udp->uh_sport != udp->uh_dport ||
+	    ipp->ipv4->ip_src.s_addr != ip->ip_dst.s_addr)
+	  continue;
+	
+	newstate = PORT_OPEN;
+	goodone = true;
+      }
+    } else continue; /* Unexpected protocol */
+  } while (!goodone && !timedout);
 
-  if (current == NULL || current->state != PORT_TESTING)
-    return;
-
-  while(1) {
-    nextidx = current->next;
-    currentidx = current - scanarray;
-    /* current->state is always PORT_TESTING here */
-    current->next = current->prev; // special case 1st node dealt w/later
-    current->prev = nextidx; // special last TESTING node case dealt w/later
-    if (nextidx == -1) {
-      // Every node was in TESTING state
-      current->prev = -1; // New head of list
-      pil->testinglist->next = -1;
-      pil->testinglist = current;
-      break;
-    } else if (scanarray[nextidx].state != PORT_TESTING) {
-      current->prev = -1; // New head of list
-      pil->testinglist->next = nextidx;
-      scanarray[nextidx].prev = pil->testinglist - scanarray;
-      pil->testinglist = current;
-      break;
-    }
-    current = scanarray + nextidx;
-  }
-}
-
-/* Handles the "positive-response" scans (where we get a response
-   telling us that the port is open based on the probe.  This includes
-   SYN Scan, Connect Scan, RPC scan, Window Scan, and ACK scan */
-void pos_scan(Target *target, u16 *portarray, int numports, stype scantype) {
-  struct scanstats ss;
-  int rawsd = -1;
-  int scanflags = 0;
-  int victim;
-  int senddelay = 0;
-  int rpcportsscanned = 0;
-  bool printedinitialmsg = false;
-  pcap_t *pd = NULL;
-  char filter[512];
-  u32 ack_number = 0;
-  int tries = 0;
-  int  res;
-  int connecterror = 0;
-  time_t starttime;
-  struct sockaddr_storage sock;
-  struct sockaddr_in *sin = (struct sockaddr_in *) &sock;
-#if HAVE_IPV6
-  struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) &sock;
-#endif
-  size_t socklen;
-  struct portinfo *scan = NULL,  *current, *next;
-  struct portinfolist pil;
-  int *portlookup = NULL; /* Indexes port number -> scan[] index */
-  struct timeval now;
-  struct connectsockinfo csi;
-  struct rpcscaninfo rsi;
-  u32 sequences[3]; /* for various reasons we use 3 separate
-				 ones rather than simply incrementing from
-				 a base */
-  char hostname[1200];
-  int i;
-  unsigned long j;
-  struct serviceDeductions sd;
-
-  if (target->timedout)
-    return;
-
-  if (!numports && scantype != RPC_SCAN) return; /* nothing to scan for */
-
-  if (scantype == RPC_SCAN && target->ports.state_counts[PORT_OPEN] == 0)
-    return; // RPC Scan only works against already known-open ports
-
-  /* If it is a SYN scan and we have already figured out the states
-     of all the TCP ports, might as well skip the scan (this can happen
-     if the ping scan determined the states) */
-  if (target->ports.state_counts_tcp[PORT_OPEN] + target->ports.state_counts_tcp[PORT_CLOSED] + target->ports.state_counts_tcp[PORT_FIREWALLED] == numports && scantype == SYN_SCAN) {
-    if (o.debugging)
-      error("Skipping SYN scan since all ports already known");
-    return;
-  }
-
-  if (o.debugging)
-    log_write(LOG_STDOUT, "Starting pos_scan (%s)\n", scantype2str(scantype));
-
-  ss.packet_incr = 4;
-  ss.initial_packet_width = (scantype == RPC_SCAN)? 2 : 30;
-  ss.fallback_percent = 0.7;
-  ss.numqueries_outstanding = 0;
-  ss.ports_left = numports;
-  ss.alreadydecreasedqueries = 0;
-
-  memset(&pil, 0, sizeof(pil));
-
-  FD_ZERO(&csi.fds_read);
-  FD_ZERO(&csi.fds_write);
-  FD_ZERO(&csi.fds_except);
-  csi.maxsd = 0;
-
-  /* Start the firewall mode with a clean slate ... */
-  target->firewallmode.active = 0;
-  target->firewallmode.nonresponsive_ports = 0;
-  target->firewallmode.responsive_ports = 0;
-
-  if (o.max_parallelism) {
-    ss.max_width = o.max_parallelism;
-  } else {
-    if (scantype == CONNECT_SCAN) {
-      ss.max_width = MAX(5, max_sd() - 4);
-    } else {
-      ss.max_width = 150;
-    }
-  }
-
-  if (o.min_parallelism) {
-    ss.min_width = o.min_parallelism;
-  } else ss.min_width = 1;
-
-  ss.initial_packet_width = box(ss.min_width, ss.max_width, ss.initial_packet_width);
-  ss.numqueries_ideal = ss.initial_packet_width;
-
-  portlookup = (int *) safe_malloc(sizeof(int) * 65536);
-  memset(portlookup, 255, sizeof(int) * 65536); /* 0xffffffff better always be (int) -1 */
-  memset(csi.socklookup, 0, sizeof(csi.socklookup));
-
-  if (scantype != RPC_SCAN) {
-    /* Initialize our portlist (scan) */
-    scan = (struct portinfo *) safe_zalloc(numports * sizeof(struct portinfo));
-    for(i = 0; i < numports; i++) {
-      scan[i].state = PORT_FRESH;
-      scan[i].portno = portarray[i];
-      scan[i].trynum = 0;
-      scan[i].prev = i-1;
-      scan[i].sd[0] = scan[i].sd[1] = scan[i].sd[2] = -1;
-      if (i < numports -1 ) scan[i].next = i+1;
-      else scan[i].next = -1;
-      portlookup[portarray[i]] = i;
-    }
-    current = pil.testinglist = &scan[0]; /* testinglist is a list of all 
-					     ports that haven't been determined 					    to be closed yet */
-  }
-   
-  /* Init our raw socket */
-  if ((scantype == SYN_SCAN) || (scantype == WINDOW_SCAN) || 
-      (scantype == ACK_SCAN)) {  
-    if ((rawsd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0 )
-      pfatal("socket troubles in pos_scan");
-    /* We do not wan't to unblock the socket since we want to wait 
-       if kernel send buffers fill up rather than get ENOBUF, and
-       we won't be receiving on the socket anyway 
-       unblock_socket(rawsd);*/
-
-    broadcast_socket(rawsd);
-    
-
-    /* Init ISNs */
-    get_random_bytes(sequences, sizeof(sequences));
-
-    /* Now for the pcap opening nonsense ...
-       Note that the snaplen is 100 = 64 byte max IPhdr + 24 byte max 
-       link_layer header + first 12 bytes of TCP header.
-    */
-    
-    pd = my_pcap_open_live(target->device, 100,  (o.spoofsource)? 1 : 0, 20);
-    
-    flt_srchost = target->v4host().s_addr;
-    flt_dsthost = target->v4source().s_addr;
-
-    snprintf(filter, sizeof(filter), "dst host %s and (icmp or (tcp and src host %s))", inet_ntoa(target->v4source()), target->targetipstr());
-
-    set_pcap_filter(target, pd, flt_icmptcp, filter);
-
-    if (o.scanflags != -1) scanflags = o.scanflags;
-    else if (scantype == SYN_SCAN)
-      scanflags = TH_SYN;
+  if (goodone) {
+    if (probe->isPing())
+      ultrascan_ping_update(USI, hss, probeI, &rcvdtime);
     else
-      scanflags = TH_ACK;
-  } else if (scantype == CONNECT_SCAN) {
-    rawsd = -1;
-    /* Init our sock */
-    if (target->TargetSockAddr(&sock, &socklen) != 0) {
-      fatal("Failed to get target socket address in pos_scan");
-    }
-  } else if (scantype == RPC_SCAN) {
-    get_rpc_procs(&(rsi.rpc_progs), &(rsi.rpc_number));
-    scan = (struct portinfo *) safe_malloc(rsi.rpc_number * sizeof(struct portinfo));
-    for(j = 0; j < rsi.rpc_number; j++) {
-      scan[j].state = PORT_FRESH;
-      scan[j].portno = rsi.rpc_progs[j];
-      scan[j].trynum = 0;
-      scan[j].prev = j-1;
-      scan[j].sd[0] = scan[j].sd[1] = scan[j].sd[2] = -1;
-      if (j < rsi.rpc_number -1 ) scan[j].next = j+1;
-      else scan[j].next = -1;
-    }
-    current = pil.testinglist = &scan[0]; 
-    rawsd = -1;
-    rsi.rpc_current_port = NULL; 
-  } else {
-    fatal("Unknown scan type given to pos_scan()");
+      ultrascan_port_update(USI, hss, probeI, newstate, &rcvdtime);
   }
 
-  starttime = time(NULL);
+  return goodone;
+}
 
-  if (scantype != SYN_SCAN)
-    ack_number = get_random_uint();
-  else ack_number = 0;
+static void waitForResponses(UltraScanInfo *USI) {
+  struct timeval stime;
+  bool gotone = false;
+
+  gettimeofday(&USI->now, NULL);
+  USI->gstats->last_wait = USI->now;
+  USI->gstats->probes_sent_at_last_wait = USI->gstats->probes_sent;
 
   do {
-    ss.changed = 0;
-    if (tries > 3 && tries < 10) {
-      senddelay += 10000 * (tries - 3); 
-      if (o.verbose) log_write(LOG_STDOUT, "Bumping up senddelay by %d (to %d), due to excessive drops\n", 10000 * (tries - 3), senddelay);
-    } else if (tries >= 10) {
-      senddelay += 75000; 
-      if (o.verbose) log_write(LOG_STDOUT, "Bumping up senddelay by 75000 (to %d), due to excessive drops\n", senddelay);
-    }
-    
-    if (senddelay > 200000) {
-      ss.max_width = MIN(ss.max_width, 5);
-      ss.numqueries_ideal = MIN(ss.max_width, ss.numqueries_ideal);
-    }
+    USI->sendOK(&stime);
+    if (USI->pd) {
+      gotone = get_pcap_result(USI, &stime);
+    } else if (USI->scantype == CONNECT_SCAN) {
+      gotone = do_one_select_round(USI, &stime);
+    } else assert(0); /* TODO: Must fill this out for maybe rpc scan, etc. */
+  } while (gotone && USI->gstats->num_probes_active > 0);
 
-    if (target->timedout)
-      goto posscan_timedout;
+  gettimeofday(&USI->now, NULL);
+  USI->gstats->last_wait = USI->now;
+}
 
-    /* Find a good port to scan if we are rpc scanning */
-    if (scantype == RPC_SCAN) {
-      /* Make sure we have ports left to scan */
-      while(1) {
-	rsi.rpc_current_port = target->ports.nextPort(rsi.rpc_current_port,
-						      0, PORT_OPEN, true);
-	// When service scan is in use, we only want to scan ports that have already
-	// been determined to be RPC
+/* Initiate libpcap or some other sniffer as appropriate to be able to catch
+   responses */
+static void begin_sniffer(UltraScanInfo *USI, vector<Target *> &Targets) {
+  char pcap_filter[3072];
+  int filterlen = 0;
+  int len;
+  unsigned int targetno;
+  bool doIndividual = Targets.size() <= 20; // Don't bother IP limits if scanning huge # of hosts
+  pcap_filter[0] = '\0';
 
-	if (!o.servicescan)
-	  break; // We do all open ports if no service scan
-	if (!rsi.rpc_current_port) 
-	  break; // done!
-	rsi.rpc_current_port->getServiceDeductions(&sd);
-	if (sd.name && sd.service_tunnel == SERVICE_TUNNEL_NONE && strcmp(sd.name, "rpc") == 0)
-	  break; // Good - an RPC port for us to scan.
+  if (USI->scantype == CONNECT_SCAN)
+    return; /* No sniffer needed! */
+
+  USI->pd = my_pcap_open_live(Targets[0]->device, 100,  (o.spoofsource)? 1 : 0, 2);
+  /* Windows nonsense */
+  flt_srchost = Targets[0]->v4host().s_addr;
+  flt_dsthost = Targets[0]->v4source().s_addr;
+
+  if (USI->tcp_scan || USI->udp_scan) {
+    if (doIndividual)
+      len = snprintf(pcap_filter, sizeof(pcap_filter), 
+		     "dst host %s and (icmp or (%s and (", 
+		     inet_ntoa(Targets[0]->v4source()), (USI->tcp_scan)? "tcp" : "udp");
+    else len = snprintf(pcap_filter, sizeof(pcap_filter), 
+			"dst host %s and (icmp or %s)", 
+			inet_ntoa(Targets[0]->v4source()), 
+			(USI->tcp_scan)? "tcp" : "udp");
+    if (len < 0 || len >= (int) sizeof(pcap_filter))
+      fatal("ran out of space in pcap filter");
+    filterlen += len;
+    if (doIndividual) {
+      for(targetno = 0; targetno < Targets.size(); targetno++) {
+	len = snprintf(pcap_filter + filterlen, sizeof(pcap_filter) - filterlen,
+		       "%ssrc host %s", (targetno == 0)? "" : " or ",
+		       Targets[targetno]->targetipstr());
+	if (len < 0 || len + filterlen >= (int) sizeof(pcap_filter))
+	  fatal("ran out of space in pcap_filter");
+	filterlen += len;
       }
-
-      if (!rsi.rpc_current_port) /* Woop!  Done! */ break;
-
-      /* Reinit our testinglist so we try each RPC prog */
-      pil.testinglist = &scan[0];
-      rsi.valid_responses_this_port = 0;
-      rsi.rpc_status = RPC_STATUS_UNKNOWN;
-      rpcportsscanned++;
+      len = snprintf(pcap_filter + filterlen, sizeof(pcap_filter) - filterlen, ")))");
+      if (len < 0 || len + filterlen >= (int) sizeof(pcap_filter))
+	fatal("ran out of space in pcap_filter");
     }
-
-    // This initial message is way down here because we don't want to print it if
-    // no RPC ports need scanning.
-    if (o.verbose && !printedinitialmsg) {
-      struct tm *tm = localtime(&starttime);
-      assert(tm);
-      log_write(LOG_STDOUT, "Initiating %s against %s at %02d:%02d\n", scantype2str(scantype), target->NameIP(hostname, sizeof(hostname)), tm->tm_hour, tm->tm_min);
-      printedinitialmsg = true;
-    }
-
-
-    while(pil.testinglist != NULL)  /* While we have live queries or more ports to scan */
-      {
-	/* Check the possible retransmissions first */
-	gettimeofday(&now, NULL);
-      
-	/* Insure we haven't overrun our allotted time ... */
-	if (o.host_timeout && (TIMEVAL_MSEC_SUBTRACT(now, target->host_timeout) >= 0))
-	  {
-	    target->timedout = 1;
-	    goto posscan_timedout;
-	  }
-
-	/* Check if we should be in firewall mode and occasionally make 
-	   related adjustments*/
-	check_firewallmode(target, &ss);
-
-	for( current = pil.testinglist; current ; current = next) {
-	  /* For each port or RPC program */
-	  next = (current->next > -1)? &scan[current->next] : NULL;
-	  if (current->state == PORT_TESTING) {
-	    if ( TIMEVAL_SUBTRACT(now, current->sent[current->trynum]) > target->to.timeout) {
-	      if (current->trynum > 1 ||
-		  (current->trynum > 0 && target->firewallmode.active)) {
-		/* No responses !#$!#@$ firewalled? */
-		if (scantype == RPC_SCAN) {
-		  if (rsi.valid_responses_this_port == 0) {	       
-		    if (o.debugging) {
-		      log_write(LOG_STDOUT, "RPC Scan giving up on port %hu proto %d due to repeated lack of response\n", rsi.rpc_current_port->portno,  rsi.rpc_current_port->proto);
-		    }
-		    rsi.rpc_status = RPC_STATUS_NOT_RPC;
-		    break;
-		  }
-		  else {
-		    /* I think I am going to slow down a little */
-		    target->to.rttvar = MIN(2000000, (int) (target->to.rttvar * 1.2));
-		  }	      
-		}
-		if (o.debugging > 2) { log_write(LOG_STDOUT, "Moving port or prog %lu to the potentially firewalled list\n", current->portno); }
-		target->firewallmode.nonresponsive_ports++;
-		current->state = PORT_FIREWALLED; /* For various reasons */
-		/* First delete from old list */
-		if (current->next > -1) scan[current->next].prev = current->prev;
-		if (current->prev > -1) scan[current->prev].next = current->next;
-		if (current == pil.testinglist)
-		  pil.testinglist = (current->next >= 0)?  &scan[current->next] : NULL;
-		current->next = -1;
-		current->prev = -1;
-		/* Now move into new list */
-		if (scantype != RPC_SCAN) {	      
-		  if (!pil.firewalled) pil.firewalled = current;
-		  else {
-		    current->next = pil.firewalled - scan;
-		    pil.firewalled = current;
-		    scan[current->next].prev = current - scan;	      
-		  }
-		}
-		if (scantype == CONNECT_SCAN) {
-		  /* close the appropriate sd for each try */
-		  for(i=0; i <= current->trynum; i++) {
-		    if (current->sd[i] >= 0) {
-		      csi.socklookup[current->sd[i]] = NULL;
-		      FD_CLR(current->sd[i], &csi.fds_read);
-		      FD_CLR(current->sd[i], &csi.fds_write);
-		      FD_CLR(current->sd[i], &csi.fds_except);
-		      close(current->sd[i]);
-		      current->sd[i] = -1;
-		      ss.numqueries_outstanding--;
-		    }
-		  }
-		} else { ss.numqueries_outstanding--; }
-	      } else {  /* timeout ... we've got to resend */
-		if (o.scan_delay) enforce_scan_delay(NULL);
-		if (o.debugging > 2) { log_write(LOG_STDOUT, "Timeout, resending to portno/progno %lu\n", current->portno); }
-		current->trynum++;
-		gettimeofday(&current->sent[current->trynum], NULL);
-		now = current->sent[current->trynum];
-		if ((scantype == SYN_SCAN) || (scantype == WINDOW_SCAN) || (scantype == ACK_SCAN)) {	      
-		  if (o.fragscan)
-		    send_small_fragz_decoys(rawsd, target->v4hostip(), o.ttl, sequences[current->trynum], o.magic_port_set? o.magic_port : o.magic_port + tries * 3 + current->trynum, current->portno, scanflags);
-		  else 
-		    send_tcp_raw_decoys(rawsd, target->v4hostip(), o.ttl,
-		    			o.magic_port_set? o.magic_port : 
-					o.magic_port + tries * 3 + current->trynum, 
-					current->portno, 
-					sequences[current->trynum], 
-					ack_number, scanflags, 0, NULL, 0, 
-					o.extra_payload, 
-					o.extra_payload_length);
-
-		} else if (scantype == RPC_SCAN) {
-		  if (send_rpc_query(target->v4hostip(), rsi.rpc_current_port->portno,
-				     rsi.rpc_current_port->proto, 
-				     current->portno, current - scan, 
-				     current->trynum) == -1) {
-		    /* Futz, I'll give up on this guy ... */
-		    rsi.rpc_status = RPC_STATUS_NOT_RPC;
-		    break;
-		  }
-		} else { /* Connect scan */
-		  /* Unfortunately, retries cost us a socket!  If we are
-		     out of sockets, we must drop one of our earlier tries
-		     :( */
-		  if (ss.numqueries_outstanding >= ss.max_width) {		
-		    victim = -1;
-		    for(i=0; i < current->trynum; i++)
-		      if (current->sd[i] >= 0) {
-			victim = i;
-			break;
-		      }
-		    if (victim == -1) 
-		      fatal("Illegal situation in pos_scan -- please report to fyodor@dhp.com");
-		    csi.socklookup[current->sd[victim]] = NULL;
-		    FD_CLR(current->sd[victim], &csi.fds_read);
-		    FD_CLR(current->sd[victim], &csi.fds_write);
-		    FD_CLR(current->sd[victim], &csi.fds_except);
-		    close(current->sd[victim]);
-		    current->sd[victim] = -1;
-		  } else {
-		    ss.numqueries_outstanding++;
-		  }
-		  res = socket(o.af(), SOCK_STREAM, IPPROTO_TCP);
-		  if (res == -1) pfatal("Socket troubles in pos_scan 143");
-		  csi.socklookup[res] = current;
-		  unblock_socket(res);
-		  init_socket(res);
-		  if (sin->sin_family == AF_INET)
-		    sin->sin_port = htons(current->portno);
-#if HAVE_IPV6
-		  else sin6->sin6_port = htons(current->portno);
-#endif
-		  current->sd[current->trynum] = res;		
-		  res =  connect(res,(struct sockaddr *)&sock, socklen);
-		  if (res != -1) {
-		    posportupdate(target, current, NULL, current->trynum, scan, &ss, scantype, PORT_OPEN, &pil, &csi);
-		  } else {
-		    switch(socket_errno()) {
-		    case EINPROGRESS: /* The one I always see */
-		    case EAGAIN:
-		      /* GOOD REASON FOR THIS????block_socket(sockets[current_socket]); */
-		      if (csi.maxsd < current->sd[current->trynum])
-			csi.maxsd = current->sd[current->trynum];
-		      FD_SET( current->sd[current->trynum], &csi.fds_write);
-		      FD_SET( current->sd[current->trynum], &csi.fds_read);
-		      FD_SET( current->sd[current->trynum], &csi.fds_except);
-		      break;
-		    default:
-		      if (!connecterror) {	
-			connecterror++;
-			fprintf(stderr, "Strange error from connect (%d):", socket_errno());
-			fflush(stdout);
-			perror(""); /*falling through intentionally*/
-		      }
-		    case ECONNREFUSED:
-		      posportupdate(target, current, NULL, current->trynum, scan, &ss, scantype, PORT_CLOSED, &pil, &csi);
-		      break;
-		    }  		  
-		  }
-		}
-		if (senddelay) usleep(senddelay);
-	      }
-	    }
-	  } else { 
-	    if (current->state != PORT_FRESH) 
-	      fatal("State mismatch!!@ %d", current->state);
-	    /* current->state == PORT_FRESH */
-	    /* OK, now we have gone through our list of in-transit queries, so now
-	       we try to send off new queries if we can ... */
-	    if (ss.numqueries_outstanding >= (int) ss.numqueries_ideal) break;
-	    if (o.scan_delay) enforce_scan_delay(NULL);
-	    if (o.debugging > 2) log_write(LOG_STDOUT, "Sending initial query to port/prog %lu\n", current->portno);
-	    /* Otherwise lets send a packet! */
-	    current->state = PORT_TESTING;
-	    current->trynum = 0;
-	    /*	if (!testinglist) testinglist = current; */
-	    ss.numqueries_outstanding++;
-	    gettimeofday(&current->sent[0], NULL);
-	    if ((scantype == SYN_SCAN) || (scantype == WINDOW_SCAN) || 
-		(scantype == ACK_SCAN)) {	  
-	      if (o.fragscan)
-		send_small_fragz_decoys(rawsd, target->v4hostip(), o.ttl, sequences[current->trynum], o.magic_port_set? o.magic_port : o.magic_port + tries * 3, current->portno, scanflags);
-	      else
-		send_tcp_raw_decoys(rawsd, target->v4hostip(), o.ttl, 
-				    o.magic_port_set? o.magic_port : o.magic_port + tries * 3, current->portno,
-				    sequences[current->trynum], ack_number, 
-				    scanflags, 0, NULL, 0, o.extra_payload, 
-				    o.extra_payload_length);
-	    } else if (scantype == RPC_SCAN) {
-	      if (send_rpc_query(target->v4hostip(), rsi.rpc_current_port->portno,
-				 rsi.rpc_current_port->proto, current->portno, 
-				 current - scan, current->trynum) == -1) {
-		/* Futz, I'll give up on this guy ... */
-		rsi.rpc_status = RPC_STATUS_NOT_RPC;
-		break;
-	      }
-	    } else { /* CONNECT SCAN */
-	      res = socket(o.af(), SOCK_STREAM, IPPROTO_TCP);
-	      if (res == -1) pfatal("Socket troubles in pos_scan 11234");
-#ifdef WIN32
-	      if(res > 2047)
-		    fatal("got sd > 2047 in pos_scan\n");
-#endif
-	      csi.socklookup[res] = current;
-	      unblock_socket(res);
-	      init_socket(res);
-	      if (sin->sin_family == AF_INET)
-		sin->sin_port = htons(current->portno);
-#if HAVE_IPV6
-	      else sin6->sin6_port = htons(current->portno);
-#endif
-	      current->sd[current->trynum] = res;		
-	      res =  connect(res,(struct sockaddr *)&sock, socklen);
-	      if (res != -1) {
-		posportupdate(target, current, NULL, current->trynum, scan, &ss, scantype, PORT_OPEN, &pil, &csi);
-	      } else {
-		switch(socket_errno()) {
-		case EINPROGRESS: /* The one I always see */
-		case EAGAIN:
-		  /* GOOD REASON FOR THIS????block_socket(sockets[current_socket]); */
-		  if (csi.maxsd < current->sd[current->trynum])
-		    csi.maxsd = current->sd[current->trynum];
-		  FD_SET( current->sd[current->trynum], &csi.fds_write);
-		  FD_SET( current->sd[current->trynum], &csi.fds_read);
-		  FD_SET( current->sd[current->trynum], &csi.fds_except);
-		  break;
-		default:
-		  if (!connecterror) {	
-		    connecterror++;
-		    fprintf(stderr, "Strange error from connect (%d):", socket_errno());
-		    fflush(stdout);
-		    perror(""); /*falling through intentionally*/
-		  }
-		case ECONNREFUSED:
-		  posportupdate(target, current, NULL, current->trynum, scan, &ss, scantype, PORT_CLOSED, &pil, &csi);
-		  break;
-		}  		  
-	      }	    
-	    }
-	    if (senddelay) usleep(senddelay);
-	  }
-	}
-	if (o.debugging > 1) log_write(LOG_STDOUT, "Ideal number of queries: %d outstanding: %d max %d ports_left %d timeout %d senddelay: %dus\n", (int) ss.numqueries_ideal, ss.numqueries_outstanding, ss.max_width, ss.ports_left, target->to.timeout, senddelay);
-
-	/* Now that we have sent the packets we wait for responses */
-	ss.alreadydecreasedqueries = 0;
-	if ((scantype == SYN_SCAN) || (scantype == WINDOW_SCAN) || (scantype == ACK_SCAN))
-	  get_syn_results(target, scan, &ss, &pil, portlookup, pd, sequences, scantype);
-	else if (scantype == RPC_SCAN) {
-	  /* We only bother worrying about responses if we haven't reached
-	     a conclusion yet */
-	  if (rsi.rpc_status == RPC_STATUS_UNKNOWN) {	  
-	    get_rpc_results(target, scan, &ss, &pil, &rsi);
-	  }
-	  if (rsi.rpc_status != RPC_STATUS_UNKNOWN)
-	    break;
-	}
-	else {
-	  get_connect_results(target, scan, &ss, &pil, portlookup, sequences, &csi);	
-	}
-
-
-	/* I want to reverse the order of all PORT_TESTING entries in
-           the list -- this way if an intermediate router along the
-           way got overloaded and dropped the last X packets, they are
-           likely to get through (and flag us a problem if responsive)
-           if we let them go first in the next round */
-	reverse_testing_order(&pil, scan);
-
-	/* If we timed out while trying to get results -- we're outta here! */
-	if (target->timedout)
-	  goto posscan_timedout;
-      }
-
-    if (scantype == RPC_SCAN) {
-      /* Now we figure out the results of the port we just RPC scanned */
-
-      rsi.rpc_current_port->setRPCProbeResults(rsi.rpc_status, rsi.rpc_program, 
-					       rsi.rpc_lowver, rsi.rpc_highver);
-
-      /* Time to put our RPC program scan list back together for the
-	 next port ... */
-      for(j = 0; j < rsi.rpc_number; j++) {
-	scan[j].state = PORT_FRESH;
-	scan[j].trynum = 0;
-	scan[j].prev = j-1;
-	if (j < rsi.rpc_number -1 ) scan[j].next = j+1;
-	else scan[j].next = -1;
-      }
-      current = pil.testinglist = &scan[0]; 
-      pil.firewalled = NULL;
-      ss.numqueries_outstanding = 0;
-      /* Now we out o' here! */
-      continue;
-    }
-
-    if (ss.numqueries_outstanding != 0) {
-      fatal("Bean counting error no. 4321897: ports_left: %d numqueries_outstanding: %d\n", ss.ports_left, ss.numqueries_outstanding);
-    }
-
-    /* We only want to try again if the 'firewalled' list contains
-       elements, meaning that some ports timed out.  We retry until
-       nothing changes for a round (not counting the very first
-       round).  We don't retry if aggressive timing is being used and
-       the vast majority of ports are filtered, since this is more
-       likely a deny-by-default firewall than a packet loss indicator.  */
-    if (pil.firewalled) {
-      bool limitedfiltering = (double) target->firewallmode.nonresponsive_ports / (target->firewallmode.responsive_ports + target->firewallmode.nonresponsive_ports) < 0.1;
-      if ((limitedfiltering || o.timing_level < 4) && (tries == 0 || ss.changed)) {	
-	pil.testinglist = pil.firewalled;
-	for( current = pil.testinglist; current ; 
-	     current = (current->next > -1)? &scan[current->next] : NULL) {
-	  current->state = PORT_FRESH;
-	  current->trynum = 0;
-	  current->sd[0] = current->sd[1] = current->sd[2] = -1;
-	}
-	pil.firewalled = NULL;
-      } else {
-	/* Consider the ports firewalled */	
-	for( current = pil.firewalled; current ; 
-	     current = (current->next > -1)? &scan[current->next] : NULL) {
-	  target->ports.addPort(current->portno, IPPROTO_TCP, NULL, PORT_FIREWALLED);
-	}
-	pil.testinglist = NULL;
-      }
-    }
-
-    tries++;
-
-    if (o.debugging) {
-      log_write(LOG_STDOUT, "Finished round #%d. Current stats: numqueries_ideal: %d; min_width: %d; max_width: %d; packet_incr: %d; senddelay: %dus; fallback: %d%%\n", tries, (int) ss.numqueries_ideal, ss.min_width, ss.max_width, ss.packet_incr, senddelay, (int) (100 * ss.fallback_percent));
-    }
-    ss.numqueries_ideal = ss.initial_packet_width;
-    
-  } while(pil.testinglist && tries < 20);
+  } else if (USI->prot_scan) {
+    snprintf(pcap_filter, sizeof(pcap_filter), "dst host %s and icmp", 
+	     inet_ntoa(Targets[0]->v4source())); 
+ } else assert(0); /* Other scan types? */
+  if (o.debugging > 2) printf("Pcap filter: %s\n", pcap_filter);
+  set_pcap_filter(Targets[0], USI->pd, flt_all, pcap_filter);
+  /* pcap_setnonblock(USI->pd, 1, NULL); */
   
-  if (tries == 20) {
-    error("WARNING: GAVE UP ON SCAN AFTER 20 RETRIES");
+  return;
+}
+
+/* Go through the data structures, making appropriate changes (such as expiring
+   probes, noting when hosts are complete, etc. */
+void processData(UltraScanInfo *USI) {
+  list<HostScanStats *>::iterator hostI;
+  list<UltraProbe *>::iterator probeI, nextProbeI;
+  HostScanStats *host = NULL;
+  UltraProbe *probe = NULL;
+  static UltraScanInfo *lastRetryCappedWarning = NULL;
+  int newstate = PORT_UNKNOWN;
+  unsigned int maxtries = 0;
+  bool scanmaybedone = true; /* The whole scan is not yet done */
+  int expire_us = 0;
+
+  bool tryno_capped = false, tryno_mayincrease = false;
+  struct timeval tv_start;
+  if (o.debugging) {
+    gettimeofday(&USI->now, NULL);
+    tv_start = USI->now;
+  }
+    
+  /* First go through hosts and remove any completed ones from incompleteHosts */
+  USI->removeCompletedHosts();
+  if (USI->numIncompleteHosts() == 0)
+    return;
+
+  /* Run through probe lists to:
+     1) Mark timedout entries as such
+     2) Remove long-expired and retransmitted entries
+     3) Detect if we are done (we may just have a bunch of probes
+        sitting around waiting to see if another round of
+        retransmissions will be required).
+  */
+  for(hostI = USI->incompleteHosts.begin(); 
+      hostI != USI->incompleteHosts.end(); hostI++) {
+    host = *hostI;
+    if (host->num_probes_active != 0 || host->freshPortsLeft() != 0)
+      scanmaybedone = false;
+    /* Look for timedout or long expired entries */
+    expire_us = host->probeExpire(); // give up completely after this long
+    maxtries = host->allowedTryno(&tryno_capped, &tryno_mayincrease);
+
+    /* Should we dump everyone off the bench? */
+    if (host->probe_bench.size() > 0) {
+      if (maxtries > host->bench_tryno || !tryno_mayincrease) {
+	/* In the former case, we retransmit; in the latter, we're
+	   done w/these probes. Move benchmembers back to probes_outstanding */
+	host->clearBench();
+      }
+    }
+
+    for(probeI = host->probes_outstanding.begin(); 
+	probeI != host->probes_outstanding.end(); probeI = nextProbeI) {
+      nextProbeI = probeI;
+      nextProbeI++;
+      probe = *probeI;
+      
+      if (!probe->timedout && TIMEVAL_SUBTRACT(USI->now, probe->sent) > 
+	  (long) host->probeTimeout()) {
+	host->markProbeTimedout(probeI);
+      }
+      
+      if (!probe->isPing() && probe->timedout && !probe->retransmitted) {
+	if (!tryno_mayincrease && probe->tryno >= maxtries) {
+	  /* No response received and no further tries allowed */
+	  if (USI->scantype == SYN_SCAN || USI->scantype == ACK_SCAN || 
+	      USI->scantype == WINDOW_SCAN || USI->scantype == CONNECT_SCAN)
+	    newstate = PORT_FILTERED;
+	  else if (USI->scantype == FIN_SCAN || USI->scantype == XMAS_SCAN || 
+		   USI->scantype == MAIMON_SCAN || USI->scantype == NULL_SCAN)
+	    newstate = PORT_OPEN;	  
+	  else if (USI->scantype == UDP_SCAN || USI->scantype == IPPROT_SCAN) {
+	    newstate = PORT_OPENFILTERED;
+	  } else assert(0); /* TODO: May differ for RPC scan and such */
+	  ultrascan_port_update(USI, host, probeI, newstate, NULL);
+	  if (tryno_capped && lastRetryCappedWarning != USI) {
+	    /* Perhaps I should give this on a per-host basis.  Oh
+	       well, hopefully it is rare anyway. */
+	    printf("Warning: Giving up on some ports due to excessive retransmissions\n");
+	    lastRetryCappedWarning = USI;
+	  }
+	  continue;
+	} else if (probe->tryno >= maxtries && 
+		   TIMEVAL_SUBTRACT(USI->now, probe->sent) > expire_us) {
+	  assert(probe->tryno == maxtries);
+	  /* Move it to the bench until it is needed (maxtries
+	     increases or is capped */
+	  host->moveProbeToBench(probeI);
+	  continue;
+	}
+      }
+
+      if ((probe->isPing() || (probe->timedout && probe->retransmitted)) && 
+	  TIMEVAL_SUBTRACT(USI->now, probe->sent) > expire_us) {
+	host->destroyOutstandingProbe(probeI);
+	continue;
+      }
+    }
   }
 
-  if (scantype == RPC_SCAN) numports = rpcportsscanned;
-  if (o.verbose && numports > 0)
-    log_write(LOG_STDOUT, "The %s took %ld %s to scan %d ports.\n", scantype2str(scantype),  (long) time(NULL) - starttime, (((long) time(NULL) - starttime) == 1)? "second" : "seconds", numports);
-  
+  /* In case any hosts were completed during this run */
+  USI->removeCompletedHosts();
 
+  if (o.debugging) {
+    long tv_diff;
+    gettimeofday(&USI->now, NULL);
+    tv_diff = TIMEVAL_MSEC_SUBTRACT(USI->now, tv_start);
+    if (tv_diff > 30) printf("processData took %lims\n", tv_diff);
+  }
+}
 
- posscan_timedout:
+/* Start the timeout clocks of any targets that aren't already timedout */
+static void startTimeOutClocks(vector<Target *> &Targets) {
+  struct timeval tv;
+  vector<Target *>::iterator hostI;
   
-  free(scan);
-  if (rawsd >= 0) 
-    close(rawsd);
-  if (pd)
-    pcap_close(pd);
-  if (scantype == RPC_SCAN)
-    close_rpc_query_sockets();
-  free(portlookup);
-  return;
+  gettimeofday(&tv, NULL);
+  for(hostI = Targets.begin(); hostI != Targets.end(); hostI++) {
+    if (!(*hostI)->timedOut(NULL))
+      (*hostI)->startTimeOutClock(&tv);
+  }
+}
+
+/* 3rd generation Nmap scanning function.  Handles most Nmap port scan types */
+void ultra_scan(vector<Target *> &Targets, struct scan_lists *ports, 
+		stype scantype) {
+  UltraScanInfo *USI = NULL;
+  time_t starttime;
+  if (Targets.size() == 0) {
+    return;
+  }
+
+  startTimeOutClocks(Targets);
+  USI = new UltraScanInfo(Targets, ports, scantype);
+
+  if (o.verbose) {
+    char targetstr[128];
+    struct tm *tm;
+    bool plural = (Targets.size() != 1);
+    if (!plural) {
+      (*(Targets.begin()))->NameIP(targetstr, sizeof(targetstr));
+    } else snprintf(targetstr, sizeof(targetstr), "%d hosts", Targets.size());
+    starttime = USI->now.tv_sec;
+    tm = localtime(&starttime);
+    log_write(LOG_STDOUT, "Initiating %s against %s [%d port%s%s] at %02d:%02d\n", scantype2str(scantype), targetstr, USI->gstats->numports, (USI->gstats->numports != 1)? "s" : "", plural? "/host" : "", tm->tm_hour, tm->tm_min);
+  }
+
+  begin_sniffer(USI, Targets);
+  while(USI->numIncompleteHosts() != 0) {
+    doAnyPings(USI);
+    doAnyRetransmits(USI);
+    doAnyNewProbes(USI);
+    gettimeofday(&USI->now, NULL);
+    // printf("TRACE: Finished doAnyNewProbes() at %.4fs\n", o.TimeSinceStartMS(&USI->now) / 1000.0);
+    printAnyStats(USI);
+    waitForResponses(USI);
+    gettimeofday(&USI->now, NULL);
+    // printf("TRACE: Finished waitForResponses() at %.4fs\n", o.TimeSinceStartMS(&USI->now) / 1000.0);
+    processData(USI);
+  }
+
+  if (o.verbose) {
+    if (USI->gstats->num_hosts_timedout == 0)
+      log_write(LOG_STDOUT, "The %s took %.2fs to scan %d total ports.\n",
+		scantype2str(scantype), 
+		TIMEVAL_MSEC_SUBTRACT(USI->now, USI->SPM->begin) / 1000.0, 
+		USI->gstats->numports * Targets.size());
+    else log_write(LOG_STDOUT, "Finished %s in %.2fs, but %d %s timed out.\n", 
+		   scantype2str(scantype), 
+		   TIMEVAL_MSEC_SUBTRACT(USI->now, USI->SPM->begin) / 1000.0,
+		   USI->gstats->num_hosts_timedout, 
+		   (USI->gstats->num_hosts_timedout == 1)? "host" : "hosts");
+  }
+  delete USI;
 }
 
 /* FTP bounce attack scan.  This function is rather lame and should be
@@ -1251,7 +2753,6 @@ void bounce_scan(Target *target, u16 *portarray, int numports,
   char command[512];
   char hostname[1200];
   unsigned short portno,p1,p2;
-  struct timeval now;
   int timedout;
 
   if (! numports) return;		 /* nothing to scan for */
@@ -1267,14 +2768,8 @@ void bounce_scan(Target *target, u16 *portarray, int numports,
   for(i=0; i < numports; i++) {
 
     /* Check for timeout */
-    if (o.host_timeout) {
-      gettimeofday(&now, NULL);
-      if ((TIMEVAL_MSEC_SUBTRACT(now, target->host_timeout) >= 0))
-	{
-	  target->timedout = 1;
-	  return;
-	}
-    }
+    if (target->timedOut(NULL))
+      return;
 
     portno = htons(portarray[i]);
     p1 = ((unsigned char *) &portno)[0];
@@ -1318,10 +2813,6 @@ void bounce_scan(Target *target, u16 *portarray, int numports,
 	    while(i < numports && portarray[i] < 1024) i++;
 	    if (!portarray[i]) {
 	      fprintf(stderr, "And you didn't want to scan any unpriviliged ports.  Giving up.\n");
-	      /*	  close(sd);
-			  ftp->sd = -1;
-			  return *ports;*/
-	      /* screw this gentle return crap!  This is an emergency! */
 	      exit(1);
 	    }
 	  }  
@@ -1334,7 +2825,7 @@ void bounce_scan(Target *target, u16 *portarray, int numports,
 	    } else if (res == 0) {
 	      if (timedout)
 		target->ports.addPort(portarray[i], IPPROTO_TCP, NULL, 
-				      PORT_FIREWALLED);
+				      PORT_FILTERED);
 	      else target->ports.addPort(portarray[i], IPPROTO_TCP, NULL, 
 					 PORT_CLOSED);
 	    } else {
@@ -1377,519 +2868,323 @@ void bounce_scan(Target *target, u16 *portarray, int numports,
   return;
 }
 
-/* Handles the scan types where no positive-acknowledgement of open
-   port is received (those scans are in pos_scan).  Super_scan
-   includes scans such as FIN/XMAS/NULL/Maimon/UDP and IP Proto scans */
-void super_scan(Target *target, u16 *portarray, int numports,
-		stype scantype) {
-  int initial_packet_width;  /* How many scan packets in parallel (to start with) */
-  int packet_incr = 4; /* How much we increase the parallel packets by each round */
-  double fallback_percent = 0.7;
-  int rawsd;
-  int scanflags = 0;
+/* I want to reverse the order of all PORT_TESTING entries in
+   the scan list -- this way if an intermediate router along the
+   way got overloaded and dropped the last X packets, they are
+   likely to get through (and flag us a problem if responsive)
+   if we let them go first in the next round */
+void reverse_testing_order(struct portinfolist *pil, struct portinfo *scanarray) {
+  int currentidx, nextidx;
+  struct portinfo *current;
 
-  int dropped = 0;  /* These three are for UDP squelching */
-  int freshportstried = 0;
-  int senddelay = 0;
-  pcap_t *pd;
-  unsigned int bytes;
-  struct ip *ip, *ip2;
-  struct tcphdr *tcp;
-  char filter[512];
-  int changed = 0;  /* Have we found new ports (or rejected earlier "found" ones) this round? */
-  int numqueries_outstanding = 0; /* How many unexpired queries are on the 'net right now? */
-  double numqueries_ideal; /* How many do we WANT to be on the 'net right now? */
-  int max_width; /* No more packets than this at once, pleeze */
-  int min_width; /* At least this many at once */
-  int tries = 0;
-  int tmp = 0;
-  time_t starttime;
-  u16 newport;
-  int newstate = 999; /* This ought to break something if used illegally */
-  struct portinfo *scan, *openlist, *current, *testinglist, *next;
-  int *portlookup; /* Indexes port number -> scan[] index */
-  struct timeval now, end;
-  int packcount, timedout;
-  int UDPPacketWarning = 0;
-  int i;
-  u16 *data;
-  int packet_trynum = 0;
-  int windowdecrease = 0; /* Has the window been decreased this round yet? */
-  struct icmp *icmp;
-  int portno;
-  Port *current_port_tmp;
-  char hostname[1200];
-  struct link_header linkhdr;
+  current = pil->testinglist;
 
-  if (target->timedout)
+  if (current == NULL || current->state != PORT_TESTING)
     return;
 
-  if (! numports) return;		 /* nothing to scan for */
+  while(1) {
+    nextidx = current->next;
+    currentidx = current - scanarray;
+    /* current->state is always PORT_TESTING here */
+    current->next = current->prev; // special case 1st node dealt w/later
+    current->prev = nextidx; // special last TESTING node case dealt w/later
+    if (nextidx == -1) {
+      // Every node was in TESTING state
+      current->prev = -1; // New head of list
+      pil->testinglist->next = -1;
+      pil->testinglist = current;
+      break;
+    } else if (scanarray[nextidx].state != PORT_TESTING) {
+      current->prev = -1; // New head of list
+      pil->testinglist->next = nextidx;
+      scanarray[nextidx].prev = pil->testinglist - scanarray;
+      pil->testinglist = current;
+      break;
+    }
+    current = scanarray + nextidx;
+  }
+}
 
-  if (o.debugging) 
-    log_write(LOG_STDOUT, "Starting super_scan\n");
 
-  max_width = (o.max_parallelism)? o.max_parallelism : 125;
-  min_width = 1;
-  min_width = (o.min_parallelism)? o.min_parallelism :
-    (o.timing_level == 4)? 10 :
-    (o.timing_level == 5)? 20 : 1;
-  numqueries_ideal = initial_packet_width = MAX(min_width, MIN(max_width, 10));
+/* Used to handle all the "positive-response" scans (where we get a
+   response telling us that the port is open based on the probe.  This
+   includes SYN Scan, Connect Scan, RPC scan, Window Scan, and ACK
+   scan.  Now ultra_scan() does all of those, except for RPC scan,
+   which is the only pos_scan now supported.  */
+void pos_scan(Target *target, u16 *portarray, int numports, stype scantype) {
+  struct scanstats ss;
+  int senddelay = 0;
+  int rpcportsscanned = 0;
+  bool printedinitialmsg = false;
+  int tries = 0;
+  time_t starttime;
+  struct timeval starttm;
+  struct portinfo *scan = NULL,  *current, *next;
+  struct portinfolist pil;
+  struct timeval now;
+  struct connectsockinfo csi;
+  struct rpcscaninfo rsi;
+  char hostname[1200];
+  unsigned long j;
+  struct serviceDeductions sd;
 
-  portlookup = (int *) safe_malloc(sizeof(int) * 65536);
-  memset(portlookup, 255, 65536 * sizeof(int)); /* 0xffffffff better always be (int) -1 */
-  scan = (struct portinfo *) safe_malloc(numports * sizeof(struct portinfo));
+  if (target->timedOut(NULL))
+    return;
 
-  /* Initialize timeout info */
-  /*
-    target->to.srtt = (target->rtt > 0)? 4 * target->rtt : 1000000;
-    target->to.rttvar = (target->rtt > 0)? target->rtt / 2 : 1000000;
-    target->to.timeout = target->to.srtt + 4 * target->to.rttvar;
-  */
+  if (scantype != RPC_SCAN)
+    fatal("pos_scan now handles only rpc scan");
 
-  /* Initialize our portlist (scan) */
-  for(i = 0; i < numports; i++) {
-    scan[i].state = PORT_FRESH;
-    scan[i].portno = portarray[i];
-    scan[i].trynum = 0;
-    scan[i].prev = i-1;
-    if (i < numports -1 ) scan[i].next = i+1;
-    else scan[i].next = -1;
-    portlookup[portarray[i]] = i;
+  if (target->ports.state_counts[PORT_OPEN] == 0)
+    return; // RPC Scan only works against already known-open ports
+
+  if (o.debugging)
+    log_write(LOG_STDOUT, "Starting RPC scan against %s\n", target->NameIP());
+
+  gettimeofday(&starttm, NULL);
+  target->startTimeOutClock(&starttm);
+
+  ss.packet_incr = 4;
+  ss.initial_packet_width = (scantype == RPC_SCAN)? 2 : 30;
+  ss.fallback_percent = 0.7;
+  ss.numqueries_outstanding = 0;
+  ss.ports_left = numports;
+  ss.alreadydecreasedqueries = 0;
+
+  memset(&pil, 0, sizeof(pil));
+
+  FD_ZERO(&csi.fds_read);
+  FD_ZERO(&csi.fds_write);
+  FD_ZERO(&csi.fds_except);
+  csi.maxsd = 0;
+
+  if (o.max_parallelism) {
+    ss.max_width = o.max_parallelism;
+  } else {
+      ss.max_width = 150;
   }
 
-  current = testinglist = &scan[0]; /* fresh == unscanned ports, testinglist is a list of all ports that haven't been determined to be closed yet */
-  openlist = NULL; /* we haven't shown any ports to be open yet... */
+  if (o.min_parallelism) {
+    ss.min_width = o.min_parallelism;
+  } else ss.min_width = 1;
 
+  ss.initial_packet_width = box(ss.min_width, ss.max_width, ss.initial_packet_width);
+  ss.numqueries_ideal = ss.initial_packet_width;
 
-    
-  /* Init our raw socket */
-  if ((rawsd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0 )
-    pfatal("socket troubles in super_scan");
-  broadcast_socket(rawsd); /* This isn't pretty, but I don't have much of a
-			      choice */
-  /* No reason to do this since we don't receive on this socket,
-     and it can cause ENOBUF errors if socket transmit buffers
-     overflow 
-     unblock_socket(rawsd);
-  */
+  memset(csi.socklookup, 0, sizeof(csi.socklookup));
 
-  /* Now for the pcap opening nonsense ... */
-  /* Note that the snaplen is 92 = 64 byte max IPhdr + 24 byte max link_layer
-   * header + 4 bytes of TCP port info.
-   */
-  pd = my_pcap_open_live(target->device, 92,  (o.spoofsource)? 1 : 0, 10);
-
-
-  flt_srchost = target->v4host().s_addr;
-  flt_dsthost = target->v4source().s_addr;
-  flt_baseport = o.magic_port;
-
-  snprintf(filter, sizeof(filter), "(icmp and dst host %s) or (tcp and src host %s and dst host %s and ( dst port %d or dst port %d))", inet_ntoa(target->v4source()), target->targetipstr(), inet_ntoa(target->v4source()), o.magic_port , o.magic_port + 1);
-
-  set_pcap_filter(target, pd, flt_icmptcp_2port, filter);
-
-  if (o.scanflags != -1) scanflags = o.scanflags;
-  else if (scantype == XMAS_SCAN) scanflags = TH_FIN|TH_URG|TH_PUSH;
-  else if (scantype == NULL_SCAN) scanflags = 0;
-  else if (scantype == FIN_SCAN) scanflags = TH_FIN;
-  else if (scantype == MAIMON_SCAN) scanflags = TH_FIN|TH_ACK;
-  else if (scantype != UDP_SCAN && scantype != IPPROT_SCAN) {
-    fatal("Unknown scan type for super_scan"); }
+  get_rpc_procs(&(rsi.rpc_progs), &(rsi.rpc_number));
+  scan = (struct portinfo *) safe_malloc(rsi.rpc_number * sizeof(struct portinfo));
+  for(j = 0; j < rsi.rpc_number; j++) {
+    scan[j].state = PORT_FRESH;
+    scan[j].portno = rsi.rpc_progs[j];
+    scan[j].trynum = 0;
+    scan[j].prev = j-1;
+    scan[j].sd[0] = scan[j].sd[1] = scan[j].sd[2] = -1;
+    if (j < rsi.rpc_number -1 ) scan[j].next = j+1;
+    else scan[j].next = -1;
+  }
+  current = pil.testinglist = &scan[0]; 
+  rsi.rpc_current_port = NULL; 
 
   starttime = time(NULL);
 
-  if (o.debugging || o.verbose) {
-    struct tm *tm = localtime(&starttime);
-    assert(tm);
-    log_write(LOG_STDOUT, "Initiating %s against %s at %02d:%02d\n", scantype2str(scantype), target->NameIP(hostname, sizeof(hostname)), tm->tm_hour, tm->tm_min);
-  }
-
   do {
-    changed = 0;
-    if (tries > 3 && senddelay == 0) senddelay = 10000; 
-							   
-    while(testinglist != NULL)  /* While we have live queries or more ports to scan */
+    ss.changed = 0;
+    if (tries > 3 && tries < 10) {
+      senddelay += 10000 * (tries - 3); 
+      if (o.verbose) log_write(LOG_STDOUT, "Bumping up senddelay by %d (to %d), due to excessive drops\n", 10000 * (tries - 3), senddelay);
+    } else if (tries >= 10) {
+      senddelay += 75000; 
+      if (o.verbose) log_write(LOG_STDOUT, "Bumping up senddelay by 75000 (to %d), due to excessive drops\n", senddelay);
+    }
+    
+    if (senddelay > 200000) {
+      ss.max_width = MIN(ss.max_width, 5);
+      ss.numqueries_ideal = MIN(ss.max_width, ss.numqueries_ideal);
+    }
+
+    if (target->timedOut(NULL))
+      goto posscan_timedout;
+
+    /* Make sure we have ports left to scan */
+    while(1) {
+      rsi.rpc_current_port = target->ports.nextPort(rsi.rpc_current_port,
+						    0, PORT_OPEN, true);
+      // When service scan is in use, we only want to scan ports that have already
+      // been determined to be RPC
+      
+      if (!o.servicescan)
+	break; // We do all open ports if no service scan
+      if (!rsi.rpc_current_port) 
+	break; // done!
+      rsi.rpc_current_port->getServiceDeductions(&sd);
+      if (sd.name && sd.service_tunnel == SERVICE_TUNNEL_NONE && strcmp(sd.name, "rpc") == 0)
+	break; // Good - an RPC port for us to scan.
+    }
+    
+    if (!rsi.rpc_current_port) /* Woop!  Done! */ break;
+    
+    /* Reinit our testinglist so we try each RPC prog */
+    pil.testinglist = &scan[0];
+    rsi.valid_responses_this_port = 0;
+    rsi.rpc_status = RPC_STATUS_UNKNOWN;
+    rpcportsscanned++;
+  
+    // This initial message is way down here because we don't want to print it if
+    // no RPC ports need scanning.
+    if (o.verbose && !printedinitialmsg) {
+      struct tm *tm = localtime(&starttime);
+      assert(tm);
+      log_write(LOG_STDOUT, "Initiating %s against %s at %02d:%02d\n", scantype2str(scantype), target->NameIP(hostname, sizeof(hostname)), tm->tm_hour, tm->tm_min);
+      printedinitialmsg = true;
+    }
+    
+    while(pil.testinglist != NULL)  /* While we have live queries or more ports to scan */
       {
 	/* Check the possible retransmissions first */
 	gettimeofday(&now, NULL);
-
+      
 	/* Insure we haven't overrun our allotted time ... */
-	if (o.host_timeout && numqueries_outstanding > 0 && (TIMEVAL_MSEC_SUBTRACT(now, target->host_timeout) >= 0))
-	  {
-	    target->timedout = 1;
-	    goto superscan_timedout;
-	  }
+	if (target->timedOut(&now))
+	  goto posscan_timedout;
 
-	for( current = testinglist; current ; current = next) {
+	for( current = pil.testinglist; current ; current = next) {
+	  /* For each port or RPC program */
 	  next = (current->next > -1)? &scan[current->next] : NULL;
 	  if (current->state == PORT_TESTING) {
 	    if ( TIMEVAL_SUBTRACT(now, current->sent[current->trynum]) > target->to.timeout) {
-	      if (current->trynum > 0) {
-		/* We consider this port valid, move it to open list */
-		if (o.debugging > 1) { log_write(LOG_STDOUT, "Moving port %lu to the open list\n", current->portno); }
-		freshportstried--;
-		current->state = PORT_OPEN;
+	      if (current->trynum > 1) {
+		/* No responses !#$!#@$ firewalled? */
+
+		if (rsi.valid_responses_this_port == 0) {	       
+		  if (o.debugging) {
+		    log_write(LOG_STDOUT, "RPC Scan giving up on port %hu proto %d due to repeated lack of response\n", rsi.rpc_current_port->portno,  rsi.rpc_current_port->proto);
+		  }
+		  rsi.rpc_status = RPC_STATUS_NOT_RPC;
+		  break;
+		}
+		else {
+		  /* I think I am going to slow down a little */
+		  target->to.rttvar = MIN(2000000, (int) (target->to.rttvar * 1.2));
+		}	      
+		
+		if (o.debugging > 2) { log_write(LOG_STDOUT, "Moving port or prog %lu to the potentially firewalled list\n", current->portno); }
+		current->state = PORT_FILTERED; /* For various reasons */
 		/* First delete from old list */
 		if (current->next > -1) scan[current->next].prev = current->prev;
 		if (current->prev > -1) scan[current->prev].next = current->next;
-		if (current == testinglist)
-		  testinglist = (current->next >= 0)?  &scan[current->next] : NULL;
-		current->next = current->prev = -1;
-
+		if (current == pil.testinglist)
+		  pil.testinglist = (current->next >= 0)?  &scan[current->next] : NULL;
+		current->next = -1;
+		current->prev = -1;
 		/* Now move into new list */
-		if (!openlist) openlist = current;
-		else {
-		  current->next = openlist - scan;
-		  openlist = current;
-		  scan[current->next].prev = current - scan;	      
-		}
-		numqueries_outstanding--;
-	      } else {
-		/* Initial timeout ... we've got to resend */
+
+		ss.numqueries_outstanding--;
+	      } else {  /* timeout ... we've got to resend */
 		if (o.scan_delay) enforce_scan_delay(NULL);
-		if (o.debugging > 1) { log_write(LOG_STDOUT, "Initial timeout, resending to portno %lu\n", current->portno); }
+		if (o.debugging > 2) { log_write(LOG_STDOUT, "Timeout, resending to portno/progno %lu\n", current->portno); }
 		current->trynum++;
-		/* If they didn't specify the magic port, we use magic_port +1
-		   so we can tell that it was a retransmit later */
-		i = (o.magic_port_set)? o.magic_port : o.magic_port + 1;
-		gettimeofday(&current->sent[1], NULL);
-		now = current->sent[1];
-		if (o.fragscan)
-		  send_small_fragz_decoys(rawsd, target->v4hostip(), 0, o.ttl, i, current->portno, scanflags);
-		else if (scantype == UDP_SCAN)
-		  send_udp_raw_decoys(rawsd, target->v4hostip(), o.ttl, i,
-				      current->portno, get_random_u16(), o.extra_payload, o.extra_payload_length);
-		else if (scantype == IPPROT_SCAN)
-		  send_ip_raw_decoys(rawsd, target->v4hostip(), o.ttl, current->portno, o.extra_payload, o.extra_payload_length);
-		else
-		  send_tcp_raw_decoys(rawsd, target->v4hostip(), o.ttl, i,
-				      current->portno, 0, 0, scanflags, 0, NULL, 0,
-				      o.extra_payload, o.extra_payload_length);
-		if (senddelay &&
-		    (scantype == UDP_SCAN || scantype == IPPROT_SCAN))
-		  usleep(senddelay);
+		gettimeofday(&current->sent[current->trynum], NULL);
+		now = current->sent[current->trynum];
+		if (send_rpc_query(target->v4hostip(), rsi.rpc_current_port->portno,
+				   rsi.rpc_current_port->proto, 
+				   current->portno, current - scan, 
+				   current->trynum) == -1) {
+		  /* Futz, I'll give up on this guy ... */
+		  rsi.rpc_status = RPC_STATUS_NOT_RPC;
+		  break;
+		}
+
+		if (senddelay) usleep(senddelay);
 	      }
 	    }
 	  } else { 
+	    if (current->state != PORT_FRESH) 
+	      fatal("State mismatch!!@ %d", current->state);
 	    /* current->state == PORT_FRESH */
-	    /* OK, now we have gone through our list of in-transit queries, 
-	       so now we try to send off new queries if we can ... */
-	    if (numqueries_outstanding >= (int) numqueries_ideal) break;
+	    /* OK, now we have gone through our list of in-transit queries, so now
+	       we try to send off new queries if we can ... */
+	    if (ss.numqueries_outstanding >= (int) ss.numqueries_ideal) break;
 	    if (o.scan_delay) enforce_scan_delay(NULL);
-	    if (o.debugging > 1) log_write(LOG_STDOUT, "Sending initial query to port %lu\n", current->portno);
-	    freshportstried++;
-	    /* lets send a packet! */
+	    if (o.debugging > 2) log_write(LOG_STDOUT, "Sending initial query to port/prog %lu\n", current->portno);
+	    /* Otherwise lets send a packet! */
 	    current->state = PORT_TESTING;
+	    current->trynum = 0;
 	    /*	if (!testinglist) testinglist = current; */
-	    numqueries_outstanding++;
+	    ss.numqueries_outstanding++;
 	    gettimeofday(&current->sent[0], NULL);
-	    if (o.fragscan)
-	      send_small_fragz_decoys(rawsd, target->v4hostip(), 0, o.ttl, o.magic_port, current->portno, scanflags);
-	    else if (scantype == UDP_SCAN)
-	      send_udp_raw_decoys(rawsd, target->v4hostip(), o.ttl,
-			      	  o.magic_port, current->portno,
-				  get_random_u16(), o.extra_payload, 
-				  o.extra_payload_length);
-	    else if (scantype == IPPROT_SCAN)
-	      send_ip_raw_decoys(rawsd, target->v4hostip(), o.ttl,
-				 current->portno, o.extra_payload, o.extra_payload_length);
-	    else
-	      send_tcp_raw_decoys(rawsd, target->v4hostip(), o.ttl,
-	      			  o.magic_port, 
-				  current->portno, 0, 0, scanflags, 0, NULL, 0,
-				  o.extra_payload, o.extra_payload_length);
-	    if ((scantype == UDP_SCAN || scantype == IPPROT_SCAN) &&
-		senddelay)
-	      usleep(senddelay);
+	    if (senddelay) usleep(senddelay);
 	  }
 	}
+	if (o.debugging > 1) log_write(LOG_STDOUT, "Ideal number of queries: %d outstanding: %d max %d ports_left %d timeout %d senddelay: %dus\n", (int) ss.numqueries_ideal, ss.numqueries_outstanding, ss.max_width, ss.ports_left, target->to.timeout, senddelay);
 
-	if (o.debugging > 1) log_write(LOG_STDOUT, "Ideal number of queries: %d\n", (int) numqueries_ideal);
-	tmp++;
 	/* Now that we have sent the packets we wait for responses */
-	windowdecrease = 0;
-	timedout = packcount = 0;
-	gettimeofday(&now, NULL);
-	if (o.host_timeout && (TIMEVAL_MSEC_SUBTRACT(now, target->host_timeout) >= 0))
-	  {
-	    target->timedout = 1;
-	    goto superscan_timedout;
-	  }
-	while (!timedout && numqueries_outstanding > 0 && ( ip = (struct ip*) readip_pcap(pd, &bytes, target->to.timeout, &end, &linkhdr)))
-	  {
-	    if (++packcount >= 30) {
-	      /* We don't want to allow for the possibility if this going
-		 forever */
-	      if (TIMEVAL_SUBTRACT(end, now) > 8000000)
-		timedout = 1;
-	    }
-	    if (bytes < (4 * ip->ip_hl) + 4U || bytes < 24)
-	      continue;	
-	    setTargetMACIfAvailable(target, &linkhdr, ip, 0);
-	    current = NULL;
-	    if (ip->ip_p == IPPROTO_ICMP ||
-		ip->ip_src.s_addr == target->v4host().s_addr) {
-	      if (ip->ip_p == IPPROTO_TCP) {
-		tcp = (struct tcphdr *) (((char *) ip) + 4 * ip->ip_hl);
-		if (tcp->th_flags & TH_RST) {	    
-		  newstate = PORT_CLOSED;
-		  newport = ntohs(tcp->th_sport);
-		  if (portlookup[newport] < 0) {
-		    if (o.debugging) {
-		      log_write(LOG_STDOUT, "Strange packet from port %d:\n", ntohs(tcp->th_sport));
-		      readtcppacket((unsigned char *)ip, bytes);
-		    }
-		    current = NULL;
-		    continue;
-		  }	  
-		  current = &scan[portlookup[newport]];
-		
-		  if (ntohs(tcp->th_dport) != o.magic_port && 
-		      ntohs(tcp->th_dport) != o.magic_port + 1) {
-		    if (o.debugging)  {		
-		      error("BAD TCP packet detected to port %d from port %d", ntohs(tcp->th_dport), newport);
-		    }
-		    continue;		
-		  }
-		
-		  if (current->state != PORT_TESTING && o.debugging) {
-		    error("TCP packet detected from port %d which is in state %d (should usually be PORT_TESTING (but not always)", 
-			  newport, current->state); 
-		  }
-		
-		  if (!o.magic_port_set) {
-		    packet_trynum = ntohs(tcp->th_dport) - o.magic_port;
-		    if ((packet_trynum|1) != 1) packet_trynum = -1;
-		  }  else packet_trynum = -1;
-		  if (current->trynum == 0) packet_trynum = 0;
-		} else { continue; } /* Wrong TCP flags */
-	      
-	      } else if (ip->ip_p == IPPROTO_ICMP) {
-		icmp = (struct icmp *) ((char *)ip + 4 * ip->ip_hl);
-		ip2 = (struct ip *) (((char *) icmp) + 8);
-		if (ip2->ip_dst.s_addr != target->v4host().s_addr)
-		  continue;
-		data = (u16 *) ((char *)ip2 + 4 * ip2->ip_hl);
-		/*	    log_write(LOG_STDOUT, "Caught ICMP packet:\n");
-			    hdump(icmp, ntohs(ip->ip_len) - sizeof(struct ip)); */
+	ss.alreadydecreasedqueries = 0;
+	/* We only bother worrying about responses if we haven't reached
+	   a conclusion yet */
+	if (rsi.rpc_status == RPC_STATUS_UNKNOWN) {	  
+	  get_rpc_results(target, scan, &ss, &pil, &rsi);
+	}
+	if (rsi.rpc_status != RPC_STATUS_UNKNOWN)
+	  break;
 
-		if (icmp->icmp_type == 3) {
-		  if (scantype != IPPROT_SCAN)
-		    newport = ntohs(data[1]);
-		  else
-		    newport = ip2->ip_p;
-		  if (portlookup[newport] < 0) {
-		    if (o.debugging) {
-		      log_write(LOG_STDOUT, "Strange ICMP packet type 3 code %d related to port %d:\n", icmp->icmp_code, newport);
-		      readtcppacket((unsigned char *)ip, bytes);		
-		    }
-		    continue;		
-		  }
-		  current = &scan[portlookup[newport]];
-		  if (!o.magic_port_set) {
-		    packet_trynum = ntohs(data[0]) - o.magic_port;
-		    if ((packet_trynum|1) != 1) packet_trynum = -1;
-		  } else {
-		    if (current->trynum == 0)  {
-		      packet_trynum = 0;
-		    }
-		    else packet_trynum = -1;
-		  }
-		
-		  switch(icmp->icmp_code) {
-		  
-		  case 1: /* Host unreachable */
-		  case 2: /* pr0t0c0l unreachable */
-		    if (scantype == IPPROT_SCAN) {
-		      newstate = PORT_CLOSED;
-		    } else
-		      newstate = PORT_FIREWALLED;
-		    break;
-		  
-		  case 3: /* p0rt unreachable */		
-		    if (scantype == UDP_SCAN && 
-			ip->ip_src.s_addr == target->v4host().s_addr) {
-		      newstate = PORT_CLOSED;
-		    } else newstate = PORT_FIREWALLED;
-		    break;
-		  
-		  case 9:
-		  case 10:
-		  case 13: /* Administratively prohibited packet */
-		    newstate = PORT_FIREWALLED;
-		    break;		
-		  
-		  default:
-		    if (o.debugging) {
-		      error("Received strange ICMP destunreach response -- code: %d", icmp->icmp_code);
-		      hdump((unsigned char *)icmp, ntohs(ip->ip_len) - 
-			    sizeof(struct ip));
-		    }
-		    continue;
-		  }
-		}
-	      } else if (ip->ip_p == IPPROTO_UDP) {
-		if (UDPPacketWarning == 0) {
-		  UDPPacketWarning = 1;
-		  if (o.debugging)
-		    error("UDP packet received\n");
-		}
-		continue;
-	      } else if (scantype == IPPROT_SCAN) {
-		if (o.debugging)
-		  error("packet with protocol %d received\n", ip->ip_p);
-	      }
-	    
-	      if (current) {	  
-		if (current->state == PORT_CLOSED && (packet_trynum < 0)) {
-		  target->to.rttvar = (int) (target->to.rttvar * 1.2);
-		  if (o.debugging) { log_write(LOG_STDOUT, "Late packet, couldn't figure out sendno so we do varianceincrease to %d\n", target->to.rttvar); 
-		  }
-		} 
-		if (packet_trynum > -1) {		
-		  /* Update our records */
-		  adjust_timeouts2(&current->sent[packet_trynum], &end, &(target->to));
-		  numqueries_ideal = MIN(numqueries_ideal + (packet_incr/numqueries_ideal), max_width);
-		  if (packet_trynum > 0 && current->trynum > 0) {
-		    /* The first packet was apparently lost, slow down */
-		    dropped++;
-		    if (freshportstried > 50 && ((double) dropped/freshportstried) > 0.3) {
-		      if (!senddelay) senddelay = 50000;
-		      else senddelay = MIN(senddelay * 2, 1000000);
-		      if (senddelay >= 200000 &&
-			  (scantype == UDP_SCAN || scantype == IPPROT_SCAN))
-			max_width = MIN(max_width,2);
-		      freshportstried = 0;
-		      dropped = 0;
-		      if (o.verbose || o.debugging )  
-			log_write(LOG_STDOUT, "Too many drops ... increasing senddelay to %d\n", senddelay);
-		    }
-		    if (windowdecrease == 0) {
-		      numqueries_ideal = MAX(min_width, numqueries_ideal * fallback_percent);
-		      if (o.debugging) { log_write(LOG_STDOUT, "Lost a packet, decreasing window to %d\n", (int) numqueries_ideal);
-		      windowdecrease++;
-		      if (scantype == UDP_SCAN || scantype == IPPROT_SCAN)
-			usleep(250000);
-		      }
-		    } else if (o.debugging > 1) { 
-		      log_write(LOG_STDOUT, "Lost a packet, but not decreasing\n");
-		    }
-		  }
-		}    
-		if (current->state != newstate) {
-		  changed++;
-		}
-		if (current->state != PORT_OPEN && 
-		    current->state != PORT_CLOSED) {	    
-		  numqueries_outstanding--;
-		}
-		if (current->state == PORT_TESTING && current == testinglist)
-		  testinglist = (current->next >= 0)?  &scan[current->next] : NULL;
-		else if (current->state == PORT_OPEN && current == openlist)
-		  openlist = (current->next >= 0)? &scan[current->next] : NULL;
-		if (current->next >= 0) scan[current->next].prev = current->prev;
-		if (current->prev >= 0) scan[current->prev].next = current->next;
-		current->next = current->prev = -1;
-		current->state = newstate;
-		target->ports.addPort(current->portno, 
-			(scantype == UDP_SCAN)? IPPROTO_UDP :
-			  (scantype == IPPROT_SCAN? IPPROTO_IP: IPPROTO_TCP), 
-			NULL, current->state);
-	      }
-	    }
-	  }
-      } 
-  
-    
-    /* Prepare for retry */
-    testinglist = openlist;
-    for(current = openlist; current; current = (current->next >= 0)? &scan[current->next] : NULL) {
-      current->state = PORT_FRESH;
-      current->trynum = 0;
-      if (o.debugging) { 
-	log_write(LOG_STDOUT, "Preparing for retry, open port %lu noted\n", current->portno); 
+	/* I want to reverse the order of all PORT_TESTING entries in
+           the list -- this way if an intermediate router along the
+           way got overloaded and dropped the last X packets, they are
+           likely to get through (and flag us a problem if responsive)
+           if we let them go first in the next round */
+	reverse_testing_order(&pil, scan);
+
+	/* If we timed out while trying to get results -- we're outta here! */
+	if (target->timedOut(NULL))
+	  goto posscan_timedout;
       }
-    }
+
+    /* Now we figure out the results of the port we just RPC scanned */
     
-    openlist = NULL;
-    numqueries_ideal = initial_packet_width;
-    if (o.debugging)
-      log_write(LOG_STDOUT, "Done with round %d\n", tries);
-    if (scantype == UDP_SCAN && changed && (tries + 1) < 100) {
-      if (o.debugging) {
-	log_write(LOG_STDOUT, "Sleeping for 1/2 second to overcome ICMP error rate limiting\n");
-      }
-      usleep(500000);
+    rsi.rpc_current_port->setRPCProbeResults(rsi.rpc_status, rsi.rpc_program, 
+					     rsi.rpc_lowver, rsi.rpc_highver);
+    
+    /* Time to put our RPC program scan list back together for the
+       next port ... */
+    for(j = 0; j < rsi.rpc_number; j++) {
+      scan[j].state = PORT_FRESH;
+      scan[j].trynum = 0;
+      scan[j].prev = j-1;
+      if (j < rsi.rpc_number -1 ) scan[j].next = j+1;
+      else scan[j].next = -1;
     }
-  } while(changed && ++tries < 100);   
+    current = pil.testinglist = &scan[0]; 
+    pil.firewalled = NULL;
+    ss.numqueries_outstanding = 0;
+    /* Now we out o' here! */
+    continue;
+    
+    if (ss.numqueries_outstanding != 0) {
+      fatal("Bean counting error no. 4321897: ports_left: %d numqueries_outstanding: %d\n", ss.ports_left, ss.numqueries_outstanding);
+    }
 
-  openlist = testinglist;
+    tries++;
 
-  if (o.debugging || o.verbose)
-    log_write(LOG_STDOUT, "The %s took %ld %s to scan %d ports.\n", scantype2str(scantype), (long) time(NULL) - starttime, (((long) time(NULL) - starttime) == 1)? "second" : "seconds",  numports);
+    if (o.debugging) {
+      log_write(LOG_STDOUT, "Finished round #%d. Current stats: numqueries_ideal: %d; min_width: %d; max_width: %d; packet_incr: %d; senddelay: %dus; fallback: %d%%\n", tries, (int) ss.numqueries_ideal, ss.min_width, ss.max_width, ss.packet_incr, senddelay, (int) (100 * ss.fallback_percent));
+    }
+    ss.numqueries_ideal = ss.initial_packet_width;
+    
+  } while(pil.testinglist && tries < 20);
   
-  for (current = openlist; current;  current = (current->next >= 0)? &scan[current->next] : NULL) {
-    if (scantype == IPPROT_SCAN)
-      target->ports.addPort(current->portno, IPPROTO_IP, NULL, PORT_OPEN);
-    else if (scantype != UDP_SCAN)
-      target->ports.addPort(current->portno, IPPROTO_TCP, NULL, PORT_OPEN);
-    else
-      target->ports.addPort(current->portno, IPPROTO_UDP, NULL, PORT_OPEN);
+  if (tries == 20) {
+    error("WARNING: GAVE UP ON SCAN AFTER 20 RETRIES");
   }
 
- superscan_timedout:
-
+  numports = rpcportsscanned;
+  if (o.verbose && numports > 0) {
+    gettimeofday(&now, NULL);
+    log_write(LOG_STDOUT, "The %s took %.2fs to scan %d ports on %s.\n", scantype2str(scantype), TIMEVAL_MSEC_SUBTRACT(now, starttm) / 1000.0, numports, target->NameIP());
+  }
+ posscan_timedout:
+  target->stopTimeOutClock(NULL);
   free(scan);
-  close(rawsd);
-  pcap_close(pd);
-
-  /* Super scan relies on us receiving a response if the port is
-     CLOSED and no response if the port is OPEN.  A problem with
-     this is that when a machine is doing heavy filtering, all ports
-     will seem to be open.  Thus we add a little metric: if > 25
-     ports were scanned and they are ALL considered open by this
-     function, then it is reasonably to assume that the REAL reason
-     they are all open is that they have been filtered. */
-  if (numports > 25) {    
-    if (scantype == UDP_SCAN) {
-      if (target->ports.state_counts_udp[PORT_OPEN] == numports) {
-	if (o.verbose) { 
-	  error("(no udp responses received -- assuming all ports filtered)");
-	}
-	for(portno = 0; portno < 65536; portno++)
-	  {
-	    current_port_tmp = target->ports.lookupPort(portno, IPPROTO_UDP);
-	    if (current_port_tmp) {
-	      assert(current_port_tmp->state == PORT_OPEN);
-	      current_port_tmp->state = PORT_FIREWALLED;
-	      target->ports.state_counts[PORT_OPEN]--;
-	      target->ports.state_counts[PORT_FIREWALLED]++;
-	      target->ports.state_counts_udp[PORT_OPEN]--;
-	      target->ports.state_counts_udp[PORT_FIREWALLED]++;
-	    }
-	  }
-      }
-    } else { 
-      if (target->ports.state_counts_tcp[PORT_OPEN] == numports) {
-	if (o.verbose) { 
-	  error("(no tcp responses received -- assuming all ports filtered)");
-	}
-	for(portno = 0; portno < 65536; portno++)
-	  {
-	    current_port_tmp = target->ports.lookupPort(portno, IPPROTO_TCP);
-	    if (current_port_tmp) {
-	      assert(current_port_tmp->state == PORT_OPEN);
-	      current_port_tmp->state = PORT_FIREWALLED;
-	      target->ports.state_counts[PORT_OPEN]--;
-	      target->ports.state_counts[PORT_FIREWALLED]++;
-	      target->ports.state_counts_tcp[PORT_OPEN]--;
-	      target->ports.state_counts_tcp[PORT_FIREWALLED]++;
-	    }
-	  }
-      }
-    }
-  }
-  free(portlookup);
+  close_rpc_query_sockets();
   return;
 }

@@ -26,8 +26,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -54,8 +57,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -81,11 +93,12 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: targets.cc,v 1.35 2004/07/07 08:02:15 fyodor Exp $ */
+/* $Id: targets.cc,v 1.41 2004/08/29 09:12:03 fyodor Exp $ */
 
 
 #include "targets.h"
@@ -231,7 +244,14 @@ void hoststructfry(Target *hostbatch[], int nelem) {
   return;
 }
 
-Target *nexthost(HostGroupState *hs, 
+/* Returns the last host obtained by nexthost.  It will be given again the next
+   time you call nexthost(). */
+void returnhost(HostGroupState *hs) {
+  assert(hs->next_batch_no > 0);
+  hs->next_batch_no--;
+}
+
+Target *nexthost(HostGroupState *hs, TargetGroup *exclude_group,
 			    struct scan_lists *ports, int *pingtype) {
 int hidx;
 char *device;
@@ -252,6 +272,9 @@ do {
   while (hs->current_batch_sz < hs->max_batch_sz && 
 	 hs->current_expression.get_next_host(&ss, &sslen) == 0)
     {
+      if (hostInExclude((struct sockaddr *)&ss, sslen, exclude_group)) {
+	continue; /* Skip any hosts the user asked to exclude */
+      }
       hidx = hs->current_batch_sz;
       hs->hostbatch[hidx] = new Target();
       hs->hostbatch[hidx]->setTargetSockAddr(&ss, sslen);
@@ -268,10 +291,7 @@ do {
 	   3) We are doing a raw-mode portscan or osscan OR
 	   4) We are on windows and doing ICMP ping */
 	if (o.isr00t && o.af() == AF_INET && 
-	    ((*pingtype & (PINGTYPE_TCP|PINGTYPE_UDP)) || 
-	     o.synscan || o.finscan || o.xmasscan || o.nullscan || 
-	     o.ipprotscan || o.maimonscan || o.idlescan || o.ackscan || 
-	     o.udpscan || o.osscan || o.windowscan
+	    ((*pingtype & (PINGTYPE_TCP|PINGTYPE_UDP)) || o.RawScan()
 #ifdef WIN32
          || (*pingtype & (PINGTYPE_ICMP_PING|PINGTYPE_ICMP_MASK|PINGTYPE_ICMP_TS))
 #endif // WIN32
@@ -305,7 +325,10 @@ do {
 
       /* In some cases, we can only allow hosts that use the same device
 	 in a group. */
-      if (o.af() == AF_INET && o.isr00t && hidx > 0 && *hs->hostbatch[hidx]->device && hs->hostbatch[hidx]->v4source().s_addr != hs->hostbatch[0]->v4source().s_addr) {
+      if (o.af() == AF_INET && o.isr00t && hidx > 0 && 
+	  *hs->hostbatch[hidx]->device && 
+	  (hs->hostbatch[hidx]->v4source().s_addr != hs->hostbatch[0]->v4source().s_addr || 
+	   strcmp(hs->hostbatch[0]->device, hs->hostbatch[hidx]->device) != 0)) {
 	/* Cancel everything!  This guy must go in the next group and we are
 	   outtof here */
 	hs->current_expression.return_last_host();
@@ -342,9 +365,7 @@ if (hs->randomize) {
       (*pingtype != PINGTYPE_NONE))) 
    massping(hs->hostbatch, hs->current_batch_sz, ports, *pingtype);
  else for(i=0; i < hs->current_batch_sz; i++)  {
-   hs->hostbatch[i]->to.srtt = -1;
-   hs->hostbatch[i]->to.rttvar = -1;
-   hs->hostbatch[i]->to.timeout = o.initialRttTimeout() * 1000;
+   initialize_timeout_info(&hs->hostbatch[i]->to);
    hs->hostbatch[i]->flags |= HOST_UP; /*hostbatch[i].up = 1;*/
  }
  return hs->hostbatch[hs->next_batch_no++];
@@ -466,6 +487,9 @@ if (ptech.icmpscan) {
   sd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
   if (sd < 0) pfatal("Socket trouble in massping"); 
   unblock_socket(sd);
+#ifndef WIN32
+  sethdrinclude(sd);
+#endif
   sd_blocking = 0;
   if (num_hosts > 10)
     max_rcvbuf(sd);
@@ -477,20 +501,26 @@ if (ptech.icmpscan) {
 if (!to.srtt && !to.rttvar && !to.timeout) {
   /*  to.srtt = 800000;
       to.rttvar = 500000; */ /* we will init these when we get real data */
-  to.timeout = o.initialRttTimeout() * 1000;
-  to.srtt = -1;
-  to.rttvar = -1;
-} 
+  initialize_timeout_info(&to);
+}
 
 /* Init our raw socket */
 if (o.numdecoys > 1 || ptech.rawtcpscan || ptech.rawicmpscan || ptech.rawudpscan) {
   if ((rawsd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0 )
     pfatal("socket trobles in massping");
   broadcast_socket(rawsd);
-  
+#ifndef WIN32
+  sethdrinclude(rawsd);
+#endif
+
+ 
   if ((rawpingsd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0 )
     pfatal("socket trobles in massping");
   broadcast_socket(rawpingsd);
+#ifndef WIN32
+  sethdrinclude(rawpingsd);
+#endif
+
 }
  else { rawsd = -1; rawpingsd = -1; }
 
@@ -598,7 +628,7 @@ gettimeofday(&start, NULL);
    /*   pt.block_unaccounted = pt.group_end - pt.group_start + 1;   */
  }
 
- close(sd);
+ if (sd >= 0) close(sd);
  if (ptech.connecttcpscan)
    for(p=0; p < o.num_ping_synprobes; p++)
      free(tqi.sockets[p]);
@@ -632,7 +662,7 @@ int sendconnecttcpquery(Target *hostbatch[], struct tcpqueryinfo *tqi,
 			struct timeval *time, struct pingtune *pt, 
 			struct timeout_info *to, int max_sockets) {
 
-  int res,i;
+  int res,sock_err,i;
   int tmpsd;
   int hostnum, trynum;
   struct sockaddr_storage sock;
@@ -682,15 +712,16 @@ int sendconnecttcpquery(Target *hostbatch[], struct tcpqueryinfo *tqi,
 #endif //HAVE_IPV6
 
   res = connect(tqi->sockets[probe_port_num][seq],(struct sockaddr *)&sock, socklen);
+  sock_err = socket_errno();
 
-  if ((res != -1 || socket_errno() == ECONNREFUSED)) {
+  if ((res != -1 || sock_err == ECONNREFUSED)) {
     /* This can happen on localhost, successful/failing connection immediately
        in non-blocking mode */
       hostupdate(hostbatch, target, HOST_UP, 1, trynum, to, 
 		 &time[seq], NULL, pt, tqi, pingstyle_connecttcp);
     if (tqi->maxsd == tqi->sockets[probe_port_num][seq]) tqi->maxsd--;
   }
-  else if (socket_errno() == ENETUNREACH) {
+  else if (sock_err == ENETUNREACH) {
     if (o.debugging) 
       error("Got ENETUNREACH from sendconnecttcpquery connect()");
     hostupdate(hostbatch, target, HOST_DOWN, 1, trynum, to, 
@@ -861,6 +892,8 @@ if (ptech.icmpscan) {
 
  for (decoy = 0; decoy < o.numdecoys; decoy++) {
    if (ptech.icmpscan && decoy == o.decoyturn) {
+      int sock_err = 0;
+
      /* FIXME: If EHOSTUNREACH (Windows does that) then we were
 	probably unable to obtain an arp response from the machine.
 	We should just consider the host down rather than ignoring
@@ -869,15 +902,15 @@ if (ptech.icmpscan) {
      //     PacketTrace::trace(PacketTrace::SENT, (u8 *) ping, icmplen); 
      if ((res = sendto(sd,(char *) ping,icmplen,0,(struct sockaddr *)&sock,
 		       sizeof(struct sockaddr))) != icmplen && 
-		       socket_errno() != EHOSTUNREACH 
+                       (sock_err = socket_errno()) != EHOSTUNREACH
 #ifdef WIN32
         // Windows (correctly) returns this if we scan an address that is
         // known to be nonsensical (e.g. myip & mysubnetmask)
-	&& socket_errno() != WSAEADDRNOTAVAIL
+	&& sock_err != WSAEADDRNOTAVAIL
 #endif 
 		       ) {
        fprintf(stderr, "sendto in sendpingquery returned %d (should be 8)!\n", res);
-       perror("sendto");
+       fprintf(stderr, "sendto: %s\n", strerror(sock_err));
      }
    } else {
      send_ip_raw( rawsd, &o.decoys[decoy], target->v4hostip(), o.ttl, IPPROTO_ICMP, ping, icmplen);
@@ -934,13 +967,14 @@ while(pt->block_unaccounted) {
 	      foundsomething = 0;
 	      res2 = recv(tqi->sockets[p][seq], buf, sizeof(buf) - 1, 0);
 	      if (res2 == -1) {
-	        switch(socket_errno()) {
+  	        int sock_err = socket_errno();
+	        switch(sock_err) {
 	        case ECONNREFUSED:
 	        case EAGAIN:
 #ifdef WIN32
 //		  case WSAENOTCONN:	//	needed?  this fails around here on my system
 #endif
-		  if (socket_errno() == EAGAIN && o.verbose) {
+		  if (sock_err == EAGAIN && o.verbose) {
 		    log_write(LOG_STDOUT, "Machine %s MIGHT actually be listening on probe port %d\n", hostbatch[hostindex]->targetipstr(), o.ping_synprobes[p]);
 		  }
 		  foundsomething = 1;
@@ -958,7 +992,7 @@ while(pt->block_unaccounted) {
 		  break;
 	        default:
 		  snprintf (buf, sizeof(buf), "Strange read error from %s", hostbatch[hostindex]->targetipstr());
-		  perror(buf);
+		  fprintf(stderr, "%s: %s\n", buf, strerror(sock_err));
 		  break;
 	        }
 	      } else { 
@@ -1275,7 +1309,7 @@ int get_ping_results(int sd, pcap_t *pd, Target *hostbatch[], int pingtype,
 	    /* Since this gives an idea of how long it takes to get an answer,
 	       we add it into our times */
 	    newstate = HOST_DOWN;
-	    newportstate = PORT_FIREWALLED;
+	    newportstate = PORT_FILTERED;
 	  }
 	} else if (ping->type == 11) {
 	  if (o.debugging) 
@@ -1408,9 +1442,12 @@ int get_ping_results(int sd, pcap_t *pd, Target *hostbatch[], int pingtype,
     if (newport && newportstate != PORT_UNKNOWN) {
       /* OK, we can add it, but that is only appropriate if this is one
 	 of the ports the user ASKED for */
+      /* This was for the old turbo mode -- which I no longer support now that ultra_scan() can handle parallel hosts.  Maybe I'll brign it back someday */
+      /*
       if (ports && ports->tcp_count == 1 && ports->tcp_ports[0] == newport)
 	hostbatch[hostnum]->ports.addPort(newport, IPPROTO_TCP, NULL, 
 					  newportstate);
+      */
     }
   }
   return 0;
@@ -1432,3 +1469,239 @@ char *readhoststate(int state) {
 
 
 
+/* loads an exclude file into an exclude target list  (mdmcl) */
+TargetGroup* load_exclude(FILE *fExclude, char *szExclude) {
+  int i=0;			/* loop counter */
+  int iLine=0;			/* line count */
+  int iListSz=0;		/* size of our exclude target list. 
+				 * It doubles in size as it gets
+				 *  close to filling up
+				 */
+  char acBuf[512];
+  char *p_acBuf;
+  TargetGroup *excludelist;	/* list of ptrs to excluded targets */
+  char *pc;			/* the split out exclude expressions */
+  char b_file = (char)0;        /* flag to indicate if we are using a file */
+
+  /* If there are no params return now with a NULL list */
+  if (((FILE *)0 == fExclude) && ((char *)0 == szExclude)) {
+    excludelist=NULL;
+    return excludelist;
+  }
+
+  if ((FILE *)0 != fExclude)
+    b_file = (char)1;
+
+  /* Since I don't know of a realloc equiv in C++, we will just count
+   * the number of elements here. */
+
+  /* If the input was given to us in a file, count the number of elements
+   * in the file, and reset the file */
+  if (1 == b_file) {
+    while ((char *)0 != fgets(acBuf,sizeof(acBuf), fExclude)) {
+      if ((char *)0 == strchr(acBuf, '\n')) {
+        fatal("Exclude file line %d was too long to read.  Exiting.", iLine);
+      }
+      pc=strtok(acBuf, "\t\n ");	
+      while (NULL != pc) {
+        iListSz++;
+        pc=strtok(NULL, "\t\n ");
+      }
+    }
+    rewind(fExclude);
+  } /* If the exclude file was provided via command line, count the elements here */
+  else {
+    p_acBuf=strdup(szExclude);
+    pc=strtok(p_acBuf, ",");
+    while (NULL != pc) {
+      iListSz++;
+      pc=strtok(NULL, ",");
+    }
+    free(p_acBuf);
+    p_acBuf = NULL;
+  }
+
+  /* allocate enough TargetGroups to cover our entries, plus one that
+   * remains uninitialized so we know we reached the end */
+  excludelist = new TargetGroup[iListSz + 1];
+
+  /* don't use a for loop since the counter isn't incremented if the 
+   * exclude entry isn't parsed
+   */
+  i=0;
+  if (1 == b_file) {
+    /* If we are parsing a file load the exclude list from that */
+    while ((char *)0 != fgets(acBuf, sizeof(acBuf), fExclude)) {
+      ++iLine;
+      if ((char *)0 == strchr(acBuf, '\n')) {
+        fatal("Exclude file line %d was too long to read.  Exiting.", iLine);
+      }
+  
+      pc=strtok(acBuf, "\t\n ");	
+  
+      while ((char *)0 != pc) {
+         if(excludelist[i].parse_expr(pc,o.af()) == 0) {
+           if (o.debugging > 1)
+             fprintf(stderr, "Loaded exclude target of: %s\n", pc);
+           ++i;
+         } 
+         pc=strtok(NULL, "\t\n ");
+      }
+    }
+  }
+  else {
+    /* If we are parsing command line, load the exclude file from the string */
+    p_acBuf=strdup(szExclude);
+    pc=strtok(p_acBuf, ",");
+
+    while (NULL != pc) {
+      if(excludelist[i].parse_expr(pc,o.af()) == 0) {
+        if (o.debugging >1)
+          fprintf(stderr, "Loaded exclude target of: %s\n", pc);
+        ++i;
+      } 
+
+      /* This is a totally cheezy hack, but since I can't use strtok_r...
+       * If you can think of a better way to do this, feel free to change.
+       * As for now, we will reset strtok each time we leave parse_expr */
+      {
+	int hack_i;
+	char *hack_c = strdup(szExclude);
+
+	pc=strtok(hack_c, ",");
+
+        for (hack_i = 0; hack_i < i; hack_i++) 
+          pc=strtok(NULL, ",");
+
+	free(hack_c);
+      }
+    } 
+  }
+  return excludelist;
+}
+
+/* Is the host passed as Target to be excluded, much of this logic had  (mdmcl)
+ * to be rewritten from wam's original code to allow for the objects */
+int hostInExclude(struct sockaddr *checksock, size_t checksocklen, 
+		  TargetGroup *exclude_group) {
+  unsigned long tmpTarget; /* ip we examine */
+  int i=0;                 /* a simple index */
+  char targets_type;       /* what is the address type of the Target Group */
+  struct sockaddr_storage ss; 
+  struct sockaddr_in *sin = (struct sockaddr_in *) &ss;
+  size_t slen;             /* needed for funct but not used */
+  unsigned long mask = 0;  /* our trusty netmask, which we convert to nbo */
+  struct sockaddr_in *checkhost;
+
+  if ((TargetGroup *)0 == exclude_group)
+    return 0;
+
+  assert(checksocklen >= sizeof(struct sockaddr_in));
+  checkhost = (struct sockaddr_in *) checksock;
+  if (checkhost->sin_family != AF_INET)
+    checkhost = NULL;
+
+  /* First find out what type of addresses are in the target group */
+  targets_type = exclude_group[i].get_targets_type();
+
+  /* Lets go through the targets until we reach our uninitialized placeholder */
+  while (exclude_group[i].get_targets_type() != TargetGroup::TYPE_NONE)
+  { 
+    /* while there are still hosts in the target group */
+    while (exclude_group[i].get_next_host(&ss, &slen) == 0) {
+      tmpTarget = sin->sin_addr.s_addr; 
+
+      /* For Netmasks simply compare the network bits and move to the next
+       * group if it does not compare, we don't care about the individual addrs */
+      if (targets_type == TargetGroup::IPV4_NETMASK) {
+        mask = htonl((unsigned long) (0-1) << 32-exclude_group[i].get_mask());
+        if ((tmpTarget & mask) == (checkhost->sin_addr.s_addr & mask)) {
+	  exclude_group[i].rewind();
+	  return 1;
+        }
+	else {
+	  exclude_group[i++].rewind();
+	  continue;
+	}
+      } 
+      /* For ranges we need to be a little more slick, if we don't find a match
+       * we should skip the rest of the addrs in the octet, thank wam for this
+       * optimization */
+      else if (targets_type == TargetGroup::IPV4_RANGES) {
+        if (tmpTarget == checkhost->sin_addr.s_addr) {
+          exclude_group[i].rewind();
+          return 1;
+        }
+        else { /* note these are in network byte order */
+	  if ((tmpTarget & 0x000000ff) != (checkhost->sin_addr.s_addr & 0x000000ff))
+            exclude_group[i].skip_range(TargetGroup::FIRST_OCTET); 
+	  else if ((tmpTarget & 0x0000ff00) != (checkhost->sin_addr.s_addr & 0x0000ff00))
+            exclude_group[i].skip_range(TargetGroup::SECOND_OCTET); 
+	  else if ((tmpTarget & 0x00ff0000) != (checkhost->sin_addr.s_addr & 0x00ff0000))
+            exclude_group[i].skip_range(TargetGroup::THIRD_OCTET); 
+
+          continue;
+        }
+      }
+#if HAVE_IPV6
+      else if (targets_type == TargetGroup::IPV6_ADDRESS) {
+        fatal("exclude file not supported for IPV6 -- If it is important to you, send a mail to fyodor@insecure.org so I can guage support\n");
+      }
+#endif
+    }
+    exclude_group[i++].rewind();
+  }
+
+  /* we did not find the host */
+  return 0;
+}
+
+/* A debug routine to dump some information to stdout.                  (mdmcl)
+ * Invoked if debugging is set to 3 or higher
+ * I had to make signigicant changes from wam's code. Although wam
+ * displayed much more detail, alot of this is now hidden inside
+ * of the Target Group Object. Rather than writing a bunch of methods
+ * to return private attributes, which would only be used for 
+ * debugging, I went for the method below.
+ */
+int dumpExclude(TargetGroup *exclude_group) {
+  int i=0, debug_save=0, type=TargetGroup::TYPE_NONE;
+  unsigned int mask = 0;
+  struct sockaddr_storage ss;
+  struct sockaddr_in *sin = (struct sockaddr_in *) &ss;
+  size_t slen;
+
+  /* shut off debugging for now, this is a debug routine in itself,
+   * we don't want to see all the debug messages inside of the object */
+  debug_save = o.debugging;
+  o.debugging = 0;
+
+  while ((type = exclude_group[i].get_targets_type()) != TargetGroup::TYPE_NONE)
+  {
+    switch (type) {
+       case TargetGroup::IPV4_NETMASK:
+         exclude_group[i].get_next_host(&ss, &slen);
+         mask = exclude_group[i].get_mask();
+         fprintf(stderr, "exclude host group %d is %s/%d\n", i, inet_ntoa(sin->sin_addr), mask);
+         break;
+
+       case TargetGroup::IPV4_RANGES:
+         while (exclude_group[i].get_next_host(&ss, &slen) == 0) 
+           fprintf(stderr, "exclude host group %d is %s\n", i, inet_ntoa(sin->sin_addr));
+         break;
+
+       case TargetGroup::IPV6_ADDRESS:
+	 fatal("IPV6 addresses are not supported in the exclude file\n");
+         break;
+
+       default:
+	 fatal("Unknown target type in exclude file.\n");
+    }
+    exclude_group[i++].rewind();
+  }
+
+  /* return debuggin to what it was */
+  o.debugging = debug_save; 
+  return 1;
+}
+ 

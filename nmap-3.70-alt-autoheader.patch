@@ -7,7 +7,7 @@
 -    AC_DEFINE(DEC)
 +    AC_DEFINE(DEC, 1, [Define to 1 for DEC])
      ;;
-   *-netbsd*)
+   *-netbsd* | *-knetbsd*-gnu)
 -    AC_DEFINE(NETBSD)
 +    AC_DEFINE(NETBSD, 1, [Define to 1 for NetBSD])
      ;;
@@ -35,7 +35,7 @@
 +    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG, 1, [Define to 1 for Solaris checksum bug])
 +    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
      ;;
-   *-solaris2.[1-9][0-9]*)
+   *-solaris2.[[1-9]][[0-9]]*)
 -    AC_DEFINE(SOLARIS)
 +    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
      ;;
@@ -88,7 +88,7 @@
 +    AC_DEFINE(PCAP_TIMEOUT_IGNORED, 1, [Define to 1 if pcap(3) timeout is ignored])
 +    # libpcap doesn't even LOOK at the timeout you give it under Linux
      ;;
-   *-freebsd*)
+   *-freebsd* | *-kfreebsd*-gnu)
 -    AC_DEFINE(FREEBSD)
 +    AC_DEFINE(FREEBSD, 1, [Define to 1 for FreeBSD])
      ;;

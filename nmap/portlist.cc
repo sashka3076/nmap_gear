@@ -25,8 +25,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -53,8 +56,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -80,11 +92,12 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: portlist.cc,v 1.18 2004/03/12 01:59:04 fyodor Exp $ */
+/* $Id: portlist.cc,v 1.21 2004/08/29 09:12:03 fyodor Exp $ */
 
 
 #include "portlist.h"
@@ -335,6 +348,7 @@ PortList::PortList() {
   memset(state_counts_tcp, 0, sizeof(state_counts_tcp));
   memset(state_counts_ip, 0, sizeof(state_counts_ip));
   numports = 0;
+  idstr = NULL;
 }
 
 PortList::~PortList() {
@@ -366,6 +380,12 @@ PortList::~PortList() {
     free(ip_prots);
     ip_prots = NULL;
   }
+
+  if (idstr) { 
+    free(idstr);
+    idstr = NULL;
+  }
+
 }
 
 
@@ -379,22 +399,24 @@ int PortList::addPort(u16 portno, u8 protocol, char *owner, int state) {
       snprintf(msg, sizeof(msg), " (owner: %s)", owner);
     } else msg[0] = '\0';
     
-    log_write(LOG_STDOUT, "Adding %s port %hu/%s%s\n",
+    log_write(LOG_STDOUT, "Discovered %s port %hu/%s%s%s\n",
 	      statenum2str(state), portno, 
-	      proto2ascii(protocol), msg);
+	      proto2ascii(protocol), msg, idstr? idstr : "");
     log_flush(LOG_STDOUT);
     
-    /* Write out add port messages for XML format so wrapper libraries can
-       use it and not have to parse LOG_STDOUT ;), which is a pain! */
-    
-    log_write(LOG_XML, "<addport state=\"%s\" portid=\"%hu\" protocol=\"%s\" owner=\"%s\"/>\n", statenum2str(state), portno, proto2ascii(protocol), ((owner && *owner) ? owner : ""));
+    /* Write out add port messages for XML format so wrapper libraries
+       can use it and not have to parse LOG_STDOUT ;), which is a
+       pain! REMOVED now that Nmap scans multiple hosts in parallel.
+       This addport does not even tell which host the new port was
+       on. */    
+    //    log_write(LOG_XML, "<addport state=\"%s\" portid=\"%hu\" protocol=\"%s\" owner=\"%s\"/>\n", statenum2str(state), portno, proto2ascii(protocol), ((owner && *owner) ? owner : ""));
     log_flush(LOG_XML); 
   }
 
 
 /* Make sure state is OK */
-  if (state != PORT_OPEN && state != PORT_CLOSED && state != PORT_FIREWALLED &&
-      state != PORT_UNFIREWALLED)
+  if (state != PORT_OPEN && state != PORT_CLOSED && state != PORT_FILTERED &&
+      state != PORT_UNFILTERED && state != PORT_OPENFILTERED)
     fatal("addPort: attempt to add port number %d with illegal state %d\n", portno, state);
 
   if (protocol == IPPROTO_TCP) {
@@ -484,6 +506,19 @@ int PortList::removePort(u16 portno, u8 protocol) {
   return 0;
 }
 
+  /* Saves an identification string for the target containing these
+     ports (an IP addrss might be a good example, but set what you
+     want).  Only used when printing new port updates.  Optional.  A
+     copy is made. */
+void PortList::setIdStr(const char *id) {
+  int len = 0;
+  if (idstr) free(idstr);
+  if (!id) { idstr = NULL; return; }
+  len = strlen(id);
+  len += 5; // " on " + \0
+  idstr = (char *) safe_malloc(len);
+  snprintf(idstr, len, " on %s", id);
+}
 
 Port *PortList::lookupPort(u16 portno, u8 protocol) {
 
@@ -501,17 +536,18 @@ Port *PortList::lookupPort(u16 portno, u8 protocol) {
 
 int PortList::getIgnoredPortState() {
   int ignored = PORT_UNKNOWN;
+  int ignoredNum = 0;
+  int i;
+  for(i=0; i < PORT_HIGHEST_STATE; i++) {
+    if (i == PORT_OPEN || i == PORT_UNKNOWN || i == PORT_TESTING || 
+	i == PORT_FRESH) continue; /* Cannot be ignored */
+    if (state_counts[i] > ignoredNum) {
+      ignored = i;
+      ignoredNum = state_counts[i];
+    }
+  }
 
-  if (state_counts[PORT_FIREWALLED] > 10 + 
-      MAX(state_counts[PORT_UNFIREWALLED], 
-	  state_counts[PORT_CLOSED])) {
-    ignored = PORT_FIREWALLED;
-  } else if (state_counts[PORT_UNFIREWALLED] > 
-	     state_counts[PORT_CLOSED]) {
-    ignored = PORT_UNFIREWALLED;
-  } else ignored = PORT_CLOSED;
-
-  if (state_counts[ignored] < 10)
+  if (state_counts[ignored] < 15)
     ignored = PORT_UNKNOWN;
 
   return ignored;
@@ -570,5 +606,32 @@ if ((allowed_protocol == 0 || allowed_protocol == IPPROTO_UDP) &&
 
 /*  No more ports */
 return NULL;
+}
+
+// Move some popular TCP ports to the beginning of the portlist, because
+// that can speed up certain scans.  You should have already done any port
+// randomization, this should prevent the ports from always coming out in the
+// same order.
+void random_port_cheat(u16 *ports, int portcount) {
+  int allportidx = 0;
+  int popportidx = 0;
+  int earlyreplidx = 0;
+  u16 pop_ports[] = { 21, 22, 23, 25, 53, 80, 113, 256, 389, 443, 554, 636, 1723, 3389 };
+  int num_pop_ports = sizeof(pop_ports) / sizeof(u16);
+
+  for(allportidx = 0; allportidx < portcount; allportidx++) {
+    // see if the currentport is a popular port
+    for(popportidx = 0; popportidx < num_pop_ports; popportidx++) {
+      if (ports[allportidx] == pop_ports[popportidx]) {
+	// This one is popular!  Swap it near to the beginning.
+	if (allportidx != earlyreplidx) {
+	  ports[allportidx] = ports[earlyreplidx];
+	  ports[earlyreplidx] = pop_ports[popportidx];
+	}
+	earlyreplidx++;
+	break;
+      }
+    }
+  }
 }
 

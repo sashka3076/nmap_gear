@@ -25,8 +25,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -53,8 +56,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -80,11 +92,12 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOps.h,v 1.17 2004/03/12 01:59:04 fyodor Exp $ */
+/* $Id: NmapOps.h,v 1.20 2004/08/29 09:12:03 fyodor Exp $ */
 
 class NmapOps {
  public:
@@ -111,6 +124,12 @@ class NmapOps {
   const struct in_addr *v4sourceip();
   bool TCPScan(); /* Returns true if at least one chosen scan type is TCP */
   bool UDPScan(); /* Returns true if at least one chosen scan type is UDP */
+
+  /* Returns true if at least one chosen scan type uses raw packets.
+     Itdoes not currently cover cases such as TCP SYN ping scan which
+     can go either way based on whether the user is root or IPv6 is
+     being used.  It will return false in those cases where a RawScan
+     is not neccessarily used. */
   bool RawScan();
   void ValidateOptions(); /* Checks that the options given are
                              reasonable and consistant.  If they aren't, the
@@ -130,7 +149,7 @@ class NmapOps {
   int spoofsource; /* -S used */
   char device[64];
   int interactivemode;
-  int host_group_sz;
+  int ping_group_sz;
   int generate_random_ips; /* -iR option */
   FingerPrint **reference_FPs;
   u16 magic_port;
@@ -157,6 +176,13 @@ class NmapOps {
   void setMaxRttTimeout(int rtt);
   void setMinRttTimeout(int rtt);
   void setInitialRttTimeout(int rtt);
+
+  /* Similar functions for Host group size */
+  int minHostGroupSz() { return min_host_group_sz; }
+  int maxHostGroupSz() { return max_host_group_sz; }
+  void setMinHostGroupSz(unsigned int sz);
+  void setMaxHostGroupSz(unsigned int sz);
+
   int max_ips_to_scan; // Used for Random input (-iR) to specify how 
                        // many IPs to try before stopping. 0 means unlimited.
   int extra_payload_length; /* These two are for --data_length op */
@@ -179,7 +205,6 @@ class NmapOps {
   int osscan_guess;   /* Be more aggressive in guessing OS type */
   int numdecoys;
   int decoyturn;
-  int identscan;
   int osscan;
   int servicescan;
   int pingtype;
@@ -211,6 +236,8 @@ class NmapOps {
   int max_rtt_timeout;
   int min_rtt_timeout;
   int initial_rtt_timeout;
+  unsigned int min_host_group_sz;
+  unsigned int max_host_group_sz;
   void Initialize();
   int addressfamily; /*  Address family:  AF_INET or AF_INET6 */  
   struct sockaddr_storage sourcesock;

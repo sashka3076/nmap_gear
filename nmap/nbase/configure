@@ -2431,7 +2431,7 @@ host_os=`echo $ac_cv_host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
 linux=no
 
 case "$host" in
-  *-netbsd*)
+  *-netbsd* | *-knetbsd*-gnu)
     cat >>confdefs.h <<\_ACEOF
 #define NETBSD 1
 _ACEOF
@@ -2471,7 +2471,7 @@ _ACEOF
 _ACEOF
 
     ;;
-  *-solaris2.1-90-9*)
+  *-solaris2.[1-9][0-9]*)
     cat >>confdefs.h <<\_ACEOF
 #define SOLARIS 1
 _ACEOF
@@ -2555,7 +2555,7 @@ _ACEOF
   # libpcap doesn't even LOOK at
                                      # the timeout you give it under Linux
     ;;
-  *-freebsd*)
+  *-freebsd* | *-kfreebsd*-gnu)
     cat >>confdefs.h <<\_ACEOF
 #define FREEBSD 1
 _ACEOF

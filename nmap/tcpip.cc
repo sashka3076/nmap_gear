@@ -26,8 +26,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -54,8 +57,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -81,11 +93,12 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: tcpip.cc,v 1.37 2004/07/07 08:02:15 fyodor Exp $ */
+/* $Id: tcpip.cc,v 1.45 2004/08/31 03:46:19 fyodor Exp $ */
 
 
 #include "tcpip.h"
@@ -182,6 +195,60 @@ void PacketTrace::trace(pdirection pdir, const u8 *packet, u32 len,
   log_write(LOG_STDOUT|LOG_NORMAL, "%s (%.4fs) %s\n", (pdir == SENT)? "SENT" : "RCVD",  o.TimeSinceStartMS(&tv) / 1000.0, ippackethdrinfo(packet, len));
 
   return;
+}
+
+/* Adds a trace entry when a connect() is attempted if packet tracing
+   is enabled.  Pass IPPROTO_TCP or IPPROTO_UDP as the protocol.  The
+   sock may be a sockaddr_in or sockaddr_in6.  The return code of
+   connect is passed in connectrc.  If the return code is -1, get the
+   errno and pass that as connect_errno. */
+void PacketTrace::traceConnect(u8 proto, const struct sockaddr *sock, 
+			       int socklen, int connectrc, int connect_errno,
+			       const struct timeval *now) {
+  struct sockaddr_in *sin = (struct sockaddr_in *) sock;
+#if HAVE_IPV6
+  struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) sock;
+#endif
+  struct timeval tv;
+  char errbuf[64] = "";
+  char targetipstr[INET6_ADDRSTRLEN] = "";
+  u16 targetport = 0;
+
+  if (!o.packetTrace()) return;
+  
+  if (now)
+    tv = *now;
+  else gettimeofday(&tv, NULL);
+
+  assert(proto == IPPROTO_TCP || proto == IPPROTO_UDP);
+
+  if (connectrc == 0)
+    Strncpy(errbuf, "Connected", sizeof(errbuf));
+  else {
+    snprintf(errbuf, sizeof(errbuf), "%s", strerror(connect_errno));
+  }
+
+  if (sin->sin_family == AF_INET) {
+    if (inet_ntop(sin->sin_family, (char *) &sin->sin_addr, targetipstr, 
+		  sizeof(targetipstr)) == NULL)
+      fatal("Failed to convert target IPv4 address to presentation format!?!");
+    targetport = ntohs(sin->sin_port);
+  } else {
+#if HAVE_IPV6
+    assert(sin->sin_family == AF_INET6);
+    if (inet_ntop(sin->sin_family, (char *) &sin6->sin6_addr, targetipstr, 
+		  sizeof(targetipstr)) == NULL)
+      fatal("Failed to convert target IPv4 address to presentation format!?!");
+    targetport = ntohs(sin6->sin6_port);
+#else
+    assert(0);
+#endif
+  }
+
+  log_write(LOG_STDOUT|LOG_NORMAL, "CONN (%.4fs) %s localhost > %s:%d => %s\n",
+	    o.TimeSinceStartMS(&tv) / 1000.0, 
+	    (proto == IPPROTO_TCP)? "TCP" : "UDP", targetipstr, targetport, 
+	    errbuf);
 }
 
 /* Converts an IP address given in a sockaddr_storage to an IPv4 or
@@ -293,7 +360,7 @@ const char *ippackethdrinfo(const u8 *packet, u32 len) {
       if (tcp->th_flags & TH_ACK) {
 	*p++ = 'A';
 	snprintf(buf, sizeof(buf), " ack=%lu", 
-		 (unsigned long) ntohl(tcp->th_seq));
+		 (unsigned long) ntohl(tcp->th_ack));
 	strncat(tcpinfo, buf, sizeof(tcpinfo));
       }
       if (tcp->th_flags & TH_URG) *p++ = 'U';
@@ -458,7 +525,7 @@ pcap_t *my_real_pcap_open_live(char *device, int snaplen, int promisc, int to_ms
     fatal("my_real_pcap_open_live: invalid device %s\n", device);
   
   if(o.debugging > 1)
-    printf("Trying to open %s for recieve with winpcap.\n", device);
+    printf("Trying to open %s for receive with winpcap.\n", device);
   
   ifentry = ifi2ifentry(ifi);
   
@@ -564,14 +631,17 @@ int send_tcp_raw_decoys( int sd, const struct in_addr *victim, int ttl,
   return 0;
 }
 
-
-
-int send_tcp_raw( int sd, const struct in_addr *source, 
+/* Builds a TCP packet (including an IP header) by packing the fields
+   with the given information.  It allocates a new buffer to store the
+   packet contents, and then returns that buffer.  The packet is not
+   actually sent by this function.  Caller must delete the buffer when
+   finished with the packet.  The packet length is returned in
+   packetlen, which must be a valid int pointer. */
+u8 *build_tcp_raw(const struct in_addr *source, 
 		  const struct in_addr *victim, int ttl, 
-		  u16 sport, u16 dport, u32 seq, u32 ack, u8 flags,
+		  u16 ipid, u16 sport, u16 dport, u32 seq, u32 ack, u8 flags,
 		  u16 window, u8 *options, int optlen, char *data, 
-		  u16 datalen) 
-{
+		  u16 datalen, u32 *packetlen) {
 
 struct pseudo_header { 
   /*for computing TCP checksum, see TCP/IP Illustrated p. 145 */
@@ -585,20 +655,10 @@ u8 *packet = (u8 *) safe_malloc(sizeof(struct ip) + sizeof(struct tcphdr) + optl
 struct ip *ip = (struct ip *) packet;
 struct tcphdr *tcp = (struct tcphdr *) (packet + sizeof(struct ip));
 struct pseudo_header *pseudo =  (struct pseudo_header *) (packet + sizeof(struct ip) - sizeof(struct pseudo_header)); 
-
- /*With these placement we get data and some field alignment so we aren't
-   wasting too much in computing the checksum */
-int res = -1;
-struct sockaddr_in sock;
 static int myttl = 0;
 
-/* check that required fields are there and not too silly */
-/* We used to check that sport and dport were nonzer0, but scr3w that! */
-if ( !victim || sd < 0) {
-  fprintf(stderr, "send_tcp_raw: One or more of your parameters suck!\n");
-  free(packet);
-  return -1;
-}
+assert(victim);
+assert(source);
 
 if (optlen % 4) {
   fatal("send_tcp_raw called with an option length argument of %d which is illegal because it is not divisible by 4", optlen);
@@ -606,26 +666,10 @@ if (optlen % 4) {
 
 /* Time to live */
 if (ttl == -1) {
-	myttl = (get_random_uint() % 23) + 37;
+  myttl = (get_random_uint() % 23) + 37;
 } else {
-	myttl = ttl;
+  myttl = ttl;
 }
-
-assert(source);
-
-#ifndef WIN32
-/* It was a tough decision whether to do this here for every packet
-   or let the calling function deal with it.  In the end I grudgingly decided
-   to do it here and potentially waste a couple microseconds... */
-sethdrinclude(sd); 
-#endif
-
-/*do we even have to fill out this damn thing?  This is a raw packet, 
-  after all */
-sock.sin_family = AF_INET;
-sock.sin_port = htons(dport);
-sock.sin_addr.s_addr = victim->s_addr;
-
 
 memset((char *) packet, 0, sizeof(struct ip) + sizeof(struct tcphdr));
 
@@ -678,6 +722,7 @@ ip->ip_len = BSDFIX(sizeof(struct ip) + sizeof(struct tcphdr) + optlen + datalen
 get_random_bytes(&(ip->ip_id), 2);
 ip->ip_ttl = myttl;
 ip->ip_p = IPPROTO_TCP;
+ip->ip_id = ipid;
 ip->ip_src.s_addr = source->s_addr;
 #ifdef WIN32
 // I'm not sure why this is --Fyodor
@@ -694,11 +739,67 @@ if (TCPIP_DEBUGGING > 1) {
   readtcppacket(packet,BSDUFIX(ip->ip_len));
 }
 
-res = Sendto("send_tcp_raw", sd, packet, BSDUFIX(ip->ip_len), 0,
-	     (struct sockaddr *)&sock,  (int)sizeof(struct sockaddr_in));
+ *packetlen = BSDUFIX(ip->ip_len);
+ return packet;
 
-free(packet);
-return res;
+}
+
+/* You need to call sethdrinclude(sd) on the sending sd before calling this */
+int send_tcp_raw( int sd, const struct in_addr *source, 
+		  const struct in_addr *victim, int ttl, 
+		  u16 sport, u16 dport, u32 seq, u32 ack, u8 flags,
+		  u16 window, u8 *options, int optlen, char *data, 
+		  u16 datalen) 
+{
+  unsigned int packetlen;
+  int res = -1;
+
+  u8 *packet = build_tcp_raw(source, victim, ttl, get_random_u16(), sport, 
+			     dport, seq, ack, flags, window, options, optlen, 
+			     data, datalen, &packetlen);
+  if (!packet) return -1;
+  res = send_ip_packet(sd, packet, packetlen);
+
+  free(packet);
+  return res;
+}
+
+/* Send a pre-built IPv4 packet */
+int send_ip_packet(int sd, u8 *packet, unsigned int packetlen) {
+  struct sockaddr_in sock;
+  int res;
+  struct ip *ip = (struct ip *) packet;
+  struct tcphdr *tcp = NULL;
+  udphdr_bsd *udp;
+
+  assert(sd >= 0);
+  assert(packet);
+  assert( (int) packetlen > 0);
+
+  memset(&sock, 0, sizeof(sock));
+  sock.sin_family = AF_INET;
+#if HAVE_SOCKADDR_SA_LEN
+  sock.sin_len = sizeof(sock);
+#endif
+  /* It is bogus that I need the address and port info when sending a RAW IP 
+     packet, but it doesn't seem to work w/o them */
+  if (packetlen >= 20) {
+    sock.sin_addr.s_addr = ip->ip_dst.s_addr;
+    if (ip->ip_p == IPPROTO_TCP && packetlen >= (unsigned int) ip->ip_hl * 4 + 20) {
+      tcp = (struct tcphdr *) ((u8 *) ip + ip->ip_hl * 4);
+      sock.sin_port = tcp->th_dport;
+    } else if (ip->ip_p == IPPROTO_UDP && packetlen >= (unsigned int) ip->ip_hl * 4 + 8) {
+      udp = (udphdr_bsd *) ((u8 *) ip + ip->ip_hl * 4);
+      sock.sin_port = udp->uh_dport;
+    }
+  }
+  /* I'll try leaving out port and est address and see what happens */
+  /* sock.sin_port = htons(dport);
+     sock.sin_addr.s_addr = victim->s_addr; */
+  
+  res = Sendto("send_ip_packet", sd, packet, BSDUFIX(ip->ip_len), 0,
+	       (struct sockaddr *)&sock,  (int)sizeof(struct sockaddr_in));
+  return res;
 }
 
 void readippacket(const u8 *packet, int readdata) {
@@ -835,109 +936,110 @@ int send_udp_raw_decoys( int sd, const struct in_addr *victim, int ttl,
 }
 
 
+/* Builds a UDP packet (including an IP header) by packing the fields
+   with the given information.  It allocates a new buffer to store the
+   packet contents, and then returns that buffer.  The packet is not
+   actually sent by this function.  Caller must delete the buffer when
+   finished with the packet.  The packet length is returned in
+   packetlen, which must be a valid int pointer. */
+u8 *build_udp_raw(struct in_addr *source, const struct in_addr *victim,
+ 		  int ttl, u16 sport, u16 dport, u16 ipid, char *data, 
+		  u16 datalen, u32 *packetlen) 
+{
+  unsigned char *packet = (unsigned char *) safe_malloc(sizeof(struct ip) + sizeof(udphdr_bsd) + datalen);
+  struct ip *ip = (struct ip *) packet;
+  udphdr_bsd *udp = (udphdr_bsd *) (packet + sizeof(struct ip));
+  static int myttl = 0;
+  
+  struct pseudo_udp_hdr {
+    struct in_addr source;
+    struct in_addr dest;        
+    u8 zero;
+    u8 proto;        
+    u16 length;
+  } *pseudo = (struct pseudo_udp_hdr *) ((char *)udp - 12) ;
 
+  *packetlen = 0;
+
+  /* check that required fields are there and not too silly */
+  if ( !victim) {
+    fprintf(stderr, "build_udp_raw: One or more of your parameters suck!\n");
+    free(packet);
+    return NULL;
+  }
+  
+  /* Time to live */
+  if (ttl == -1) {
+    myttl = (get_random_uint() % 23) + 37;
+  } else {
+    myttl = ttl;
+  }
+  
+  memset((char *) packet, 0, sizeof(struct ip) + sizeof(udphdr_bsd));
+  
+  udp->uh_sport = htons(sport);
+  udp->uh_dport = htons(dport);
+  udp->uh_ulen = htons(8 + datalen);
+  
+  /* We should probably copy the data over too */
+  if (data)
+    memcpy(packet + sizeof(struct ip) + sizeof(udphdr_bsd), data, datalen);
+  
+  /* Now the psuedo header for checksuming */
+  pseudo->source.s_addr = source->s_addr;
+  pseudo->dest.s_addr = victim->s_addr;
+  pseudo->proto = IPPROTO_UDP;
+  pseudo->length = htons(sizeof(udphdr_bsd) + datalen);
+  
+  /* OK, now we should be able to compute a valid checksum */
+#if STUPID_SOLARIS_CHECKSUM_BUG
+  udp->uh_sum = sizeof(udphdr_bsd) + datalen;
+#else
+  udp->uh_sum = in_cksum((unsigned short *)pseudo, 20 /* pseudo + UDP headers */ + datalen);
+#endif
+  
+  /* Goodbye, pseudo header! */
+  memset(pseudo, 0, sizeof(*pseudo));
+  
+  /* Now for the ip header */
+  ip->ip_v = 4;
+  ip->ip_hl = 5;
+  ip->ip_len = BSDFIX(sizeof(struct ip) + sizeof(udphdr_bsd) + datalen);
+  ip->ip_id = htons(ipid);
+  ip->ip_ttl = myttl;
+  ip->ip_p = IPPROTO_UDP;
+  ip->ip_src.s_addr = source->s_addr;
+#ifdef WIN32
+  // I'm not exactly sure why this is needed --Fyodor
+  if(source->s_addr == victim->s_addr) ip->ip_src.s_addr;
+#endif
+  ip->ip_dst.s_addr= victim->s_addr;
+#if HAVE_IP_IP_SUM
+  ip->ip_sum = in_cksum((unsigned short *)ip, sizeof(struct ip));
+#endif
+  
+  if (TCPIP_DEBUGGING > 1) {
+    printf("Raw UDP packet creation completed!  Here it is:\n");
+    readudppacket(packet,1);
+  }
+  
+  *packetlen = BSDUFIX(ip->ip_len);
+  return packet;
+}
 
 int send_udp_raw( int sd, struct in_addr *source, const struct in_addr *victim,
  		  int ttl, u16 sport, u16 dport, u16 ipid, char *data, 
 		  u16 datalen) 
 {
+  unsigned int packetlen;
+  int res = -1;
+  u8 *packet = build_udp_raw(source, victim, ttl, sport, dport, ipid, data, 
+			     datalen, &packetlen);
+  if (!packet) return -1;
+  res = send_ip_packet(sd, packet, packetlen);
 
-unsigned char *packet = (unsigned char *) safe_malloc(sizeof(struct ip) + sizeof(udphdr_bsd) + datalen);
-struct ip *ip = (struct ip *) packet;
-udphdr_bsd *udp = (udphdr_bsd *) (packet + sizeof(struct ip));
-static int myttl = 0;
-
-int res;
-struct sockaddr_in sock;
-struct pseudo_udp_hdr {
-  struct in_addr source;
-  struct in_addr dest;        
-  u8 zero;
-  u8 proto;        
-  u16 length;
-} *pseudo = (struct pseudo_udp_hdr *) ((char *)udp - 12) ;
-
-/* check that required fields are there and not too silly */
-if ( !victim || sd < 0) {
-  fprintf(stderr, "send_udp_raw: One or more of your parameters suck!\n");
   free(packet);
-  return -1;
-}
-
-/* Time to live */
-if (ttl == -1) {
-  myttl = (get_random_uint() % 23) + 37;
-} else {
-  myttl = ttl;
-}
-
-#ifndef WIN32
-/* It was a tough decision whether to do this here for every packet
-   or let the calling function deal with it.  In the end I grudgingly decided
-   to do it here and potentially waste a couple microseconds... */
-sethdrinclude(sd); 
-#endif
-
-/*do we even have to fill out this damn thing?  This is a raw packet, 
-  after all */
-sock.sin_family = AF_INET;
-sock.sin_port = htons(dport);
-sock.sin_addr.s_addr = victim->s_addr;
-
-
-memset((char *) packet, 0, sizeof(struct ip) + sizeof(udphdr_bsd));
-
-udp->uh_sport = htons(sport);
-udp->uh_dport = htons(dport);
-udp->uh_ulen = htons(8 + datalen);
-
- /* We should probably copy the data over too */
-if (data)
-  memcpy(packet + sizeof(struct ip) + sizeof(udphdr_bsd), data, datalen);
-
-/* Now the psuedo header for checksuming */
-pseudo->source.s_addr = source->s_addr;
-pseudo->dest.s_addr = victim->s_addr;
-pseudo->proto = IPPROTO_UDP;
-pseudo->length = htons(sizeof(udphdr_bsd) + datalen);
-
-/* OK, now we should be able to compute a valid checksum */
-#if STUPID_SOLARIS_CHECKSUM_BUG
- udp->uh_sum = sizeof(struct udphdr_bsd) + datalen;
-#else
-udp->uh_sum = in_cksum((unsigned short *)pseudo, 20 /* pseudo + UDP headers */ + datalen);
-#endif
-
-/* Goodbye, pseudo header! */
-memset(pseudo, 0, sizeof(*pseudo));
-
-/* Now for the ip header */
-ip->ip_v = 4;
-ip->ip_hl = 5;
-ip->ip_len = BSDFIX(sizeof(struct ip) + sizeof(udphdr_bsd) + datalen);
-ip->ip_id = htons(ipid);
-ip->ip_ttl = myttl;
-ip->ip_p = IPPROTO_UDP;
-ip->ip_src.s_addr = source->s_addr;
-#ifdef WIN32
-// I'm not exactly sure why this is needed --Fyodor
-if(source->s_addr == victim->s_addr) ip->ip_src.s_addr;
-#endif
-ip->ip_dst.s_addr= victim->s_addr;
-#if HAVE_IP_IP_SUM
-ip->ip_sum = in_cksum((unsigned short *)ip, sizeof(struct ip));
-#endif
-
-if (TCPIP_DEBUGGING > 1) {
-  printf("Raw UDP packet creation completed!  Here it is:\n");
-  readudppacket(packet,1);
-}
-
-res = Sendto("send_udp_raw", sd, packet, BSDUFIX(ip->ip_len), 0,
-	     (struct sockaddr *)&sock,  (int)sizeof(struct sockaddr_in));
-
-free(packet);
-return res;
+  return res;
 }
 
 int send_small_fragz_decoys(int sd, const struct in_addr *victim, u32 seq,
@@ -1110,22 +1212,26 @@ int send_ip_raw_decoys( int sd, const struct in_addr *victim, int ttl,
 
 }
 
-int send_ip_raw( int sd, struct in_addr *source, const struct in_addr *victim, 
-		 int ttl, u8 proto, char *data, u16 datalen) 
+/* Builds an IP packet (including an IP header) by packing the fields
+   with the given information.  It allocates a new buffer to store the
+   packet contents, and then returns that buffer.  The packet is not
+   actually sent by this function.  Caller must delete the buffer when
+   finished with the packet.  The packet length is returned in
+   packetlen, which must be a valid int pointer. */
+u8 *build_ip_raw(struct in_addr *source, const struct in_addr *victim, 
+		 int ttl, u8 proto, u16 ipid, char *data, u16 datalen, 
+		 u32 *packetlen) 
 {
 
 unsigned char *packet = (unsigned char *) safe_malloc(sizeof(struct ip) + datalen);
 struct ip *ip = (struct ip *) packet;
 static int myttl = 0;
 
-int res = -1;
-struct sockaddr_in sock;
-
 /* check that required fields are there and not too silly */
-if ( !victim || sd < 0) {
+if ( !victim) {
   fprintf(stderr, "send_ip_raw: One or more of your parameters suck!\n");
   free(packet);
-  return -1;
+  return NULL;
 }
 
 /* Time to live */
@@ -1135,20 +1241,6 @@ if (ttl == -1) {
 	        myttl = ttl;
 }
 
-#ifndef WIN32
-/* It was a tough decision whether to do this here for every packet
-   or let the calling function deal with it.  In the end I grudgingly decided
-   to do it here and potentially waste a couple microseconds... */
-sethdrinclude(sd); 
-#endif
-
-/*do we even have to fill out this damn thing?  This is a raw packet, 
-  after all */
-sock.sin_family = AF_INET;
-sock.sin_port = 0;
-sock.sin_addr.s_addr = victim->s_addr;
-
-
 memset((char *) packet, 0, sizeof(struct ip));
 
 /* Now for the ip header */
@@ -1156,15 +1248,15 @@ memset((char *) packet, 0, sizeof(struct ip));
 ip->ip_v = 4;
 ip->ip_hl = 5;
 ip->ip_len = BSDFIX(sizeof(struct ip) + datalen);
-get_random_bytes(&(ip->ip_id), 2);
+ip->ip_id = htons(ipid);
 ip->ip_ttl = myttl;
 ip->ip_p = proto;
 ip->ip_src.s_addr = source->s_addr;
 #ifdef WIN32
-// I'm not sure why this is here -- Fyodor
+// TODO: Should this be removed? I'm not sure why this is here -- Fyodor
 if(source->s_addr == victim->s_addr) ip->ip_src.s_addr++;
 #endif
-ip->ip_dst.s_addr= victim->s_addr;
+ip->ip_dst.s_addr = victim->s_addr;
 #if HAVE_IP_IP_SUM
 ip->ip_sum = in_cksum((unsigned short *)ip, sizeof(struct ip));
 #endif
@@ -1178,12 +1270,26 @@ if (TCPIP_DEBUGGING > 1) {
   hdump(packet, BSDUFIX(ip->ip_len));
 }
 
+ *packetlen = BSDUFIX(ip->ip_len);
+ return packet;
+}
 
-res = Sendto("send_ip_raw", sd, packet, BSDUFIX(ip->ip_len), 0,
-	     (struct sockaddr *)&sock,  (int)sizeof(struct sockaddr_in));
 
-free(packet); 
-return res;
+/* You need to call sethdrinclude(sd) on the sending sd before calling this */
+int send_ip_raw( int sd, struct in_addr *source, const struct in_addr *victim, 
+		 int ttl, u8 proto, char *data, u16 datalen) 
+{
+  unsigned int packetlen;
+  int res = -1;
+
+  u8 *packet = build_ip_raw(source, victim, ttl, proto, get_random_u16(), 
+			    data, datalen, &packetlen);
+  if (!packet) return -1;
+
+  res = send_ip_packet(sd, packet, packetlen);
+
+  free(packet);
+  return res;
 }
 
 int unblock_socket(int sd) {
@@ -1390,7 +1496,6 @@ struct timeval tv_start, tv_end;
 static char *alignedbuf = NULL;
 static unsigned int alignedbufsz=0;
 static int warning = 0;
-
 if (linknfo) { memset(linknfo, 0, sizeof(*linknfo)); }
 
 #ifdef WIN32
@@ -1555,7 +1660,19 @@ if (!pd) fatal("NULL packet device passed to readip_pcap");
 
  return alignedbuf;
 }
-  
+ 
+// Returns whether the packet receive time value obtaned from libpcap
+// (and thus by readip_pcap()) should be considered valid.  When
+// invalid (Windows and Amiga), readip_pcap returns the time you called it.
+bool pcap_recv_timeval_valid() {
+#if defined(WIN32) || defined(__amigaos__)
+  return false;
+#else
+  return true;
+#endif
+}
+
+
 /* This function tries to determine the target's ethernet MAC address
    from a received packet as follows:
    1) If linkhdr is an ethernet header, grab the src mac (otherwise give up)
@@ -1609,7 +1726,7 @@ void set_pcap_filter(Target *target,
 		     pcap_t *pd, PFILTERFN filter, char *bpf, ...)
 {
   va_list ap;
-  char buf[512];
+  char buf[1024];
   struct bpf_program fcode;
 #ifndef __amigaos__
   unsigned int localnet, netmask;
@@ -1622,7 +1739,8 @@ void set_pcap_filter(Target *target,
     fatal("Failed to lookup device subnet/netmask: %s", err0r);
   
   va_start(ap, bpf);
-  vsprintf(buf, bpf, ap);
+  if (vsnprintf(buf, sizeof(buf), bpf, ap) >= (int) sizeof(buf))
+    fatal("set_pcap_filter called with too-large filter arg\n");
   va_end(ap);
   
   if (o.debugging)
@@ -1644,6 +1762,12 @@ void set_pcap_filter(Target *target,
 unsigned long flt_dsthost, flt_srchost;	/* _net_ order */
 unsigned short flt_baseport;	/*	_host_ order */
 
+/* Just accept everything ... TODO: Need a better approach than this flt_ 
+   stuff */
+int flt_all(const char *packet, unsigned int len) {
+  return 1;
+}
+
 int flt_icmptcp(const char *packet, unsigned int len)
 {
   struct ip* ip = (struct ip*)packet;
@@ -1664,7 +1788,7 @@ int flt_icmptcp_2port(const char *packet, unsigned int len)
   if(ip->ip_p == IPPROTO_TCP)
     {
       struct tcphdr* tcp = (struct tcphdr *) (((char *) ip) + 4 * ip->ip_hl);
-      if(len < (unsigned int) 4 * ip->ip_hl + 4) return 0;
+      if(len < (unsigned) 4 * ip->ip_hl + 4) return 0;
 	  dport = ntohs(tcp->th_dport);
       if(dport == flt_baseport || dport == flt_baseport + 1)
 	return 1;
@@ -1682,7 +1806,7 @@ int flt_icmptcp_5port(const char *packet, unsigned int len)
   if(ip->ip_p == IPPROTO_TCP)
     {
       struct tcphdr* tcp = (struct tcphdr *) (((char *) ip) + 4 * ip->ip_hl);
-      if(len < (unsigned int) 4 * ip->ip_hl + 4) return 0;
+      if(len < (unsigned) 4 * ip->ip_hl + 4) return 0;
       dport = ntohs(tcp->th_dport);
       if(dport >= flt_baseport && dport <= flt_baseport + 4) return 1;
     }
@@ -1774,7 +1898,7 @@ struct interface_info *getinterfaces(int *howmany) {
     printf("ifnet list length = %d\n",ifc.ifc_len);
     printf("sa_len = %d\n",len);
     hdump((unsigned char *) buf, ifc.ifc_len);
-    printf("ifr = %X\n",(unsigned int)(*(char **)&ifr));
+    printf("ifr = %X\n",(unsigned)(*(char **)&ifr));
     printf("Size of struct ifreq: %d\n", sizeof(struct ifreq));
 #endif
 
@@ -1782,7 +1906,7 @@ struct interface_info *getinterfaces(int *howmany) {
 	((*(char **)&ifr) += len )) {
 #if TCPIP_DEBUGGING
       printf("ifr_name size = %d\n", sizeof(ifr->ifr_name));
-      printf("ifr = %X\n",(unsigned int)(*(char **)&ifr));
+      printf("ifr = %X\n",(unsigned)(*(char **)&ifr));
 #endif
 
       /* skip any device with no name */
@@ -1834,12 +1958,16 @@ struct interface_info *getinterfaces(int *howmany) {
 
 /* Check whether an IP address appears to be directly connected to an
    interface on the computer (e.g. on the same ethernet network rather
-   than having to route).  Returns 1 if yes, -1 if maybe, 0 if not. Windows
-   machines always return -1, because nobody has written a windows version.
-   Any volunteers? */
+   than having to route).  Returns 1 if yes, -1 if maybe, 0 if not.
+   The Windows version tries to give an accurate answer, which I'm
+   not sure is the right thing to do in rawsock mode... */
 int IPisDirectlyConnected(struct sockaddr_storage *ss, size_t ss_len) {
 #if WIN32
-return -1;
+  struct sockaddr_in *sin = (struct sockaddr_in *) ss;
+  MIB_IPFORWARDROW route;
+  if(get_best_route(sin->sin_addr.s_addr, &route) < 0)
+         return -1;
+  return route.dwForwardType == 3 ? 1 : 0;
 #else
   struct interface_info *interfaces;
   int numinterfaces;
@@ -1968,8 +2096,17 @@ char *routethrough(const struct in_addr * const dest, struct in_addr *source) {
   /* WHEW, that takes care of initializing, now we have the easy job of 
      finding which route matches */
   if (islocalhost(dest)) {
-    if (source)
-      source->s_addr = htonl(0x7F000001);
+
+    /* I used to set the source to 127.0.0.1 in this case, but that
+       seems to cause problems on Linux, where the dang system will
+       reply from another addy:
+         0.160995    127.0.0.1 -> 192.168.0.42 TCP 63331 > 1 [SYN] Seq=1321326640 Ack=0 Win=1024 Len=0
+         0.161027 192.168.0.42 -> 192.168.0.42 TCP 1 > 63331 [RST, ACK] Seq=0 Ack=1321326641 Win=0 Len=0
+         So I'll try just using the localhost device, but keeping the
+         more proper source 
+    //    if (source)
+    //      source->s_addr = htonl(0x7F000001);
+    */
     /* Now we find the localhost interface name, assuming 127.0.0.1 is
        localhost (it damn well better be!)... */
     for(i=0; i < numinterfaces; i++) {    
@@ -2027,7 +2164,7 @@ void max_rcvbuf(int sd) {
 
 #ifndef WIN32
   if (setsockopt(sd, SOL_SOCKET, SO_RCVBUF, (const char *) &optval, optlen))
-    if (o.debugging) perror("Problem setting large socket recieve buffer");
+    if (o.debugging) perror("Problem setting large socket receive buffer");
   if (o.debugging) {
     getsockopt(sd, SOL_SOCKET, SO_RCVBUF,(char *) &optval, &optlen);
     log_write(LOG_STDOUT, "Our buffer size is now %d\n", optval);
@@ -2227,10 +2364,12 @@ do {
 	   sd, len, inet_ntoa(sin->sin_addr), tolen);
   }
   if ((res = sendto(sd, (const char *) packet, len, flags, to, tolen)) == -1) {
+    int err = socket_errno();
+
     error("sendto in %s: sendto(%d, packet, %d, 0, %s, %d) => %s",
 	  functionname, sd, len, inet_ntoa(sin->sin_addr), tolen,
-	  strerror(socket_errno()));
-    if (retries > 2 || socket_errno() == EPERM || socket_errno() == EACCES || socket_errno() == EADDRNOTAVAIL)
+	  strerror(err));
+    if (retries > 2 || err == EPERM || err == EACCES || err == EADDRNOTAVAIL)
       return -1;
     sleeptime = 15 * (1 << (2 * retries));
     error("Sleeping %d seconds then retrying", sleeptime);
@@ -2248,3 +2387,52 @@ if (TCPIP_DEBUGGING > 1)
 return res;
 }
 #endif
+
+IPProbe::IPProbe() {
+  packetbuflen = 0;
+  packetbuf = NULL;
+  Reset();
+}
+
+void IPProbe::Reset() {
+  if (packetbuf)
+    free(packetbuf);
+  packetbuflen = 0;
+  packetbuf = NULL;
+  ipv4 = NULL;
+  icmp = NULL;
+  tcp = NULL;
+  udp = NULL;
+}
+
+IPProbe::~IPProbe() {
+  if (packetbuf) {
+    free(packetbuf);
+    packetbuf = NULL;
+    packetbuflen = 0;
+  }
+  Reset();
+}
+
+int IPProbe::storePacket(u8 *ippacket, u32 len) {
+  assert(packetbuf == NULL);
+  af = AF_INET;
+  packetbuf = (u8 *) safe_malloc(len);
+  memcpy(packetbuf, ippacket, len);
+  packetbuflen = len;
+  ipv4 = (struct ip *) packetbuf;
+  assert(ipv4->ip_v == 4);
+  assert(len >= 20);
+  assert(len == BSDUFIX(ipv4->ip_len));
+  if (ipv4->ip_p == IPPROTO_TCP) {
+    if (len >= (unsigned) ipv4->ip_hl * 4 + 20)
+      tcp = (struct tcphdr *) ((u8 *) ipv4 + ipv4->ip_hl * 4);
+  } else if (ipv4->ip_p == IPPROTO_ICMP) {
+    if (len >= (unsigned) ipv4->ip_hl * 4 + 8)
+      icmp = (struct icmp *) ((u8 *) ipv4 + ipv4->ip_hl * 4);
+  } else if (ipv4->ip_p == IPPROTO_UDP) {
+    if (len >= (unsigned) ipv4->ip_hl * 4 + 8)
+      udp = (udphdr_bsd *) ((u8 *) ipv4 + ipv4->ip_hl * 4);
+  }
+  return 0;
+}

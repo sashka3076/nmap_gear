@@ -27,8 +27,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -55,8 +58,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -82,11 +94,12 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: TargetGroup.cc,v 1.9 2004/03/12 01:59:04 fyodor Exp $ */
+/* $Id: TargetGroup.cc,v 1.12 2004/08/29 09:12:03 fyodor Exp $ */
 
 #include "TargetGroup.h"
 #include "NmapOps.h"
@@ -104,6 +117,42 @@ void TargetGroup::Initialize() {
   memset(current, 0, sizeof(current));
   memset(last, 0, sizeof(last));
   ipsleft = 0;
+}
+
+/* take the object back to the begining without  (mdmcl)
+ * reinitalizing the data structures */  
+int  TargetGroup::rewind() {
+
+  /* For netmasks we must set the current address to the
+   * starting address and calculate the ips by distance */
+  if (targets_type == IPV4_NETMASK) {
+      currentaddr = startaddr;
+      if (startaddr.s_addr <= endaddr.s_addr) { 
+	ipsleft = endaddr.s_addr - startaddr.s_addr + 1;
+	return 0; 
+      }
+      else
+        assert(FALSE);
+  }
+  /* For ranges, we easily set current to zero and calculate
+   * the ips by the number of values in the columns */
+  else if (targets_type == IPV4_RANGES) {
+    memset((char *)current, 0, sizeof(current));
+    ipsleft = (last[0] + 1) * (last[1] + 1) *
+      (last[2] + 1) * (last[3] + 1);
+    return 0;
+  }
+#if HAVE_IPV6
+  /* For IPV6 there is only one address, this function doesn't
+   * make much sence for IPv6 does it? */
+  else if (targets_type == IPV6_ADDRESS) {
+    ipsleft = 1;
+    return 0;
+  }
+#endif 
+
+  /* If we got this far there must be an error, wrong type */
+  return -1;
 }
 
  /* Initializes (or reinitializes) the object with a new expression, such
@@ -207,7 +256,7 @@ int TargetGroup::parse_expr(const char * const target_expr, int af) {
 	    if ((r = strchr(addy[i],'-')) && *(r+1) ) end = atoi(r + 1);
 	    else if (r && !*(r+1)) end = 255;
 	  }
-	  if (o.debugging)
+	  if (o.debugging > 2)
 	    log_write(LOG_STDOUT, "The first host is %d, and the last one is %d\n", start, end);
 	  if (start < 0 || start > end) fatal("Your host specifications are illegal!");
 	  for(k=start; k <= end; k++)
@@ -225,7 +274,7 @@ int TargetGroup::parse_expr(const char * const target_expr, int af) {
 	  if ((r =  strchr(addy[i],'-')) && *(r+1) ) end = atoi(r+1);
 	  else if (r && !*(r+1)) end = 255;
 	}
-	if (o.debugging)
+	if (o.debugging > 2)
 	  log_write(LOG_STDOUT, "The first host is %d, and the last one is %d\n", start, end);
 	if (start < 0 || start > end) fatal("Your host specifications are illegal!");
 	if (j + (end - start) > 255) fatal("Your host specifications are illegal!");
@@ -235,7 +284,7 @@ int TargetGroup::parse_expr(const char * const target_expr, int af) {
 	
       }
     }
-  memset((char *)current, 0, 4);
+  memset((char *)current, 0, sizeof(current));
   ipsleft = (last[0] + 1) * (last[1] + 1) *
     (last[2] + 1) * (last[3] + 1);
   }
@@ -270,6 +319,60 @@ int TargetGroup::parse_expr(const char * const target_expr, int af) {
 
   free(hostexp);
   return 0;
+}
+
+/* For ranges, skip all hosts in an octet,                  (mdmcl)
+ * get_next_host should be used for skipping the last octet :-) 
+ * returns: number of hosts skipped */
+int TargetGroup::skip_range(_octet_nums octet) {
+  int hosts_skipped = 0, /* number of hosts skipped */
+      oct = 0,           /* octect number */
+      i;                 /* simple lcv */
+
+  /* This function is only supported for RANGES! */
+  if (targets_type != IPV4_RANGES)
+    return -1;
+
+  switch (octet) {
+    case FIRST_OCTET:
+      oct = 0;
+      hosts_skipped = (last[1] + 1) * (last[2] + 1) * (last[3] + 1);
+      break;
+    case SECOND_OCTET:
+      oct = 1;
+      hosts_skipped = (last[2] + 1) * (last[3] + 1);
+      break;
+    case THIRD_OCTET:
+      oct = 2;
+      hosts_skipped = (last[3] + 1);
+      break;
+    default:  /* Hmm, how'd you do that */
+      return -1;
+  }
+
+  /* catch if we try to take more than are left */
+  assert(ipsleft >= hosts_skipped - 1);
+
+  /* increment the next octect that we can above us */
+  for (i = oct; i >= 0; i--) {
+    if (current[i] < last[i]) {
+      current[i]++;
+      break;
+    }
+    else
+      current[i] = 0;
+  }
+
+  /* reset all the ones below us to zero */
+  for (i = oct+1; i <= 3; i++) {
+    current[i] = 0;
+  }
+
+  /* we actauly don't skip the current, it was accounted for 
+   * by get_next_host */
+  ipsleft -= hosts_skipped - 1;
+ 
+  return hosts_skipped;
 }
 
  /* Grab the next host from this expression (if any) and uptdates its internal

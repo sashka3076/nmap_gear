@@ -27,8 +27,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -55,8 +58,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -82,11 +94,12 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: TargetGroup.h,v 1.7 2004/03/12 01:59:04 fyodor Exp $ */
+/* $Id: TargetGroup.h,v 1.9 2004/08/29 09:12:03 fyodor Exp $ */
 
 #ifndef TARGETGROUP_H
 #define TARGETGROUP_H
@@ -95,6 +108,10 @@
 
 class TargetGroup {
  public:
+  /* used by get_target_types */
+  enum _targets_types { TYPE_NONE, IPV4_NETMASK, IPV4_RANGES, IPV6_ADDRESS };
+  /* used as input to skip range */
+  enum _octet_nums { FIRST_OCTET, SECOND_OCTET, THIRD_OCTET };
   TargetGroup();
 
  /* Initializes (or reinitializes) the object with a new expression,
@@ -102,6 +119,8 @@ class TargetGroup {
     fe80::202:e3ff:fe14:1102 .  The af parameter is AF_INET or
     AF_INET6 Returns 0 for success */
   int parse_expr(const char * const target_expr, int af);
+  /* Reset the object without reinitializing it */
+  int rewind();
   /* Grab the next host from this expression (if any).  Returns 0 and
      fills in ss if successful.  ss must point to a pre-allocated
      sockaddr_storage structure */
@@ -111,9 +130,14 @@ class TargetGroup {
      this if you have fetched at least 1 host since parse_expr() was
      called */
   int return_last_host();
+  /* return the target type */
+  char get_targets_type() {return targets_type;};
+  /* get the netmask */
+  int get_mask() {return netmask;};
+  /* Skip an octet in the range array */
+  int skip_range(_octet_nums octet);
  private:
-  enum { TYPE_NONE, IPV4_NETMASK, IPV4_RANGES, IPV6_ADDRESS } targets_type;
-
+  enum _targets_types targets_type;
   void Initialize();
 
 #if HAVE_IPV6

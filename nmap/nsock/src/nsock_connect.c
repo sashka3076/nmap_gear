@@ -13,6 +13,15 @@
  * may be willing to sell alternative licenses (contact                    *
  * sales@insecure.com ).                                                   *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         * 
  * If you received these files with a written license agreement stating    *
  * terms other than the (GPL) terms above, then that alternative license   *
  * agreement takes precedence over this comment.                          *
@@ -44,7 +53,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_connect.c,v 1.18 2004/03/12 01:50:58 fyodor Exp $ */
+/* $Id: nsock_connect.c,v 1.20 2004/08/29 09:12:05 fyodor Exp $ */
 
 #include "nsock.h"
 #include "nsock_internal.h"
@@ -93,11 +102,18 @@ static void nsock_connect_internal(mspool *ms, msevent *nse, int proto,
     memcpy(&nse->iod->peer, ss, sslen);
     nse->iod->peerlen = sslen;
 
-    if ((res = connect(nse->iod->sd, (struct sockaddr *) ss,
-		       sslen)) != -1) {
-      nse->event_done = 1; nse->status = NSE_STATUS_SUCCESS;
-    } else if (proto != IPPROTO_TCP || (socket_errno() != EINPROGRESS && socket_errno() != EAGAIN)) {
-      nse->event_done = 1; nse->status = NSE_STATUS_ERROR; nse->errnum = socket_errno();
+    if ((res = connect(nse->iod->sd, (struct sockaddr *) ss, sslen)) != -1) {
+      nse->event_done = 1;
+      nse->status = NSE_STATUS_SUCCESS;
+    }
+    else {
+      int err = socket_errno();
+
+      if (proto != IPPROTO_TCP || (err != EINPROGRESS && err != EAGAIN)) {
+        nse->event_done = 1;
+        nse->status = NSE_STATUS_ERROR;
+        nse->errnum = err;
+      }
     }
   }
 }

@@ -26,8 +26,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -54,8 +57,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -81,11 +93,12 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: service_scan.cc,v 1.32 2004/07/07 08:02:15 fyodor Exp $ */
+/* $Id: service_scan.cc,v 1.35 2004/08/29 09:12:03 fyodor Exp $ */
 
 
 #include "service_scan.h"
@@ -203,12 +216,14 @@ private:
 // This holds the service information for a group of Targets being service scanned.
 class ServiceGroup {
 public:
-  ServiceGroup(Target *targets[], int num_targets, AllProbes *AP);
+  ServiceGroup(vector<Target *> &Targets, AllProbes *AP);
   ~ServiceGroup();
   list<ServiceNFO *> services_finished; // Services finished (discovered or not)
   list<ServiceNFO *> services_in_progress; // Services currently being probed
   list<ServiceNFO *> services_remaining; // Probes not started yet
   unsigned int ideal_parallelism; // Max (and desired) number of probes out at once.
+  ScanProgressMeter *SPM;
+  int num_hosts_timedout; // # of hosts timed out during (or before) scan
   private:
 };
 
@@ -1391,19 +1406,25 @@ u8 *ServiceNFO::getcurrentproberesponse(int *respstrlen) {
 }
 
 
-ServiceGroup::ServiceGroup(Target *targets[], int num_targets, 
-			   AllProbes *AP) {
-  int targetno;
+ServiceGroup::ServiceGroup(vector<Target *> &Targets, AllProbes *AP) {
+  unsigned int targetno;
   ServiceNFO *svc;
   Port *nxtport;
   int desired_par;
+  struct timeval now;
+  num_hosts_timedout = 0;
+  gettimeofday(&now, NULL);
 
-  for(targetno = 0 ; targetno < num_targets; targetno++) {
+  for(targetno = 0 ; targetno < Targets.size(); targetno++) {
     nxtport = NULL;
-    while((nxtport = targets[targetno]->ports.nextPort(nxtport, 0, PORT_OPEN,
+    if (Targets[targetno]->timedOut(&now)) {
+      num_hosts_timedout++;
+      continue;
+    }
+    while((nxtport = Targets[targetno]->ports.nextPort(nxtport, 0, PORT_OPEN,
 			      true))) {
       svc = new ServiceNFO(AP);
-      svc->target = targets[targetno];
+      svc->target = Targets[targetno];
       svc->portno = nxtport->portno;
       svc->proto = nxtport->proto;
       svc->port = nxtport;
@@ -1411,6 +1432,26 @@ ServiceGroup::ServiceGroup(Target *targets[], int num_targets,
     }
   }
 
+  /* Use a whole new loop for PORT_OPENFILTERED so that we try all the
+     known open ports first before bothering with this speculative
+     stuff */
+  for(targetno = 0 ; targetno < Targets.size(); targetno++) {
+    nxtport = NULL;
+    if (Targets[targetno]->timedOut(&now)) {
+      continue;
+    }
+    while((nxtport = Targets[targetno]->ports.nextPort(nxtport, 0, 
+						       PORT_OPENFILTERED, true))) {
+      svc = new ServiceNFO(AP);
+      svc->target = Targets[targetno];
+      svc->portno = nxtport->portno;
+      svc->proto = nxtport->proto;
+      svc->port = nxtport;
+      services_remaining.push_back(svc);
+    }
+  }
+
+  SPM = new ScanProgressMeter("Service scan");
   desired_par = 1;
   if (o.timing_level == 3) desired_par = 10;
   if (o.timing_level == 4) desired_par = 15;
@@ -1430,6 +1471,8 @@ ServiceGroup::~ServiceGroup() {
 
   for(i = services_remaining.begin(); i != services_remaining.end(); i++)
     delete *i;
+
+  delete SPM;
 }
 
   // Sends probe text to an open connection.  In the case of a NULL probe, there
@@ -1569,11 +1612,51 @@ static int scanThroughTunnel(nsock_pool nsp, nsock_iod nsi, ServiceGroup *SG,
   return 1;
 }
 
+/* Prints completion estimates and the like when appropriate */
+static void considerPrintingStats(ServiceGroup *SG) {
+  /* Perhaps this should be made more complex, but I suppose it should be
+     good enough for now. */
+  if (SG->SPM->mayBePrinted(nsock_gettimeofday())) {
+    SG->SPM->printStatsIfNeccessary(SG->services_finished.size() / ((double)SG->services_remaining.size() + SG->services_in_progress.size() + SG->services_finished.size()), nsock_gettimeofday());
+  }
+}
+
+/* Check if target is done (no more probes remaining for it in service group),
+   and responds appropriately if so */
+static void handleHostIfDone(ServiceGroup *SG, Target *target) {
+  list<ServiceNFO *>::iterator svcI;
+  bool found = false;
+
+  for(svcI = SG->services_in_progress.begin(); 
+      svcI != SG->services_in_progress.end(); svcI++) {
+    if ((*svcI)->target == target) {
+      found = true;
+      break;
+    }
+  }
+
+  for(svcI = SG->services_remaining.begin(); 
+      !found && svcI != SG->services_remaining.end(); svcI++) {
+    if ((*svcI)->target == target) {
+      found = true;
+      break;
+    }
+  }
+
+  if (!found) {
+    target->stopTimeOutClock(nsock_gettimeofday());
+    if (target->timedOut(NULL)) {
+      SG->num_hosts_timedout++;
+    }
+  }
+}
+
 // A simple helper function to cancel further work on a service and
 // set it to the given probe_state pass NULL for nsi if you don't want
 // it to be deleted (for example, if you already have done so).
 void end_svcprobe(nsock_pool nsp, enum serviceprobestate probe_state, ServiceGroup *SG, ServiceNFO *svc, nsock_iod nsi) {
   list<ServiceNFO *>::iterator member;
+  Target *target = svc->target;
 
   svc->probe_state = probe_state;
   member = find(SG->services_in_progress.begin(), SG->services_in_progress.end(),
@@ -1582,10 +1665,13 @@ void end_svcprobe(nsock_pool nsp, enum serviceprobestate probe_state, ServiceGro
   SG->services_in_progress.erase(member);
   SG->services_finished.push_back(svc);
 
+  considerPrintingStats(SG);
+
   if (nsi) {
     nsi_delete(nsi, NSOCK_PENDING_SILENT);
   }
 
+  handleHostIfDone(SG, target);
   return;
 }
 
@@ -1599,7 +1685,9 @@ void servicescan_connect_handler(nsock_pool nsp, nsock_event nse, void *mydata) 
 
   assert(type == NSE_TYPE_CONNECT || type == NSE_TYPE_CONNECT_SSL);
 
-  if (status == NSE_STATUS_SUCCESS) {
+  if (svc->target->timedOut(nsock_gettimeofday())) {
+    end_svcprobe(nsp, PROBESTATE_INCOMPLETE, SG, svc, nsi);
+  } else if (status == NSE_STATUS_SUCCESS) {
 
 #if HAVE_OPENSSL
     // Snag our SSL_SESSION from the nsi for use in subsequent connections.
@@ -1650,11 +1738,16 @@ void servicescan_write_handler(nsock_pool nsp, nsock_event nse, void *mydata) {
   ServiceGroup *SG;
   int err;
 
-  if (status == NSE_STATUS_SUCCESS)
-    return;
-
   SG = (ServiceGroup *) nsp_getud(nsp);
   nsi = nse_iod(nse);
+
+  if (svc->target->timedOut(nsock_gettimeofday())) {
+    end_svcprobe(nsp, PROBESTATE_INCOMPLETE, SG, svc, nsi);
+    return;
+  }
+
+  if (status == NSE_STATUS_SUCCESS)
+    return;
 
   if (status == NSE_STATUS_KILL) {
     /* User probablby specified host_timeout and so the service scan is
@@ -1680,6 +1773,20 @@ void servicescan_write_handler(nsock_pool nsp, nsock_event nse, void *mydata) {
   return;
 }
 
+/* Called if data is read for a service.  Checks if the service is UDP and
+   the port is in state PORT_OPENFILTERED.  If that is the case, the state
+   is changed to PORT_OPEN, as only an open port would return a response */
+static void adjustPortStateIfNeccessary(ServiceNFO *svc) {
+  if (svc->proto != IPPROTO_UDP)
+    return;
+
+  if (svc->port->state == PORT_OPENFILTERED) {
+    svc->target->ports.addPort(svc->portno, IPPROTO_UDP, NULL, PORT_OPEN);
+  }
+
+  return;
+}
+
 void servicescan_read_handler(nsock_pool nsp, nsock_event nse, void *mydata) {
   nsock_iod nsi = nse_iod(nse);
   enum nse_status status = nse_status(nse);
@@ -1694,9 +1801,12 @@ void servicescan_read_handler(nsock_pool nsp, nsock_event nse, void *mydata) {
 
   assert(type == NSE_TYPE_READ);
 
-  if (status == NSE_STATUS_SUCCESS) {
+  if (svc->target->timedOut(nsock_gettimeofday())) {
+    end_svcprobe(nsp, PROBESTATE_INCOMPLETE, SG, svc, nsi);
+  } else if (status == NSE_STATUS_SUCCESS) {
     // w00p, w00p, we read something back from the port.
     readstr = (u8 *) nse_readbuf(nse, &readstrlen);
+    adjustPortStateIfNeccessary(svc); /* A UDP response means PORT_OPENFILTERED is really PORT_OPEN */
     svc->appendtocurrentproberesponse(readstr, readstrlen);
     // now get the full version
     readstr = svc->getcurrentproberesponse(&readstrlen);
@@ -1889,6 +1999,10 @@ int launchSomeServiceProbes(nsock_pool nsp, ServiceGroup *SG) {
 	 !SG->services_remaining.empty()) {
     // Start executing a probe from the new list and move it to in_progress
     svc = SG->services_remaining.front();
+    if (svc->target->timedOut(nsock_gettimeofday())) {
+      end_svcprobe(nsp, PROBESTATE_INCOMPLETE, SG, svc, NULL);
+      continue;
+    }
     nextprobe = svc->nextProbe(true);
     // We start by requesting a connection to the target
     if ((svc->niod = nsi_new(nsp, svc)) == NULL) {
@@ -1917,10 +2031,27 @@ int launchSomeServiceProbes(nsock_pool nsp, ServiceGroup *SG) {
   return 0;
 }
 
+/* Start the timeout clocks of any targets that have probes.  Assumes
+   that this is called before any probes have been launched (so they
+   are all in services_remaining */
+static void startTimeOutClocks(ServiceGroup *SG) {
+  list<ServiceNFO *>::iterator svcI;
+  Target *target = NULL;
+  struct timeval tv;
+
+  gettimeofday(&tv, NULL);
+  for(svcI = SG->services_remaining.begin(); 
+      svcI != SG->services_remaining.end(); svcI++) {
+    target = (*svcI)->target;
+    if (!target->timeOutClockRunning())
+      target->startTimeOutClock(&tv);
+  }
+}
 
 /* Execute a service fingerprinting scan against all open ports of the
-   targets[] specified. */
-int service_scan(Target *targets[], int num_targets) {
+   Targets specified. */
+int service_scan(vector<Target *> &Targets) {
+  // int service_scan(Target *targets[], int num_targets)
   static AllProbes *AP;
   ServiceGroup *SG;
   nsock_pool nsp;
@@ -1928,13 +2059,9 @@ int service_scan(Target *targets[], int num_targets) {
   int timeout;
   enum nsock_loopstatus looprc;
   time_t starttime;
+  struct timeval starttv;
 
-  if (num_targets <= 0)
-    return 1;
-
-  // TODO:  This might have to change once I actually start passing in
-  // more than one target.
-  if (targets[0]->timedout)
+  if (Targets.size() == 0)
     return 1;
 
   if (!AP) {
@@ -1942,18 +2069,30 @@ int service_scan(Target *targets[], int num_targets) {
     parse_nmap_service_probes(AP);
   }
 
+
   // Now I convert the targets into a new ServiceGroup
-  SG = new ServiceGroup(targets, num_targets, AP);
+  SG = new ServiceGroup(Targets, AP);
+  startTimeOutClocks(SG);
 
   if (SG->services_remaining.size() == 0) {
     delete SG;
     return 1;
   }
-
+  
+  gettimeofday(&starttv, NULL);
   starttime = time(NULL);
   if (o.verbose) {
+    char targetstr[128];
     struct tm *tm = localtime(&starttime);
-    log_write(LOG_STDOUT, "Initiating service scan against %d %s on %d %s at %02d:%02d\n", SG->services_remaining.size(), (SG->services_remaining.size() == 1)? "service" : "services", num_targets, (num_targets == 1)? "host" : "hosts", tm->tm_hour, tm->tm_min);
+    bool plural = (Targets.size() != 1);
+    if (!plural) {
+      (*(Targets.begin()))->NameIP(targetstr, sizeof(targetstr));
+    } else snprintf(targetstr, sizeof(targetstr), "%d hosts", Targets.size());
+
+    log_write(LOG_STDOUT, "Initiating service scan against %d %s on %s at %02d:%02d\n", 
+	      SG->services_remaining.size(), 
+	      (SG->services_remaining.size() == 1)? "service" : "services", 
+	      targetstr, tm->tm_hour, tm->tm_min);
   }
 
   // Lets create a nsock pool for managing all the concurrent probes
@@ -1970,32 +2109,30 @@ int service_scan(Target *targets[], int num_targets) {
 
   // How long do we have befor timing out?
   gettimeofday(&now, NULL);
-  // TODO:  May need to change when multiple hosts are actually used
-  if (!o.host_timeout)
-    timeout= -1;
-  else 
-    timeout = TIMEVAL_MSEC_SUBTRACT(targets[0]->host_timeout, now);
-    
-  if (timeout != -1 && timeout < 500) { // half a second or less just won't cut it
-    targets[0]->timedout = 1;
-  } else {
-    // OK!  Lets start our main loop!
-    looprc = nsock_loop(nsp, timeout);
-    if (looprc == NSOCK_LOOP_ERROR) {
-      int err = nsp_geterrorcode(nsp);
-      fatal("Unexpected nsock_loop error.  Error code %d (%s)", err, strerror(err));
-    } else if (looprc == NSOCK_LOOP_TIMEOUT) {
-      targets[0]->timedout = 1;
-    } // else we succeeded!  Should we do something in that case?
+  timeout = -1;
+
+  // OK!  Lets start our main loop!
+  looprc = nsock_loop(nsp, timeout);
+  if (looprc == NSOCK_LOOP_ERROR) {
+    int err = nsp_geterrorcode(nsp);
+    fatal("Unexpected nsock_loop error.  Error code %d (%s)", err, strerror(err));
   }
 
   nsp_delete(nsp);
 
   if (o.verbose) {
-    long nsec = time(NULL) - starttime;
-    if (!targets[0]->timedout) {
-      log_write(LOG_STDOUT, "The service scan took %ld %s to scan %d %s on %d %s.\n", nsec, (nsec == 1)? "second" : "seconds", SG->services_finished.size(),  (SG->services_finished.size() == 1)? "service" : "services", num_targets, (num_targets == 1)? "host" : "hosts");
-    } else log_write(LOG_STDOUT, "The service scan timed out.\n");
+    gettimeofday(&now, NULL);
+    if (SG->num_hosts_timedout == 0)
+      log_write(LOG_STDOUT, "The service scan took %.2fs to scan %d %s on %d %s.\n", 
+		TIMEVAL_MSEC_SUBTRACT(now, starttv) / 1000.0, 
+		SG->services_finished.size(),  
+		(SG->services_finished.size() == 1)? "service" : "services", 
+		Targets.size(), (Targets.size() == 1)? "host" : "hosts");
+    else log_write(LOG_STDOUT, 
+		   "Finished service scan in %.2fs, but %d %s timed out.\n", 
+		   TIMEVAL_MSEC_SUBTRACT(now, starttv) / 1000.0, 
+		   SG->num_hosts_timedout, 
+		   (SG->num_hosts_timedout == 1)? "host" : "hosts");
   }
 
   // Yeah - done with the service scan.  Now I go through the results

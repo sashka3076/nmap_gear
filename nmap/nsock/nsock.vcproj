@@ -137,10 +137,10 @@
 				RelativePath=".\src\nsock_timers.c">
 			</File>
 			<File
-				RelativePath=".\src\nsock_write.c">
+				RelativePath=".\src\nsock_utils.c">
 			</File>
 			<File
-				RelativePath=".\src\utils.c">
+				RelativePath=".\src\nsock_write.c">
 			</File>
 		</Filter>
 		<Filter
@@ -166,7 +166,7 @@
 				RelativePath=".\src\nsock_internal.h">
 			</File>
 			<File
-				RelativePath=".\src\utils.h">
+				RelativePath=".\src\nsock_utils.h">
 			</File>
 		</Filter>
 		<Filter

@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #include "..\tcpip.h"
 #include "winip.h"
 #include "..\..\NmapOps.h"
+#undef socket
 
 #ifndef SIO_RCVALL
 #define IOC_VENDOR 0x18000000
@@ -52,7 +53,7 @@ pcap_t *rawrecv_open(const char *dev)
 	struct sockaddr_in sin;
 
 	if(o.debugging > 1)
-		printf("Trying to open %s for rawsock recieve\n", dev);
+		printf("Trying to open %s for rawsock receive\n", dev);
 
 	ZeroMemory(&sin, sizeof(sin));
 	sin.sin_family = AF_INET;
@@ -67,7 +68,7 @@ pcap_t *rawrecv_open(const char *dev)
 		fatal("rawrecv: cannot open raw socket\n");
 
 	if(bind(s, (struct sockaddr*)&sin, sizeof(sin)))
-		fatal("rawrecv_open: failed to bind to %s\n", inet_ntoa(sin.sin_addr));
+	  fatal("rawrecv_open: failed to bind to %s (%d)\n", inet_ntoa(sin.sin_addr), WSAGetLastError());
 
 	if(setsockopt(s, SOL_SOCKET, SO_RCVBUF, (char*)&bufsz, sizeof(bufsz)))
 		fatal("rawrecv_open: failed to set buffer size\n");

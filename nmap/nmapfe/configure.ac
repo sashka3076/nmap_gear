@@ -22,7 +22,7 @@ linux=no
 macosx=no
 needs_cpp_precomp=no
 case "$host" in
-  *-netbsd*)
+  *-netbsd* | *-knetbsd*-gnu)
     AC_DEFINE(NETBSD)
     ;;
   *-openbsd*)
@@ -44,7 +44,7 @@ case "$host" in
     AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
     AC_DEFINE(SOLARIS)
     ;;
-  *-solaris2.[1-9][0-9]*)
+  *-solaris2.[[1-9]][[0-9]]*)
     AC_DEFINE(SOLARIS)
     ;;
   *-solaris2.1*)
@@ -80,7 +80,7 @@ case "$host" in
     AC_DEFINE(PCAP_TIMEOUT_IGNORED)  # libpcap doesn't even LOOK at
                                      # the timeout you give it under Linux
     ;;
-  *-freebsd*)
+  *-freebsd* | *-kfreebsd*-gnu)
     AC_DEFINE(FREEBSD)
     ;;
   *-bsdi*)

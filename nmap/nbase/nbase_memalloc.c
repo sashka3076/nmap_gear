@@ -28,8 +28,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -56,8 +59,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -83,11 +95,12 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_memalloc.c,v 1.5 2004/03/12 01:59:04 fyodor Exp $ */
+/* $Id: nbase_memalloc.c,v 1.6 2004/08/29 09:12:04 fyodor Exp $ */
 
 #include "nbase.h"
 #include <stdio.h>
@@ -113,7 +126,6 @@ void *safe_malloc(int size)
   mymem = malloc(size);
   if (mymem == NULL)
     fatal("Malloc Failed! Probably out of space.");
-  //  printf("Called safe_malloc(%d) -- returning %lX\n", size, (unsigned long) mymem);
   return mymem;
 }
 
@@ -125,7 +137,6 @@ void *safe_realloc(void *ptr, size_t size)
   mymem = realloc(ptr, size);
   if (mymem == NULL)
     fatal("Realloc Failed! Probably out of space.");
-  //  printf("Called safe_malloc(%d) -- returning %lX\n", size, (unsigned long) mymem);
   return mymem;
 }
 
@@ -138,6 +149,5 @@ void *safe_zalloc(int size)
   mymem = calloc(1, size);
   if (mymem == NULL)
     fatal("Malloc Failed! Probably out of space.");
-  //  printf("Called safe_zalloc(%d) -- returning %lX\n", size, (unsigned long) mymem);
   return mymem;
 }

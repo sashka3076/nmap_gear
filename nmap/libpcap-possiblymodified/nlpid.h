@@ -15,7 +15,7 @@
  * WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * @(#) $Header: /CVS/nmap/libpcap-possiblymodified/nlpid.h,v 1.2 2002/12/18 06:10:07 fyodor Exp $ (Juniper)
+ * @(#) $Header: /CVS/nmap/libpcap-possiblymodified/nlpid.h,v 1.3 2004/08/01 05:34:47 fyodor Exp $ (Juniper)
  */
 
 /* Types missing from some systems */
@@ -35,6 +35,21 @@
 #ifndef	ISO10589_ISIS
 #define	ISO10589_ISIS		0x83
 #endif
+/*
+ * this does not really belong in the nlpid.h file
+ * however we need it for generating nice
+ * IS-IS related BPF filters
+ */
+#define ISIS_L1_LAN_IIH      15
+#define ISIS_L2_LAN_IIH      16
+#define ISIS_PTP_IIH         17
+#define ISIS_L1_LSP          18
+#define ISIS_L2_LSP          20
+#define ISIS_L1_CSNP         24
+#define ISIS_L2_CSNP         25
+#define ISIS_L1_PSNP         26
+#define ISIS_L2_PSNP         27
+
 #ifndef ISO8878A_CONS
 #define	ISO8878A_CONS		0x84
 #endif

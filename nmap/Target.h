@@ -26,8 +26,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -54,8 +57,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -81,17 +93,24 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: Target.h,v 1.12 2004/04/19 02:02:23 fyodor Exp $ */
+/* $Id: Target.h,v 1.14 2004/08/29 09:12:03 fyodor Exp $ */
 
 #ifndef TARGET_H
 #define TARGET_H
 
 #include "nmap.h"
 #include "FingerPrintResults.h"
+
+struct host_timeout_nfo {
+  unsigned long msecs_used; /* How many msecs has this Target used? */
+  bool toclock_running; /* Is the clock running right now? */
+  struct timeval toclock_start; /* When did the clock start? */
+};
 
 class Target {
  public: /* For now ... a lot of the data members should be made private */
@@ -140,6 +159,21 @@ class Target {
   /* This next version returns a STATIC buffer -- so no concurrency */
   const char *NameIP();
 
+  /* Starts the timeout clock for the host running (e.g. you are
+     beginning a scan).  If you do not have the current time handy,
+     you can pass in NULL.  When done, call stopTimeOutClock (it will
+     also automatically be stopped of timedOut() returns true) */
+  void startTimeOutClock(const struct timeval *now);
+  /* The complement to startTimeOutClock. */
+  void stopTimeOutClock(const struct timeval *now);
+  /* Is the timeout clock currently running? */
+  bool timeOutClockRunning() { return htn.toclock_running; }
+  /* Returns whether the host is timedout.  If the timeoutclock is
+     running, counts elapsed time for that.  Pass NULL if you don't have the
+     current time handy.  You might as well also pass NULL if the
+     clock is not running, as the func won't need the time. */
+  bool timedOut(const struct timeval *now);
+
   /* Takes a 6-byte MAC address */
   int setMACAddress(const u8 *addy);
   /* Returns a pointer to 6-byte MAC address, or NULL if none is set */
@@ -155,10 +189,6 @@ class Target {
   int wierd_responses; /* echo responses from other addresses, Ie a network broadcast address */
   unsigned int flags; /* HOST_UP, HOST_DOWN, HOST_FIREWALLED, HOST_BROADCAST (instead of HOST_BROADCAST use wierd_responses */
   struct timeout_info to;
-  struct timeval host_timeout;
-  struct firewallmodeinfo firewallmode; /* For supporting "firewall mode" speed optimisations */
-  int timedout; /* Nonzero if continued scanning should be aborted due to
-		   timeout  */
   char device[64]; /* The device we transmit on -- make sure to adjust some str* calls if I ever change this*/
 
  private:
@@ -176,6 +206,7 @@ class Target {
   char *nameIPBuf; /* for the NameIP(void) function to return */
   u8 MACaddress[6];
   bool MACaddress_set;
+  struct host_timeout_nfo htn;
 };
 
 #endif /* TARGET_H */

@@ -29,8 +29,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -57,8 +60,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -84,11 +96,12 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: output.cc,v 1.31 2004/04/19 02:02:23 fyodor Exp $ */
+/* $Id: output.cc,v 1.37 2004/08/29 09:12:03 fyodor Exp $ */
 
 #include "output.h"
 #include "osscan.h"
@@ -228,7 +241,7 @@ void printportoutput(Target *currenths, PortList *plist) {
   int statecol = -1; // port/protocol state
   int servicecol = -1; // service or protocol name
   int versioncol = -1;
-  int ownercol = -1; // Used for ident scan
+  //  int ownercol = -1; // Used for ident scan
   int colno = 0;
   unsigned int rowno;
   int numrows;
@@ -269,14 +282,15 @@ void printportoutput(Target *currenths, PortList *plist) {
   portcol = colno++;
   statecol = colno++;
   servicecol = colno++;
-  if (o.identscan)
-    ownercol = colno++;
+  /*  if (o.identscan)
+      ownercol = colno++; */
   if (o.servicescan || o.rpcscan)
     versioncol = colno++;
 
   numrows = plist->state_counts[PORT_CLOSED] + 
-    plist->state_counts[PORT_OPEN] + plist->state_counts[PORT_FIREWALLED] + 
-    plist->state_counts[PORT_UNFIREWALLED];
+    plist->state_counts[PORT_OPEN] + plist->state_counts[PORT_FILTERED] + 
+    plist->state_counts[PORT_UNFILTERED] + 
+    plist->state_counts[PORT_OPENFILTERED];
   if (istate != PORT_UNKNOWN)
     numrows -=  plist->state_counts[istate];
   assert(numrows > 0);
@@ -293,8 +307,8 @@ void printportoutput(Target *currenths, PortList *plist) {
   Tbl->addItem(0, servicecol, false, "SERVICE", 7);
   if (versioncol > 0)
     Tbl->addItem(0, versioncol, false, "VERSION", 7);
-  if (ownercol > 0)
-    Tbl->addItem(0, ownercol, false, "OWNER", 5);
+  /*  if (ownercol > 0)
+      Tbl->addItem(0, ownercol, false, "OWNER", 5); */
 
   log_write(LOG_MACHINE,"\t%s: ", (o.ipprotscan)? "Protocols" : "Ports" );
   
@@ -380,8 +394,8 @@ void printportoutput(Target *currenths, PortList *plist) {
 	Tbl->addItem(rowno, portcol, true, portinfo);
 	Tbl->addItem(rowno, statecol, false, state);
 	Tbl->addItem(rowno, servicecol, true, serviceinfo);
-	if (current->owner)
-	  Tbl->addItem(rowno, ownercol, true, current->owner);
+	/*	if (current->owner)
+		Tbl->addItem(rowno, ownercol, true, current->owner); */
 	if (*sd.fullversion)
 	  Tbl->addItem(rowno, versioncol, true, sd.fullversion);
 
@@ -440,6 +454,7 @@ void printportoutput(Target *currenths, PortList *plist) {
 
   // Now we write the table for the user
   log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "%s", Tbl->printableTable(NULL));
+  delete Tbl;
 
   // There may be service fingerprints I would like the user to submit
   if (saved_servicefps.size() > 0) {
@@ -929,8 +944,11 @@ void printmacinfo(Target *currenths) {
 
   if (mac) {
     const char *macvendor = MACPrefix2Corp(mac);
-    if (macvendor) snprintf(vendorstr, sizeof(vendorstr), " vendor=\"%s\"", macvendor);
-    else vendorstr[0] = '\0';
+    if (macvendor) {
+      char *xml_mac = xml_convert(macvendor);
+      snprintf(vendorstr, sizeof(vendorstr), " vendor=\"%s\"", xml_mac);
+      free(xml_mac);
+    } else vendorstr[0] = '\0';
     snprintf(macascii, sizeof(macascii), "%02X:%02X:%02X:%02X:%02X:%02X",  mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "MAC Address: %s (%s)\n", macascii, macvendor? macvendor : "Unknown");
     log_write(LOG_XML, "<address addr=\"%s\"%s addrtype=\"%s\" />\n", macascii, vendorstr, "mac");
@@ -1035,7 +1053,7 @@ void printosscanoutput(Target *currenths) {
       {
 	log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Too many fingerprints match this host to give specific OS details\n");
 	if (o.debugging || o.verbose) {
-	  log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"TCP/IP fingerprint:\n%s\n\n",  mergeFPs(currenths->FPR->FPs, currenths->FPR->numFPs, currenths->FPR->osscan_opentcpport, currenths->FPR->osscan_closedtcpport));
+	  log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"TCP/IP fingerprint:\n%s",  mergeFPs(currenths->FPR->FPs, currenths->FPR->numFPs, currenths->FPR->osscan_opentcpport, currenths->FPR->osscan_closedtcpport));
 	}
       } else { assert(0); }
     

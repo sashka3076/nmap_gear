@@ -26,8 +26,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -54,8 +57,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -81,11 +93,12 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_rnd.c,v 1.7 2004/03/12 01:59:04 fyodor Exp $ */
+/* $Id: nbase_rnd.c,v 1.10 2004/08/29 09:12:04 fyodor Exp $ */
 
 #include "nbase.h"
 #include <string.h>
@@ -102,7 +115,9 @@ int get_random_bytes(void *buf, int numbytes) {
   static char bytebuf[2048];
   static char badrandomwarning = 0;
   static int bytesleft = 0;
+#if HAVE_OPENSSL
   static int prng_seeded = 0;
+#endif
   int res;
   int tmp;
   struct timeval tv;
@@ -112,14 +127,14 @@ int get_random_bytes(void *buf, int numbytes) {
   
   if (numbytes < 0 || numbytes > 0xFFFF) return -1;
   
-// If we have OpenSSL, then let's use it's internal PRNG
-// for random numbers, rather than opening /dev/urandom
-// and friends.  The PRNG, once seeded, should never empty.
+ /* If we have OpenSSL, then let's use it's internal PRNG for random
+    numbers, rather than opening /dev/urandom and friends.  The PRNG,
+    once seeded, should never empty. */
 #if HAVE_OPENSSL
   if ( prng_seeded ) {
-    if ( RAND_bytes(buf, numbytes) ) {
+    if ( RAND_bytes((unsigned char*) buf, numbytes) ) {
       return(0);
-    } else if ( RAND_pseudo_bytes( buf, numbytes ) ) {
+    } else if ( RAND_pseudo_bytes( (unsigned char*) buf, numbytes ) ) {
       return(0);
     } else {
       prng_seeded=0;
@@ -160,9 +175,9 @@ int get_random_bytes(void *buf, int numbytes) {
     } else fclose(fp);
   }
   
-// If we have OpenSSL, use these bytes to seed the PRNG.  If it's satisfied
-// (RAND_status) then set prng_seeded and re-run ourselves to actually fill
-// the buffer with random data.
+  /* If we have OpenSSL, use these bytes to seed the PRNG.  If it's satisfied
+     (RAND_status) then set prng_seeded and re-run ourselves to actually fill
+     the buffer with random data. */
 #if HAVE_OPENSSL
   RAND_seed( bytebuf, sizeof(bytebuf) );
   if ( RAND_status() ) {
@@ -173,7 +188,7 @@ int get_random_bytes(void *buf, int numbytes) {
   return get_random_bytes((char *)buf, numbytes);
 #endif
 
-  // We're not OpenSSL, do things the 'old fashioned way'
+  /* We're not OpenSSL, do things the 'old fashioned way' */
   if (numbytes <= bytesleft) { /* we can cover it */
     memcpy(buf, bytebuf + (sizeof(bytebuf) - bytesleft), numbytes);
     bytesleft -= numbytes;

@@ -26,8 +26,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -54,8 +57,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -81,15 +93,19 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: Target.cc,v 1.16 2004/04/19 02:02:23 fyodor Exp $ */
+/* $Id: Target.cc,v 1.19 2004/08/29 09:12:03 fyodor Exp $ */
 
 #include "Target.h"
 #include "osscan.h"
 #include "nbase.h"
+#include "NmapOps.h"
+
+extern NmapOps o;
 
 Target::Target() {
   Initialize();
@@ -102,9 +118,6 @@ void Target::Initialize() {
   osscan_performed = 0;
   wierd_responses = flags = 0;
   memset(&to, 0, sizeof(to));
-  memset(&host_timeout, 0, sizeof(host_timeout));
-  memset(&firewallmode, 0, sizeof(struct firewallmodeinfo));
-  timedout = 0;
   device[0] = '\0';
   memset(&targetsock, 0, sizeof(targetsock));
   memset(&sourcesock, 0, sizeof(sourcesock));
@@ -113,6 +126,8 @@ void Target::Initialize() {
   nameIPBuf = NULL;
   memset(&MACaddress, 0, sizeof(MACaddress));
   MACaddress_set = false;
+  htn.msecs_used = 0;
+  htn.toclock_running = false;
 }
 
 void Target::Recycle() {
@@ -185,6 +200,8 @@ void Target::setTargetSockAddr(struct sockaddr_storage *ss, size_t ss_len) {
   memcpy(&targetsock, ss, ss_len);
   targetsocklen = ss_len;
   GenerateIPString();
+  /* The ports array needs to know a name too */
+  ports.setIdStr(targetipstr());
 }
 
 // Returns IPv4 host address or {0} if unavailable.
@@ -287,6 +304,44 @@ const char *Target::NameIP() {
   if (!nameIPBuf) nameIPBuf = (char *) safe_malloc(MAXHOSTNAMELEN + INET6_ADDRSTRLEN);
   return NameIP(nameIPBuf, MAXHOSTNAMELEN + INET6_ADDRSTRLEN);
 }
+
+  /* Starts the timeout clock for the host running (e.g. you are
+     beginning a scan).  If you do not have the current time handy,
+     you can pass in NULL.  When done, call stopTimeOutClock (it will
+     also automatically be stopped of timedOut() returns true) */
+void Target::startTimeOutClock(const struct timeval *now) {
+  assert(htn.toclock_running == false);
+  htn.toclock_running = true;
+  if (now) htn.toclock_start = *now;
+  else gettimeofday(&htn.toclock_start, NULL);
+}
+  /* The complement to startTimeOutClock. */
+void Target::stopTimeOutClock(const struct timeval *now) {
+  struct timeval tv;
+  assert(htn.toclock_running == true);
+  htn.toclock_running = false;
+  if (now) tv = *now;
+  else gettimeofday(&tv, NULL);
+  htn.msecs_used += TIMEVAL_MSEC_SUBTRACT(tv, htn.toclock_start);
+}
+  /* Returns whether the host is timedout.  If the timeoutclock is
+     running, counts elapsed time for that.  Pass NULL if you don't have the
+     current time handy.  You might as well also pass NULL if the
+     clock is not running, as the func won't need the time. */
+bool Target::timedOut(const struct timeval *now) {
+  unsigned long used = htn.msecs_used;
+  struct timeval tv;
+
+  if (!o.host_timeout) return false;
+  if (htn.toclock_running) {
+    if (now) tv = *now;
+    else gettimeofday(&tv, NULL);
+    used += TIMEVAL_MSEC_SUBTRACT(tv, htn.toclock_start);
+  }
+
+  return (used > o.host_timeout)? true : false;
+}
+
 
 /* Returns zero if MAC address set successfully */
 int Target::setMACAddress(const u8 *addy) {

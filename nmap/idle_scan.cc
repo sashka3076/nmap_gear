@@ -29,8 +29,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -57,8 +60,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -84,11 +96,12 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: idle_scan.cc,v 1.27 2004/04/19 02:02:23 fyodor Exp $ */
+/* $Id: idle_scan.cc,v 1.30 2004/08/29 09:12:03 fyodor Exp $ */
 
 #include "idle_scan.h"
 #include "scan_engine.h"
@@ -292,9 +305,7 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
   for(i=0; i < NUM_IPID_PROBES; i++) probe_returned[i] = 0;
 
   memset(proxy, 0, sizeof(*proxy));
-  proxy->host.to.srtt = -1;
-  proxy->host.to.rttvar = -1;
-  proxy->host.to.timeout = o.initialRttTimeout() * 1000;
+  initialize_timeout_info(&proxy->host.to);
 
   proxy->max_groupsz = (o.max_parallelism)? o.max_parallelism : 100;
   proxy->min_groupsz = (o.min_parallelism)? o.min_parallelism : 4;
@@ -345,7 +356,9 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
     pfatal("socket trobles in get_fingerprint");
   unblock_socket(proxy->rawsd);
   broadcast_socket(proxy->rawsd);
-
+#ifndef WIN32
+  sethdrinclude(proxy->rawsd);
+#endif
 
 /* Now for the pcap opening nonsense ... */
  /* Note that the snaplen is 152 = 64 byte max IPhdr + 24 byte max link_layer
@@ -922,7 +935,7 @@ void idle_scan(Target *target, u16 *portarray, int numports,
   int portidx = 0; /* Used for splitting the port array into chunks */
   int portsleft;
   time_t starttime;
-  
+
   if (numports == 0) return; /* nothing to scan for */
   if (!proxyName) fatal("Idlescan requires a proxy host");
 
@@ -930,7 +943,10 @@ void idle_scan(Target *target, u16 *portarray, int numports,
     fatal("idle_scan(): You are not allowed to change proxies midstream.  Sorry");
   assert(target);
 
+  if (target->timedOut(NULL))
+    return;
 
+  target->startTimeOutClock(NULL);
 
   /* If this is the first call,  */
   if (!*lastproxy) {
@@ -983,5 +999,6 @@ void idle_scan(Target *target, u16 *portarray, int numports,
     }
   }
 
+  target->stopTimeOutClock(NULL);
   return;
 }

@@ -18,7 +18,7 @@
  * WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * @(#) $Header: /CVS/nmap/libpcap-possiblymodified/llc.h,v 1.2 2002/12/18 06:10:07 fyodor Exp $ (LBL)
+ * @(#) $Header: /CVS/nmap/libpcap-possiblymodified/llc.h,v 1.3 2004/08/01 05:34:47 fyodor Exp $ (LBL)
  */
 
 /*

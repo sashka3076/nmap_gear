@@ -19,8 +19,8 @@
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 #ifndef lint
-static const char rcsid[] =
-    "@(#) $Header: /CVS/nmap/libpcap-possiblymodified/bpf_dump.c,v 1.3 2003/09/20 09:03:01 fyodor Exp $ (LBL)";
+static const char rcsid[] _U_ =
+    "@(#) $Header: /CVS/nmap/libpcap-possiblymodified/bpf_dump.c,v 1.4 2004/08/01 05:34:47 fyodor Exp $ (LBL)";
 #endif
 
 #ifdef HAVE_CONFIG_H

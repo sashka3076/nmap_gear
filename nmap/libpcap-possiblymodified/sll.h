@@ -4,7 +4,7 @@
  *
  * This code is derived from the Stanford/CMU enet packet filter,
  * (net/enet.c) distributed as part of 4.3BSD, and code contributed
- * to Berkeley by Steven McCanne and Van Jacobson both of Lawrence 
+ * to Berkeley by Steven McCanne and Van Jacobson both of Lawrence
  * Berkeley Laboratory.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,7 +35,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * @(#) $Header: /CVS/nmap/libpcap-possiblymodified/sll.h,v 1.2 2002/12/18 06:10:07 fyodor Exp $ (LBL)
+ * @(#) $Header: /CVS/nmap/libpcap-possiblymodified/sll.h,v 1.3 2004/08/01 05:34:47 fyodor Exp $ (LBL)
  */
 
 /*

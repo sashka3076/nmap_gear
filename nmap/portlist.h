@@ -25,8 +25,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -53,8 +56,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -80,11 +92,12 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: portlist.h,v 1.19 2004/03/12 01:59:04 fyodor Exp $ */
+/* $Id: portlist.h,v 1.21 2004/08/29 09:12:03 fyodor Exp $ */
 
 #ifndef PORTLIST_H
 #define PORTLIST_H
@@ -95,11 +108,12 @@
 #define PORT_UNKNOWN 0
 #define PORT_CLOSED 1
 #define PORT_OPEN 2
-#define PORT_FIREWALLED 3
+#define PORT_FILTERED 3
 #define PORT_TESTING 4
 #define PORT_FRESH 5
-#define PORT_UNFIREWALLED 6
-#define PORT_HIGHEST_STATE 7 /* ***IMPORTANT -- BUMP THIS UP WHEN STATES ARE 
+#define PORT_UNFILTERED 6
+#define PORT_OPENFILTERED 7 /* Like udp scan with no response */
+#define PORT_HIGHEST_STATE 8 /* ***IMPORTANT -- BUMP THIS UP WHEN STATES ARE 
 				ADDED *** */
  
 #define CONF_NONE 0
@@ -121,6 +135,12 @@ enum serviceprobestate {
 enum service_detection_type { SERVICE_DETECTION_TABLE, SERVICE_DETECTION_PROBED };
 
 enum service_tunnel_type { SERVICE_TUNNEL_NONE, SERVICE_TUNNEL_SSL };
+
+// Move some popular TCP ports to the beginning of the portlist, because
+// that can speed up certain scans.  You should have already done any port
+// randomization, this should prevent the ports from always coming out in the
+// same order.
+void random_port_cheat(u16 *ports, int portcount);
 
 struct serviceDeductions {
   const char *name; // will be NULL if can't determine
@@ -221,9 +241,15 @@ class PortList {
  public:
   PortList();
   ~PortList();
-  // Add a new port to this list
+  /* Add a new port to this list.  If the state has changed, it is
+     OK to call this function to effect the change */
   int addPort(u16 portno, u8 protocol, char *owner, int state);
   int removePort(u16 portno, u8 protocol);
+  /* Saves an identification string for the target containing these
+     ports (an IP addrss might be a good example, but set what you
+     want).  Only used when printing new port updates.  Optional.  A
+     copy is made. */
+  void setIdStr(const char *id);
 /* A function for iterating through the ports.  Give NULL for the
    first "afterthisport".  Then supply the most recent returned port
    for each subsequent call.  When no more matching ports remain, NULL
@@ -250,6 +276,9 @@ class PortList {
   int getIgnoredPortState(); /* The state of the port we ignore for output */
   int numports; /* Total number of ports in list in ANY state */
  private:
+  /* A string identifying the system these ports are on.  Just used for 
+     printing open ports, if it is set with setIdStr() */
+  char *idstr;
 
 };
 

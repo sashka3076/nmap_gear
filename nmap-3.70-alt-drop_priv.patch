@@ -307,10 +307,9 @@ diff -uprk.orig nmap-3.55.orig/protocols.cc nmap-3.55/protocols.cc
    
    memset(usedprots, 0, sizeof(usedprots));
  
-diff -uprk.orig nmap-3.55.orig/service_scan.cc nmap-3.55/service_scan.cc
---- nmap-3.55.orig/service_scan.cc	2004-07-07 08:02:15 +0000
-+++ nmap-3.55/service_scan.cc	2004-07-16 14:42:41 +0000
-@@ -1033,7 +1033,7 @@ void parse_nmap_service_probe_file(AllPr
+--- nmap-3.70/service_scan.cc	2004-08-29 12:12:03 +0300
++++ nmap-3.70/service_scan.cc	2004-09-01 20:38:50 +0300
+@@ -1048,7 +1048,7 @@
  
  // Parses the nmap-service-probes file, and adds each probe to
  // the already-created 'probes' vector.
@@ -319,9 +318,9 @@ diff -uprk.orig nmap-3.55.orig/service_scan.cc nmap-3.55/service_scan.cc
    char filename[256];
  
    if (nmap_fetchfile(filename, sizeof(filename), "nmap-service-probes") == -1){
-@@ -1918,10 +1918,23 @@ int launchSomeServiceProbes(nsock_pool n
+@@ -2048,11 +2048,23 @@
+   }
  }
- 
  
 +AllProbes *service_scan_init(void)
 +{
@@ -335,17 +334,17 @@ diff -uprk.orig nmap-3.55.orig/service_scan.cc nmap-3.55/service_scan.cc
 +  return AP;
 +}
 +
-+
  /* Execute a service fingerprinting scan against all open ports of the
-    targets[] specified. */
- int service_scan(Target *targets[], int num_targets) {
+    Targets specified. */
+ int service_scan(vector<Target *> &Targets) {
+   // int service_scan(Target *targets[], int num_targets)
 -  static AllProbes *AP;
 +  AllProbes *AP;
    ServiceGroup *SG;
    nsock_pool nsp;
    struct timeval now;
-@@ -1937,10 +1950,7 @@ int service_scan(Target *targets[], int 
-   if (targets[0]->timedout)
+@@ -2064,10 +2076,7 @@
+   if (Targets.size() == 0)
      return 1;
  
 -  if (!AP) {
@@ -354,8 +353,8 @@ diff -uprk.orig nmap-3.55.orig/service_scan.cc nmap-3.55/service_scan.cc
 -  }
 +  AP = service_scan_init();
  
+ 
    // Now I convert the targets into a new ServiceGroup
-   SG = new ServiceGroup(targets, num_targets, AP);
 diff -uprk.orig nmap-3.55.orig/services.cc nmap-3.55/services.cc
 --- nmap-3.55.orig/services.cc	2004-03-12 01:59:04 +0000
 +++ nmap-3.55/services.cc	2004-07-16 14:42:41 +0000

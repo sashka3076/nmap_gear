@@ -25,8 +25,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -53,8 +56,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -80,11 +92,12 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOps.cc,v 1.23 2004/03/12 01:59:04 fyodor Exp $ */
+/* $Id: NmapOps.cc,v 1.26 2004/08/29 09:12:02 fyodor Exp $ */
 #include "nmap.h"
 #include "nbase.h"
 #include "NmapOps.h"
@@ -173,7 +186,7 @@ void NmapOps::Initialize() {
   spoofsource = 0;
   device[0] = '\0';
   interactivemode = 0;
-  host_group_sz = HOST_GROUP_SZ;
+  ping_group_sz = PING_GROUP_SZ;
   generate_random_ips = 0;
   reference_FPs = NULL;
   magic_port = 33000 + (get_random_uint() % 31000);
@@ -185,10 +198,11 @@ void NmapOps::Initialize() {
   max_rtt_timeout = MAX_RTT_TIMEOUT;
   min_rtt_timeout = MIN_RTT_TIMEOUT;
   initial_rtt_timeout = INITIAL_RTT_TIMEOUT;
+  min_host_group_sz = 1;
+  max_host_group_sz = 100000; // don't want to be restrictive unles user sets
   max_ips_to_scan = 0;
   extra_payload_length = 0;
   extra_payload = NULL;
-  host_timeout = HOST_TIMEOUT;
   scan_delay = 0;
   scanflags = -1;
   resume_ip.s_addr = 0;
@@ -196,7 +210,6 @@ void NmapOps::Initialize() {
   osscan_guess = 0;
   numdecoys = 0;
   decoyturn = -1;
-  identscan = 0;
   osscan = 0;
   servicescan = 0;
   pingtype = PINGTYPE_UNKNOWN;
@@ -219,6 +232,19 @@ bool NmapOps::TCPScan() {
 
 bool NmapOps::UDPScan() {
   return udpscan;
+}
+
+  /* this function does not currently cover cases such as TCP SYN ping
+     scan which can go either way based on whether the user is root or
+     IPv6 is being used.  It will return false in those cases where a
+     RawScan is not neccessarily used. */
+bool NmapOps::RawScan() {
+  if (ackscan|finscan|idlescan|ipprotscan|maimonscan|nullscan|osscan|synscan|udpscan|windowscan|xmasscan)
+    return true;
+  if (o.pingtype & (PINGTYPE_ICMP_PING|PINGTYPE_ICMP_MASK|PINGTYPE_ICMP_TS|PINGTYPE_TCP_USE_ACK|PINGTYPE_RAWTCP|PINGTYPE_UDP))
+    return true;
+
+   return false; 
 }
 
 
@@ -352,11 +378,6 @@ void NmapOps::ValidateOptions() {
     fatal("Fragscan only works with ACK, FIN, Maimon, NULL, SYN, Window, and XMAS scan types");
   }
   
-  if (identscan && !connectscan) {
-    error("Identscan only works with connect scan (-sT) ... ignoring option");
-    identscan = 0;
-  }
-  
   if (osscan && bouncescan)
     error("Combining bounce scan with OS scan seems silly, but I will let you do whatever you want!");
   
@@ -408,4 +429,18 @@ void NmapOps::setInitialRttTimeout(int rtt)
   initial_rtt_timeout = rtt; 
   if (rtt > max_rtt_timeout) max_rtt_timeout = rtt;  
   if (rtt < min_rtt_timeout) min_rtt_timeout = rtt;
+}
+
+void NmapOps::setMinHostGroupSz(unsigned int sz) {
+  if (sz > max_host_group_sz)
+    fatal("Minimum host group size may not be set to greater than maximum size (currently %d)\n", max_host_group_sz);
+  min_host_group_sz = sz;
+}
+
+void NmapOps::setMaxHostGroupSz(unsigned int sz) {
+  if (sz < min_host_group_sz)
+    fatal("Maximum host group size may not be set to less than the maximum size (currently %d)\n", min_host_group_sz);
+  if (sz <= 0)
+    fatal("Max host size must be at least 1");
+  max_host_group_sz = sz;
 }

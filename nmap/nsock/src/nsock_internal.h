@@ -15,6 +15,15 @@
  * may be willing to sell alternative licenses (contact                    *
  * sales@insecure.com ).                                                   *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         * 
  * If you received these files with a written license agreement stating    *
  * terms other than the (GPL) terms above, then that alternative license   *
  * agreement takes precedence over this comment.                          *
@@ -46,7 +55,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_internal.h,v 1.16 2004/03/12 01:50:58 fyodor Exp $ */
+/* $Id: nsock_internal.h,v 1.18 2004/08/29 09:12:05 fyodor Exp $ */
 
 #ifndef NSOCK_INTERNAL_H
 #define NSOCK_INTERNAL_H
@@ -90,7 +99,7 @@
 #include <strings.h>
 #endif
 
-#include "utils.h"
+#include "nsock_utils.h"
 
 /*********      STRUCTURES   **************/
 

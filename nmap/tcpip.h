@@ -26,8 +26,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -54,8 +57,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -81,11 +93,12 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: tcpip.h,v 1.58 2004/07/04 05:14:15 fyodor Exp $ */
+/* $Id: tcpip.h,v 1.64 2004/08/29 09:12:04 fyodor Exp $ */
 
 
 #ifndef TCPIP_H
@@ -218,14 +231,14 @@ extern "C" {
 }
 #endif
 
-#include <setjmp.h>
-#include <errno.h>
-#include <signal.h>
-
 #if HAVE_SYS_SOCKIO_H
 #include <sys/sockio.h>  /* SIOCGIFCONF for Solaris */
 #endif
 #endif /* WIN32 */
+
+#include <setjmp.h>
+#include <errno.h>
+#include <signal.h>
 
 #include "nmap_error.h"
 #include "utils.h"
@@ -274,6 +287,14 @@ class PacketTrace {
      call. */
   static void trace(pdirection pdir, const u8 *packet, u32 len,
 		    struct timeval *now=NULL);
+/* Adds a trace entry when a connect() is attempted if packet tracing
+   is enabled.  Pass IPPROTO_TCP or IPPROTO_UDP as the protocol.  The
+   sock may be a sockaddr_in or sockaddr_in6.  The return code of
+   connect is passed in connectrc.  If the return code is -1, get the
+   errno and pass that as connect_errno. */
+  static void traceConnect(u8 proto, const struct sockaddr *sock, 
+			   int socklen, int connectrc, int connect_errno,
+			   const struct timeval *now);
 };
 
 #define MAX_LINK_HEADERSZ 24
@@ -414,6 +435,31 @@ struct icmp
 };
 #endif /* HAVE_STRUCT_ICMP */
 
+/* Represents a single probe packet, such as a SYN to port 80 or an
+   ICMP netmask request packet. Values are still in network byte order. */
+class IPProbe {
+ public:
+  IPProbe();
+  ~IPProbe();
+/* Takes an IP packet and stores _a copy_ of it, in this Probe,
+   adjusting proper header pointers and such */
+  int storePacket(u8 *ippacket, u32 len);
+  u32 packetbuflen; /* Length of the whole packet */
+  u8 *packetbuf; /* The packet itself */
+  struct ip *ipv4; /* IP header of packet */
+  struct icmp *icmp; /* icmp, tcp, and udp are NULL if the packet has no such header */
+  struct tcphdr *tcp;
+  udphdr_bsd *udp;
+
+  u8 af; /* AF_INET or AF_INET6 */
+  /* Resets everything to NULL.  Frees packetbuf if it is filled.  You
+     can reuse a Probe by calling Reset() and then a new
+     storePacket(). */
+  void Reset(); 
+ private:
+
+};
+
  /* This ideally should be a port that isn't in use for any protocol on our machine or on the target */
 #define MAGIC_PORT 49724
 #define TVAL2LONG(X)  X.tv_sec * 1e6 + X.tv_usec
@@ -458,6 +504,41 @@ int send_udp_raw( int sd, struct in_addr *source, const struct in_addr *victim,
 int send_ip_raw( int sd, struct in_addr *source, const struct in_addr *victim, 
 		 int ttl, u8 proto, char *data, u16 datalen);
 
+/* Builds a TCP packet (including an IP header) by packing the fields
+   with the given information.  It allocates a new buffer to store the
+   packet contents, and then returns that buffer.  The packet is not
+   actually sent by this function.  Caller must delete the buffer when
+   finished with the packet.  The packet length is returned in
+   packetlen, which must be a valid int pointer. */
+u8 *build_tcp_raw(const struct in_addr *source, 
+		  const struct in_addr *victim, int ttl, 
+		  u16 ipid, u16 sport, u16 dport, u32 seq, u32 ack, u8 flags,
+		  u16 window, u8 *options, int optlen, char *data, 
+		  u16 datalen, u32 *packetlen);
+
+/* Builds a UDP packet (including an IP header) by packing the fields
+   with the given information.  It allocates a new buffer to store the
+   packet contents, and then returns that buffer.  The packet is not
+   actually sent by this function.  Caller must delete the buffer when
+   finished with the packet.  The packet length is returned in
+   packetlen, which must be a valid int pointer. */
+u8 *build_udp_raw(struct in_addr *source, const struct in_addr *victim,
+ 		  int ttl, u16 sport, u16 dport, u16 ipid, char *data, 
+		  u16 datalen, u32 *packetlen);
+
+/* Builds an IP packet (including an IP header) by packing the fields
+   with the given information.  It allocates a new buffer to store the
+   packet contents, and then returns that buffer.  The packet is not
+   actually sent by this function.  Caller must delete the buffer when
+   finished with the packet.  The packet length is returned in
+   packetlen, which must be a valid int pointer. */
+u8 *build_ip_raw(struct in_addr *source, const struct in_addr *victim, 
+		 int ttl, u8 proto, u16 ipid, char *data, u16 datalen, 
+		 u32 *packetlen);
+
+/* Send a pre-built IPv4 packet */
+int send_ip_packet(int sd, u8 *packet, unsigned int packetlen);
+
 /* Much of this is swiped from my send_tcp_raw function above, which 
    doesn't support fragmentation */
 int send_small_fragz(int sd, struct in_addr *source, 
@@ -482,7 +563,10 @@ int send_ip_raw_decoys( int sd, const struct in_addr *victim, int ttl, u8 proto,
 /* Calls pcap_open_live and spits out an error (and quits) if the call fails.
    So a valid pcap_t will always be returned. */
 pcap_t *my_pcap_open_live(char *device, int snaplen, int promisc, int to_ms);
-
+// Returns whether the packet receive time value obtaned from libpcap
+// (and thus by readip_pcap()) should be considered valid.  When
+// invalid (Windows and Amiga), readip_pcap returns the time you called it.
+bool pcap_recv_timeval_valid();
 
 /* Returns a buffer of ASCII information about a packet that may look
    like "TCP 127.0.0.1:50923 > 127.0.0.1:3 S ttl=61 id=39516 iplen=40
@@ -599,6 +683,9 @@ typedef int (*PFILTERFN)(const char *packet, unsigned int len); /* 1 to keep */
 void set_pcap_filter(Target *target, pcap_t *pd, PFILTERFN filter, char *bpf, ...);
 #endif
 
+/* Just accept everything ... TODO: Need a better approach than this flt_ 
+   stuff */
+int flt_all(const char *packet, unsigned int len);
 int flt_icmptcp(const char *packet, unsigned int len);
 int flt_icmptcp_2port(const char *packet, unsigned int len);
 int flt_icmptcp_5port(const char *packet, unsigned int len);

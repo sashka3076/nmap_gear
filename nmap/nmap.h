@@ -26,8 +26,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -54,8 +57,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -81,11 +93,12 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.h,v 1.103 2004/07/04 05:14:15 fyodor Exp $ */
+/* $Id: nmap.h,v 1.106 2004/08/29 09:12:03 fyodor Exp $ */
 
 #ifndef NMAP_H
 #define NMAP_H
@@ -294,11 +307,15 @@ void *realloc();
 				 trip */
 #endif
 
+/* We wait at least 100 ms for a response by default - while that
+   seems aggressive, waiting too long can cause us to fail to detect
+   drops until many probes later on extremely low-latency
+   networks (such as localhost scans).  */
 #ifndef MIN_RTT_TIMEOUT
-#define MIN_RTT_TIMEOUT 300 /* We will always wait at least 300 ms for a response */
+#define MIN_RTT_TIMEOUT 100 
 #endif
 
-#define INITIAL_RTT_TIMEOUT 6000 /* Allow 6 seconds at first for packet responses */
+#define INITIAL_RTT_TIMEOUT 1000 /* Allow 1 second initially for packet responses */
 #define HOST_TIMEOUT    0 /* By default allow unlimited time to scan each host */
 
 /* If nmap is called with one of the names below, it will start up in interactive mode -- alternatively, you can rename Nmap any of the following names to have it start up interactivey by default.  */
@@ -307,7 +324,7 @@ void *realloc();
 /* Number of hosts we pre-ping and then scan.  We do a lot more if
    randomize_hosts is set.  Every one you add to this leads to ~1K of
    extra always-resident memory in nmap */
-#define HOST_GROUP_SZ 1024
+#define PING_GROUP_SZ 1024
 
 /* DO NOT change stuff after this point */
 #define UC(b)   (((int)b)&0xff)
@@ -443,7 +460,6 @@ char *tsseqclass2ascii(int seqclass);
 const char *seqidx2difficultystr(unsigned long idx);
 int nmap_fetchfile(char *filename_returned, int bufferlen, char *file);
 int fileexistsandisreadable(char *pathname);
-int check_firewallmode(Target *target, struct scanstats *ss);
 int gather_logfile_resumption_state(char *fname, int *myargc, char ***myargv);
 
 /* From glibc 2.0.6 because Solaris doesn't seem to have this function */

@@ -2,7 +2,7 @@ dnl # -*- mode: fundamental; -*-
 dnl # Autoconf configuration file for Nbase
 dnl #
 dnl # Process this file with autoconf to produce a configure script.
-dnl # $Id: configure.ac,v 1.12 2003/10/14 04:31:09 fyodor Exp $
+dnl # $Id: configure.ac,v 1.14 2004/08/26 00:30:18 fyodor Exp $
 
 # Require autoconf 2.13
 AC_PREREQ(2.13)
@@ -56,7 +56,7 @@ AC_CANONICAL_HOST
 linux=no
 
 case "$host" in
-  *-netbsd*)
+  *-netbsd* | *-knetbsd*-gnu)
     AC_DEFINE(NETBSD)
     ;;
   *-openbsd*)
@@ -78,7 +78,7 @@ case "$host" in
     AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
     AC_DEFINE(SOLARIS)
     ;;
-  *-solaris2.[1-9][0-9]*)
+  *-solaris2.[[1-9]][[0-9]]*)
     AC_DEFINE(SOLARIS)
     ;;
   *-solaris2.1*)
@@ -114,7 +114,7 @@ case "$host" in
     AC_DEFINE(PCAP_TIMEOUT_IGNORED)  # libpcap doesn't even LOOK at
                                      # the timeout you give it under Linux
     ;;
-  *-freebsd*)
+  *-freebsd* | *-kfreebsd*-gnu)
     AC_DEFINE(FREEBSD)
     ;;
   *-bsdi*)

@@ -26,8 +26,11 @@
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
  *   nmap-os-fingerprints or nmap-service-probes.                          *
- * o Executes Nmap                                                         *
- * o Integrates/includes/aggregates Nmap into an executable installer      *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
@@ -54,8 +57,17 @@
  * the continued development of Nmap technology.  Please email             *
  * sales@insecure.com for further information.                             *
  *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
  * If you received these files with a written license agreement or         *
- * contract stating terms other than the (GPL) terms above, then that      *
+ * contract stating terms other than the terms above, then that            *
  * alternative license agreement takes precedence over these comments.     *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
@@ -81,11 +93,12 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
  * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html .                                  *
+ * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
+ * with Nmap.                                                              *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: osscan.cc,v 1.21 2004/04/19 02:02:23 fyodor Exp $ */
+/* $Id: osscan.cc,v 1.25 2004/08/29 09:12:03 fyodor Exp $ */
 
 
 #include "osscan.h"
@@ -150,7 +163,7 @@ int seq_response_num; /* response # for sequencing */
 double avg_ts_hz = 0.0; /* Avg. amount that timestamps incr. each second */
 struct link_header linkhdr;
 
-if (target->timedout)
+if (target->timedOut(NULL))
   return NULL;
 
 /* The seqs must start out as zero for the si struct */
@@ -167,6 +180,9 @@ get_random_bytes(&sequence_base, sizeof(unsigned int));
    pfatal("socket trobles in get_fingerprint");
  unblock_socket(rawsd);
  broadcast_socket(rawsd);
+#ifndef WIN32
+ sethdrinclude(rawsd);
+#endif
 
  /* Now for the pcap opening nonsense ... */
  /* Note that the snaplen is 152 = 64 byte max IPhdr + 24 byte max link_layer
@@ -203,7 +219,7 @@ snprintf(filter, sizeof(filter), "dst host %s and (icmp or (tcp and src host %s)
  if ((tport = target->ports.nextPort(NULL, IPPROTO_TCP, PORT_CLOSED, false))) {
    closedport = tport->portno;
    target->FPR->osscan_closedtcpport = tport->portno;
- } else if ((tport = target->ports.nextPort(NULL, IPPROTO_TCP, PORT_UNFIREWALLED, false))) {
+ } else if ((tport = target->ports.nextPort(NULL, IPPROTO_TCP, PORT_UNFILTERED, false))) {
    /* Well, we will settle for unfiltered */
    closedport = tport->portno;
  } else {
@@ -281,21 +297,17 @@ if (o.verbose && openport != (unsigned long) -1)
    timeout = 0;
 
    /* Insure we haven't overrun our allotted time ... */
-   if (o.host_timeout && (TIMEVAL_MSEC_SUBTRACT(t1, target->host_timeout) >= 0))
-     {
-       target->timedout = 1;
-       goto osscan_timedout;
-     }
+   if (target->timedOut(&t1))
+     goto osscan_timedout;
+
    while(( ip = (struct ip*) readip_pcap(pd, &bytes, oshardtimeout, NULL, &linkhdr)) && !timeout) {
      gettimeofday(&t2, NULL);
      if (TIMEVAL_SUBTRACT(t2,t1) > oshardtimeout) {
        timeout = 1;
      }
-     if (o.host_timeout && (TIMEVAL_MSEC_SUBTRACT(t2, target->host_timeout) >= 0))
-       {
-	 target->timedout = 1;
-	 goto osscan_timedout;
-       }
+
+     if (target->timedOut(&t2))
+       goto osscan_timedout;
 
      if (bytes < (4 * ip->ip_hl) + 4U || bytes < 20)
        continue;
@@ -372,11 +384,9 @@ if (o.verbose && openport != (unsigned long) -1)
        /*     error("DEBUG: got a response (len=%d):\n", bytes);  */
        /*     lamont_hdump((unsigned char *) ip, bytes); */
        /* Insure we haven't overrun our allotted time ... */
-       if (o.host_timeout && (TIMEVAL_MSEC_SUBTRACT(t2, target->host_timeout) >= 0))
-	 {
-	   target->timedout = 1;
-	   goto osscan_timedout;
-	 }
+       if (target->timedOut(&t2))
+	 goto osscan_timedout;
+
        if (!ip) { 
 	 if (seq_packets_sent < NUM_SEQ_SAMPLES)
 	   break;
@@ -715,7 +725,7 @@ for(i=0; i < 9; i++) {
  if (last) FPtests[last]->next = NULL;
  
  osscan_timedout:
- if (target->timedout)
+ if (target->timedOut(NULL))
    FP = NULL;
  close(rawsd);
  pcap_close(pd);
@@ -1130,7 +1140,7 @@ struct timeval now;
 double bestacc;
 int bestaccidx;
 
- if (target->timedout)
+ if (target->timedOut(NULL))
    return 1;
  
  if (target->FPR == NULL)
@@ -1139,7 +1149,7 @@ int bestaccidx;
  memset(si, 0, sizeof(si));
  if (target->ports.state_counts_tcp[PORT_OPEN] == 0 ||
      (target->ports.state_counts_tcp[PORT_CLOSED] == 0 &&
-      target->ports.state_counts_tcp[PORT_UNFIREWALLED] == 0)) {
+      target->ports.state_counts_tcp[PORT_UNFILTERED] == 0)) {
    if (o.osscan_limit) {
      if (o.verbose)
        log_write(LOG_STDOUT|LOG_NORMAL|LOG_SKID, "Skipping OS Scan due to absence of open (or perhaps closed) ports\n");
@@ -1150,17 +1160,12 @@ int bestaccidx;
  }
 
  for(itry=0; itry < 3; itry++) {
-   if (o.host_timeout) {   
-     gettimeofday(&now, NULL);
-     if (target->timedout || TIMEVAL_MSEC_SUBTRACT(now, target->host_timeout) >= 0)
-       {
-	 target->timedout = 1;
-	 return 1;
-       }
-   }
-   target->FPR->FPs[itry] = get_fingerprint(target, &si[itry]); 
-   if (target->timedout)
+   gettimeofday(&now, NULL);
+   if (target->timedOut(&now))
      return 1;
+
+   target->FPR->FPs[itry] = get_fingerprint(target, &si[itry]); 
+
    match_fingerprint(target->FPR->FPs[itry], &FP_matches[itry], 
 		     o.reference_FPs, OSSCAN_GUESS_THRESHOLD);
    if (FP_matches[itry].overall_results == OSSCAN_SUCCESS && 
@@ -1720,7 +1725,7 @@ sethdrinclude(sd);
 realcheck = in_cksum((unsigned short *)pseudo, 20 /* pseudo + UDP headers */ +
  datalen);
 #if STUPID_SOLARIS_CHECKSUM_BUG
- udp->uh_sum = sizeof(struct udphdr_bsd) + datalen;
+ udp->uh_sum = sizeof(udphdr_bsd) + datalen;
 #else
 udp->uh_sum = realcheck;
 #endif
