@@ -101,7 +101,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: idle_scan.cc,v 1.30 2004/08/29 09:12:03 fyodor Exp $ */
+/* $Id: idle_scan.cc,v 1.31 2004/11/12 09:35:13 fyodor Exp $ */
 
 #include "idle_scan.h"
 #include "scan_engine.h"
@@ -995,7 +995,7 @@ void idle_scan(Target *target, u16 *portarray, int numports,
   for(portidx = 0; portidx < numports; portidx++) {
     if (target->ports.lookupPort(portarray[portidx], IPPROTO_TCP) == NULL) {
       target->ports.addPort(portarray[portidx], IPPROTO_TCP, NULL,
-	      PORT_CLOSED);
+	      PORT_CLOSEDFILTERED);
     }
   }
 

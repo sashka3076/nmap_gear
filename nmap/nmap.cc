@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.cc,v 1.55 2004/10/18 16:59:36 fyodor Exp $ */
+/* $Id: nmap.cc,v 1.57 2004/12/12 00:46:18 fyodor Exp $ */
 
 #include "nmap.h"
 #include "osscan.h"
@@ -879,8 +879,8 @@ int nmap_main(int argc, char *argv[]) {
   for(i=0; i < argc; i++) 
     log_write(LOG_XML, (i == argc-1)? "%s\" " : "%s ", fakeargv[i]);
 
-  log_write(LOG_XML, "start=\"%lu\" version=\"%s\" xmloutputversion=\"1.01\">\n",
-	    (unsigned long) timep, NMAP_VERSION);
+  log_write(LOG_XML, "start=\"%lu\" startstr=\"%s\" version=\"%s\" xmloutputversion=\"1.01\">\n",
+	    (unsigned long) timep, mytime, NMAP_VERSION);
 
   output_xml_scaninfo_records(ports);
 
@@ -1780,6 +1780,7 @@ char *statenum2str(int state) {
   case PORT_UNFILTERED: return "UNfiltered"; break;
   case PORT_CLOSED: return "closed"; break;
   case PORT_OPENFILTERED: return "open|filtered"; break;
+  case PORT_CLOSEDFILTERED: return "closed|filtered"; break;
   default: return "unknown"; break;
   }
   return "unknown";

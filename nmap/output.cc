@@ -101,7 +101,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: output.cc,v 1.39 2004/11/06 03:41:53 fyodor Exp $ */
+/* $Id: output.cc,v 1.42 2004/12/12 00:46:18 fyodor Exp $ */
 
 #include "output.h"
 #include "osscan.h"
@@ -110,6 +110,10 @@
 #include "MACLookup.h"
 
 #include <string>
+
+/* Workaround for lack of namespace std on HP-UX 11.00 */
+namespace std {};
+using namespace std;
 
 extern NmapOps o;
 static char *logtypes[LOG_TYPES]=LOG_NAMES;
@@ -120,7 +124,7 @@ static char *logtypes[LOG_TYPES]=LOG_NAMES;
 // returns 0 for success.
 static int getServiceXMLBuf(struct serviceDeductions *sd, char *xmlbuf, 
 		     unsigned int xmlbuflen) {
-  std::string versionxmlstring;
+  string versionxmlstring;
   char rpcbuf[128];
   char *xml_product = NULL, *xml_version = NULL, *xml_extrainfo = NULL;
 
@@ -290,7 +294,8 @@ void printportoutput(Target *currenths, PortList *plist) {
   numrows = plist->state_counts[PORT_CLOSED] + 
     plist->state_counts[PORT_OPEN] + plist->state_counts[PORT_FILTERED] + 
     plist->state_counts[PORT_UNFILTERED] + 
-    plist->state_counts[PORT_OPENFILTERED];
+    plist->state_counts[PORT_OPENFILTERED] + 
+    plist->state_counts[PORT_CLOSEDFILTERED];
   if (istate != PORT_UNKNOWN)
     numrows -=  plist->state_counts[istate];
   assert(numrows > 0);
@@ -1167,7 +1172,7 @@ void printfinaloutput(int numhosts_scanned, int numhosts_up,
   Strncpy(mytime, ctime(&timep), sizeof(mytime));
   chomp(mytime);
   
-  log_write(LOG_XML, "<runstats><finished time=\"%lu\" /><hosts up=\"%d\" down=\"%d\" total=\"%d\" />\n", (unsigned long) timep, numhosts_up, numhosts_scanned - numhosts_up, numhosts_scanned);
+  log_write(LOG_XML, "<runstats><finished time=\"%lu\" timestr=\"%s\"/><hosts up=\"%d\" down=\"%d\" total=\"%d\" />\n", (unsigned long) timep, mytime, numhosts_up, numhosts_scanned - numhosts_up, numhosts_scanned);
 
   log_write(LOG_XML, "<!-- Nmap run completed at %s; %d %s (%d %s up) scanned in %.3f seconds -->\n", mytime, numhosts_scanned, (numhosts_scanned == 1)? "IP address" : "IP addresses", numhosts_up, (numhosts_up == 1)? "host" : "hosts",  o.TimeSinceStartMS(&tv) / 1000.0 );
   log_write(LOG_NORMAL|LOG_MACHINE, "# Nmap run completed at %s -- %d %s (%d %s up) scanned in %.3f seconds\n", mytime, numhosts_scanned, (numhosts_scanned == 1)? "IP address" : "IP addresses", numhosts_up, (numhosts_up == 1)? "host" : "hosts", o.TimeSinceStartMS(&tv) / 1000.0 );

@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: tcpip.cc,v 1.48 2004/11/04 01:23:10 fyodor Exp $ */
+/* $Id: tcpip.cc,v 1.49 2004/11/12 09:35:14 fyodor Exp $ */
 
 
 #include "tcpip.h"
@@ -1680,7 +1680,8 @@ if (!pd) fatal("NULL packet device passed to readip_pcap");
      }
    }
  } while(!timedout && (!p || (*p & 0x40) != 0x40)); /* Go until we get IPv4 packet */
- if (timedout) {
+ 
+if (timedout) {
    *len = 0;
    return NULL;
  }

@@ -2,7 +2,7 @@ dnl # -*- mode: fundamental; -*-
 dnl # Autoconf configuration file for Nbase
 dnl #
 dnl # Process this file with autoconf to produce a configure script.
-dnl # $Id: configure.ac,v 1.15 2004/10/12 09:34:12 fyodor Exp $
+dnl # $Id: configure.ac,v 1.16 2004/11/24 20:13:02 fyodor Exp $
 
 # Require autoconf 2.13
 AC_PREREQ(2.13)
@@ -144,12 +144,15 @@ AC_CHECK_HEADERS([netinet/if_ether.h],[],[],
 [#if HAVE_SYS_TYPES_H
 # include <sys/types.h>
 # endif
+#if HAVE_NETINET_IN_H
+# include <netinet/in.h>
+#endif
 #if HAVE_SYS_SOCKET_H
 # include <sys/socket.h>
-# endif
-# if HAVE_NET_IF_H
+#endif
+#if HAVE_NET_IF_H
 # include <net/if.h>
-# endif
+#endif
 ])
 
 AC_HEADER_TIME

@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: portlist.cc,v 1.21 2004/08/29 09:12:03 fyodor Exp $ */
+/* $Id: portlist.cc,v 1.23 2004/11/12 20:25:06 fyodor Exp $ */
 
 
 #include "portlist.h"
@@ -394,6 +394,8 @@ int PortList::addPort(u16 portno, u8 protocol, char *owner, int state) {
   Port **portarray = NULL;
   char msg[128];
 
+  assert(state < PORT_HIGHEST_STATE);
+
   if ((state == PORT_OPEN && o.verbose) || (o.debugging > 1)) {
     if (owner && *owner) {
       snprintf(msg, sizeof(msg), " (owner: %s)", owner);
@@ -416,7 +418,8 @@ int PortList::addPort(u16 portno, u8 protocol, char *owner, int state) {
 
 /* Make sure state is OK */
   if (state != PORT_OPEN && state != PORT_CLOSED && state != PORT_FILTERED &&
-      state != PORT_UNFILTERED && state != PORT_OPENFILTERED)
+      state != PORT_UNFILTERED && state != PORT_OPENFILTERED && 
+      state != PORT_CLOSEDFILTERED)
     fatal("addPort: attempt to add port number %d with illegal state %d\n", portno, state);
 
   if (protocol == IPPROTO_TCP) {

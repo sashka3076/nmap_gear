@@ -1,6 +1,6 @@
 Name: nmap
-Version: 3.77
-Release: alt2
+Version: 3.78
+Release: alt1
 Serial: 20020501
 
 Summary: Network exploration tool and security scanner
@@ -22,8 +22,8 @@ Patch5: nmap-3.77-alt-drop_priv.patch
 
 PreReq: libpcap >= 2:0.7.2-alt2, chrooted-resolv
 
-# Automatically added by buildreq on Tue Oct 19 2004
-BuildRequires: gcc-c++ glib-devel gtk+-devel libcap-devel libpcap-devel libpcre-devel libssl-devel
+# Automatically added by buildreq on Thu Dec 16 2004
+BuildRequires: gcc-c++ glib-devel gtk+-devel libcap-devel libpcap-devel libpcre-devel libssl-devel libstdc++-devel xorg-x11-libs
 
 %package frontend
 Summary: Gtk+ frontend for %name
@@ -79,12 +79,21 @@ bzip2 -9fk CHANGELOG
 %install
 %__mkdir_p $RPM_BUILD_ROOT{%_bindir,%_man1dir,%_iconsdir}
 %__mkdir_p $RPM_BUILD_ROOT%_datadir/%name
+%__mkdir_p $RPM_BUILD_ROOT%_mandir/{ru,fr,lt,de,it,pt,es}/man1
 %__mkdir_p $RPM_BUILD_ROOT%_x11dir/{bin,man/man1}
 %makeinstall nmapdatadir=$RPM_BUILD_ROOT%_datadir/%name
 %__mv $RPM_BUILD_ROOT%_bindir/{nmapfe,xnmap} $RPM_BUILD_ROOT%_x11bindir/
 %__mv $RPM_BUILD_ROOT%_man1dir/{nmapfe,xnmap}.1 $RPM_BUILD_ROOT%_x11mandir/man1/
 %__install -pD -m644 %SOURCE1 $RPM_BUILD_ROOT%_menudir/nmapfe
 %__install -p -m644 %SOURCE2 $RPM_BUILD_ROOT%_iconsdir/
+%__install -p -m644 docs/%name.dtd $RPM_BUILD_ROOT%_datadir/%name/%name.dtd
+%__install -p -m644 docs/%{name}_french.1 $RPM_BUILD_ROOT%_mandir/fr/man1/%name.1
+%__install -p -m644 docs/%{name}_german.1 $RPM_BUILD_ROOT%_mandir/de/man1/%name.1
+%__install -p -m644 docs/%{name}_italian.1 $RPM_BUILD_ROOT%_mandir/it/man1/%name.1
+%__install -p -m644 docs/%{name}_lithuanian.1 $RPM_BUILD_ROOT%_mandir/lt/man1/%name.1
+%__install -p -m644 docs/%{name}_portuguese.1 $RPM_BUILD_ROOT%_mandir/pt/man1/%name.1
+%__install -p -m644 docs/%{name}_russian.1 $RPM_BUILD_ROOT%_mandir/ru/man1/%name.1
+%__install -p -m644 docs/%{name}_spanish.1 $RPM_BUILD_ROOT%_mandir/es/man1/%name.1
 
 %pre
 /usr/sbin/groupadd -r -f nmapuser
@@ -100,6 +109,13 @@ bzip2 -9fk CHANGELOG
 %_bindir/*
 %_datadir/%name
 %_mandir/man?/*
+%_mandir/fr/man?/*
+%_mandir/de/man?/*
+%_mandir/it/man?/*
+%_mandir/lt/man?/*
+%_mandir/pt/man?/*
+%_mandir/ru/man?/*
+%_mandir/es/man?/*
 %doc CHANGELOG.bz2 HACKING docs/{README,*.{txt,html}}
 
 %files frontend
@@ -109,6 +125,10 @@ bzip2 -9fk CHANGELOG
 %_iconsdir/*
 
 %changelog
+* Wed Dec 15 2004 Aleksandr Blokhin 'Sass' <sass@altlinux.ru> 20020501:3.78-alt1
+- Updated to 3.78.
+- Localized manual pages installed by default from now.
+
 * Sun Nov 28 2004 Dmitry V. Levin <ldv@altlinux.org> 20020501:3.77-alt2
 - Split drop-priv patch into two patches.
 

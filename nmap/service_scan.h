@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: service_scan.h,v 1.18 2004/10/12 09:34:12 fyodor Exp $ */
+/* $Id: service_scan.h,v 1.19 2004/11/24 20:13:01 fyodor Exp $ */
 
 #ifndef SERVICE_SCAN_H
 #define SERVICE_SCAN_H
@@ -113,7 +113,8 @@
 # include <pcre.h>
 #endif
 
-
+/* Workaround for lack of namespace std on HP-UX 11.00 */
+namespace std {};
 using namespace std;
 
 /**********************  DEFINES/ENUMS ***********************************/

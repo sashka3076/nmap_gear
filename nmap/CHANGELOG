@@ -1,10 +1,25 @@
-# Nmap Changelog ($Id: CHANGELOG,v 1.225 2004/11/10 02:07:50 fyodor Exp $)
+# Nmap Changelog ($Id: CHANGELOG,v 1.229 2004/12/12 00:46:18 fyodor Exp $)
+
+UNRELEASED:
+
+o The XML nmaprun element now has a startstr attribute which gives the
+  human readable calendar time format that a scan started.  Similarly
+  the finished element now has a timestr attribute describing when the
+  scan finished.  These are in addition to the existing nmaprun/start
+  and finished/time attributes that provided the start and finish time
+  in UNIX time_t notation.  This should help in development of better
+  XSLT stylesheets for Nmap XML output.
+
+o Added new "closed|filtered" state.  This is used for Idlescan, since
+  that scan method can't distinguish between those two staes.  Nmap
+  previously just used "closed", but this is more accurate.
 
 o Fixed a memory leak that would generally consume several hundred
   bytes per down host scanned.  While the effect for most scans is
   negligible, it was overwhelming when Scott Carlson
   (Scott.Carlson(a)schwab.com) tried to scan 24 million IPs
-  (10.0.0.0/8).  Thanks to him for reporting the problem.
+  (10.0.0.0/8).  Thanks to him for reporting the problem.  Also thanks
+  to Valgrind ( http://valgrind.kde.org ) for making it easy to debug.
 
 o Fixed a bug in ACK scan that could cause Nmap to crash with the
   message "Unexpected port state: 6" in some cases.  Thanks to Glyn
@@ -43,9 +58,22 @@ o Ensured that the device type, os vendor, and os family OS
   in the XML output.  Thanks to Matthieu Verbert
   (mve(a)zurich.ibm.com) for reporting the problem and sending a patch.
 
+o Rewrote the host IP (target specification) parser for easier
+  maintenance and to fix a bug found by Netris (netris(a)ok.kz)
+
 o Changed to Nmap XML DTD to use the same xmloutputversion (1.01) as
   newer versions of Nmap.  Thanks to Laurent Estieux
   (laurent.estieux(a)free.fr) for reporting the problem.
+
+o Fixed compilation on soem HP-UX 11 boxes thanks to a patch by Petter
+  Reinholdtsen (pere(a)hungry.com).
+
+o Fixed a portability problem on some OpenBSD and FreeBSD machines
+  thanks to a patch by Okan Demirmen (okan(a)demirmen.com).
+
+o Added an NTP probe and matches to the version detection database
+  (nmap-service-probes) thanks to a submission from Martin
+  Maèok (martin.macok@underground.cz).
 
 Nmap 3.75
 

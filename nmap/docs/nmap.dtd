@@ -1,7 +1,7 @@
 <!-- 
      nmap.dtd
      This is the DTD for nmap's XML output (-oX) format.
-     $Id: nmap.dtd,v 1.7 2004/11/06 03:41:53 fyodor Exp $
+     $Id: nmap.dtd,v 1.9 2004/12/12 00:46:19 fyodor Exp $
 
      Originally written by:
      William McVey <wam@cisco.com> <wam+nmap@wamber.net>
@@ -47,7 +47,6 @@
 
 -->
 
-
 <!-- parameter entities to specify common "types" used elsewhere in the DTD -->
 <!ENTITY % attr_numeric "CDATA" >
 <!ENTITY % attr_ipaddr "CDATA" >
@@ -57,7 +56,9 @@
 <!ENTITY % host_states "(up|down|unknown|skipped)" >
 
 <!-- see: nmap.c:statenum2str for list of port states -->
-<!ENTITY % port_states "(open|closed|filtered|UNfiltered|unknown)" >
+<!-- Maybe they should be enumerated as in scan_types below , but I -->
+<!-- don't know how to escape states like open|filtered -->
+<!ENTITY % port_states "CDATA" >
 
 <!ENTITY % hostname_types "(PTR)" >
 
@@ -73,8 +74,6 @@
 --> 
 <!ENTITY % service_confs  "( 3 | 5 | 10)" >
 
-
-
 <!-- This element was started in nmap.c:nmap_main().
      It represents to the topmost element of the output document.
 -->
@@ -83,6 +82,7 @@
 			scanner		(nmap)		#REQUIRED
 			args		CDATA		#IMPLIED
 			start		%attr_numeric;	#IMPLIED
+			startstr	CDATA	        #IMPLIED
 			version		CDATA		#REQUIRED
 			xmloutputversion (1.01)		#REQUIRED
 >
@@ -95,7 +95,6 @@
 			numservices	%attr_numeric;	#REQUIRED
 			services	CDATA		#REQUIRED
 >
-
 
 <!-- these elements are written in nmap.c:nmap_main() -->
 <!ELEMENT verbose	EMPTY >
@@ -110,7 +109,9 @@
      output.c:write_host_status(), output.c:printportoutput(), and
      output.c:printosscanoutput()
 -->
-<!ELEMENT host		( status, address , (address | hostnames | smurf | ports | addport | os | uptime | tcpsequence | ipidsequence | tcptssequence )* ) >
+<!ELEMENT host		( status, address , (address | hostnames |
+                          smurf | ports | addport | os | uptime | 
+                          tcpsequence | ipidsequence | tcptssequence )* ) >
 
 
 <!-- these elements are written by output.c:write_xml_initial_hostinfo() -->
@@ -239,7 +240,9 @@
 <!ELEMENT runstats	(finished, hosts) >
 
 <!ELEMENT finished	EMPTY >
-<!ATTLIST finished	time		%attr_numeric;	#REQUIRED >
+<!ATTLIST finished	time		%attr_numeric;	#REQUIRED 
+                        timestr		CDATA	        #IMPLIED
+>
 
 <!ELEMENT hosts		EMPTY >
 <!ATTLIST hosts
