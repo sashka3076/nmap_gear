@@ -1,0 +1,11 @@
+--- nmap-3.55/nbase/nbase.h.orig	2004-07-07 10:08:10 +0400
++++ nmap-3.55/nbase/nbase.h	2004-07-16 18:35:57 +0400
+@@ -318,7 +318,7 @@ void usleep(unsigned long usec);
+ /***************** String functions -- See nbase_str.c ******************/
+ /* I modified this conditional because !@# Redhat does not easily provide
+    the prototype even though the function exists */
+-#if !defined(HAVE_STRCASESTR) || (defined(LINUX) && !defined(__USE_GNU) && !defined(_GNU_SOURCE))
++#if !defined(HAVE_STRCASESTR) || (defined(LINUX) && !defined(__USE_GNU))
+ /* strcasestr is like strstr() except case insensitive */
+ char *strcasestr(const char *haystack, const char *pneedle);
+ #endif

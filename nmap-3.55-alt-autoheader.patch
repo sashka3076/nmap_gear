@@ -1,0 +1,195 @@
+--- nmap-3.55/configure.ac.orig	2004-07-04 10:30:31 +0400
++++ nmap-3.55/configure.ac	2004-07-16 18:38:09 +0400
+@@ -80,75 +80,75 @@
+ 
+ case "$host" in
+   *alpha-dec-osf*)
+-    AC_DEFINE(DEC)
++    AC_DEFINE(DEC, 1, [Define to 1 for DEC])
+     ;;
+   *-netbsd*)
+-    AC_DEFINE(NETBSD)
++    AC_DEFINE(NETBSD, 1, [Define to 1 for NetBSD])
+     ;;
+   *-openbsd*)
+-    AC_DEFINE(OPENBSD)
++    AC_DEFINE(OPENBSD, 1, [Define to 1 for OpenBSD])
+     ;;
+   *-sgi-irix5*)
+-    AC_DEFINE(IRIX)
++    AC_DEFINE(IRIX, 1, [Define to 1 for IRIX])
+     if test -z "$GCC"; then
+       sgi_cc=yes
+     fi
+     ;;
+   *-sgi-irix6*)
+-    AC_DEFINE(IRIX)
++    AC_DEFINE(IRIX, 1, [Define to 1 for IRIX])
+     if test -z "$GCC"; then
+       sgi_cc=yes
+     fi
+     ;;
+   *-solaris2.0*)  
+-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+-    AC_DEFINE(SOLARIS)
++    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG, 1, [Define to 1 for Solaris checksum bug])
++    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+     ;;
+   *-solaris2.[1-9][0-9]*)
+-    AC_DEFINE(SOLARIS)
++    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+     ;;
+   *-solaris2.1*)
+-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+-    AC_DEFINE(SOLARIS)
++    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG, 1, [Define to 1 for Solaris checksum bug])
++    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+     ;;
+   *-solaris2.2*)
+-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+-    AC_DEFINE(SOLARIS)
++    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG, 1, [Define to 1 for Solaris checksum bug])
++    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+     ;;
+   *-solaris2.3*)
+-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+-    AC_DEFINE(SOLARIS)
++    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG, 1, [Define to 1 for Solaris checksum bug])
++    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+     ;;
+   *-solaris2.4*)
+-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+-    AC_DEFINE(SOLARIS)
++    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG, 1, [Define to 1 for Solaris checksum bug])
++    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+     ;;
+   *-solaris2.5.1)
+-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+-    AC_DEFINE(SOLARIS)
++    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG, 1, [Define to 1 for Solaris checksum bug])
++    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+     ;;
+   *-solaris*)
+-    AC_DEFINE(SOLARIS)
++    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+     ;;
+   *-sunos4*)
+-    AC_DEFINE(SUNOS)
+-    AC_DEFINE(SPRINTF_RETURNS_STRING)
++    AC_DEFINE(SUNOS, 1, [Define to 1 for SunOS])
++    AC_DEFINE(SPRINTF_RETURNS_STRING, 1, [Define to 1 if sprintf returns string])
+     ;;
+   *-linux*)
+     linux=yes
+-    AC_DEFINE(LINUX)
+-    AC_DEFINE(PCAP_TIMEOUT_IGNORED)  # libpcap doesn't even LOOK at
+-                                     # the timeout you give it under Linux
++    AC_DEFINE(LINUX, 1, [Define to 1 for Linux])
++    AC_DEFINE(PCAP_TIMEOUT_IGNORED, 1, [Define to 1 if pcap(3) timeout is ignored])
++    # libpcap doesn't even LOOK at the timeout you give it under Linux
+     ;;
+   *-freebsd*)
+-    AC_DEFINE(FREEBSD)
++    AC_DEFINE(FREEBSD, 1, [Define to 1 for FreeBSD])
+     ;;
+   *-bsdi*)
+-    AC_DEFINE(BSDI)
++    AC_DEFINE(BSDI, 1, [Define to 1 for BSDI])
+     ;;
+   *-apple-darwin*)
+     macosx=yes
+-    AC_DEFINE(MACOSX)
++    AC_DEFINE(MACOSX, 1, [Define to 1 for MacOSX])
+     needs_cpp_precomp=yes
+     ;;
+ esac
+@@ -270,7 +270,7 @@
+ 
+ OPENSSL_LIBS=
+ if test "$use_openssl" = "yes"; then
+-  AC_DEFINE(HAVE_OPENSSL)
++  AC_DEFINE(HAVE_OPENSSL, 1, [Define to 1 for OpenSSL support])
+   OPENSSL_LIBS="-lssl -lcrypto"
+ fi
+ 
+@@ -366,7 +366,7 @@
+   PCAP_DEPENDS=""
+   PCAP_CLEAN=""
+   PCAP_DIST_CLEAN=""
+-  AC_DEFINE(HAVE_LIBPCAP)
++  AC_DEFINE(HAVE_LIBPCAP, 1, [Define to 1 for libpcap support])
+ else
+   if test "${LIBPCAP_INC+set}" = "set"; then
+     LDFLAGS="-L$libpcapdir $_ldflags"
+@@ -450,7 +450,7 @@
+                [AC_MSG_RESULT(no); bsd_networking=no]);
+ if test $bsd_networking = yes; then
+ 
+-  AC_DEFINE(BSD_NETWORKING)
++  AC_DEFINE(BSD_NETWORKING, 1, [Define to 1 for BSD networking])
+   AC_MSG_CHECKING([ip_v in struct ip])
+   AC_TRY_COMPILE([#include <sys/types.h>
+ #include <netinet/in.h>
+@@ -498,7 +498,7 @@
+         ac_cv_sockaddr_has_sa_len=yes,
+         ac_cv_sockaddr_has_sa_len=no))
+ if test $ac_cv_sockaddr_has_sa_len = yes ; then
+-        AC_DEFINE(HAVE_SOCKADDR_SA_LEN)
++        AC_DEFINE(HAVE_SOCKADDR_SA_LEN, 1, [Define to 1 for sa_len member in sockaddr])
+ fi
+ 
+ dnl check endedness
+@@ -507,7 +507,7 @@
+ AC_MSG_CHECKING([if struct in_addr is a wacky huge structure (some Sun boxes)])
+ 
+ AC_TRY_COMPILE([#include <netinet/in.h>], struct in_addr i; i._S_un._S_addr;, \
+-              AC_DEFINE(IN_ADDR_DEEPSTRUCT) \
++              AC_DEFINE(IN_ADDR_DEEPSTRUCT, 1, [Define to 1 for huge struct in_addr]) \
+               AC_MSG_RESULT(yes) , \
+               AC_TRY_COMPILE([#include <sys/types.h>
+ #include <netinet/in.h>], struct in_addr i; i.S_un.S_addr;, \
+@@ -530,7 +530,7 @@
+         ac_cv_struct_icmp_exists=yes,
+         ac_cv_struct_icmp_exists=no))
+ if test $ac_cv_struct_icmp_exists = yes ; then
+-        AC_DEFINE(HAVE_STRUCT_ICMP)
++        AC_DEFINE(HAVE_STRUCT_ICMP, 1, [Define to 1 for struct icmp])
+ fi
+ 
+ AC_CACHE_CHECK(if struct ip exists, ac_cv_struct_ip_exists,
+@@ -547,7 +547,7 @@
+         ac_cv_struct_ip_exists=yes,
+         ac_cv_struct_ip_exists=no))
+ if test $ac_cv_struct_ip_exists = yes ; then
+-        AC_DEFINE(HAVE_STRUCT_IP)
++        AC_DEFINE(HAVE_STRUCT_IP, 1, [Define to 1 for struct ip])
+ fi
+ 
+ AC_CACHE_CHECK(if struct ip has ip_sum member, ac_cv_ip_has_ip_sum,
+@@ -565,7 +565,7 @@
+         ac_cv_ip_has_ip_sum=yes,
+         ac_cv_ip_has_ip_sum=no))
+ if test $ac_cv_ip_has_ip_sum = yes ; then
+-        AC_DEFINE(HAVE_IP_IP_SUM)
++        AC_DEFINE(HAVE_IP_IP_SUM, 1, [Define to 1 for ip_sum member])
+ fi
+ 
+ 
+@@ -586,7 +586,7 @@
+ extern "C" int usleep (unsigned int);],[
+ usleep (200);],[
+   AC_MSG_RESULT(yes)
+-  AC_DEFINE(NEED_USLEEP_PROTO)],
++  AC_DEFINE(NEED_USLEEP_PROTO, 1, [Define to 1 for usleep prototype])],
+   AC_MSG_RESULT(not found))])
+ AC_LANG_POP(C++)
+ 
+@@ -604,7 +604,7 @@
+ char buffer[200];
+ gethostname (buffer, 200);],[
+   AC_MSG_RESULT(yes)
+-  AC_DEFINE(NEED_GETHOSTNAME_PROTO)],
++  AC_DEFINE(NEED_GETHOSTNAME_PROTO, 1, [Define to 1 for gethostname prototype])],
+   AC_MSG_RESULT(not found))])
+ AC_LANG_POP(C++)
+ 

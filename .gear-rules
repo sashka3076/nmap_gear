@@ -1,4 +1,4 @@
 copy: *.menu
 copy: *.patch
 copy: *.xpm
-tar.bz2: nmap-3.51-TEST3 name=nmap-3.51-TEST3
+tar.bz2: nmap
