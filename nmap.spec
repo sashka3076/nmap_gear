@@ -1,6 +1,6 @@
 Name: nmap
-Version: 3.78
-Release: alt1.1
+Version: 3.81
+Release: alt1
 Serial: 20020501
 
 Summary: Network exploration tool and security scanner
@@ -125,6 +125,9 @@ bzip2 -9fk CHANGELOG
 %_iconsdir/*
 
 %changelog
+* Mon Feb 07 2005 Aleksandr Blokhin 'Sass' <sass@altlinux.ru> 20020501:3.81-alt1
+- 3.81
+
 * Tue Jan 18 2005 ALT QA Team Robot <qa-robot@altlinux.org> 20020501:3.78-alt1.1
 - Rebuilt with libstdc++.so.6.
 

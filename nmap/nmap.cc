@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.cc,v 1.57 2004/12/12 00:46:18 fyodor Exp $ */
+/* $Id: nmap.cc,v 1.61 2005/02/07 08:52:52 fyodor Exp $ */
 
 #include "nmap.h"
 #include "osscan.h"
@@ -223,6 +223,9 @@ int nmap_main(int argc, char *argv[]) {
   Target *currenths;
   vector<Target *> Targets;
   char *proberr;
+#if WIN32
+  bool skip_winip_init = false;
+#endif
   char emptystring[1];
   int sourceaddrwarning = 0; /* Have we warned them yet about unguessable
 				source addresses? */
@@ -272,8 +275,12 @@ int nmap_main(int argc, char *argv[]) {
       {"version_trace", no_argument, 0, 0}, /* Display -sV related activity */
       {"fuzzy", no_argument, 0, 0}, /* Alias for osscan_guess */
       {"data_length", required_argument, 0, 0},
+      {"stylesheet", required_argument, 0, 0},
+      {"no-stylesheet", no_argument, 0, 0},
       {"rH", no_argument, 0, 0},
       {"vv", no_argument, 0, 0},
+      {"ff", no_argument, 0, 0},
+      {"mtu", required_argument, 0, 0},
       {"append_output", no_argument, 0, 0},
       {"noninteractive", no_argument, 0, 0},
       {"ttl", required_argument, 0, 0}, /* Time to live */
@@ -286,6 +293,7 @@ int nmap_main(int argc, char *argv[]) {
       {"win_noiphlpapi", no_argument, 0, 0}, 
       {"win_help", no_argument, 0, 0},
       {"win_trace", no_argument, 0, 0},
+      {"win_skip_winip_init", no_argument, 0, 0},
 #endif
       {0, 0, 0, 0}
     };
@@ -309,7 +317,7 @@ int nmap_main(int argc, char *argv[]) {
     case 0:
       if (strcmp(long_options[option_index].name, "max_rtt_timeout") == 0) {
 	o.setMaxRttTimeout(atoi(optarg));
-	if (o.maxRttTimeout() <= 5) {
+	if (o.maxRttTimeout() < 5) {
 	  fatal("max_rtt_timeout is given in milliseconds and must be at least 5");
 	}       
         if (o.maxRttTimeout() < 20) {
@@ -378,6 +386,8 @@ int nmap_main(int argc, char *argv[]) {
 	wo.noiphlpapi = 1; 
       } else if (strcmp(long_options[option_index].name, "win_trace") == 0 ) { 
 	wo.trace++; 
+      } else if (strcmp(long_options[option_index].name, "win_skip_winip_init") == 0 ) { 
+	skip_winip_init = true;
       } else if (strcmp(long_options[option_index].name, "win_help") == 0 ) { 
 	printf("Windows-specific options:\n\n"); 
 	printf(" --win_list_interfaces : list all network interfaces\n"); 
@@ -430,6 +440,10 @@ int nmap_main(int argc, char *argv[]) {
 	  o.extra_payload = (char *) safe_malloc(o.extra_payload_length);
 	  get_random_bytes(o.extra_payload, o.extra_payload_length);
 	}
+      } else if (strcmp(long_options[option_index].name, "stylesheet") == 0) {
+	o.setXSLStyleSheet(optarg);
+      } else if (strcmp(long_options[option_index].name, "no-stylesheet") == 0) {
+	o.setXSLStyleSheet(NULL);
       } else if (strcmp(long_options[option_index].name, "oN") == 0) {
 	normalfilename = optarg;
       } else if (strcmp(long_options[option_index].name, "oG") == 0 ||
@@ -474,6 +488,12 @@ int nmap_main(int argc, char *argv[]) {
       } else if (strcmp(long_options[option_index].name, "vv") == 0) {
 	/* Compatability hack ... ugly */
 	o.verbose += 2;
+      } else if (strcmp(long_options[option_index].name, "ff") == 0) {
+	o.fragscan += 16; 
+      } else if (strcmp(long_options[option_index].name, "mtu") == 0) {
+        o.fragscan = atoi(optarg);
+        if (o.fragscan <= 0 || o.fragscan % 8 != 0)
+            fatal("Data payload MTU must be >0 and multiple of 8");
       } else {
 	fatal("Unknown long option (%s) given@#!$#$", long_options[option_index].name);
       }
@@ -530,7 +550,7 @@ int nmap_main(int argc, char *argv[]) {
     case 'e': 
       strncpy(o.device, optarg,63); o.device[63] = '\0'; break;
     case 'F': fastscan++; break;
-    case 'f': o.fragscan++; break;
+    case 'f': o.fragscan += 8; break;
     case 'g': 
       o.magic_port = atoi(optarg);
       o.magic_port_set = 1;
@@ -636,7 +656,7 @@ int nmap_main(int argc, char *argv[]) {
       } else if (*optarg == 'O') {
 	fatal("-PO (the letter O)? No such option. Perhaps you meant to disable pings with -P0 (Zero).");
       } else { 
-	fatal("Illegal Argument to -P, use -P0, -PI, -PB, -PM, -PP, -PT, or -PT80 (or whatever number you want for the TCP probe destination port)"); 
+	fatal("Illegal Argument to -P, use -P0, -PI, -PB, -PE, -PM, -PP, -PA, -PU, -PT, or -PT80 (or whatever number you want for the TCP probe destination port)"); 
       }
       break;
     case 'p': 
@@ -733,7 +753,8 @@ int nmap_main(int argc, char *argv[]) {
   }
 
 #ifdef WIN32
-  winip_postopt_init();
+  if (!skip_winip_init)
+    winip_postopt_init();
 #endif
 
 #if HAVE_SIGNAL
@@ -856,13 +877,21 @@ int nmap_main(int argc, char *argv[]) {
 		ftp.server_name, inet_ntoa(ftp.server)); 
   }
   fflush(stdout);
+  fflush(stderr);
 
   timep = time(NULL);
   
   /* Brief info incase they forget what was scanned */
   Strncpy(mytime, ctime(&timep), sizeof(mytime));
   chomp(mytime);
-  log_write(LOG_XML, "<?xml version=\"1.0\" ?>\n<!-- ");
+  char *xslfname = o.XSLStyleSheet();
+  char xslline[1024];
+  if (xslfname) {
+    char *p = xml_convert(xslfname);
+    snprintf(xslline, sizeof(xslline), "<?xml-stylesheet href=\"%s\" type=\"text/xsl\"?>\n", p);
+    free(p);
+  }  else xslline[0] = '\0';
+  log_write(LOG_XML, "<?xml version=\"1.0\" ?>\n%s<!-- ", xslline);
   log_write(LOG_NORMAL|LOG_MACHINE, "# ");
   log_write(LOG_NORMAL|LOG_MACHINE|LOG_XML, "%s %s scan initiated %s as: ", NMAP_NAME, NMAP_VERSION, mytime);
   
@@ -1924,6 +1953,7 @@ void sigdie(int signo) {
     break;
   }
   fflush(stdout);
+  fflush(stderr);
   log_close(LOG_MACHINE|LOG_NORMAL|LOG_SKID);
   if (abt) abort();
   exit(1);

@@ -38,7 +38,7 @@
 
 #ifndef lint
 static const char rcsid[] _U_ =
-    "@(#) $Header: /CVS/nmap/libpcap-possiblymodified/pcap-dlpi.c,v 1.4 2004/08/01 05:34:47 fyodor Exp $ (LBL)";
+    "@(#) $Header: /CVS/nmap/libpcap-possiblymodified/pcap-dlpi.c,v 1.5 2005/02/05 06:57:24 fyodor Exp $ (LBL)";
 #endif
 
 #ifdef HAVE_CONFIG_H
@@ -675,16 +675,6 @@ pcap_open_live(const char *device, int snaplen, int promisc, int to_ms,
 		}
 	}
 
-	/*
-	** Set the chunk length.
-	*/
-	chunksize = CHUNKSIZE;
-	if (strioctl(p->fd, SBIOCSCHUNK, sizeof(chunksize), (char *)&chunksize)
-	    != 0) {
-		snprintf(ebuf, PCAP_ERRBUF_SIZE, "SBIOCSCHUNKP: %s",
-		    pcap_strerror(errno));
-		goto bad;
-	}
 #endif
 
 	/*

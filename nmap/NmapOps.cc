@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOps.cc,v 1.28 2004/10/18 16:59:36 fyodor Exp $ */
+/* $Id: NmapOps.cc,v 1.30 2005/02/07 08:52:52 fyodor Exp $ */
 #include "nmap.h"
 #include "nbase.h"
 #include "NmapOps.h"
@@ -106,11 +106,13 @@ NmapOps o;
 
 NmapOps::NmapOps() {
   datadir = NULL;
+  xsl_stylesheet = NULL;
   Initialize();
 }
 
 NmapOps::~NmapOps() {
   if (datadir) free(datadir);
+  if (xsl_stylesheet) free(xsl_stylesheet);
 }
 
 void NmapOps::ReInit() {
@@ -169,6 +171,8 @@ int NmapOps::TimeSinceStartMS(struct timeval *now) {
 }
 
 void NmapOps::Initialize() {
+  char tmpxsl[MAXPATHLEN];
+
   setaf(AF_INET);
 #ifndef WIN32
 # ifdef __amigaos__
@@ -226,6 +230,13 @@ void NmapOps::Initialize() {
   pTrace = vTrace = false;
   if (datadir) free(datadir);
   datadir = NULL;
+#if WIN32
+  Strncpy(tmpxsl, "nmap.xsl", sizeof(tmpxsl));
+#else
+  snprintf(tmpxsl, sizeof(tmpxsl), "%s/nmap.xsl", NMAPDATADIR);
+#endif
+  if (xsl_stylesheet) free(xsl_stylesheet);
+  xsl_stylesheet = strdup(tmpxsl);
 }
 
 bool NmapOps::TCPScan() {
@@ -376,8 +387,10 @@ void NmapOps::ValidateOptions() {
     error("WARNING: Decoys are irrelevant to the bounce or connect scans");
   }
   
-  if (fragscan && !(ackscan|finscan|maimonscan|nullscan|synscan|windowscan|xmasscan)) {
-    fatal("Fragscan only works with ACK, FIN, Maimon, NULL, SYN, Window, and XMAS scan types");
+  if (fragscan && !(ackscan|finscan|maimonscan|nullscan|synscan|windowscan|xmasscan) && \
+      !(pingtype&(PINGTYPE_ICMP_TS|PINGTYPE_TCP)) && !(fragscan == 8 && pingtype&PINGTYPE_ICMP_MASK) && \
+      !(extra_payload_length + 8 > fragscan)) {
+    fatal("Fragscan only works with TCP, ICMP Timestamp or ICMP Mask (mtu=8) ping types or ACK, FIN, Maimon, NULL, SYN, Window, and XMAS scan types");
   }
   
   if (osscan && bouncescan)
@@ -445,4 +458,13 @@ void NmapOps::setMaxHostGroupSz(unsigned int sz) {
   if (sz <= 0)
     fatal("Max host size must be at least 1");
   max_host_group_sz = sz;
+}
+
+  /* Sets the Name of the XML stylesheet to be printed in XML output.
+     If this is never called, a default stylesheet distributed with
+     Nmap is used.  If you call it with NULL as the xslname, no
+     stylesheet line is printed. */
+void NmapOps::setXSLStyleSheet(char *xslname) {
+  if (xsl_stylesheet) free(xsl_stylesheet);
+  xsl_stylesheet = xslname? strdup(xslname) : NULL;
 }

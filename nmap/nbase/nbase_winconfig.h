@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_winconfig.h,v 1.16 2004/08/29 09:12:04 fyodor Exp $ */
+/* $Id: nbase_winconfig.h,v 1.17 2005/02/05 22:37:57 fyodor Exp $ */
 
 #ifndef NBASE_WINCONFIG_H
 #define NBASE_WINCONFIG_H
@@ -123,6 +123,9 @@
 #define HAVE_NETINET_IN_SYSTEM_H 1
 #define HAVE_NETINET_IF_ETHER_H 1
 #define HAVE_SYS_STAT_H 1
+
+#define HAVE_GETADDRINFO 1
+#define HAVE_GETNAMEINFO 1
 
 #define HAVE_SNPRINTF 1
 #define HAVE_VASPRINTF 1

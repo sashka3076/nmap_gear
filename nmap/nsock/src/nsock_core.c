@@ -53,7 +53,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_core.c,v 1.22 2004/10/12 09:34:12 fyodor Exp $ */
+/* $Id: nsock_core.c,v 1.23 2005/01/31 20:40:45 fyodor Exp $ */
 
 #include "nsock_internal.h"
 #include "gh_list.h"
@@ -447,7 +447,7 @@ static int do_actual_read(mspool *ms, msevent *nse) {
   char buf[8192];
   int buflen = 0;
   msiod *iod = nse->iod;
-  int err;
+  int err = 0;
   int max_chunk = NSOCK_READ_CHUNK_SIZE;
   int startlen = FILESPACE_LENGTH(&nse->iobuf);
 
@@ -456,30 +456,32 @@ static int do_actual_read(mspool *ms, msevent *nse) {
 
   if (!iod->ssl) {
     /* Traditional read() - no SSL - using recv() because that works better on Windows */
-    while(((buflen = recv(iod->sd, buf, sizeof(buf), 0)) > 0) ||
-	  ( buflen == -1 && socket_errno() == EINTR)) {
-      if (fscat(&nse->iobuf, buf, buflen) == -1) {
-	nse->event_done = 1;
-	nse->status = NSE_STATUS_ERROR;
-	nse->errnum = ENOMEM;
-	return -1;
+    do {
+      buflen = recv(iod->sd, buf, sizeof(buf), 0);
+      if (buflen == -1) err = socket_errno();
+      if (buflen > 0) {
+	if (fscat(&nse->iobuf, buf, buflen) == -1) {
+	  nse->event_done = 1;
+	  nse->status = NSE_STATUS_ERROR;
+	  nse->errnum = ENOMEM;
+	  return -1;
+	}
+
+	// Sometimes a service just spews and spews data.  So we return
+	// after a somewhat large amount to avoid monopolizing resources
+	// and avoid DOS attacks.
+	if (FILESPACE_LENGTH(&nse->iobuf) > max_chunk)
+	  return FILESPACE_LENGTH(&nse->iobuf) - startlen;
+	
+	// No good reason to read again if we we were successful in the read but
+	// didn't fill up the buffer.  I'll insist on it being TCP too, because I
+	// think UDP might only give me one packet worth at a time (I dunno ...).
+	if (buflen > 0 && buflen < sizeof(buf) && iod->lastproto == IPPROTO_TCP)
+	  return FILESPACE_LENGTH(&nse->iobuf) - startlen;
       }
-      
-      // Sometimes a service just spews and spews data.  So we return
-      // after a somewhat large amount to avoid monopolizing resources
-      // and avoid DOS attacks.
-      if (FILESPACE_LENGTH(&nse->iobuf) > max_chunk)
-	return FILESPACE_LENGTH(&nse->iobuf) - startlen;
-      
-      // No good reason to read again if we we were successful in the read but
-      // didn't fill up the buffer.  I'll insist on it being TCP too, because I
-      // think UDP might only give me one packet worth at a time (I dunno ...).
-      if (buflen > 0 && buflen < sizeof(buf) && iod->lastproto == IPPROTO_TCP)
-	return FILESPACE_LENGTH(&nse->iobuf) - startlen;
-    }
+    } while (buflen > 0 || (buflen == -1 && err == EINTR));
 
     if (buflen == -1) {
-      err = socket_errno();
       if (err != EINTR && err != EAGAIN) {
 	nse->event_done = 1;
 	nse->status = NSE_STATUS_ERROR;
@@ -949,7 +951,7 @@ void nsock_trace_handler_callback(mspool *ms, msevent *nse) {
   nsi = nse->iod;
 
   if (nse->status == NSE_STATUS_ERROR) {
-    snprintf(errstr, sizeof(errstr), "[%s] ", strerror(nse->errnum));
+    snprintf(errstr, sizeof(errstr), "[%s (%d)] ", strerror(nse->errnum), nse->errnum);
   } else errstr[0] = '\0';
 
   // Some types have special tracing treatment

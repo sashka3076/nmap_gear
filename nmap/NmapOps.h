@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOps.h,v 1.22 2004/10/18 16:59:36 fyodor Exp $ */
+/* $Id: NmapOps.h,v 1.24 2005/02/05 06:57:24 fyodor Exp $ */
 
 class NmapOps {
  public:
@@ -126,7 +126,7 @@ class NmapOps {
   bool UDPScan(); /* Returns true if at least one chosen scan type is UDP */
 
   /* Returns true if at least one chosen scan type uses raw packets.
-     Itdoes not currently cover cases such as TCP SYN ping scan which
+     It does not currently cover cases such as TCP SYN ping scan which
      can go either way based on whether the user is root or IPv6 is
      being used.  It will return false in those cases where a RawScan
      is not neccessarily used. */
@@ -187,6 +187,16 @@ class NmapOps {
   void setMaxTCPScanDelay(unsigned int delayMS) { max_tcp_scan_delay = delayMS; }
   void setMaxUDPScanDelay(unsigned int delayMS) { max_udp_scan_delay = delayMS; }
 
+  /* Sets the Name of the XML stylesheet to be printed in XML output.
+     If this is never called, a default stylesheet distributed with
+     Nmap is used.  If you call it with NULL as the xslname, no
+     stylesheet line is printed. */
+  void setXSLStyleSheet(char *xslname);
+  /* Returns the full path or URL that should be printed in the XML
+     output xml-stylesheet element.  Returns NULL if the whole element
+     should be skipped */
+  char *XSLStyleSheet() { return xsl_stylesheet; }
+
   int max_ips_to_scan; // Used for Random input (-iR) to specify how 
                        // many IPs to try before stopping. 0 means unlimited.
   int extra_payload_length; /* These two are for --data_length op */
@@ -217,7 +227,7 @@ class NmapOps {
   int listscan;
   int pingscan;
   int allowall;
-  int fragscan;
+  int fragscan; /* 0 or MTU (without IPv4 header size) */
   int ackscan;
   int bouncescan;
   int connectscan;
@@ -253,5 +263,6 @@ class NmapOps {
   struct timeval start_time;
   bool pTrace; // Whether packet tracing has been enabled
   bool vTrace; // Whether version tracing has been enabled
+  char *xsl_stylesheet;
 };
   

@@ -99,7 +99,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_config.h.in,v 1.20 2004/10/12 09:34:12 fyodor Exp $ */
+/* $Id: nbase_config.h.in,v 1.21 2005/02/05 22:37:57 fyodor Exp $ */
 #ifndef NBASE_CONFIG_H
 #define NBASE_CONFIG_H
 
@@ -149,6 +149,8 @@
 #undef HAVE_SYS_SOCKET_H
 
 #undef HAVE_SYS_WAIT_H
+
+#undef HAVE_NET_IF_H
 
 #undef BSD_NETWORKING
 

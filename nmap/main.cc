@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: main.cc,v 1.12 2004/08/29 09:12:03 fyodor Exp $ */
+/* $Id: main.cc,v 1.13 2005/01/31 20:40:45 fyodor Exp $ */
 
 #include "nmap.h"
 #include "osscan.h"
@@ -207,7 +207,9 @@ int main(int argc, char *argv[], char *envp[]) {
   } else nmapcalledas++;
 
   if ((cptr = getenv("NMAP_ARGS"))) {
-    snprintf(command, sizeof(command), "nmap %s", cptr);
+    if (snprintf(command, sizeof(command), "nmap %s", cptr) >= (int) sizeof(command)) {
+        error("Warning: NMAP_ARGS variable is too long, truncated");
+    }
     myargc = arg_parse(command, &myargv);
     if (myargc < 1) {
       fatal("NMAP_ARG variable could not be parsed");

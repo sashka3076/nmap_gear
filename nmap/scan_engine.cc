@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: scan_engine.cc,v 1.52 2004/11/24 20:13:01 fyodor Exp $ */
+/* $Id: scan_engine.cc,v 1.54 2005/02/05 07:51:37 fyodor Exp $ */
 
 #include "scan_engine.h"
 #include "timing.h"
@@ -236,7 +236,7 @@ public:
   int probes_sent_at_last_wait;
   // number of hosts that timed out during scan, or were already timedout
   int num_hosts_timedout;
-  struct ConnectScanInfo *CSI;
+  ConnectScanInfo *CSI;
 private:
 };
 
@@ -1183,7 +1183,7 @@ int HostScanStats::freshPortsLeft() {
   /* Removes a probe from probes_outstanding, adjusts HSS and USS
      active probe stats accordingly, then deletes the probe. */
 void HostScanStats::destroyOutstandingProbe(list<UltraProbe *>::iterator probeI) {
-  struct UltraProbe *probe = *probeI;
+  UltraProbe *probe = *probeI;
   assert(!probes_outstanding.empty());
   if (!probe->timedout) {
     assert(num_probes_active > 0);
@@ -1674,6 +1674,7 @@ static UltraProbe *sendConnectScanProbe(UltraScanInfo *USI, HostScanStats *hss,
 	connecterror = true;
 	fprintf(stderr, "Strange error from connect (%d):", connect_errno);
 	fflush(stdout);
+	fflush(stderr);
 	perror(""); /*falling through intentionally*/
       }
     case ECONNREFUSED:
@@ -2468,7 +2469,7 @@ static bool get_pcap_result(UltraScanInfo *USI, struct timeval *stime) {
 	      tcp->th_seq != ipp->tcp->th_seq)
 	    continue;
 	} else if (ip2->ip_p == IPPROTO_UDP && !USI->prot_scan) {
-	  /* TOOD: IPID verification */
+	  /* TODO: IPID verification */
 	  udp = (udphdr_bsd *) ((u8 *) ip2 + ip->ip_hl * 4);
 	  if (udp->uh_sport != ipp->udp->uh_sport || 
 	      udp->uh_dport != ipp->udp->uh_dport)

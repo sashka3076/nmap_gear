@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.h,v 1.107 2004/10/18 16:59:37 fyodor Exp $ */
+/* $Id: nmap.h,v 1.108 2005/02/05 22:37:55 fyodor Exp $ */
 
 #ifndef NMAP_H
 #define NMAP_H
@@ -247,9 +247,11 @@ void *realloc();
 #endif
 
 /*#include <net/if_arp.h> *//* defines struct arphdr needed for if_ether.h */
-#ifndef NET_IF_H  /* why the HELL does OpenBSD not do this? */
+#if HAVE_NET_IF_H
+#ifndef NET_IF_H  /* why doesn't OpenBSD do this?! */
 #include <net/if.h>
 #define NET_IF_H
+#endif
 #endif
 #if HAVE_NETINET_IF_ETHER_H 
 #ifndef NETINET_IF_ETHER_H

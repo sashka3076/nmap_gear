@@ -96,7 +96,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap_error.cc,v 1.9 2004/08/29 09:12:03 fyodor Exp $ */
+/* $Id: nmap_error.cc,v 1.10 2005/01/31 20:40:45 fyodor Exp $ */
 
 #include "nmap_error.h"
 
@@ -114,6 +114,7 @@ va_start(ap, fmt);
 fflush(stdout);
 vfprintf(stderr, fmt, ap);
 fprintf(stderr, "\nQUITTING!\n");
+fflush(stderr);
 va_end(ap);
 exit(1);
 }
@@ -124,6 +125,7 @@ va_start(ap, fmt);
 fflush(stdout);
 vfprintf(stderr, fmt, ap);
 fprintf(stderr, "\n");
+fflush(stderr);
 va_end(ap);
 return;
 }

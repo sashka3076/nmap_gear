@@ -2,7 +2,7 @@ dnl # -*- mode: fundamental; -*-
 dnl # Autoconf configuration file for Nbase
 dnl #
 dnl # Process this file with autoconf to produce a configure script.
-dnl # $Id: configure.ac,v 1.16 2004/11/24 20:13:02 fyodor Exp $
+dnl # $Id: configure.ac,v 1.17 2005/02/05 22:37:57 fyodor Exp $
 
 # Require autoconf 2.13
 AC_PREREQ(2.13)
@@ -128,7 +128,7 @@ esac
 
 dnl Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS( string.h getopt.h strings.h memory.h sys/param.h sys/time.h unistd.h bstring.h errno.h sys/types.h sys/socket.h netinet/in.h sys/sockio.h rpc/types.h netdb.h pwd.h arpa/inet.h sys/resource.h sys/stat.h sys/wait.h libiberty.h fcntl.h )
+AC_CHECK_HEADERS( string.h getopt.h strings.h memory.h sys/param.h sys/time.h unistd.h bstring.h errno.h sys/types.h sys/socket.h netinet/in.h sys/sockio.h rpc/types.h netdb.h pwd.h arpa/inet.h sys/resource.h sys/stat.h sys/wait.h net/if.h libiberty.h fcntl.h )
 AC_CHECK_HEADERS([net/if.h],[],[],
 [#if HAVE_SYS_TYPES_H
 # include <sys/types.h>

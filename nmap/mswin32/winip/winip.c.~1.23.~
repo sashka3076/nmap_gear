@@ -40,6 +40,7 @@ If used outside nmap in a GPL'ed app, just copy them from wintcpip.c.
 #include "..\tcpip.h"
 #include "winip.h"
 #include "..\..\NmapOps.h"
+#include "ntddndis.h"
 
 #ifdef _MSC_VER
 # include <delayimp.h>
@@ -309,8 +310,8 @@ void winip_postopt_init()
    pcap_avail = 1;
    if(wo.trace) printf("***WinIP***  trying to initialize winpcap 2.1\n");
    PacketGetAdapterNames(pcaplist, &len);
-   if(o.debugging > 1 || wo.trace)
-     printf("***WinIP***  winpcap is present\n");
+   if(o.debugging || wo.trace)
+	   printf("***WinIP***  winpcap present, dynamic linked to: %s\n", pcap_lib_version());
  }
     }
 #ifdef _MSC_VER
@@ -860,7 +861,7 @@ void set_pcap_filter(Target *target,
        pcap_t *pd, PFILTERFN filter, char *bpf, ...)
 {
   va_list ap;
-  char buf[512];
+  char buf[3072]; // same size as bpf ie size of filter in scan_engine.cc
   struct bpf_program fcode;
   unsigned int localnet, netmask;
   char err0r[256];
@@ -875,7 +876,10 @@ void set_pcap_filter(Target *target,
     ; /* fatal("Failed to lookup device subnet/netmask: %s", err0r);*/
 
   va_start(ap, bpf);
-  vsprintf(buf, bpf, ap);
+  if (vsnprintf(buf, sizeof(buf), bpf, ap) < 0)
+    {
+      fatal("Failed to copy the filter string %s",bpf);
+    }
   va_end(ap);
 
   if (o.debugging)
