@@ -1,4 +1,96 @@
-# Nmap Changelog ($Id: CHANGELOG,v 1.185 2003/10/03 08:32:14 fyodor Exp $)
+# Nmap Changelog ($Id: CHANGELOG,v 1.194 2004/01/19 02:25:35 fyodor Exp $)
+
+Nmap 3.50
+
+o Integrated a ton of service fingerprints, increasing the number of
+  signatures more than 50%.  It has now exceeded 1,000 for the first
+  time, and represents 180 unique service protocols from acap, afp,
+  and aim to xml-rpc, zebedee, and zebra.
+
+o Implemented a huge OS fingerprint update.  The number of
+  fingerprints has increased more than 13% to 1,121.  This is the first
+  time it has exceeded 1000.  Notable updates include Linux 2.6.0, Mac
+  OS X up to 10.3.2 (Panther), OpenBSD 3.4 (normal and pf "scrub all"),
+  FreeBSD 5.2, the latest Windows Longhorn warez, and Cisco PIX 6.3.3.
+  As usual, there are a ton of new consumer devices from ubiquitous
+  D-Link, Linksys, and Netgear broadband routers to a number of new IP
+  phones including the Cisco devices commonly used by Vonage.  Linksys
+  has apparently gone special-purpose with some of their devices, such
+  as their WGA54G "Wireless Game Adapter" and WPS54GU2 wireless print
+  server.  A cute little MP3 player called the Rio Karma was submitted
+  multiple times and I also received and integrated fingerprints for the
+  Handspring Treo 600 (PalmOS).
+
+o Applied some man page fixes from Eric S. Raymond
+  (esr(a)snark.thyrsus.com).
+
+o Added version scan information to grepable output between the last
+  two '/' delimiters (that space was previously unused).  So the format
+  is now "portnum/state/protocol/owner/servicename/rpcinfo/versioninfo"
+  as in "53/open/tcp//domain//ISC Bind 9.2.1/" and
+  "22/open/tcp//ssh//OpenSSH 3.5p1 (protocol 1.99)/".  Thanks to
+  MadHat (madhat(a)unspecific.com) for sending a patch (although I did
+  it differently).  Note that any '/' characters in the
+  version (or owner) field are replaced with '|' to keep awk/cut
+  parsing simple.  The service name field has been updated so that it
+  is the same as in normal output (except for the same sort of
+  escaping discussed above).
+
+o Integrated an Oracle TNS service probe and match lines contributed
+  by Frank Berger (fm.berger(a)gmx.de).  New probe contributions are
+  always appreciated!
+
+o Fixed a crash that could happen during SSL version detection due to
+  SSL session ID cache reference counting issues.
+
+o Applied patch from Rob Foehl (rwf(a)loonybin.net) which fixes the
+  --with_openssl=DIR configure argument.
+
+o Applied patch to nmap XML dtd (nmap.dtd) from Mario Manno
+  (mm(a)koeln.ccc.de).  This accounts for the new version scanning
+  functionality.
+
+o Updated the Windows build system so that you don't have to manually
+  copy nmap-service-probes to the output directory.  I also updated
+  the README-WIN32 to elaborate further on the build process.
+
+o Added configure option --with-libpcre=included which causes Nmap to
+  build with its included version of libpcre even if an acceptable
+  version is available on the system.
+
+o Upgraded to Autoconf 2.59 (from 2.57).  This should help HP-UX
+  compilation problems reported by Petter Reinholdtsen
+  (pere(a)hungry.com) and may have other benefits as well.
+
+o Applied patch from Przemek Galczewski (sako(a)avet.com.pl) which
+  adds spaces to the XML output in places tha apparently help certain
+  older XML parsers.
+
+o Made Ident-scan (-I) limits on the length and type of responses
+  stricter so that rogue servers can't flood your screen with 1024
+  characters.  The new length limit is 32.  Thanks to Tom Rune Flo
+  (tom(a)x86.no) for the suggestion and a patch.
+
+o Fingerprints for unrecognized services can now be a bit longer to
+  avoid truncating as much useful response information.  While the
+  fingerprints can be longer now, I hope they will be less frequent
+  because of all the newly recognized services in this version.
+
+o The nmap-service-probes "match" directive can now take a service
+  name like "ssl/vmware-auth".  The service will then be reported as
+  vmware-auth (or whatever follows "ssl/") tunneled by SSL, yet Nmap
+  won't actually bother initiating an SSL connection.  This is useful
+  for SSL services which can be fully recognized without the overhead
+  of making an SSL connection.
+
+o Version scan now chops commas and whitespace from the end of
+  vendorproductname, version, and info fields.  This makes it easier to
+  write templates incorporating lists.  For example, the tcpmux service
+  (TCP port 1) gives a list of supported services separated by CRLF.
+  Nmap uses this new feature to print them comma separated without
+  having an annoying trailing comma as so (linewrapped):
+  match tcpmux m|^(sgi_[-.\w]+\r\n([-.\w]+\r\n)*)$| 
+        v/SGI IRIX tcpmux//Available services: $SUBST(1, "\r\n", ",")/
 
 Nmap 3.48
 
@@ -35,7 +127,7 @@ o Added SUBST() helper function, which replaces strings in matched
   appname/version/extrainfo strings with something else.  For example,
   VanDyke Vshell gives a banner that includes
   "SSH-2\.0-VShell_2_2_0_528".  A substring match is used to pick out
-  the string "2_2_0_528", and then SUBST(1,"_",".") is called on that
+  the string "2_2_0_528", and then SUB21ST(1,"_",".") is called on that
   match to form the version number 2.2.0.528.
 
 o If responses to a probe fail to match any of the registered match

@@ -2,7 +2,7 @@ dnl # -*- mode: fundamental; -*-
 dnl # Autoconf configuration file for Nbase
 dnl #
 dnl # Process this file with autoconf to produce a configure script.
-dnl # $Id: configure.ac,v 1.11 2003/10/03 08:32:15 fyodor Exp $
+dnl # $Id: configure.ac,v 1.12 2003/10/14 04:31:09 fyodor Exp $
 
 # Require autoconf 2.13
 AC_PREREQ(2.13)
@@ -212,7 +212,7 @@ and [DIR]/include/openssl/)],
     ;;
   *)
     specialssldir="$with_openssl"
-    CXXFLAGS="-I$with_openssl/include $CXXFLAGS"
+    CFLAGS="-I$with_openssl/include $CFLAGS"
     ;;
   esac]
 )

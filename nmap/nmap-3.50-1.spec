@@ -1,5 +1,5 @@
 %define name nmap
-%define version 3.48
+%define version 3.50
 %define release 1
 %define prefix /usr
 

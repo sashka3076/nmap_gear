@@ -83,7 +83,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: service_scan.cc,v 1.26 2003/10/06 08:24:35 fyodor Exp $ */
+/* $Id: service_scan.cc,v 1.29 2004/01/11 06:59:24 fyodor Exp $ */
 
 
 #include "service_scan.h"
@@ -657,7 +657,7 @@ static int substvar(char *tmplvar, char **tmplvarend, char *newstr,
 // that was run against subject, and subjectlen, with the 'nummatches'
 // matches in ovector.  The NUL-terminated newly composted string is
 // placed into 'newstr', as long as it doesn't exceed 'newstrlen'
-// bytes.  Returns zero for success
+// bytes.  Trailing whitespace and commas are removed.  Returns zero for success
 static int dotmplsubst(const u8 *subject, int subjectlen, 
 		       int *ovector, int nummatches, char *tmpl, char *newstr,
 		       int newstrlen) {
@@ -680,6 +680,11 @@ static int dotmplsubst(const u8 *subject, int subjectlen,
 	*dst++ = *srcstart++;
       }
       *dst = '\0';
+      while (--dst >= newstr) {
+	if (isspace(*dst) || *dst == ',') 
+	  *dst = '\0';
+	else break;
+      }
       return 0;
     } else {
       // Copy the literal text up to the '$', then do the substitution
@@ -702,6 +707,11 @@ static int dotmplsubst(const u8 *subject, int subjectlen,
   if (dst >= newstrend - 1)
     return -1;
   *dst = '\0';
+  while (--dst >= newstr) {
+    if (isspace(*dst) || *dst == ',') 
+      *dst = '\0';
+    else break;
+  }
   return 0;
 
 }
@@ -1141,7 +1151,7 @@ void ServiceNFO::addToServiceFingerprint(const char *probeName, const u8 *resp,
 					 int resplen) {
   int spaceleft = servicefpalloc - servicefplen;
   int servicewrap=74; // Wrap after 74 chars / line
-  int respused = MIN(resplen, (o.debugging)? 1000 : 600); // truncate to reasonable size
+  int respused = MIN(resplen, (o.debugging)? 1300 : 900); // truncate to reasonable size
   // every char could require \xHH escape, plus there is the matter of 
   // "\nSF:" for each line, plus "%r(probename,probelen,"") Oh, and 
   // the SF-PortXXXX-TCP stuff, etc
@@ -1155,7 +1165,7 @@ void ServiceNFO::addToServiceFingerprint(const char *probeName, const u8 *resp,
   assert(resplen);
   assert(probeName);
 
-  if (servicefplen > (o.debugging? 10000 : 1700))
+  if (servicefplen > (o.debugging? 10000 : 2200))
     return; // it is large enough.
 
   if (spaceneeded >= spaceleft) {
@@ -1170,7 +1180,7 @@ void ServiceNFO::addToServiceFingerprint(const char *probeName, const u8 *resp,
   if (servicefplen == 0) {
     timep = time(NULL);
     ltime = localtime(&timep);
-    servicefplen = snprintf(servicefp, spaceleft, "SF-Port%hu-%s:V=%s%s%%D=%d/%d%%Time=%X", portno, proto2ascii(proto, true), NMAP_VERSION, (tunnel == SERVICE_TUNNEL_SSL)? "%T=SSL" : "", ltime->tm_mon + 1, ltime->tm_mday, (int) timep);
+    servicefplen = snprintf(servicefp, spaceleft, "SF-Port%hu-%s:V=%s%s%%D=%d/%d%%Time=%X%%P=%s", portno, proto2ascii(proto, true), NMAP_VERSION, (tunnel == SERVICE_TUNNEL_SSL)? "%T=SSL" : "", ltime->tm_mon + 1, ltime->tm_mday, (int) timep, NMAP_PLATFORM);
   }
 
   // Note that we give the total length of the response, even though we 
@@ -1513,9 +1523,22 @@ static void startNextProbe(nsock_pool nsp, nsock_iod nsi, ServiceGroup *SG,
    will take a service that has just been detected (hard match only),
    and see if we can dig deeper through tunneling.  Nonzero is
    returned if we can do more.  Otherwise 0 is returned and the caller
-   should end the service with its successful match */
+   should end the service with its successful match.  If the tunnel
+   results can be determined with no more effort, 0 is also returned.
+   For example, a service that already matched as "ssl/ldap" will be
+   chaned to "ldap" with the tunnel being SSL and 0 will be returned.
+   That is a special case.
+*/
+
 static int scanThroughTunnel(nsock_pool nsp, nsock_iod nsi, ServiceGroup *SG, 
 			     ServiceNFO *svc) {
+
+  if (strncmp(svc->probe_matched, "ssl/", 4) == 0) {
+    /* The service has been detected without having to make an SSL connection */
+    svc->tunnel = SERVICE_TUNNEL_SSL;
+    svc->probe_matched += 4;
+    return 0;
+  }
 
 #ifndef HAVE_OPENSSL
   return 0;

@@ -1,7 +1,7 @@
 # Well known service port numbers -*- mode: fundamental; -*-
 # From the Nmap security scanner ( http://www.insecure.org/nmap/ )
 #
-# $Id: nmap-services,v 1.60 2003/10/06 08:24:35 fyodor Exp $
+# $Id: nmap-services,v 1.63 2003/12/18 21:42:56 fyodor Exp $
 # For a HUGE list of services (including these and others), 
 # see http://www.graffiti.com/services
 tcpmux            1/tcp      # TCP Port Service Multiplexer [rfc-1078]
@@ -187,10 +187,10 @@ rtelnet           107/tcp    # Remote Telnet
 rtelnet           107/udp    # Remote Telnet Service
 snagas            108/tcp    # SNA Gateway Access Server
 snagas            108/udp    # SNA Gateway Access Server
-pop-2             109/tcp    # PostOffice V.2
-pop-2             109/udp    # PostOffice V.2
-pop-3             110/tcp    # PostOffice V.3
-pop-3             110/udp    # PostOffice V.3
+pop2             109/tcp    # PostOffice V.2
+pop2             109/udp    # PostOffice V.2
+pop3             110/tcp    # PostOffice V.3
+pop3             110/udp    # PostOffice V.3
 rpcbind           111/tcp    # portmapper, rpcbind
 rpcbind           111/udp    # portmapper, rpcbind
 mcidas            112/tcp    # McIDAS Data Transmission Protocol
@@ -1106,6 +1106,7 @@ mdbs_daemon       800/tcp    #
 mdbs_daemon       800/udp    # 
 device            801/tcp    # 
 device            801/udp    # 
+ccproxy-http      808/tcp    # CCProxy HTTP/Gopher/FTP (over HTTP) proxy
 supfilesrv        871/tcp    # SUP server
 rsync             873/tcp    # Rsync server ( http://rsync.samba.org )
 accessbuilder     888/tcp    # or Audio CD Database
@@ -1113,6 +1114,8 @@ accessbuilder     888/udp    #
 sun-manageconsole 898/tcp    # Solaris Management Console Java listener (Solaris 8 & 9)
 ftps-data         989/tcp    # ftp protocol, data, over TLS/SSL
 samba-swat        901/tcp    # Samba SWAT tool.  Also used by ISS RealSecure.
+iss-realsecure-sensor 902/tcp # ISS RealSecure Sensor
+iss-console-mgr   903/tcp    # ISS Console Manager
 oftep-rpc         950/tcp    # Often RPC.statd (on Redhat Linux)
 rndc              953/tcp    # RNDC is used by BIND 9 (& probably other NS)
 securenetpro-sensor 975/tcp
@@ -1131,6 +1134,7 @@ garcon            999/tcp    #
 applix            999/udp    # Applix ac
 cadlock           1000/tcp   # 
 ock               1000/udp   # 
+windows-icfw      1002/tcp   # Windows Internet Connection Firewall or Internet Locator Server for NetMeeting.
 ufsd              1008/tcp   # ufsd		# UFS-aware server
 ufsd              1008/udp   # 
 sometimes-rpc1    1012/udp   # This is rstatd on my openBSD box
@@ -1785,6 +1789,7 @@ rkinit            2108/udp   # Kerberos (v4) remote initialization
 kx                2111/tcp   # X over kerberos
 kip               2112/tcp   # IP over kerberos
 kauth             2120/tcp   # Remote kauth
+ccproxy-ftp       2121/tcp   # CCProxy FTP Proxy
 ats               2201/tcp   # Advanced Training System Program
 ats               2201/udp   # Advanced Training System Program
 ivs-video         2232/tcp   # IVS Video default
@@ -1817,6 +1822,7 @@ ospfd             2604/tcp   # OSPFd vty
 bgpd              2605/tcp   # BGPd vty
 webster           2627/tcp   # Network dictionary
 webster           2627/udp   # 
+dict              2628/tcp   # Dictionary service (RFC2229)
 sybase            2638/tcp   # Sybase database
 listen            2766/tcp   # System V listener port
 www-dev           2784/tcp   # world wide web - development

@@ -47,7 +47,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_ssl.c,v 1.4 2003/09/13 04:19:56 fyodor Exp $ */
+/* $Id: nsock_ssl.c,v 1.5 2004/01/17 02:47:18 fyodor Exp $ */
 
 
 #include "nsock.h"
@@ -97,7 +97,7 @@ void Nsock_SSL_Init() {
      DES, for example. */
 
   /* Accept any and all ciphers, including none.  Since speed, not security, is
-     our goal, the list below is sorted by speed, based on my (bri@ifokr.org)
+     our goal, the list below is sorted by speed, based on Brian Hatch's (bri@ifokr.org)
      tests on an Pentium 686 against the ciphers listed.  Nmap's typical
      version scanning connections are short and sweet, so the actual speed
      difference isn't terribly great anyway. */

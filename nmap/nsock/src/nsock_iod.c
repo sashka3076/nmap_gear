@@ -47,7 +47,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_iod.c,v 1.17 2003/09/13 04:19:56 fyodor Exp $ */
+/* $Id: nsock_iod.c,v 1.18 2004/01/18 11:40:41 fyodor Exp $ */
 
 #include "nsock.h"
 #include "nsock_internal.h"
@@ -167,9 +167,10 @@ void nsi_delete(nsock_iod nsockiod, int pending_response) {
 #if HAVE_OPENSSL
   /* Close any SSL resources */
   if (nsi->ssl) {
-    if (nsi->ssl_session)
-      SSL_SESSION_free(nsi->ssl_session);
-    nsi->ssl_session = NULL;
+    /* No longer free session because copy nsi stores is not reference counted */
+    /*    if (nsi->ssl_session)
+	  SSL_SESSION_free(nsi->ssl_session); 
+	  nsi->ssl_session = NULL; */
     if (SSL_shutdown(nsi->ssl) == -1) {
       if (nsi->nsp->tracelevel > 1)
 	nsock_trace(nsi->nsp, 
@@ -219,7 +220,7 @@ nsock_ssl_session nsi_get1_ssl_session(nsock_iod nsockiod) {
 /* Returns the SSL_SESSION without incrementing usage count */
 nsock_ssl_session nsi_get0_ssl_session(nsock_iod nsockiod) {
 #if HAVE_OPENSSL
-  return (((msiod *)nsockiod)->ssl_session);
+  return SSL_get0_session(((msiod *)nsockiod)->ssl);
 #else
   return NULL;
 #endif
@@ -232,9 +233,7 @@ void nsi_set_ssl_session(msiod *iod, SSL_SESSION *sessid) {
   if (sessid) {
     iod->ssl_session = sessid;
 
-    // Sadly, there's no "official" way to increment the reference count so
-    // we're stuck with this.  Not thread safe, but none of nsockssl is.
-    sessid->references += 1;
+    /* No reference counting for the copy stored briefly in nsiod */
   }
 }
 #endif

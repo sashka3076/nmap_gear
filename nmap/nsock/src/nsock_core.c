@@ -45,7 +45,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_core.c,v 1.16 2003/09/16 06:04:55 fyodor Exp $ */
+/* $Id: nsock_core.c,v 1.17 2004/01/18 11:40:41 fyodor Exp $ */
 
 #include "nsock_internal.h"
 #include "gh_list.h"
@@ -288,23 +288,17 @@ void handle_connect_result(mspool *ms, msevent *nse,
 #if HAVE_OPENSSL
   if (nse->type == NSE_TYPE_CONNECT_SSL && !nse->event_done) {
     /* Lets now start/continue/finish the connect! */
-    if (iod->ssl_session)
-      SSL_set_session(iod->ssl, iod->ssl_session);
+    if (iod->ssl_session) {    
+     rc = SSL_set_session(iod->ssl, iod->ssl_session);
+     if (rc == 0) { printf("Uh-oh: SSL_set_session() failed - please tell Fyodor\n"); }
+     iod->ssl_session = NULL; /* No need for this any more */
+    }
     rc = SSL_connect(iod->ssl);
     /* printf("DBG: SSL_connect()=%d", rc); */
     if (rc == 1) {
       /* Woop!  Connect is done! */
       nse->event_done = 1;
       nse->status = NSE_STATUS_SUCCESS;
-
-      if (iod->ssl_session == SSL_get0_session(iod->ssl)) {
-        // nothing to do - old is same as current.
-      } else {
-        // Free old session, load current one.
-	if (iod->ssl_session)
-	  SSL_SESSION_free(iod->ssl_session);
-	iod->ssl_session = SSL_get1_session(iod->ssl);
-      }
     } else {
       sslerr = SSL_get_error(iod->ssl, rc);
       if (rc == -1 && sslerr == SSL_ERROR_WANT_READ) {

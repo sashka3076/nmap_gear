@@ -23,7 +23,6 @@ if test "$user_localdirs" = 1; then
      fi
    if test -d /usr/local/include; then
      CFLAGS="$CFLAGS -I/usr/local/include"
-     CXXFLAGS="$CFLAGS -I/usr/local/include"
    fi
 fi
 
@@ -94,7 +93,7 @@ and [DIR]/include/openssl/)],
     ;;
   *)
     specialssldir="$with_openssl"
-    CXXFLAGS="-I$with_openssl/include $CXXFLAGS"
+    CFLAGS="-I$with_openssl/include $CFLAGS"
     ;;
   esac]
 )

@@ -83,7 +83,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.cc,v 1.37 2003/09/20 09:03:00 fyodor Exp $ */
+/* $Id: nmap.cc,v 1.38 2003/12/02 01:09:39 fyodor Exp $ */
 
 #include "nmap.h"
 #include "osscan.h"
@@ -1713,6 +1713,7 @@ int getidentinfoz(struct in_addr target, u16 localport, u16 remoteport,
   char response[1024];
   char *p,*q;
   char  *os;
+  int slen = 0;
 
   if (ownersz == 0) return 0;
   owner[0] = '\0';
@@ -1763,6 +1764,8 @@ int getidentinfoz(struct in_addr target, u16 localport, u16 remoteport,
 	    if ((q = strchr(p, '\r'))) *q = '\0';
 	    if ((q = strchr(p, '\n'))) *q = '\0';
 	    Strncpy(owner, p, ownersz);
+            slen = strlen(owner);
+	    replacenonprintable(owner, slen, '.');
 	  }
 	}
       } 

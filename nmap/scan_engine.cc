@@ -83,7 +83,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: scan_engine.cc,v 1.24 2003/09/11 02:12:57 fyodor Exp $ */
+/* $Id: scan_engine.cc,v 1.25 2003/12/02 01:09:39 fyodor Exp $ */
 
 #include "scan_engine.h"
 #include "timing.h"
@@ -113,7 +113,7 @@ static void posportupdate(Target *target, struct portinfo *current,
   struct sockaddr_in mysock;
   recvfrom6_t sockaddr_in_len = sizeof(SA);
   int i;
-  char owner[1024];
+  char owner[32];
   struct timeval tv;
 
   if (tryident == -1 || target->v4host().s_addr != lasttarget) 

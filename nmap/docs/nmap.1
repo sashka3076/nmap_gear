@@ -184,7 +184,7 @@ Unfortunately, it isn't always trivial to differentiate between real
 open UDP ports and these filtered false-positives.
 .Sp
 Some people think UDP scanning is pointless. I usually
-remind them of the recent Solaris rcpbind hole. Rpcbind can
+remind them of the Solaris rpcbind hole. Rpcbind can
 be found hiding on an undocumented UDP port somewhere above
 32770. So it doesn't matter that 111 is blocked by the
 firewall. But can you find which of the more than 30,000
@@ -302,8 +302,8 @@ support for UDP RPC scans.
 .TP
 .B \-sL
 List scan.  This method simply generates and prints a list of
-IPs/Names without actually pinging or port scanning them.  DNS name
-resolution will be performed unless you use -n.
+IP addresses or hostnames without actually pinging or port scanning 
+them.  DNS name resolution will be performed unless you use -n.
 .TP
 .B \-b <ftp relay host>
 FTP bounce attack: An interesting "feature" of the ftp
@@ -335,7 +335,7 @@ Everything but
 is optional.  To determine what servers are vulnerable to
 this attack, you can see my article in
 .I Phrack
-51.  And updated version is available at the 
+51.  An updated version is available at the 
 .I nmap
 URL (http://www.insecure.org/nmap).
 .TP
@@ -346,7 +346,7 @@ penetrating strict firewalls by sending many probe types using
 different TCP ports/flags and ICMP codes.
 .TP
 .B \-P0
-Do not try and ping hosts at all before scanning them.  This
+Do not try to ping hosts at all before scanning them.  This
 allows the scanning of networks that don't allow ICMP echo
 requests (or responses) through their firewall.
 microsoft.com is an example of such a network, and thus you
@@ -397,14 +397,14 @@ should be eliminated if found as they allow for numerous
 denial of service attacks (Smurf is the most common).
 .TP
 .B \-PP
-Uses an ICMP timestamp request (code 13) packet to find listening hosts.
+Uses an ICMP timestamp request (type 13) packet to find listening hosts.
 .TP
 .B \-PM
 Same as 
 .B \-PE
 and 
 .B \-PP
-except uses a netmask request (ICMP code 17).
+except uses a netmask request (ICMP type 17).
 .TP
 .B \-PB
 This is the default ping type.  It uses both the ACK (
@@ -645,16 +645,16 @@ is actually up on the network.  You might want to use IP
 addresses instead of names (so the decoy networks don't see
 you in their nameserver logs).
 .Sp
-Also note that some (stupid) "port scan detectors" will
-firewall/deny routing to hosts that attempt port scans.
-Thus you might inadvertently cause the machine you scan to
-lose connectivity with the decoy machines you are using.
-This could cause the target machines major problems if the
-decoy is, say, its Internet gateway or even "localhost".
-Thus you might want to be careful of this option.  The real
-moral of the story is that detectors of spoofable port scans
-should not take action against the machine that seems like
-it is port scanning them.  It could just be a decoy!
+Also note that some "port scan detectors" will
+firewall/deny routing to hosts that attempt port scans.  The problem
+is that many scan types can be forged (as this option demonstrates).
+So attackers can cause such a machine to sever connectivity with
+important hosts such as its internet gateway, DNS TLD servers, sites
+like Windows Update, etc.  Most such software offers whitelist
+capabilities, but you are unlikely to enumerate all of the critical
+machines.  For this reason we never recommend taking
+action against port scan that can be forged, including SYN scans, UDP
+scans, etc.  The machine you block could just be a decoy.
 .Sp
 Decoys are used both in the initial ping scan (using ICMP,
 SYN, ACK, or whatever) and during the actual port scanning
@@ -882,7 +882,7 @@ protect them with quotes.
 Another interesting thing to do is slice the Internet the
 other way.  Instead of scanning all the hosts in a class
 "B", scan "*.*.5.6-7" to scan every IP address that ends in
-.5.6 or .5.7 Pick your own numbers.  For more information on
+\&.5.6 or .5.7 Pick your own numbers.  For more information on
 specifying hosts to scan, see the
 .I examples
 section.
@@ -929,8 +929,8 @@ Same goes with CISCO, IRIX, HP/UX, and BSDI boxes.
 Rather than focus on a specific IP range, it is sometimes
 interesting to slice up the entire Internet and scan a small
 sample from each slice.  This command finds all web servers
-on machines with IP addresses ending in .2.3, .2.4, or .2.5
-.  If you are root you might as well add -sS.  Also you will
+on machines with IP addresses ending in .2.3, .2.4, or .2.5.  
+If you are root you might as well add -sS.  Also you will
 find more interesting machines starting at 127. so you might
 want to use "127-222" instead of the first asterisks because
 that section has a greater density of interesting machines
@@ -1048,6 +1048,6 @@ ECCN (export control classification number) 5D992.  This category is
 called '"Information Security" "software" not controlled by 5D002'.
 The only restriction of this classification is AT (anti-terrorism),
 which applies to almost all goods and denies export to a handful of
-rogue nations such as Iraq and North Korea.  Thus exporting Nmap does
+rogue nations such as Iran and North Korea.  Thus exporting Nmap does
 not require any special license, permit, or other governmental
 authorization.

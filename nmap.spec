@@ -1,6 +1,6 @@
 Name: nmap
-Version: 3.48
-Release: alt2
+Version: 3.50
+Release: alt1
 Serial: 20020501
 
 Summary: Network exploration tool and security scanner
@@ -102,6 +102,9 @@ export ac_cv_header_libiberty_h=no
 %_iconsdir/*
 
 %changelog
+* Wed Jan 21 2004 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 20020501:3.50-alt1
+- 3.50
+
 * Mon Jan 12 2004 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 20020501:3.48-alt2
 - Rebuilded with libpcap0.8
 - Updated BuildRequires

@@ -86,7 +86,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase.h,v 1.32 2003/09/22 09:10:12 fyodor Exp $ */
+/* $Id: nbase.h,v 1.33 2003/12/02 01:09:39 fyodor Exp $ */
 
 #ifndef NBASE_H
 #define NBASE_H
@@ -345,6 +345,14 @@ int inet_aton(const char *cp, struct in_addr *addr);
 /* Strncpy is like strcpy() except it ALWAYS zero-terminates, even if
    it must truncate */
 int Strncpy(char *dest, const char *src, size_t n);
+
+
+/* Trivial function that returns nonzero if all characters in str of
+   length strlength are printable (as defined by isprint()) */
+int stringisprintable(const char *str, int strlength);
+
+/* Convert non-printable characters to replchar in the string */
+void replacenonprintable(char *str, int strlength, char replchar);
 
 /* A few simple wrappers for the most common memory allocation routines which will exit() if the
 	allocation fails, so you don't always have to check -- see nbase_memalloc.c */

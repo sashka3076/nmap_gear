@@ -84,12 +84,12 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap_winconfig.h,v 1.58 2003/10/06 08:24:35 fyodor Exp $ */
+/* $Id: nmap_winconfig.h,v 1.59 2004/01/18 11:40:40 fyodor Exp $ */
 
 #ifndef NMAP_WINCONFIG_H
 #define NMAP_WINCONFIG_H
 
-#define NMAP_VERSION "3.48"
+#define NMAP_VERSION "3.50"
 #define NMAP_NAME "nmap"
 #define NMAP_URL "http://www.insecure.org/nmap"
 #define NMAP_PLATFORM "i686-pc-windows-windows"

@@ -44,39 +44,5 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: utils.c,v 1.7 2003/09/11 02:12:58 fyodor Exp $ */
+/* $Id: utils.c,v 1.8 2003/12/02 01:09:39 fyodor Exp $ */
 
-#include "utils.h"
-#include "error.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <ctype.h>
-#if HAVE_SYS_PARAM_H
-#include <sys/param.h>
-#endif
-#if HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-
-
-/* Trivial function that returns nonzero if all characters in str of length strlength are
-   printable (as defined by isprint()) */
-int stringisprintable(const char *str, int strlength) {
-  int i;
-  for(i=0; i < strlength; i++)
-    if (!isprint((unsigned char) str[i]))
-      return 0;
-
-  return 1;
-}
-
-/* Convert non-printable characters to replchar in the string */
-void replacenonprintable(char *str, int strlength, char replchar) {
-  int i;
-  for(i=0; i < strlength; i++)
-    if (!isprint( (unsigned char) str[i]))
-      str[i] = replchar;
-
-  return;
-}

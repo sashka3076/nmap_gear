@@ -83,7 +83,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: service_scan.h,v 1.12 2003/09/13 04:19:55 fyodor Exp $ */
+/* $Id: service_scan.h,v 1.13 2003/12/18 21:42:56 fyodor Exp $ */
 
 #ifndef SERVICE_SCAN_H
 #define SERVICE_SCAN_H
@@ -265,7 +265,7 @@ class ServiceProbe {
   const struct MatchDetails *testMatch(const u8 *buf, int buflen);
 
  private:
-  void ServiceProbe::setPortVector(vector<u16> *portv, const char *portstr, 
+  void setPortVector(vector<u16> *portv, const char *portstr, 
 				 int lineno);
   char *probename;
 

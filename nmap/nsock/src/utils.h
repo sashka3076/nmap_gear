@@ -44,7 +44,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: utils.h,v 1.6 2003/09/11 02:12:58 fyodor Exp $ */
+/* $Id: utils.h,v 1.7 2004/01/19 03:02:18 fyodor Exp $ */
 #ifndef UTILS_H
 #define UTILS_H
 
@@ -99,7 +99,4 @@
    onto a single timeval, pass the same timeval as a and b */
 #define TIMEVAL_NSEC_ADD(a, b, nsecs) (a).tv_sec = (b).tv_sec + ((nsecs) / 1000); (a).tv_usec = (b).tv_usec + ((nsecs) % 1000) * 1000; (a).tv_sec += (a).tv_usec / 1000000; (a).tv_usec %= 1000000
 
-int stringisprintable(const char *str, int strlength);
-/* Convert non-printable characters to replchar in the string */
-void replacenonprintable(char *str, int strlength, char replchar);
 #endif
