@@ -1,6 +1,6 @@
 Name: nmap
 Version: 3.48
-Release: alt1
+Release: alt2
 Serial: 20020501
 
 Summary: Network exploration tool and security scanner
@@ -21,7 +21,7 @@ Patch4: nmap-3.46-alt-drop_priv.patch
 
 PreReq: libpcap >= 0.7.2-alt2, chrooted >= 0.2, net-tools, /var/resolv
 
-# Automatically added by buildreq on Thu Oct 02 2003
+# Automatically added by buildreq on Sat Jan 10 2004
 BuildRequires: XFree86-devel XFree86-libs gcc-c++ glib-devel gtk+-devel libcap-devel libpcap-devel libpcre-devel libssl-devel libstdc++-devel
 
 %package frontend
@@ -102,6 +102,10 @@ export ac_cv_header_libiberty_h=no
 %_iconsdir/*
 
 %changelog
+* Mon Jan 12 2004 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 20020501:3.48-alt2
+- Rebuilded with libpcap0.8
+- Updated BuildRequires
+
 * Wed Oct 08 2003 Dmitry V. Levin <ldv@altlinux.org> 20020501:3.48-alt1
 - Updated to 3.48.
 
