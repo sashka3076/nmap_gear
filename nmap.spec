@@ -1,5 +1,5 @@
 Name: nmap
-Version: 3.75
+Version: 3.77
 Release: alt1
 Serial: 20020501
 
@@ -103,15 +103,26 @@ bzip2 -9fk CHANGELOG
 %_menudir/*
 %_iconsdir/*
 
+%post frontend
+%update_menus
+
+%postun frontend
+%clean_menus
+
 %changelog
+* Mon Nov 15 2004 Aleksandr Blokhin 'Sass' <sass@altlinux.ru> 20020501:3.77-alt1
+- 3.77.
+- Changed menu group to Networking/Other.
+- Added %%post and %%postun to %name-frontend package.
+
 * Tue Oct 19 2004 Aleksandr Blokhin (Sass) <sass@altlinux.ru> 20020501:3.75-alt1
-- 3.75
-- Updated autoheader.patch
-- Updated BuildRequires
+- 3.75.
+- Updated autoheader.patch.
+- Updated BuildRequires.
 
 * Wed Sep 01 2004 Aleksandr Blokhin 'Sass' <sass@altlinux.ru> 20020501:3.70-alt1
-- 3.70
-- Updated drop_priv.patch & autoheader.patch
+- 3.70.
+- Updated drop_priv.patch & autoheader.patch.
 
 * Fri Jul 16 2004 Dmitry V. Levin <ldv@altlinux.org> 20020501:3.55-alt1
 - Updated to 3.55.

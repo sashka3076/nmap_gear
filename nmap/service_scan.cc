@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: service_scan.cc,v 1.36 2004/10/12 09:34:12 fyodor Exp $ */
+/* $Id: service_scan.cc,v 1.38 2004/11/06 03:41:53 fyodor Exp $ */
 
 
 #include "service_scan.h"
@@ -1337,7 +1337,7 @@ bool dropdown = false;
  if (probe_state == PROBESTATE_NONMATCHINGPROBES) {
    if (!dropdown && current_probe != AP->probes.end()) current_probe++;
    while (current_probe != AP->probes.end()) {
-     // The protocol must be right, it must be a nonmatching port ('cause we did thos),
+     // The protocol must be right, it must be a nonmatching port ('cause we did those),
      // and we better either have no soft match yet, or the soft service match must
      // be available via this probe.
      if ((proto == (*current_probe)->getProbeProtocol()) && 
@@ -1473,6 +1473,18 @@ ServiceGroup::~ServiceGroup() {
     delete *i;
 
   delete SPM;
+}
+
+/* Called if data is read for a service or a TCP connection made.  If
+   the port state is currently PORT_UNFILTERED, changes to
+   PORT_OPEN. */
+static void adjustPortStateIfNeccessary(ServiceNFO *svc) {
+
+  if (svc->port->state == PORT_OPENFILTERED) {
+    svc->target->ports.addPort(svc->portno, svc->proto, NULL, PORT_OPEN);
+  }
+
+  return;
 }
 
   // Sends probe text to an open connection.  In the case of a NULL probe, there
@@ -1661,8 +1673,19 @@ void end_svcprobe(nsock_pool nsp, enum serviceprobestate probe_state, ServiceGro
   svc->probe_state = probe_state;
   member = find(SG->services_in_progress.begin(), SG->services_in_progress.end(),
 		  svc);
-  assert(*member);
-  SG->services_in_progress.erase(member);
+  if (member != SG->services_in_progress.end()) {
+    assert(*member == svc);
+    SG->services_in_progress.erase(member);
+  } else {
+    /* A probe can finish from services_remaining if the host times out before the
+       probe has even started */
+    member = find(SG->services_remaining.begin(), SG->services_remaining.end(),
+		  svc);
+    assert(member != SG->services_remaining.end());
+    assert(*member == svc);
+    SG->services_remaining.erase(member);
+  }
+
   SG->services_finished.push_back(svc);
 
   considerPrintingStats(SG);
@@ -1704,6 +1727,10 @@ void servicescan_connect_handler(nsock_pool nsp, nsock_event nse, void *mydata) 
       }
     }
 #endif
+
+    /* If the port is TCP, it is now known to be open rather than openfiltered */
+    if (svc->proto == IPPROTO_TCP)
+      adjustPortStateIfNeccessary(svc);
 
     // Yeah!  Connection made to the port.  Send the appropriate probe
     // text (if any is needed -- might be NULL probe)
@@ -1773,20 +1800,6 @@ void servicescan_write_handler(nsock_pool nsp, nsock_event nse, void *mydata) {
   return;
 }
 
-/* Called if data is read for a service.  Checks if the service is UDP and
-   the port is in state PORT_OPENFILTERED.  If that is the case, the state
-   is changed to PORT_OPEN, as only an open port would return a response */
-static void adjustPortStateIfNeccessary(ServiceNFO *svc) {
-  if (svc->proto != IPPROTO_UDP)
-    return;
-
-  if (svc->port->state == PORT_OPENFILTERED) {
-    svc->target->ports.addPort(svc->portno, IPPROTO_UDP, NULL, PORT_OPEN);
-  }
-
-  return;
-}
-
 void servicescan_read_handler(nsock_pool nsp, nsock_event nse, void *mydata) {
   nsock_iod nsi = nse_iod(nse);
   enum nse_status status = nse_status(nse);
@@ -1806,7 +1819,7 @@ void servicescan_read_handler(nsock_pool nsp, nsock_event nse, void *mydata) {
   } else if (status == NSE_STATUS_SUCCESS) {
     // w00p, w00p, we read something back from the port.
     readstr = (u8 *) nse_readbuf(nse, &readstrlen);
-    adjustPortStateIfNeccessary(svc); /* A UDP response means PORT_OPENFILTERED is really PORT_OPEN */
+    adjustPortStateIfNeccessary(svc); /* A response means PORT_OPENFILTERED is really PORT_OPEN */
     svc->appendtocurrentproberesponse(readstr, readstrlen);
     // now get the full version
     readstr = svc->getcurrentproberesponse(&readstrlen);
@@ -1946,7 +1959,7 @@ void servicescan_read_handler(nsock_pool nsp, nsock_event nse, void *mydata) {
   } else {
     fatal("Unexpected status (%d) in NSE_TYPE_READ callback.", (int) status);
   }
-
+  
   // We may have room for more pr0bes!
   launchSomeServiceProbes(nsp, SG);
   return;
