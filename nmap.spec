@@ -1,6 +1,6 @@
 Name: nmap
 Version: 3.77
-Release: alt1
+Release: alt2
 Serial: 20020501
 
 Summary: Network exploration tool and security scanner
@@ -17,19 +17,20 @@ Source2: nmapfe.xpm
 Patch1: nmap-3.55-alt-glibc.patch
 Patch2: nmap-3.70-alt-autoheader.patch
 Patch3: nmap-3.55-alt-owl-libpcap.patch
-Patch4: nmap-3.70-alt-drop_priv.patch
+Patch4: nmap-3.77-alt-init.patch
+Patch5: nmap-3.77-alt-drop_priv.patch
 
 PreReq: libpcap >= 2:0.7.2-alt2, chrooted-resolv
 
 # Automatically added by buildreq on Tue Oct 19 2004
-BuildRequires: gcc-c++ glib-devel gtk+-devel libcap-devel libpcap-devel libpcre-devel libssl-devel libstdc++-devel xorg-x11-libs
+BuildRequires: gcc-c++ glib-devel gtk+-devel libcap-devel libpcap-devel libpcre-devel libssl-devel
 
 %package frontend
 Summary: Gtk+ frontend for %name
 Summary(ru_RU.CP1251): Графический интерфейс пользователя для %name
 Group: Monitoring
 Requires: %name = %serial:%version-%release
-Provides: nmapfe
+Provides: nmapfe = %version-%release
 
 %description
 Nmap is designed to allow system administrators and curious individuals
@@ -62,7 +63,8 @@ This package includes nmapfe, a Gtk+ frontend for %name.
 %patch2 -p1
 %patch3 -p1
 %patch4 -p1
-find -type f -name \*.orig -print -delete
+%patch5 -p1
+find -type f -name \*.orig -delete -print
 
 %build
 aclocal
@@ -88,8 +90,11 @@ bzip2 -9fk CHANGELOG
 /usr/sbin/groupadd -r -f nmapuser
 /usr/sbin/useradd -r -g nmapuser -d /dev/null -s /dev/null -n nmapuser >/dev/null 2>&1 ||:
 
-%post
-/etc/chroot.d/resolv.all
+%post frontend
+%update_menus
+
+%postun frontend
+%clean_menus
 
 %files
 %_bindir/*
@@ -103,13 +108,10 @@ bzip2 -9fk CHANGELOG
 %_menudir/*
 %_iconsdir/*
 
-%post frontend
-%update_menus
-
-%postun frontend
-%clean_menus
-
 %changelog
+* Sun Nov 28 2004 Dmitry V. Levin <ldv@altlinux.org> 20020501:3.77-alt2
+- Split drop-priv patch into two patches.
+
 * Mon Nov 15 2004 Aleksandr Blokhin 'Sass' <sass@altlinux.ru> 20020501:3.77-alt1
 - 3.77.
 - Changed menu group to Networking/Other.
