@@ -1,70 +1,59 @@
 Name: nmap
-Version: 3.81
+Version: 4.01
 Release: alt1
 Serial: 20020501
 
 Summary: Network exploration tool and security scanner
 License: GPL
 Group: Monitoring
-Url: http://www.insecure.org/%name
+Url: http://www.insecure.org/nmap
 Packager: Nmap Development Team <nmap@packages.altlinux.org>
-Summary(ru_RU.CP1251): Инструмент для исследования сети и сетевой безопасности.
 
-Source: %url/dist/%name-%version.tar.bz2
-Source1: nmapfe.menu
-Source2: nmapfe.xpm
+Source: %url/dist/nmap-%version.tar.bz2
+Source1: nmapfe-16.png
+Source2: nmapfe-32.png
+Source3: nmapfe-48.png
 
-Patch1: nmap-3.55-alt-glibc.patch
-Patch2: nmap-3.70-alt-autoheader.patch
-Patch3: nmap-3.55-alt-owl-libpcap.patch
-Patch4: nmap-3.77-alt-init.patch
-Patch5: nmap-3.77-alt-drop_priv.patch
+Patch1: nmap-4.01-alt-autoheader.patch
+Patch2: nmap-4.01-alt-owl-libpcap.patch
+Patch3: nmap-4.01-alt-init.patch
+Patch4: nmap-4.01-alt-owl-drop-priv.patch
+Patch5: nmap-4.01-alt-nmapfe.desktop.patch
+Patch6: nmap-4.01-alt-dot-dir.patch
 
-PreReq: libpcap >= 2:0.7.2-alt2, chrooted-resolv
-
-# Automatically added by buildreq on Thu Dec 16 2004
-BuildRequires: gcc-c++ glib-devel gtk+-devel libcap-devel libpcap-devel libpcre-devel libssl-devel libstdc++-devel xorg-x11-libs
+PreReq: shadow-utils
+Requires: chrooted-resolv
+BuildRequires: libpcap-devel >= 2:0.8
+BuildRequires: gcc-c++ libcap-devel libgtk+2-devel libpcap-devel libpcre-devel libssl-devel
 
 %package frontend
-Summary: Gtk+ frontend for %name
-Summary(ru_RU.CP1251): Графический интерфейс пользователя для %name
+Summary: Gtk+ frontend for nmap
 Group: Monitoring
 Requires: %name = %serial:%version-%release
 Provides: nmapfe = %version-%release
 
 %description
-Nmap is designed to allow system administrators and curious individuals
-to scan large networks to determine which hosts are up and what services
-they are offering.  Nmap supports a large number of scanning techniques,
-such as: UDP, TCP connect(), TCP SYN (half open), ftp proxy (bounce
-attack), Reverse-ident, ICMP (ping sweep), FIN, ACK sweep, Xmas Tree,
-SYN sweep, IP Protocol, and Null scan.  Nmap also offers a number of
-advanced features such as remote OS detection via TCP/IP fingerprinting,
-stealth scanning, dynamic delay and retransmission calculations, parallel
-scanning, detection of down hosts via parallel pings, decoy scanning, port
-filtering detection, direct (non-portmapper) RPC scanning, fragmentation
-scanning, and flexible target and port specification.
-
-%description -l ru_RU.CP1251
-Nmap - это утилита для исследования сети и аудита защиты. Она поддерживает
-сканирование при помощи ping (определение действующих машин), множественное
-сканирование портов (определение предоставляемых машиной сервисов) и отпечатки
-TCP/IP (идентификация удалённой системы).
+Nmap is an utility for network exploration or security auditing.
+It supports ping scanning (determine which hosts are up), many port
+scanning techniques, version detection (determine service protocols and
+application versions listening behind ports), and TCP/IP fingerprinting
+(remote host OS or device identification).  Nmap also offers flexible
+target and port specification, decoy/stealth scanning, Sun RPC scanning,
+and more.
 
 %description frontend
-This package includes nmapfe, a Gtk+ frontend for %name.
-
-%description frontend -l ru_RU.CP1251
-Этот пакет содержит nmapfe, Gtk+ интерфейс для nmap.
+This package includes nmapfe, a Gtk+ frontend for nmap.
 
 %prep
-%setup -q -n %name-%version
+%setup -q
 %patch1 -p1
 %patch2 -p1
 %patch3 -p1
 %patch4 -p1
 %patch5 -p1
+%patch6 -p1
 find -type f -name \*.orig -delete -print
+bzip2 -9k CHANGELOG
 
 %build
 aclocal
@@ -72,59 +61,50 @@ autoheader
 autoconf
 
 export ac_cv_header_libiberty_h=no
+export LDFLAGS=-Wl,--as-needed
 %configure --with-libpcre=yes
 %make_build
-bzip2 -9fk CHANGELOG
 
 %install
-%__mkdir_p $RPM_BUILD_ROOT{%_bindir,%_man1dir,%_iconsdir}
-%__mkdir_p $RPM_BUILD_ROOT%_datadir/%name
-%__mkdir_p $RPM_BUILD_ROOT%_mandir/{ru,fr,lt,de,it,pt,es}/man1
-%__mkdir_p $RPM_BUILD_ROOT%_x11dir/{bin,man/man1}
-%makeinstall nmapdatadir=$RPM_BUILD_ROOT%_datadir/%name
-%__mv $RPM_BUILD_ROOT%_bindir/{nmapfe,xnmap} $RPM_BUILD_ROOT%_x11bindir/
-%__mv $RPM_BUILD_ROOT%_man1dir/{nmapfe,xnmap}.1 $RPM_BUILD_ROOT%_x11mandir/man1/
-%__install -pD -m644 %SOURCE1 $RPM_BUILD_ROOT%_menudir/nmapfe
-%__install -p -m644 %SOURCE2 $RPM_BUILD_ROOT%_iconsdir/
-%__install -p -m644 docs/%name.dtd $RPM_BUILD_ROOT%_datadir/%name/%name.dtd
-%__install -p -m644 docs/%{name}_french.1 $RPM_BUILD_ROOT%_mandir/fr/man1/%name.1
-%__install -p -m644 docs/%{name}_german.1 $RPM_BUILD_ROOT%_mandir/de/man1/%name.1
-%__install -p -m644 docs/%{name}_italian.1 $RPM_BUILD_ROOT%_mandir/it/man1/%name.1
-%__install -p -m644 docs/%{name}_lithuanian.1 $RPM_BUILD_ROOT%_mandir/lt/man1/%name.1
-%__install -p -m644 docs/%{name}_portuguese.1 $RPM_BUILD_ROOT%_mandir/pt/man1/%name.1
-%__install -p -m644 docs/%{name}_russian.1 $RPM_BUILD_ROOT%_mandir/ru/man1/%name.1
-%__install -p -m644 docs/%{name}_spanish.1 $RPM_BUILD_ROOT%_mandir/es/man1/%name.1
+%make_install install DESTDIR=%buildroot
+install -pD -m644 %_sourcedir/nmapfe-16.png %buildroot%_miconsdir/nmapfe.png
+install -pD -m644 %_sourcedir/nmapfe-32.png %buildroot%_niconsdir/nmapfe.png
+install -pD -m644 %_sourcedir/nmapfe-48.png %buildroot%_liconsdir/nmapfe.png
 
 %pre
 /usr/sbin/groupadd -r -f nmapuser
 /usr/sbin/useradd -r -g nmapuser -d /dev/null -s /dev/null -n nmapuser >/dev/null 2>&1 ||:
 
-%post frontend
-%update_menus
-
-%postun frontend
-%clean_menus
-
 %files
-%_bindir/*
-%_datadir/%name
-%_mandir/man?/*
-%_mandir/fr/man?/*
-%_mandir/de/man?/*
-%_mandir/it/man?/*
-%_mandir/lt/man?/*
-%_mandir/pt/man?/*
-%_mandir/ru/man?/*
-%_mandir/es/man?/*
-%doc CHANGELOG.bz2 HACKING docs/{README,*.{txt,html}}
+%_bindir/nmap
+%_datadir/nmap
+%_man1dir/nmap.*
+%doc CHANGELOG.bz2 HACKING docs/{README,*.txt}
 
 %files frontend
-%_x11bindir/*
-%_x11mandir/man?/*
-%_menudir/*
-%_iconsdir/*
+%_bindir/nmapfe
+%_bindir/xnmap
+%_man1dir/nmapfe.*
+%_man1dir/xnmap.*
+%_desktopdir/*
+%_miconsdir/*
+%_niconsdir/*
+%_liconsdir/*
 
 %changelog
+* Fri Mar 03 2006 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.01-alt1
+- Updated to 4.01.
+- Reviewed and reworked patches.
+- Cleaned up specfile.
+- Replaced menu file with desktop file.
+- Updated nmapfe icons from Mandriva package.
+- Updated build dependencies.
+
+* Wed Feb 01 2006 Victor Forsyuk <force@altlinux.ru> 20020501:4.00-alt1
+- 4.00
+- Convert 'error' to 'fatal' in droppriv.cc (as in Owl's patch).
+- Update build requirements.
+
 * Mon Feb 07 2005 Aleksandr Blokhin 'Sass' <sass@altlinux.ru> 20020501:3.81-alt1
 - 3.81
 

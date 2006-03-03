@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: targets.cc,v 1.44 2005/02/05 07:51:37 fyodor Exp $ */
+/* $Id: targets.cc 3120 2006-02-07 07:15:32Z fyodor $ */
 
 
 #include "targets.h"
@@ -107,14 +107,14 @@
 #include "NmapOps.h"
 #include "TargetGroup.h"
 #include "Target.h"
+#include "scan_engine.h"
+#include "nmap_dns.h"
+#include "tty.h"
 
+using namespace std;
 extern NmapOps o;
 enum pingstyle { pingstyle_unknown, pingstyle_rawtcp, pingstyle_rawudp, pingstyle_connecttcp, 
 		 pingstyle_icmp };
-
-/*  predefined filters -- I need to kill these globals at some pont. */
-extern unsigned long flt_dsthost, flt_srchost;
-extern unsigned short flt_baseport;
 
 /* Gets the host number (index) of target in the hostbatch array of
  pointers.  Note that the target MUST EXIST in the array or all
@@ -239,6 +239,45 @@ static int hostupdate(Target *hostbatch[], Target *target,
   return 0;
 }
 
+/* Conducts an ARP ping sweep of the given hosts to determine which ones
+   are up on a local ethernet network */
+static void arpping(Target *hostbatch[], int num_hosts, 
+	     struct scan_lists *ports) {
+  /* First I change hostbatch into a vector<Target *>, which is what ultra_scan
+     takes.  I remove hosts that cannot be ARP scanned (such as localhost) */
+  vector<Target *> targets;
+  int targetno;
+  targets.reserve(num_hosts);
+
+  for(targetno = 0; targetno < num_hosts; targetno++) {
+    initialize_timeout_info(&hostbatch[targetno]->to);
+    /* Default timout should be much lower for arp */
+    hostbatch[targetno]->to.timeout = MIN(o.initialRttTimeout(), 100) * 1000;
+    if (!hostbatch[targetno]->SrcMACAddress()) {
+      bool islocal = islocalhost(hostbatch[targetno]->v4hostip());
+      if (islocal) {
+	log_write(LOG_STDOUT|LOG_NORMAL, 
+		  "ARP ping: Considering %s UP because it is a local IP, despite no MAC address for device %s\n",
+		  hostbatch[targetno]->NameIP(), hostbatch[targetno]->deviceName());
+	hostbatch[targetno]->flags &= ~(HOST_DOWN|HOST_FIREWALLED);
+	hostbatch[targetno]->flags |= HOST_UP;
+      } else {
+	log_write(LOG_STDOUT|LOG_NORMAL, 
+		  "ARP ping: Considering %s DOWN because no MAC address found for device %s.\n",
+		  hostbatch[targetno]->NameIP(), 
+		  hostbatch[targetno]->deviceName());
+	hostbatch[targetno]->flags &= ~HOST_FIREWALLED;
+	hostbatch[targetno]->flags |= HOST_DOWN;
+      }
+      continue;
+    }
+    targets.push_back(hostbatch[targetno]);
+  }
+  if (!targets.empty())
+    ultra_scan(targets, ports, PING_SCAN_ARP);
+  return;
+}
+
 void hoststructfry(Target *hostbatch[], int nelem) {
   genfry((unsigned char *)hostbatch, sizeof(Target *), nelem);
   return;
@@ -253,12 +292,18 @@ void returnhost(HostGroupState *hs) {
 
 Target *nexthost(HostGroupState *hs, TargetGroup *exclude_group,
 			    struct scan_lists *ports, int *pingtype) {
-int hidx;
-char *device;
+int hidx = 0;
 int i;
 struct sockaddr_storage ss;
 size_t sslen;
+struct intf_entry *ifentry;
+ u32 ifbuf[200] ;
+ struct route_nfo rnfo;
+ bool arpping_done = false;
+ struct timeval now;
 
+ ifentry = (struct intf_entry *) ifbuf; 
+ ifentry->intf_len = sizeof(ifbuf); // TODO: May want to use a larger buffer if interface aliases prove important.
 if (hs->next_batch_no < hs->current_batch_sz) {
   /* Woop!  This is easy -- we just pass back the next host struct */
   return hs->hostbatch[hs->next_batch_no++];
@@ -279,68 +324,63 @@ do {
       hs->hostbatch[hidx] = new Target();
       hs->hostbatch[hidx]->setTargetSockAddr(&ss, sslen);
 
-      /* Lets figure out what device this IP uses ... */
-      if (o.spoofsource) {
-	o.SourceSockAddr(&ss, &sslen);
-	hs->hostbatch[hidx]->setSourceSockAddr(&ss, sslen);
-	Strncpy(hs->hostbatch[hidx]->device, o.device, 64);
-      } else {
-	/* We figure out the source IP/device IFF
-	   1) We are r00t AND
-	   2) We are doing tcp or udp pingscan OR
-	   3) We are doing a raw-mode portscan or osscan OR
-	   4) We are on windows and doing ICMP ping */
-	if (o.isr00t && o.af() == AF_INET && 
-	    ((*pingtype & (PINGTYPE_TCP|PINGTYPE_UDP)) || o.RawScan()
+      /* We figure out the source IP/device IFF
+	 1) We are r00t AND
+	 2) We are doing tcp or udp pingscan OR
+	 3) We are doing a raw-mode portscan or osscan OR
+	 4) We are on windows and doing ICMP ping */
+      if (o.isr00t && o.af() == AF_INET && 
+	  ((*pingtype & (PINGTYPE_TCP|PINGTYPE_UDP|PINGTYPE_ARP)) || o.RawScan()
 #ifdef WIN32
-         || (*pingtype & (PINGTYPE_ICMP_PING|PINGTYPE_ICMP_MASK|PINGTYPE_ICMP_TS))
+	   || (*pingtype & (PINGTYPE_ICMP_PING|PINGTYPE_ICMP_MASK|PINGTYPE_ICMP_TS))
 #endif // WIN32
-		 )) {
-	  struct sockaddr_in *sin = (struct sockaddr_in *) &ss;
-	  sslen = sizeof(*sin);
-	  sin->sin_family = AF_INET;
-#if HAVE_SOCKADDR_SA_LEN
-	  sin->sin_len = sslen;
-#endif
-	  device = routethrough(hs->hostbatch[hidx]->v4hostip(), 
-				&(sin->sin_addr));
-	  hs->hostbatch[hidx]->setSourceSockAddr(&ss, sslen);
-	  if (hidx == 0) /* Because later ones can have different src addy and be cut off group */
-	    o.decoys[o.decoyturn] = hs->hostbatch[hidx]->v4source();
-	  if (!device) {
-	    if (*pingtype == PINGTYPE_NONE) {
-	      fatal("Could not determine what interface to route packets through, run again with -e <device>");
-	    } else {
-#if WIN32
-          fatal("Unable to determine what interface to route packets through to %s", hs->hostbatch[hidx]->targetipstr());
-#endif
-	      error("WARNING:  Could not determine what interface to route packets through to %s, changing ping scantype to ICMP ping only", hs->hostbatch[hidx]->targetipstr());
-	      *pingtype = PINGTYPE_ICMP_PING;
-	    }
-	  } else {
-	    Strncpy(hs->hostbatch[hidx]->device, device, 64);
-	  }
+	   )) {
+	hs->hostbatch[hidx]->TargetSockAddr(&ss, &sslen);
+	if (!route_dst(&ss, &rnfo)) {
+	  fatal("%s: failed to determine route to %s", __FUNCTION__, hs->hostbatch[hidx]->NameIP());
 	}
+	if (rnfo.direct_connect) {
+	  hs->hostbatch[hidx]->setDirectlyConnected(true);
+	} else {
+	  hs->hostbatch[hidx]->setDirectlyConnected(false);
+	  hs->hostbatch[hidx]->setNextHop(&rnfo.nexthop, 
+					  sizeof(rnfo.nexthop));
+	}
+	hs->hostbatch[hidx]->setIfType(rnfo.ii.device_type);
+	if (rnfo.ii.device_type == devt_ethernet) {
+	  if (o.spoofMACAddress())
+	    hs->hostbatch[hidx]->setSrcMACAddress(o.spoofMACAddress());
+	  else hs->hostbatch[hidx]->setSrcMACAddress(rnfo.ii.mac);
+	}
+	hs->hostbatch[hidx]->setSourceSockAddr(&rnfo.srcaddr, sizeof(rnfo.srcaddr));
+	if (hidx == 0) /* Because later ones can have different src addy and be cut off group */
+	  o.decoys[o.decoyturn] = hs->hostbatch[hidx]->v4source();
+	hs->hostbatch[hidx]->setDeviceNames(rnfo.ii.devname, rnfo.ii.devfullname);
+	//	  printf("Target %s %s directly connected, goes through local iface %s, which %s ethernet\n", hs->hostbatch[hidx]->NameIP(), hs->hostbatch[hidx]->directlyConnected()? "IS" : "IS NOT", hs->hostbatch[hidx]->deviceName(), (hs->hostbatch[hidx]->ifType() == devt_ethernet)? "IS" : "IS NOT");
       }
+      
 
-      /* In some cases, we can only allow hosts that use the same device
-	 in a group. */
+      /* In some cases, we can only allow hosts that use the same
+	 device in a group.  Similarly, we don't mix
+	 directly-connected boxes with those that aren't */
       if (o.af() == AF_INET && o.isr00t && hidx > 0 && 
-	  *hs->hostbatch[hidx]->device && 
+	  hs->hostbatch[hidx]->deviceName() && 
 	  (hs->hostbatch[hidx]->v4source().s_addr != hs->hostbatch[0]->v4source().s_addr || 
-	   strcmp(hs->hostbatch[0]->device, hs->hostbatch[hidx]->device) != 0)) {
+	   strcmp(hs->hostbatch[0]->deviceName(), 
+		  hs->hostbatch[hidx]->deviceName()) != 0 
+	  || hs->hostbatch[hidx]->directlyConnected() != hs->hostbatch[0]->directlyConnected())) {
 	/* Cancel everything!  This guy must go in the next group and we are
-	   outtof here */
+	   out of here */
 	hs->current_expression.return_last_host();
 	delete hs->hostbatch[hidx];
 	goto batchfull;
       }
       hs->current_batch_sz++;
-    }
+}
 
   if (hs->current_batch_sz < hs->max_batch_sz &&
       hs->next_expression < hs->num_expressions) {
-    /* We are going to have to plop in another expression. */
+    /* We are going to have to pop in another expression. */
     while(hs->current_expression.parse_expr(hs->target_expressions[hs->next_expression++], o.af()) != 0) 
       if (hs->next_expression >= hs->num_expressions)
 	break;
@@ -358,16 +398,45 @@ if (hs->randomize) {
   hoststructfry(hs->hostbatch, hs->current_batch_sz);
 }
 
-/* Finally we do the mass ping (if required) */
- if ((*pingtype & 
-      (PINGTYPE_ICMP_PING|PINGTYPE_ICMP_MASK|PINGTYPE_ICMP_TS) ) || 
-     ((!o.isr00t || o.af() == AF_INET6 || hs->hostbatch[0]->v4host().s_addr) && 
-      (*pingtype != PINGTYPE_NONE))) 
-   massping(hs->hostbatch, hs->current_batch_sz, ports, *pingtype);
- else for(i=0; i < hs->current_batch_sz; i++)  {
-   initialize_timeout_info(&hs->hostbatch[i]->to);
-   hs->hostbatch[i]->flags |= HOST_UP; /*hostbatch[i].up = 1;*/
+/* First I'll do the ARP ping if all of the machines in the group are
+   directly connected over ethernet.  I may need the MAC addresses
+   later anyway. */
+ if (hs->hostbatch[0]->ifType() == devt_ethernet && 
+     hs->hostbatch[0]->directlyConnected() && 
+     o.sendpref != PACKET_SEND_IP_STRONG) {
+   arpping(hs->hostbatch, hs->current_batch_sz, ports);
+   arpping_done = true;
  }
+ 
+ gettimeofday(&now, NULL);
+ if ((o.sendpref & PACKET_SEND_ETH) && 
+     hs->hostbatch[0]->ifType() == devt_ethernet) {
+   for(i=0; i < hs->current_batch_sz; i++)
+     if (!(hs->hostbatch[i]->flags & HOST_DOWN) && 
+	 !hs->hostbatch[i]->timedOut(&now))
+       if (!setTargetNextHopMAC(hs->hostbatch[i]))
+	 fatal("%s: Failed to determine dst MAC address for target %s", 
+	       __FUNCTION__, hs->hostbatch[hidx]->NameIP());
+ }
+
+ /* TODO: Maybe I should allow real ping scan of directly connected
+    ethernet hosts? */
+ /* Then we do the mass ping (if required - IP-level pings) */
+ if ((*pingtype == PINGTYPE_NONE && !arpping_done) || hs->hostbatch[0]->ifType() == devt_loopback) {
+   for(i=0; i < hs->current_batch_sz; i++)  {
+     if (!hs->hostbatch[i]->timedOut(&now)) {
+       initialize_timeout_info(&hs->hostbatch[i]->to);
+       hs->hostbatch[i]->flags |= HOST_UP; /*hostbatch[i].up = 1;*/
+     }
+   }
+ } else if (!arpping_done)
+   if (*pingtype & PINGTYPE_ARP) /* A host that we can't arp scan ... maybe localhost */
+     massping(hs->hostbatch, hs->current_batch_sz, ports, DEFAULT_PING_TYPES);
+   else
+     massping(hs->hostbatch, hs->current_batch_sz, ports, *pingtype);
+ 
+ if (!o.noresolve) nmap_mass_rdns(hs->hostbatch, hs->current_batch_sz);
+ 
  return hs->hostbatch[hs->next_batch_no++];
 }
 
@@ -398,6 +467,7 @@ int sd_blocking = 1;
 struct sockaddr_in sock;
 u16 seq = 0;
 int sd = -1, rawsd = -1, rawpingsd = -1;
+eth_t *ethsd = NULL;
 struct timeval *time;
 struct timeval start, end;
 unsigned short id;
@@ -517,6 +587,13 @@ if (!to.srtt && !to.rttvar && !to.timeout) {
 
 /* Init our raw socket */
 if (o.numdecoys > 1 || ptech.rawtcpscan || ptech.rawicmpscan || ptech.rawudpscan) {
+	if ((o.sendpref & PACKET_SEND_ETH) && hostbatch[0]->ifType() == devt_ethernet) {
+		/* We'll send ethernet packets with dnet */
+		ethsd = eth_open(hostbatch[0]->deviceName());
+		if (ethsd == NULL)
+			fatal("dnet: Failed to open device %s", hostbatch[0]->deviceName());
+		rawsd = -1; rawpingsd = -1;
+	} else {
   if ((rawsd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0 )
     pfatal("socket trobles in massping");
   broadcast_socket(rawsd);
@@ -524,16 +601,14 @@ if (o.numdecoys > 1 || ptech.rawtcpscan || ptech.rawicmpscan || ptech.rawudpscan
   sethdrinclude(rawsd);
 #endif
 
- 
   if ((rawpingsd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0 )
     pfatal("socket trobles in massping");
   broadcast_socket(rawpingsd);
 #ifndef WIN32
   sethdrinclude(rawpingsd);
 #endif
-
 }
- else { rawsd = -1; rawpingsd = -1; }
+} else { rawsd = -1; rawpingsd = -1; }
 
 if (ptech.rawicmpscan || ptech.rawtcpscan || ptech.rawudpscan) {
   /* we need a pcap descript0r! */
@@ -543,10 +618,7 @@ if (ptech.rawicmpscan || ptech.rawtcpscan || ptech.rawudpscan) {
      16 bytes of the TCP header
      ---
    = 104 byte snaplen */
-  pd = my_pcap_open_live(hostbatch[0]->device, 104, o.spoofsource, 20);
-
-  flt_dsthost = hostbatch[0]->v4source().s_addr;
-  flt_baseport = sportbase;
+  pd = my_pcap_open_live(hostbatch[0]->deviceName(), 104, o.spoofsource, 20);
 
   snprintf(filter, sizeof(filter), "(icmp and dst host %s) or ((tcp or udp) and dst host %s and ( dst port %d or dst port %d or dst port %d or dst port %d or dst port %d))", 
 	   inet_ntoa(hostbatch[0]->v4source()),
@@ -554,7 +626,7 @@ if (ptech.rawicmpscan || ptech.rawtcpscan || ptech.rawudpscan) {
 	   sportbase , sportbase + 1, sportbase + 2, sportbase + 3, 
 	   sportbase + 4);
 
-  set_pcap_filter(hostbatch[0], pd, flt_icmptcp_5port, filter); 
+  set_pcap_filter(hostbatch[0]->deviceName(), pd, filter); 
 }
 
  blockinc = (int) (0.9999 + 8.0 / probes_per_host);
@@ -591,11 +663,11 @@ gettimeofday(&start, NULL);
 	 gettimeofday(&time[(seq - pt.seq_offset) & 0xFFFF], NULL);
 
 	 if (ptech.icmpscan || ptech.rawicmpscan)
-	   sendpingqueries(sd, rawpingsd, hostbatch[hostnum],  
+	   sendpingqueries(sd, rawpingsd, ethsd, hostbatch[hostnum],  
 			   seq, id, &ss, time, pingtype, ptech);
        
 	 if (ptech.rawtcpscan || ptech.rawudpscan) 
-	   sendrawtcpudppingqueries(rawsd, hostbatch[hostnum], pingtype, seq, time, &pt);
+	   sendrawtcpudppingqueries(rawsd, ethsd, hostbatch[hostnum], pingtype, seq, time, &pt);
 
 	 else if (ptech.connecttcpscan) {
 	   sendconnecttcpqueries(hostbatch, &tqi, hostbatch[hostnum], seq, time, &pt, &to, max_sockets);
@@ -646,6 +718,7 @@ gettimeofday(&start, NULL);
  if (sd >= 0) close(sd);
  if (rawsd >= 0) close(rawsd);
  if (rawpingsd >= 0) close(rawpingsd);
+ if (ethsd) eth_close(ethsd);
  free(time);
  if (pd) pcap_close(pd);
  if (o.debugging) 
@@ -747,35 +820,45 @@ int sendconnecttcpquery(Target *hostbatch[], struct tcpqueryinfo *tqi,
 return 0;
 }
 
-int sendrawtcpudppingqueries(int rawsd, Target *target, int pingtype, u16 seq, 
+int sendrawtcpudppingqueries(int rawsd, eth_t *ethsd, Target *target, int pingtype, u16 seq, 
 			  struct timeval *time, struct pingtune *pt) {
   int i;
+  struct eth_nfo eth;
+  struct eth_nfo *ethptr = NULL;
+
+  if (ethsd) {
+	  memcpy(eth.srcmac, target->SrcMACAddress(), 6);
+	  memcpy(eth.dstmac, target->NextHopMACAddress(), 6);
+	  eth.ethsd = ethsd;
+	  eth.devname[0] = '\0';
+	  ethptr = &eth;
+  } else ethptr = NULL;
 
   if (pingtype & PINGTYPE_UDP) {
     for( i=0; i<o.num_ping_udpprobes; i++ ) {
       if (i > 0 && o.scan_delay) enforce_scan_delay(NULL);
-      sendrawudppingquery(rawsd, target, o.ping_udpprobes[i], seq, time, pt);
+      sendrawudppingquery(rawsd, ethptr, target, o.ping_udpprobes[i], seq, time, pt);
     }
   }
 
   if (pingtype & PINGTYPE_TCP_USE_ACK) {
     for( i=0; i<o.num_ping_ackprobes; i++ ) {
       if (i > 0 && o.scan_delay) enforce_scan_delay(NULL);
-      sendrawtcppingquery(rawsd, target, PINGTYPE_TCP_USE_ACK, o.ping_ackprobes[i], seq, time, pt);
+      sendrawtcppingquery(rawsd, ethptr, target, PINGTYPE_TCP_USE_ACK, o.ping_ackprobes[i], seq, time, pt);
     }
   }
 
   if (pingtype & PINGTYPE_TCP_USE_SYN) {
     for( i=0; i<o.num_ping_synprobes; i++ ) {
       if (i > 0 && o.scan_delay) enforce_scan_delay(NULL);
-      sendrawtcppingquery(rawsd, target, PINGTYPE_TCP_USE_SYN, o.ping_synprobes[i], seq, time, pt);
+      sendrawtcppingquery(rawsd, ethptr, target, PINGTYPE_TCP_USE_SYN, o.ping_synprobes[i], seq, time, pt);
     }
   }
 
   return 0;
 }
 
-int sendrawudppingquery(int rawsd, Target *target, u16 probe_port,
+int sendrawudppingquery(int rawsd, struct eth_nfo *eth, Target *target, u16 probe_port,
 			u16 seq, struct timeval *time, struct pingtune *pt) {
 int trynum = 0;
 unsigned short sportbase;
@@ -788,13 +871,13 @@ else {
 
  o.decoys[o.decoyturn].s_addr = target->v4source().s_addr;
  
- send_udp_raw_decoys( rawsd, target->v4hostip(), o.ttl, sportbase + trynum, probe_port, seq, o.extra_payload, o.extra_payload_length);
+ send_udp_raw_decoys( rawsd, eth, target->v4hostip(), o.ttl, sportbase + trynum, probe_port, seq, o.extra_payload, o.extra_payload_length);
 
 
  return 0;
 }
 
-int sendrawtcppingquery(int rawsd, Target *target, int pingtype, u16 probe_port,
+int sendrawtcppingquery(int rawsd, struct eth_nfo *eth, Target *target, int pingtype, u16 probe_port,
 			u16 seq, struct timeval *time, struct pingtune *pt) {
 int trynum = 0;
 int myseq;
@@ -812,37 +895,37 @@ else {
  o.decoys[o.decoyturn].s_addr = target->v4source().s_addr;
 
  if (pingtype & PINGTYPE_TCP_USE_SYN) {   
-   send_tcp_raw_decoys( rawsd, target->v4hostip(), o.ttl, sportbase + trynum, probe_port, myseq, myack, TH_SYN, 0, NULL, 0, o.extra_payload, 
+   send_tcp_raw_decoys( rawsd, eth, target->v4hostip(), o.ttl, sportbase + trynum, probe_port, myseq, myack, TH_SYN, 0, (u8 *) "\x02\x04\x05\xb4", 4, o.extra_payload, 
 			o.extra_payload_length);
  } else {
-   send_tcp_raw_decoys( rawsd, target->v4hostip(), o.ttl, sportbase + trynum, probe_port, myseq, myack, TH_ACK, 0, NULL, 0, o.extra_payload, 
+   send_tcp_raw_decoys( rawsd, eth, target->v4hostip(), o.ttl, sportbase + trynum, probe_port, myseq, myack, TH_ACK, 0, NULL, 0, o.extra_payload, 
 			o.extra_payload_length);
  }
 
  return 0;
 }
 
-int sendpingqueries(int sd, int rawsd, Target *target,  
+int sendpingqueries(int sd, int rawsd, eth_t *ethsd, Target *target,  
 		  u16 seq, unsigned short id, struct scanstats *ss, 
 		    struct timeval *time, int pingtype, struct pingtech ptech) {
   if (pingtype & PINGTYPE_ICMP_PING) {
     if (o.scan_delay) enforce_scan_delay(NULL);
-    sendpingquery(sd, rawsd, target, seq, id, ss, time, PINGTYPE_ICMP_PING, ptech);
+    sendpingquery(sd, rawsd, ethsd, target, seq, id, ss, time, PINGTYPE_ICMP_PING, ptech);
   }
   if (pingtype & PINGTYPE_ICMP_MASK) {
     if (o.scan_delay) enforce_scan_delay(NULL);
-    sendpingquery(sd, rawsd, target, seq, id, ss, time, PINGTYPE_ICMP_MASK, ptech);
+    sendpingquery(sd, rawsd, ethsd, target, seq, id, ss, time, PINGTYPE_ICMP_MASK, ptech);
 
   }
   if (pingtype & PINGTYPE_ICMP_TS) {
     if (o.scan_delay) enforce_scan_delay(NULL);
-    sendpingquery(sd, rawsd, target, seq, id, ss, time, PINGTYPE_ICMP_TS, ptech);
+    sendpingquery(sd, rawsd, ethsd, target, seq, id, ss, time, PINGTYPE_ICMP_TS, ptech);
   }
 
   return 0;
 }
 
-int sendpingquery(int sd, int rawsd, Target *target,  
+int sendpingquery(int sd, int rawsd, eth_t *ethsd, Target *target,  
 		  u16 seq, unsigned short id, struct scanstats *ss, 
 		  struct timeval *time, int pingtype, struct pingtech ptech) {
 struct ppkt {
@@ -859,7 +942,17 @@ int icmplen=0;
 int decoy;
 int res;
 struct sockaddr_in sock;
+struct eth_nfo eth;
+struct eth_nfo *ethptr = NULL;
 char *ping = (char *) &pingpkt;
+
+if (ethsd) {
+    memcpy(eth.srcmac, target->SrcMACAddress(), 6);
+    memcpy(eth.dstmac, target->NextHopMACAddress(), 6);
+    eth.ethsd = ethsd;
+    eth.devname[0] = '\0';
+    ethptr = &eth;
+} else ethptr = NULL;
 
  if (pingtype & PINGTYPE_ICMP_PING) {
    icmplen = 8; 
@@ -891,6 +984,9 @@ pingpkt.id = id;
 pingpkt.seq = seq;
 pingpkt.checksum = 0;
 pingpkt.checksum = in_cksum((unsigned short *)ping, icmplen);
+if ( o.badsum )
+  pingpkt.checksum--;
+
 
 /* Now for our sock */
 if (ptech.icmpscan) {
@@ -924,7 +1020,7 @@ if (ptech.icmpscan) {
        fprintf(stderr, "sendto: %s\n", strerror(sock_err));
      }
    } else {
-     send_ip_raw( rawsd, &o.decoys[decoy], target->v4hostip(), o.ttl, IPPROTO_ICMP, ping, icmplen);
+     send_ip_raw( rawsd, ethptr, &o.decoys[decoy], target->v4hostip(), o.ttl, IPPROTO_ICMP, ping, icmplen);
    }
  }
 
@@ -983,7 +1079,7 @@ while(pt->block_unaccounted) {
 	        case ECONNREFUSED:
 	        case EAGAIN:
 #ifdef WIN32
-//		  case WSAENOTCONN:	//	needed?  this fails around here on my system
+			case WSAENOTCONN:
 #endif
 		  if (sock_err == EAGAIN && o.verbose) {
 		    log_write(LOG_STDOUT, "Machine %s MIGHT actually be listening on probe port %d\n", hostbatch[hostindex]->targetipstr(), o.ping_synprobes[p]);
@@ -1083,7 +1179,7 @@ int get_ping_results(int sd, pcap_t *pd, Target *hostbatch[], int pingtype,
   int dotimeout = 1;
   int newstate = HOST_DOWN;
   int foundsomething;
-  unsigned short newport;
+  unsigned short newport = 0;
   int newportstate; /* Hack so that in some specific cases we can determine the 
 		       state of a port and even skip the real scan */
   u32 trynum = 0xFFFFFF;
@@ -1111,10 +1207,11 @@ int get_ping_results(int sd, pcap_t *pd, Target *hostbatch[], int pingtype,
   else sportbase = o.magic_port + 20;
 
   gettimeofday(&start, NULL);
-  newport = 0;
   newportstate = PORT_UNKNOWN;
 
   while(pt->block_unaccounted > 0 && !timeout) {
+    keyWasPressed(); // Check for status message printing
+
     tmpto = myto;
 
     if (pd) {
@@ -1460,7 +1557,7 @@ int get_ping_results(int sd, pcap_t *pd, Target *hostbatch[], int pingtype,
     if (newport && newportstate != PORT_UNKNOWN) {
       /* OK, we can add it, but that is only appropriate if this is one
 	 of the ports the user ASKED for */
-      /* This was for the old turbo mode -- which I no longer support now that ultra_scan() can handle parallel hosts.  Maybe I'll brign it back someday */
+      /* This was for the old turbo mode -- which I no longer support now that ultra_scan() can handle parallel hosts.  Maybe I'll bring it back someday */
       /*
       if (ports && ports->tcp_count == 1 && ports->tcp_ports[0] == newport)
 	hostbatch[hostnum]->ports.addPort(newport, IPPROTO_TCP, NULL, 
@@ -1638,8 +1735,7 @@ int hostInExclude(struct sockaddr *checksock, size_t checksocklen,
 	  return 1;
         }
 	else {
-	  exclude_group[i++].rewind();
-	  continue;
+	  break;
 	}
       } 
       /* For ranges we need to be a little more slick, if we don't find a match
@@ -1718,7 +1814,7 @@ int dumpExclude(TargetGroup *exclude_group) {
     exclude_group[i++].rewind();
   }
 
-  /* return debuggin to what it was */
+  /* return debugging to what it was */
   o.debugging = debug_save; 
   return 1;
 }

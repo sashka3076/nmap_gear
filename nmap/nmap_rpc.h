@@ -99,7 +99,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap_rpc.h,v 1.10 2004/08/29 09:12:03 fyodor Exp $ */
+/* $Id: nmap_rpc.h 2891 2005-10-01 23:50:27Z fyodor $ */
 
 #ifndef NMAP_RPC_H
 #define NMAP_RPC_H
@@ -111,7 +111,7 @@
 #include "utils.h"
 #include "timing.h"
 
-/* rpc related #defines */
+/* rpc related #define's */
 #define RECORD_MARKING 4        /* length of recoder marking (bytes)     */
 
 /* defines used to check RPC answers */

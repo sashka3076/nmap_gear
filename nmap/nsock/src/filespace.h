@@ -54,7 +54,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: filespace.h,v 1.10 2004/08/29 09:12:05 fyodor Exp $ */
+/* $Id: filespace.h 2396 2004-08-29 09:12:05Z fyodor $ */
 
 #ifndef FILESPACE_H
 #define FILESPACE_H

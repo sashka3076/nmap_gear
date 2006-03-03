@@ -96,7 +96,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmapfe_sig.h,v 1.19 2004/08/29 09:12:04 fyodor Exp $ */
+/* $Id: nmapfe_sig.h 3057 2006-01-21 00:41:19Z fyodor $ */
 
 /* Original Author: Zach
  * Mail: key@aye.net
@@ -122,20 +122,18 @@
 #include "nmapfe_error.h"
 
 gboolean stop_scan();
-void print_line(GtkText *gtktext, char *line);
-void kill_output();
+void print_line(GtkTextBuffer *gtktext, char *line);
 gint read_data(gpointer data);
 
 void entry_toggle_checkbox (GtkWidget *entry, GtkWidget *checkbox);
 void entry_toggle_ping_checkbox(GtkWidget *entry, GtkWidget *checkbox);
 
 void mainMenu_fcb(int *variable, guint action, GtkWidget *w);
-void scanType_changed_fcb(int *variable, guint action, GtkWidget *w);
-void throttleType_changed_fcb(int *variable, guint action, GtkWidget *w);
-void resolveType_changed_fcb(int *variable, guint action, GtkWidget *w);
-void protportType_changed_fcb(int *variable, guint action, GtkWidget *w);
-void verboseType_changed_fcb(int *variable, guint action, GtkWidget *w);
-void outputFormatType_changed_fcb(int *variable, guint action, GtkWidget *w);
+void throttleType_cb (GtkComboBox *, gpointer);
+void resolveType_cb (GtkComboBox *, gpointer);
+void protportType_cb (GtkComboBox *, gpointer);
+void verboseType_cb (GtkComboBox *, gpointer);
+void outputFormatType_cb (GtkComboBox *, gpointer);
 
 void pingButton_toggled_cb(GtkWidget *ping_button, void *ignored);
 void toggle_button_set_sensitive_cb(GtkWidget *master, GtkWidget *slave);

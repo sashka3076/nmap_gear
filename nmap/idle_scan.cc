@@ -101,7 +101,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: idle_scan.cc,v 1.31 2004/11/12 09:35:13 fyodor Exp $ */
+/* $Id: idle_scan.cc 3120 2006-02-07 07:15:32Z fyodor $ */
 
 #include "idle_scan.h"
 #include "scan_engine.h"
@@ -122,11 +122,6 @@
 #endif
 
 extern NmapOps o;
-
-/*  predefined filters -- I need to kill these globals at some point. */
-extern unsigned long flt_dsthost, flt_srchost;
-extern unsigned short flt_baseport;
-
 
 struct idle_proxy_info {
   Target host; /* contains name, IP, source IP, timing info, etc. */
@@ -149,6 +144,8 @@ struct idle_proxy_info {
                  initialize_idleproxy) listens for TCP packets from
                  the probe_port of the proxy box */
   int rawsd; /* Socket descriptor for sending probe packets to the proxy */
+  struct eth_nfo eth; // For when we want to send probes via raw IP instead.
+  struct eth_nfo *ethptr; // points to eth if filled out, otherwise NULL
 };
 
 
@@ -189,12 +186,12 @@ int ipid_proxy_probe(struct idle_proxy_info *proxy, int *probes_sent,
     gettimeofday(&tv_sent[tries], NULL);
 
     /* Time to send the pr0be!*/
-    send_tcp_raw(proxy->rawsd, proxy->host.v4sourceip(), 
+    send_tcp_raw(proxy->rawsd, proxy->ethptr, proxy->host.v4sourceip(), 
 		 proxy->host.v4hostip(), o.ttl, base_port + tries,
 		 proxy->probe_port,
 		 seq_base + (packet_send_count++ * 500) + 1, ack, 
 		 TH_SYN|TH_ACK, 0, 
-		 NULL, 0, NULL, 0);
+		 (u8 *) "\x02\x04\x05\xb4", 4, NULL, 0);
     sent++;
     tries++;
 
@@ -225,7 +222,7 @@ int ipid_proxy_probe(struct idle_proxy_info *proxy, int *probes_sent,
 	    }
 	    else if (o.debugging > 1) {
 	      error("Received unexpected response packet from %s during ipid zombie probing:", inet_ntoa(ip->ip_src));
-	      readtcppacket( (unsigned char *) ip,BSDUFIX(ip->ip_len));
+	      readtcppacket( (unsigned char *) ip,ntohs(ip->ip_len));
 	    }
 	    continue;
 	  }
@@ -266,6 +263,16 @@ int ipid_distance(int seqclass , u16 startid, u16 endid) {
 
 }
 
+static void initialize_proxy_struct(struct idle_proxy_info *proxy) {
+  proxy->seqclass = proxy->latestid = proxy->probe_port = 0;
+  proxy->max_groupsz = proxy->min_groupsz = 0;
+  proxy->current_groupsz = 0;
+  proxy->senddelay = 0; 
+  proxy->max_senddelay = 0;
+  proxy->pd = NULL;
+  proxy->rawsd = -1;
+  proxy->ethptr = NULL;
+}
 
 /* takes a proxy name/IP, resolves it if neccessary, tests it for IPID
    suitability, and fills out an idle_proxy_info structure.  If the
@@ -281,7 +288,6 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
   char *p, *q;
   char *endptr = NULL;
   int seq_response_num;
-  char *dev;
   int newipid;
   int i;
   char filter[512]; /* Libpcap filter string */
@@ -297,6 +303,7 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
   int distance;
   u16 ipids[NUM_IPID_PROBES]; 
   u8 probe_returned[NUM_IPID_PROBES];
+  struct route_nfo rnfo;
   assert(proxy);
   assert(proxyName);
 
@@ -304,7 +311,7 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
 
   for(i=0; i < NUM_IPID_PROBES; i++) probe_returned[i] = 0;
 
-  memset(proxy, 0, sizeof(*proxy));
+  initialize_proxy_struct(proxy);
   initialize_timeout_info(&proxy->host.to);
 
   proxy->max_groupsz = (o.max_parallelism)? o.max_parallelism : 100;
@@ -330,52 +337,68 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
     fatal("Could not resolve idlescan zombie host: %s", name);
   }
   proxy->host.setTargetSockAddr(&ss, sslen);
-
+  
   /* Lets figure out the appropriate source address to use when sending
      the pr0bez */
+  proxy->host.TargetSockAddr(&ss, &sslen);
+  if (!route_dst(&ss, &rnfo))
+    fatal("Unable to find appropriate source address and device interface to use when sending packets to %s", proxyName);
+  
   if (o.spoofsource) {
     o.SourceSockAddr(&ss, &sslen);
     proxy->host.setSourceSockAddr(&ss, sslen);
-    Strncpy(proxy->host.device, o.device, sizeof(proxy->host.device));    
+    proxy->host.setDeviceNames(o.device, o.device);
   } else {
-    struct sockaddr_in *sin = (struct sockaddr_in *)&ss;
-    sslen = sizeof(*sin);
-    memset(sin, 0, sslen);
-    dev = routethrough(proxy->host.v4hostip(), &(sin->sin_addr));  
-    if (!dev) fatal("Unable to find appropriate source address and device interface to use when sending packets to %s", proxyName);
-    Strncpy(proxy->host.device, dev, sizeof(proxy->host.device));
-    sin->sin_family = AF_INET;
-#if HAVE_SOCKADDR_SA_LEN
-    sin->sin_len = sslen;
-#endif
-    proxy->host.setSourceSockAddr((struct sockaddr_storage *) sin, sslen);
+    proxy->host.setDeviceNames(rnfo.ii.devname, rnfo.ii.devfullname);
+    proxy->host.setSourceSockAddr(&rnfo.srcaddr, sizeof(rnfo.srcaddr));
   }
+  if (rnfo.direct_connect) {
+    proxy->host.setDirectlyConnected(true);
+  } else {
+    proxy->host.setDirectlyConnected(false);
+    proxy->host.setNextHop(&rnfo.nexthop, 
+			   sizeof(rnfo.nexthop));
+  }
+  proxy->host.setIfType(rnfo.ii.device_type);
+  if (rnfo.ii.device_type == devt_ethernet)
+    proxy->host.setSrcMACAddress(rnfo.ii.mac);
+  
   /* Now lets send some probes to check IPID algorithm ... */
   /* First we need a raw socket ... */
-  if ((proxy->rawsd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0 )
-    pfatal("socket trobles in get_fingerprint");
-  unblock_socket(proxy->rawsd);
-  broadcast_socket(proxy->rawsd);
+  if ((o.sendpref & PACKET_SEND_ETH) &&  proxy->host.ifType() == devt_ethernet) {
+    if (!setTargetNextHopMAC(&proxy->host))
+      fatal("%s: Failed to determine dst MAC address for Idle proxy", 
+	    __FUNCTION__);
+    memcpy(proxy->eth.srcmac, proxy->host.SrcMACAddress(), 6);
+    memcpy(proxy->eth.dstmac, proxy->host.NextHopMACAddress(), 6);
+    proxy->eth.ethsd = eth_open(proxy->host.deviceName());
+    proxy->rawsd = -1;
+    proxy->ethptr = &proxy->eth;
+  } else {
+    if ((proxy->rawsd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0 )
+      pfatal("socket trobles in get_fingerprint");
+    unblock_socket(proxy->rawsd);
+    broadcast_socket(proxy->rawsd);
 #ifndef WIN32
-  sethdrinclude(proxy->rawsd);
+    sethdrinclude(proxy->rawsd);
 #endif
+    proxy->eth.ethsd = NULL;
+    proxy->ethptr = NULL;
+  }
 
 /* Now for the pcap opening nonsense ... */
  /* Note that the snaplen is 152 = 64 byte max IPhdr + 24 byte max link_layer
   * header + 64 byte max TCP header. */
-  proxy->pd = my_pcap_open_live(proxy->host.device, 152,  (o.spoofsource)? 1 : 0, 50);
+  proxy->pd = my_pcap_open_live(proxy->host.deviceName(), 152,  (o.spoofsource)? 1 : 0, 50);
 
   p = strdup(proxy->host.targetipstr());
   q = strdup(inet_ntoa(proxy->host.v4source()));
   snprintf(filter, sizeof(filter), "tcp and src host %s and dst host %s and src port %hu", p, q, proxy->probe_port);
  free(p); 
  free(q);
- set_pcap_filter(&(proxy->host), proxy->pd, flt_icmptcp, filter);
+ set_pcap_filter(proxy->host.deviceName(), proxy->pd,  filter);
 /* Windows nonsense -- I am not sure why this is needed, but I should
    get rid of it at sometime */
-
- flt_srchost = proxy->host.v4source().s_addr;
- flt_dsthost = proxy->host.v4host().s_addr;
 
  sequence_base = get_random_u32();
 
@@ -391,11 +414,11 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
        a response with the exact request for timing purposes.  So I
        think I'll use TH_SYN, although it is a tough call. */
     /* We can't use decoys 'cause that would screw up the IPIDs */
-    send_tcp_raw(proxy->rawsd, proxy->host.v4sourceip(), 
+    send_tcp_raw(proxy->rawsd, proxy->ethptr, proxy->host.v4sourceip(), 
 		 proxy->host.v4hostip(), o.ttl, 
 		 o.magic_port + probes_sent + 1, proxy->probe_port, 
-		 sequence_base + probes_sent + 1, 0, TH_SYN|TH_ACK, 
-		 ack, NULL, 0, NULL, 0);
+		 sequence_base + probes_sent + 1, ack, TH_SYN|TH_ACK, 
+		 0, (u8 *) "\x02\x04\x05\xb4", 4, NULL, 0);
     gettimeofday(&probe_send_times[probes_sent], NULL);
     probes_sent++;
 
@@ -428,7 +451,6 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
 	continue;
 
       if (ip->ip_p == IPPROTO_TCP) {
-	/*       readtcppacket((char *) ip, ntohs(ip->ip_len));  */
 	tcp = ((struct tcphdr *) (((char *) ip) + 4 * ip->ip_hl));
 	if (ntohs(tcp->th_dport) < (o.magic_port+1) || ntohs(tcp->th_dport) - o.magic_port > NUM_IPID_PROBES  || ntohs(tcp->th_sport) != proxy->probe_port || ((tcp->th_flags & TH_RST) == 0)) {
 	  if (o.debugging > 1) error("Received unexpected response packet from %s during initial ipid zombie testing", inet_ntoa(ip->ip_src));
@@ -441,15 +463,6 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
 	   SYN|ACK, but then are slightly less stealthy and have less chance
 	   of sneaking through the firewall.  Plus SYN|ACK is what they will
 	   be receiving back from the target */
-	/*	seq_response_num = (ntohl(tcp->th_ack) - 2 - sequence_base);
-		if (seq_response_num < 0 || seq_response_num >= probes_sent) {
-		if (o.debugging) {
-		error("Unable to associate IPID proxy probe response with sent packet (received ack: %lX; sequence base: %lX. Packet:", ntohl(tcp->th_ack), sequence_base);
-		readtcppacket((char *)ip,BSDUFIX(ip->ip_len));
-		}
-		seq_response_num = probes_returned;
-		}
-	*/
 	probes_returned++;
 	ipids[seq_response_num] = (u16) ntohs(ip->ip_id);
 	probe_returned[seq_response_num] = 1;
@@ -508,10 +521,11 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
   if (first_target) {  
     for (probes_sent = 0; probes_sent < 4; probes_sent++) {  
       if (probes_sent) usleep(50000);
-      send_tcp_raw(proxy->rawsd, first_target, proxy->host.v4hostip(), 
+      send_tcp_raw(proxy->rawsd, proxy->ethptr, first_target, 
+		   proxy->host.v4hostip(), 
 		   o.ttl, o.magic_port, proxy->probe_port, 
 		   sequence_base + probes_sent + 1, 0, TH_SYN|TH_ACK, 
-		   ack, NULL, 0, NULL, 0);
+		   ack, (u8 *) "\x02\x04\x05\xb4", 4, NULL, 0);
 
     }
 
@@ -634,6 +648,7 @@ int idlescan_countopen2(struct idle_proxy_info *proxy,
   int sleeptime;
   int lasttry = 0;
   int dotry3 = 0;
+  struct eth_nfo eth;
 
   if (seq == 0) seq = get_random_u32();
 
@@ -642,6 +657,15 @@ int idlescan_countopen2(struct idle_proxy_info *proxy,
   gettimeofday(&start, NULL);
   if (sent_time) memset(sent_time, 0, sizeof(*sent_time));
   if (rcv_time) memset(rcv_time, 0, sizeof(*rcv_time));
+
+  if (proxy->rawsd < 0) {
+    if (!setTargetNextHopMAC(target))
+      fatal("%s: Failed to determine dst MAC address for Idle proxy", 
+	    __FUNCTION__);
+    memcpy(eth.srcmac, target->SrcMACAddress(), 6);
+    memcpy(eth.dstmac, target->NextHopMACAddress(), 6);
+    eth.ethsd = eth_open(target->deviceName());
+  } else eth.ethsd = NULL;
 
   /* I start by sending out the SYN pr0bez */
   for(pr0be = 0; pr0be < numports; pr0be++) {
@@ -652,9 +676,10 @@ int idlescan_countopen2(struct idle_proxy_info *proxy,
        but doing it the straightforward way (using the same decoys as
        we use in probing the proxy box is risky.  I'll have to think
        about this more. */
-    send_tcp_raw(proxy->rawsd, proxy->host.v4hostip(), target->v4hostip(),
+    send_tcp_raw(proxy->rawsd, eth.ethsd? &eth : NULL, proxy->host.v4hostip(), 
+		 target->v4hostip(),
 		 o.ttl, proxy->probe_port, ports[pr0be], seq, 0, TH_SYN, 0,
-		 NULL, 0, o.extra_payload, o.extra_payload_length);
+		 (u8 *) "\x02\x04\x05\xb4", 4, o.extra_payload, o.extra_payload_length);
   }
   gettimeofday(&end, NULL);
 
@@ -739,6 +764,7 @@ int idlescan_countopen2(struct idle_proxy_info *proxy,
     if (rcv_time) *rcv_time = latestchange;
   }
   if (newipid > 0) proxy->latestid = newipid;
+  if (eth.ethsd) { eth_close(eth.ethsd); eth.ethsd = NULL; }
   return openports;
 }
 
@@ -945,6 +971,11 @@ void idle_scan(Target *target, u16 *portarray, int numports,
 
   if (target->timedOut(NULL))
     return;
+
+  if (target->ifType() == devt_loopback) {
+    log_write(LOG_STDOUT, "Skipping Idle Scan against %s -- you can't idle scan your own machine (localhost).\n", target->NameIP());
+    return;
+  }
 
   target->startTimeOutClock(NULL);
 

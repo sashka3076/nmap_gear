@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: getnameinfo.c,v 1.6 2004/08/29 09:12:04 fyodor Exp $ */
+/* $Id: getnameinfo.c 2396 2004-08-29 09:12:05Z fyodor $ */
 #include "nbase.h"
 
 #if HAVE_NETDB_H

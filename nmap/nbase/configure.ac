@@ -2,7 +2,7 @@ dnl # -*- mode: fundamental; -*-
 dnl # Autoconf configuration file for Nbase
 dnl #
 dnl # Process this file with autoconf to produce a configure script.
-dnl # $Id: configure.ac,v 1.17 2005/02/05 22:37:57 fyodor Exp $
+dnl # $Id: configure.ac 3085 2006-01-25 07:49:28Z fyodor $
 
 # Require autoconf 2.13
 AC_PREREQ(2.13)
@@ -117,7 +117,7 @@ case "$host" in
     AC_DEFINE(PCAP_TIMEOUT_IGNORED)  # libpcap doesn't even LOOK at
                                      # the timeout you give it under Linux
     ;;
-  *-freebsd* | *-kfreebsd*-gnu)
+  *-freebsd* | *-kfreebsd*-gnu | *-dragonfly*)
     AC_DEFINE(FREEBSD)
     ;;
   *-bsdi*)
@@ -162,7 +162,32 @@ AC_C_INLINE
 if test -n "$sgi_cc"; then
    AC_DEFINE(inline, )
 fi
-AC_C___ATTRIBUTE__
+
+AC_MSG_CHECKING(for __attribute__)
+AC_CACHE_VAL(ac_cv___attribute__, [
+  AC_TRY_COMPILE(
+	[
+	#include <stdlib.h>
+
+	static void foo(void) __attribute__ ((noreturn));
+
+	static void
+	foo(void)
+	{
+	  exit(1);
+	}
+	],
+	[
+	  foo();
+	],
+	ac_cv___attribute__=yes,
+	ac_cv___attribute__=no
+  )
+])
+if test "$ac_cv___attribute__" = "yes"; then
+  AC_DEFINE(HAVE___ATTRIBUTE__, 1, [define if your compiler has __attribute__])
+fi
+AC_MSG_RESULT($ac_cv___attribute__)
 
 dnl AC_HEADER_TIME
 

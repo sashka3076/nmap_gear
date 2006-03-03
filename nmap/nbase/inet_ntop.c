@@ -17,7 +17,7 @@
 /* Modified by Fyodor (fyodor@insecure.org) for inclusion in the Nmap 
  * Security Scanner.
  *
- * $Id: inet_ntop.c,v 1.4 2002/08/27 21:08:20 fyodor Exp $
+ * $Id: inet_ntop.c 3085 2006-01-25 07:49:28Z fyodor $
  */
 
 #include "nbase.h"
@@ -240,7 +240,9 @@ inet_ntop6(const unsigned char *src, char *dst, size_t size)
      * Check for overflow, copy, and we're done.
      */
     if ((size_t)(tp - tmp) > size) {
+#ifndef WIN32
         errno = ENOSPC;
+#endif
         return (NULL);
     }
     strcpy(dst, tmp);

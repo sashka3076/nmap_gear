@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: FingerPrintResults.h,v 1.6 2004/08/29 09:12:02 fyodor Exp $ */
+/* $Id: FingerPrintResults.h 2396 2004-08-29 09:12:05Z fyodor $ */
 
 #ifndef FINGERPRINTRESULTS_H
 #define FINGERPRINTRESULTS_H

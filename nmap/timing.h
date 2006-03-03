@@ -99,7 +99,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: timing.h,v 1.11 2004/08/29 09:12:04 fyodor Exp $ */
+/* $Id: timing.h 3024 2005-12-31 00:32:42Z fyodor $ */
 
 #ifndef NMAP_TIMING_H
 #define NMAP_TIMING_H
@@ -124,7 +124,7 @@ void adjust_timeouts2(const struct timeval *sent,
 void adjust_timeouts(struct timeval sent, struct timeout_info *to);
 
 
-/* Sleeps if necessary to ensure that it isn't called twice withen less
+/* Sleeps if necessary to ensure that it isn't called twice within less
    time than o.send_delay.  If it is passed a non-null tv, the POST-SLEEP
    time is recorded in it */
 void enforce_scan_delay(struct timeval *tv);
@@ -135,7 +135,7 @@ class ScanProgressMeter {
   ScanProgressMeter(char *stypestr);
   ~ScanProgressMeter();
 /* Decides whether a timing report is likely to even be
-   printed.  There are stringint limitations on how often they are
+   printed.  There are stringent limitations on how often they are
    printed, as well as the verbosity level that must exist.  So you
    might as well check this before spending much time computing
    progress info.  now can be NULL if caller doesn't have the current
@@ -151,12 +151,15 @@ class ScanProgressMeter {
    or not a line was printed.*/
   bool printStatsIfNeccessary(double perc_done, const struct timeval *now);
 
+  /* Prints an estimate of when this scan will complete. */
+  bool printStats(double perc_done, const struct timeval *now);
+
   struct timeval begin; /* When this ScanProgressMeter was instantiated */
  private:
   struct timeval last_print_test; /* Last time printStatsIfNeccessary was called */
   struct timeval last_print; /* The most recent time the ETC was printed */
-  struct timeval last_est; /* The latest PRINTED estimate */
   char *scantypestr;
+  struct timeval last_est; /* The latest PRINTED estimate */
 };
 
 #endif /* NMAP_TIMING_H */

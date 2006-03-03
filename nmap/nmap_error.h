@@ -96,7 +96,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap_error.h,v 1.11 2004/08/29 09:12:03 fyodor Exp $ */
+/* $Id: nmap_error.h 2820 2005-08-24 19:22:11Z fyodor $ */
 
 #ifndef NMAP_ERROR_H
 #define NMAP_ERROR_H
@@ -126,13 +126,22 @@
 #include <unistd.h>
 #endif
 
-void fatal(char *fmt, ...)
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void fatal(const char *fmt, ...)
      __attribute__ ((format (printf, 1, 2)));
-void error(char *fmt, ...)
+void error(const char *fmt, ...)
      __attribute__ ((format (printf, 1, 2)));
-void pfatal(char *err, ...)
+void pfatal(const char *err, ...)
      __attribute__ ((format (printf, 1, 2)));
-void gh_perror(char *err, ...)
+void gh_perror(const char *err, ...)
      __attribute__ ((format (printf, 1, 2)));
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* NMAP_ERROR_H */
 

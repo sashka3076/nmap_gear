@@ -54,7 +54,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: netutils.h,v 1.5 2004/08/29 09:12:05 fyodor Exp $ */
+/* $Id: netutils.h 2396 2004-08-29 09:12:05Z fyodor $ */
 
 #ifndef NETUTILS_H
 #define NETUTILS_H

@@ -17,7 +17,7 @@
 /* Modified by Fyodor (fyodor@insecure.org) for inclusion in the Nmap 
  * Security Scanner.
  *
- * $Id: inet_pton.c,v 1.6 2003/08/16 03:29:26 fyodor Exp $
+ * $Id: inet_pton.c 1938 2003-08-16 03:29:26Z fyodor $
  */
 
 #include "nbase.h"

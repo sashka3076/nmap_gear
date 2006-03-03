@@ -97,20 +97,20 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: utils.h,v 1.52 2004/08/29 09:12:04 fyodor Exp $ */
+/* $Id: utils.h 3048 2006-01-19 07:29:12Z fyodor $ */
 
 #ifndef UTILS_H
 #define UTILS_H
 
-#ifdef WIN32
-#include "mswin32\winclude.h"
-#else
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
+#ifdef WIN32
+#include "mswin32\winclude.h"
+#else
 #include <sys/types.h>
 
 #if HAVE_NETINET_IN_H
@@ -190,6 +190,12 @@ template<class T> T box(T bmin, T bmax, T bnum) {
 void hdump(unsigned char *packet, unsigned int len);
 void lamont_hdump(char *cp, unsigned int length);
 
+/* Compare a canonical option name (e.g. "max-scan-delay") with a
+   user-generated option such as "max_scan_delay" and returns 0 if the
+   two values are considered equivalant (for example, - and _ are
+   considered to be the same), nonzero otherwise. */
+int optcmp(const char *canonical, const char *instance);
+
 /* Scramble the contents of an array*/
 void genfry(unsigned char *arr, int elem_sz, int num_elem);
 void shortfry(unsigned short *arr, int num_elem);
@@ -210,6 +216,14 @@ unsigned int gcd_n_uint(int nvals, unsigned int *val);
 
 int arg_parse(const char *command, char ***argv);
 void arg_parse_free(char **argv);
+
+/* Converts an Nmap time specification string into milliseconds.  If
+   the string is a plain non-negative number, it is considered to
+   already be in milliseconds and is returned.  If it is a number
+   followed by 's' (for seconds), 'm' (minutes), or 'h' (hours), the
+   number is converted to milliseconds and returned.  If Nmap cannot
+   parse the string, it is returned instead. */
+long tval2msecs(char *tspec);
 
 /* Convert a string in the format of a roughly C-style string literal
    (e.g. can have \r, \n, \xHH escapes, etc.) into a binary string.

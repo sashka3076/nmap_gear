@@ -97,12 +97,13 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: portlist.h,v 1.23 2004/11/12 20:21:27 fyodor Exp $ */
+/* $Id: portlist.h 2891 2005-10-01 23:50:27Z fyodor $ */
 
 #ifndef PORTLIST_H
 #define PORTLIST_H
 
 #include <nbase.h>
+#include <map>
 
 /* port states */
 #define PORT_UNKNOWN 0
@@ -130,6 +131,7 @@ enum serviceprobestate {
   PROBESTATE_FINISHED_SOFTMATCHED, // Well, a soft match anyway
   PROBESTATE_FINISHED_NOMATCH, // D'oh!  Failed to find the service.
   PROBESTATE_FINISHED_TCPWRAPPED, // We think the port is blocked via tcpwrappers
+  PROBESTATE_EXCLUDED, // The port has been excluded from the scan
   PROBESTATE_INCOMPLETE // failed to complete (error, host timeout, etc.)
 };
 
@@ -149,10 +151,13 @@ struct serviceDeductions {
   // confident) expressing how accurate the service detection is
   // likely to be.
   int name_confidence;
-  // Any of these three will be NULL if undetermined.
+  // Any of these 6 can be NULL if we weren't able to determine it
   const char *product;
   const char *version;
   const char *extrainfo;
+  const char *hostname;
+  const char *ostype;
+  const char *devicetype;
   // SERVICE_TUNNEL_NONE or SERVICE_TUNNEL_SSL
   enum service_tunnel_type service_tunnel; 
   // This is the combined version of the three fields above.  It will be 
@@ -179,8 +184,8 @@ class Port {
   Port();
   ~Port();
 
-  // pass in an allocated struct serviceDeductions (don't wory about initializing, and
-  // you don't have to free any inernal ptrs.  See the serviceDeductions definition for
+  // pass in an allocated struct serviceDeductions (don't worry about initializing, and
+  // you don't have to free any internal ptrs.  See the serviceDeductions definition for
   // the fields that are populated.  Returns 0 if at least a name is available.
   int getServiceDeductions(struct serviceDeductions *sd);
 
@@ -197,7 +202,8 @@ class Port {
   // detected and we tried to tunnel through it ).
   void setServiceProbeResults(enum serviceprobestate sres, const char *sname,
 			      enum service_tunnel_type tunnel, const char *product, 
-			      const char *version, 
+			      const char *version, const char *hostname,
+			      const char *ostype, const char *devicetype,
 			      const char *extrainfo, const char *fingerprint);
 
   /* Sets the results of an RPC scan.  if rpc_status is not
@@ -232,11 +238,15 @@ class Port {
   char *serviceprobe_product; 
   char *serviceprobe_version; 
   char *serviceprobe_extrainfo; 
+  char *serviceprobe_hostname;
+  char *serviceprobe_ostype;
+  char *serviceprobe_devicetype;
   enum service_tunnel_type serviceprobe_tunnel;
   // A fingerprint that the user can submit if the service wasn't recognized
   char *serviceprobe_fp;
 
 };
+
 
 class PortList {
  public:
@@ -261,14 +271,12 @@ class PortList {
    order from lowest to highest, except that if you ask for both TCP &
    UDP, every TCP port will be returned before we start returning UDP
    ports */
-    Port *nextPort(Port *afterthisport, 
-		   u8 allowed_protocol, int allowed_state, 
-		   bool allow_portzero);
+   Port *nextPort(Port *afterthisport, 
+  	          u8 allowed_protocol, int allowed_state, 
+		  bool allow_portzero);
 
   Port *lookupPort(u16 portno, u8 protocol);
-  Port **udp_ports;
-  Port **tcp_ports;
-  Port **ip_prots;
+
   int state_counts[PORT_HIGHEST_STATE]; /* How many ports in list are in each
 					   state */
   int state_counts_udp[PORT_HIGHEST_STATE];
@@ -276,6 +284,10 @@ class PortList {
   int state_counts_ip[PORT_HIGHEST_STATE];
   int getIgnoredPortState(); /* The state of the port we ignore for output */
   int numports; /* Total number of ports in list in ANY state */
+  // map<int,char*> foomap;
+  std::map < u16, Port *> udp_ports;
+  std::map < u16, Port* > tcp_ports;
+  std::map < u16, Port* > ip_prots;
  private:
   /* A string identifying the system these ports are on.  Just used for 
      printing open ports, if it is set with setIdStr() */

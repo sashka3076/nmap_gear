@@ -103,11 +103,109 @@
 #include <winclude.h>
 #include <sys/timeb.h>
 
-#include "nmap_error.h"
+
+#include "..\nmap.h"
+#include "..\tcpip.h"
+#include "winfix.h"
+#include "..\NmapOps.h"
+#include "..\nmap_error.h"
+
+#ifdef _MSC_VER
+# include <delayimp.h>
+#endif
+
+#ifdef _MSC_VER
+#define DLI_ERROR VcppException(ERROR_SEVERITY_ERROR, ERROR_MOD_NOT_FOUND)
+#endif
+
+extern NmapOps o;
+
+int pcap_avail = 0;
+
+/*   internal functions   */
+static void win_cleanup(void);
+static char pcaplist[4096];
+
+/* The code that has no preconditions to being called, so it can be
+   executed before even Nmap options parsing (so o.debugging and the
+   like don't need to be used.  Its main function is to do
+   WSAStartup() as some of the option parsing code does DNS
+   resolution */
+void win_pre_init() {
+	WORD werd;
+	WSADATA data;
+
+	werd = MAKEWORD( 2, 2 );
+	if( (WSAStartup(werd, &data)) !=0 )
+		fatal("failed to start winsock.\n");
+}
+
+/* Requires that win_pre_init() has already been called, also that
+   options processing has been done so that o.debugging is
+   available */
+void win_init()
+{
+	//   variables
+	DWORD cb = 0;
+	DWORD nRes;
+	OSVERSIONINFOEX ver;
+	PMIB_IPADDRTABLE pIp = 0;
+	int i;
+	int numipsleft;
+
+
+	ver.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
+	if(!GetVersionEx((LPOSVERSIONINFO)&ver))
+	{
+		ver.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+		if(!GetVersionEx((LPOSVERSIONINFO)&ver))
+			fatal("GetVersionEx failed\n");
+
+		ver.wServicePackMajor = 0;
+		ver.wServicePackMinor = 0;
+	}
+
+
+	//   Try to initialize winpcap
+#ifdef _MSC_VER
+	__try
+#endif
+	{
+		ULONG len = sizeof(pcaplist);
+
+		pcap_avail = 1;
+		if(o.debugging > 2) printf("***WinIP***  trying to initialize winpcap 3.1\n");
+		PacketGetAdapterNames(pcaplist, &len);
+
+#ifdef _MSC_VER
+		if(FAILED(__HrLoadAllImportsForDll("wpcap.dll")))
+		{
+			error("WARNING: your winpcap is too old to use.  Nmap may not function.\n");
+			pcap_avail = 0;
+		}
+#endif
+		if(o.debugging)
+			printf("Winpcap present, dynamic linked to: %s\n", pcap_lib_version());
+	}
+#ifdef _MSC_VER
+	__except (1) {
+			error("WARNING: Could not import all necessary WinPcap functions.  You may need to upgrade to version 3.1 or higher from http://www.winpcap.org.  Resorting to connect() mode -- Nmap may not function completely");
+		pcap_avail=0;
+		}
+#endif
+
+	o.isr00t = pcap_avail;
+	atexit(win_cleanup);
+}
+
+
+static void win_cleanup(void)
+{
+  WSACleanup();
+}
 
 int my_close(int sd)
 {
-	if(sd == 501) return 0;
 	return closesocket(sd);
 }
 

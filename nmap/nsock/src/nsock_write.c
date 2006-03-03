@@ -54,7 +54,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_write.c,v 1.11 2004/08/29 09:12:05 fyodor Exp $ */
+/* $Id: nsock_write.c 2396 2004-08-29 09:12:05Z fyodor $ */
 
 #include "nsock.h"
 #include "nsock_internal.h"

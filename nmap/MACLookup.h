@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: MACLookup.h,v 1.2 2004/08/29 09:12:02 fyodor Exp $ */
+/* $Id: MACLookup.h 2778 2005-07-26 06:26:00Z fyodor $ */
 
 #ifndef MACLOOKUP_H
 #define MACLOOKUP_H
@@ -110,5 +110,13 @@
    NULL is returned if no vendor is found for the given prefix or if there
    is some other error. */
 const char *MACPrefix2Corp(const u8 *prefix);
+
+/* Takes a string and looks through the table for a vendor name which
+   contains that string.  Sets the first three bytes in mac_data and
+   returns true for the first matching entry found.  If no entries
+   match, leaves mac_data untouched and returns false.  Note that this
+   is not particularly efficient and so should be rewriteen if it is
+   called often */
+bool MACCorp2Prefix(const char *vendorstr, u8 *mac_data);
 
 #endif /* MACLOOKUP_H */

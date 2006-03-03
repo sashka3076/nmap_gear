@@ -56,7 +56,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_iod.c,v 1.20 2004/08/29 09:12:05 fyodor Exp $ */
+/* $Id: nsock_iod.c 2396 2004-08-29 09:12:05Z fyodor $ */
 
 #include "nsock.h"
 #include "nsock_internal.h"

@@ -99,14 +99,14 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap_winconfig.h,v 1.74 2005/02/07 08:52:52 fyodor Exp $ */
+/* $Id: nmap_winconfig.h 3095 2006-01-30 07:30:56Z fyodor $ */
 
 #ifndef NMAP_WINCONFIG_H
 #define NMAP_WINCONFIG_H
 
-#define NMAP_VERSION "3.81"
-#define NMAP_NAME "nmap"
+#define NMAP_VERSION "4.01"
+#define NMAP_NAME "Nmap"
 #define NMAP_URL "http://www.insecure.org/nmap"
 #define NMAP_PLATFORM "i686-pc-windows-windows"
-#define NMAPDATADIR "c:\nmap" /* FIXME: I really need to make this dynamic */
+#define NMAPDATADIR "c:\\nmap" /* FIXME: I really need to make this dynamic */
 #endif /* NMAP_WINCONFIG_H */

@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: tcpip.h,v 1.68 2005/02/05 22:37:55 fyodor Exp $ */
+/* $Id: tcpip.h 2967 2005-12-06 21:15:45Z fyodor $ */
 
 
 #ifndef TCPIP_H
@@ -199,18 +199,6 @@ void *realloc();
 #endif
 #include <fcntl.h>
 #include <sys/socket.h>
-#if HAVE_NET_IF_H
-#ifndef NET_IF_H  /* why doesn't OpenBSD do this? */
-#include <net/if.h>
-#define NET_IF_H
-#endif
-#endif
-#if HAVE_NETINET_IF_ETHER_H
-#ifndef NETINET_IF_ETHER_H
-#include <netinet/if_ether.h>
-#define NETINET_IF_ETHER_H
-#endif /* NETINET_IF_ETHER_H */
-#endif /* HAVE_NETINET_IF_ETHER_H */
 
 #if TIME_WITH_SYS_TIME
 # include <sys/time.h>
@@ -241,11 +229,18 @@ extern "C" {
 #include <setjmp.h>
 #include <errno.h>
 #include <signal.h>
+#include <dnet.h>
+#ifndef WIN32
+#include <netinet/ip_icmp.h>
+#endif
+
+typedef enum { devt_ethernet, devt_loopback, devt_p2p, devt_other  } devtype;
 
 #include "nmap_error.h"
 #include "utils.h"
 #include "nmap.h"
 #include "global_structures.h"
+
 
 #ifndef DEBUGGING
 #define DEBUGGING 0
@@ -255,16 +250,6 @@ extern "C" {
 #define TCPIP_DEBUGGING 0
 #endif
 
-#ifndef BSDFIX
-#if FREEBSD || BSDI || NETBSD || DEC
-#define BSDFIX(x) x
-#define BSDUFIX(x) x
-#else
-#define BSDFIX(x) htons(x)
-#define BSDUFIX(x) ntohs(x)
-#endif
-#endif
-
 /* Explicit Congestion Notification (rfc 2481/3168) */
 #ifndef TH_ECE
 #define TH_ECE        0x40
@@ -272,6 +257,11 @@ extern "C" {
 #ifndef TH_CWR
 #define TH_CWR        0x80
 #endif
+
+#ifndef INET_ADDRSTRLEN
+#define INET_ADDRSTRLEN 16
+#endif
+
 
 /* Used for tracing all packets sent or received (eg the
    --packet_trace option) */
@@ -295,6 +285,14 @@ class PacketTrace {
   static void traceConnect(u8 proto, const struct sockaddr *sock, 
 			   int socklen, int connectrc, int connect_errno,
 			   const struct timeval *now);
+  /* Takes an ARP PACKET (including ethernet header) and prints it if
+     packet tracing is enabled.  'frame' must point to the 14-byte
+     ethernet header (e.g. starting with destination addr). The
+     direction must be PacketTrace::SENT or PacketTrace::RCVD .
+     Optional 'now' argument makes this function slightly more
+     efficient by avoiding a gettimeofday() call. */
+  static void traceArp(pdirection pdir, const u8 *frame, u32 len,
+				    struct timeval *now);
 };
 
 class PacketCounter {
@@ -315,10 +313,46 @@ struct link_header {
   u8 header[MAX_LINK_HEADERSZ];
 };
 
+/* Relevant (to Nmap) information about an interface */
 struct interface_info {
-  char name[64];
-  struct in_addr addr;
-  struct in_addr netmask;
+  char devname[16];
+  char devfullname[16]; /* can include alias info, such as eth0:2. */
+  struct sockaddr_storage addr;
+  u16 netmask_bits; /* CIDR-style.  So 24 means class C (255.255.255.0)*/
+  devtype device_type; /* devt_ethernet, devt_loopback, devt_p2p, devt_other */
+  bool device_up; /* True if the device is up (enabled) */
+  u8 mac[6]; /* Interface MAC address if device_type is devt_ethernet */
+};
+
+struct route_nfo {
+  struct interface_info ii;
+
+/* true if the target is directly connected on the network (no routing
+   required). */
+  bool direct_connect; 
+
+/* This is the source address that should be used by the packets.  It
+   may be different than ii.addr if you are using localhost interface
+   to scan the IP of another interface on the machine */
+  struct sockaddr_storage srcaddr; 
+
+  /* If direct_connect is 0, this is filled in with the next hop
+     required to route to the target */
+  struct sockaddr_storage nexthop;
+};
+
+struct sys_route {
+  struct interface_info *device;
+  u32 dest;
+  u32 netmask;
+  struct in_addr gw; /* gateway - 0 if none */
+};
+
+struct eth_nfo {
+  char srcmac[6];
+  char dstmac[6];
+  eth_t *ethsd; // Optional, but improves performance.  Set to NULL if unavail
+  char devname[16]; // Only needed if ethsd is NULL.
 };
 
 #ifndef HAVE_STRUCT_IP
@@ -386,8 +420,6 @@ struct icmp
   u_int16_t icmp_cksum; /* ones complement checksum of struct */
   union
   {
-    u_char ih_pptr;             /* ICMP_PARAMPROB */
-    struct in_addr ih_gwaddr;   /* gateway address */
     struct ih_idseq             /* echo datagram */
     {
       u_int16_t icd_id;
@@ -409,8 +441,7 @@ struct icmp
       u_int16_t irt_lifetime;
     } ih_rtradv;
   } icmp_hun;
-#define icmp_pptr       icmp_hun.ih_pptr
-#define icmp_gwaddr     icmp_hun.ih_gwaddr
+  /* Removed icmp_pptr and icmp_gwaddr from union and #defines because they conflict with dnet */
 #define icmp_id         icmp_hun.ih_idseq.icd_id
 #define icmp_seq        icmp_hun.ih_idseq.icd_seq
 #define icmp_void       icmp_hun.ih_void
@@ -471,6 +502,26 @@ class IPProbe {
 
 };
 
+/* Handles an *IPv4* Arp probe */
+class ArpProbe {
+ public:
+  ArpProbe();
+  ~ArpProbe();
+/* Takes an ARP packet and stores _a copy_ of it, in this Probe,
+   adjusting proper header pointers and such.  Then length better
+   equal 42! */
+  int storePacket(u8 *arppacket, u32 len);
+  u32 packetbuflen; /* Length of the whole packet */
+  u8 *packetbuf; /* The packet itself */
+  struct in_addr *ipquery; /* IP address this ARP seeks */
+  /* Resets everything to NULL.  Frees packetbuf if it is filled.  You
+     can reuse a Probe by calling Reset() and then a new
+     storePacket(). */
+  void Reset(); 
+ private:
+
+};
+
  /* This ideally should be a port that isn't in use for any protocol on our machine or on the target */
 #define MAGIC_PORT 49724
 #define TVAL2LONG(X)  X.tv_sec * 1e6 + X.tv_usec
@@ -494,26 +545,43 @@ int resolve(char *hostname, struct sockaddr_storage *ss, size_t *sslen,
    result in ip .  returns 0 if hostname cannot
    be resolved */
 int resolve(char *hostname, struct in_addr *ip);
-/* An awesome function to determine what interface a packet to a given
-   destination should be routed through.  It returns NULL if no appropriate
-   interface is found, oterwise it returns the device name and fills in the
-   source parameter */
-char *routethrough(const struct in_addr * const dest, struct in_addr *source);
+
+/* Takes a destination address (dst) and tries to determine the
+   source address and interface necessary to route to this address.
+   If no route is found, false is returned and rnfo is undefined.  If
+   a route is found, true is returned and rnfo is filled in with all
+   of the routing details.  This function takes into account -S and -e
+   options set by user (o.spoofsource, o.device) */
+bool route_dst(const struct sockaddr_storage *const dst, struct route_nfo *rnfo);
+
+/* Determines what interface packets destined to 'dest' should be
+   routed through.  It can also discover the appropriate next hop (if
+   any) for ethernet routing.  If direct_connect is passed in, it will
+   be set to 1 if dst is directly connected on the ifentry network and
+   0 if it requires routing.  If nexthop_ip is not NULL, and routing
+   is required, the next hop is filled into nexthop_ip.  This function
+   returns false if no apporpiate interface or route was found and
+   true if it succeeds. */
+bool routethrough(const struct sockaddr_storage * const dest, 
+		  struct intf_entry *ifentry, 
+		  int *direct_connect, struct sockaddr_storage *nexthop_ip);
+
 unsigned short in_cksum(u16 *ptr,int nbytes);
 
 /* Build and send a raw tcp packet.  If TTL is -1, a partially random
    (but likely large enough) one is chosen */
-int send_tcp_raw( int sd, const struct in_addr *source, 
+int send_tcp_raw( int sd, struct eth_nfo *eth, const struct in_addr *source, 
 		  const struct in_addr *victim, int ttl, 
 		  u16 sport, u16 dport, u32 seq, u32 ack, u8 flags,
 		  u16 window, u8 *options, int optlen, char *data, 
 		  u16 datalen);
-int send_udp_raw( int sd, struct in_addr *source, const struct in_addr *victim,
- 		  int ttl, u16 sport, u16 dport, u16 ipid, char *data, 
-		  u16 datalen);
+int send_udp_raw( int sd, struct eth_nfo *eth, struct in_addr *source, 
+		  const struct in_addr *victim, int ttl, u16 sport, 
+		  u16 dport, u16 ipid, char *data, u16 datalen);
 
-int send_ip_raw( int sd, struct in_addr *source, const struct in_addr *victim, 
-		 int ttl, u8 proto, char *data, u16 datalen);
+int send_ip_raw( int sd, struct eth_nfo *eth, struct in_addr *source, 
+		 const struct in_addr *victim, int ttl, u8 proto, 
+		 char *data, u16 datalen);
 
 /* Builds a TCP packet (including an IP header) by packing the fields
    with the given information.  It allocates a new buffer to store the
@@ -558,26 +626,31 @@ u8 *build_ip_raw(const struct in_addr *source, const struct in_addr *victim,
 		 u32 *packetlen);
 
 /* Send a pre-built IPv4 packet */
-int send_ip_packet(int sd, u8 *packet, unsigned int packetlen);
+int send_ip_packet(int sd, struct eth_nfo *eth, u8 *packet, 
+		   unsigned int packetlen);
 
 /* Create and send all fragments of the pre-built packet */
 /* mtu = MTU - ipv4_headerlen */
-int send_frag_ip_packet(int sd, u8 *packet, unsigned int packetlen, unsigned int mtu);
+int send_frag_ip_packet(int sd, struct eth_nfo *eth, u8 *packet, 
+			unsigned int packetlen, unsigned int mtu);
 
 /* Decoy versions of the raw packet sending functions ... */
-int send_tcp_raw_decoys( int sd, const struct in_addr *victim, int ttl,
+int send_tcp_raw_decoys( int sd, struct eth_nfo *eth, 
+			 const struct in_addr *victim, int ttl,
 			 u16 sport, u16 dport, u32 seq, u32 ack, u8 flags,
 			 u16 window, u8 *options, int optlen, char *data,
 			 u16 datalen);
 
-int send_udp_raw_decoys( int sd, const struct in_addr *victim, int ttl, 
+int send_udp_raw_decoys( int sd, struct eth_nfo *eth, 
+			 const struct in_addr *victim, int ttl, 
 			 u16 sport, u16 dport, u16 ipid, char *data, 
 			 u16 datalen);
 
 
 /* Calls pcap_open_live and spits out an error (and quits) if the call fails.
    So a valid pcap_t will always be returned. */
-pcap_t *my_pcap_open_live(char *device, int snaplen, int promisc, int to_ms);
+pcap_t *my_pcap_open_live(const char *device, int snaplen, int promisc, 
+			  int to_ms);
 // Returns whether the packet receive time value obtaned from libpcap
 // (and thus by readip_pcap()) should be considered valid.  When
 // invalid (Windows and Amiga), readip_pcap returns the time you called it.
@@ -596,22 +669,29 @@ void readippacket(const u8 *packet, int readdata);
    of a TCP packet*/
 int readtcppacket(const u8 *packet, int readdata);
 int readudppacket(const u8 *packet, int readdata);
-/* Convert an IP address to the device (IE ppp0 eth0) using that address */
+/* Convert an IP address to the device (IE ppp0 eth0) using that address.  Dev passed in must be at least 
+    32 bytes long */
 int ipaddr2devname( char *dev, const struct in_addr *addr );
 /* And vice versa */
 int devname2ipaddr(char *dev, struct in_addr *addr);
-/* Where the above 2 functions get their info */
+/* Looks for an interface assigned to the given IP (ss), and returns
+   the interface_info for the first one found.  If non found, returns NULL */
+struct interface_info *getInterfaceByIP(struct sockaddr_storage *ss);
+/* Looks for an interface with the given name (iname), and returns the
+   corresponding interface_info if found.  Will accept a match of
+   devname or devfullname.  Returns NULL if none found */
+struct interface_info *getInterfaceByName(char *iname);
+/* Where the above 4 functions get their info */
 struct interface_info *getinterfaces(int *howmany);
-/* Check whether an IP address appears to be directly connected to an
-   interface on the computer (e.g. on the same ethernet network rather
-   than having to route).  Returns 1 if yes, -1 if maybe, 0 if not. */
-int IPisDirectlyConnected(struct sockaddr_storage *ss, size_t ss_len);
+
+/* Parse the system routing table, converting each route into a
+   sys_route entry.  Returns an array of sys_routes.  numroutes is set
+   to the number of routes in the array.  The routing table is only
+   read the first time this is called -- later results are cached.
+   The returned route array is sorted by netmask with the most
+   specific matches first. */
+struct sys_route *getsysroutes(int *howmany);
 void sethdrinclude(int sd);
-int getsourceip(struct in_addr *src, const struct in_addr * const dst);
-/* Get the source IP and interface name that a packet
-   to dst should be sent to.  Interface name is dynamically
-   assigned and thus should be freed */
-char *getsourceif(struct in_addr *src, struct in_addr *dst);
 
 /* Fill buf (up to buflen -- truncate if necessary but always
    terminate) with a short representation of the packet stats.
@@ -634,6 +714,16 @@ char *getFinalPacketStats(char *buf, int buflen);
 
 int setTargetMACIfAvailable(Target *target, struct link_header *linkhdr,
 			    struct ip *ip, int overwrite);
+
+/* This function ensures that the next hop MAC address for a target is
+   filled in.  This address is the target's own MAC if it is directly
+   connected, and the next hop mac otherwise.  Returns true if the
+   address is set when the function ends, false if not.  This function
+   firt checks if it is already set, if not it tries the arp cache,
+   and if that fails it sends an ARP request itself.  This should be called
+   after an ARP scan if many directly connected machines are involved. */
+bool setTargetNextHopMAC(Target *target);
+
 int islocalhost(const struct in_addr * const addr);
 int unblock_socket(int sd);
 int Sendto(char *functionname, int sd, const unsigned char *packet, int len, 
@@ -653,6 +743,39 @@ int get_link_offset(char *device);
    lnkinfo->header will be filled with the appropriate values. */
 char *readip_pcap(pcap_t *pd, unsigned int *len, long to_usec, 
 		  struct timeval *rcvdtime, struct link_header *linknfo);
+
+/* A trivial functon that maintains a cache of IP to MAC Address
+   entries.  If the command is ARPCACHE_GEt, this func looks for the
+   IPv4 address in ss and fills in the 'mac' parameter and returns
+   true if it is found.  Otherwise (not found), the function returns
+   false.  If the command is ARPCACHE_SET, the function adds an entry
+   with the given ip (ss) and mac address.  An existing entry for the
+   IP ss will be overwritten with the new MAC address.  true is always
+   returned for the set command. */
+#define ARPCACHE_GET 1
+#define ARPCACHE_SET 2
+bool NmapArpCache(int command, struct sockaddr_storage *ss, u8 *mac);
+
+
+/* Attempts to read one IPv4/Ethernet ARP reply packet from the pcap
+   descriptor pd.  If it receives one, fills in sendermac (must pass
+   in 6 bytes), senderIP, and rcvdtime (can be NULL if you don't care)
+   and returns 1.  If it times out and reads no arp requests, returns
+   0.  to_usec is the timeout period in microseconds.  Use 0 to avoid
+   blocking to the extent possible, and -1 to block forever.  Returns
+   -1 or exits if ther is an error. */
+int read_arp_reply_pcap(pcap_t *pd, u8 *sendermac, struct in_addr *senderIP,
+		       long to_usec, struct timeval *rcvdtime);
+
+/* Issues an ARP request for the MAC of targetss (which will be placed
+   in targetmac if obtained) from the source IP (srcip) and source mac
+   (srcmac) given.  "The request is ussued using device dev to the
+   broadcast MAC address.  The transmission is attempted up to 3
+   times.  If none of these elicit a response, false will be returned.
+   If the mac is determined, true is returned. */
+bool doArp(const char *dev, u8 *srcmac, struct sockaddr_storage *srcip, 
+	   struct sockaddr_storage *targetip, u8 *targetmac);
+
 #ifndef HAVE_INET_ATON
 int inet_aton(register const char *, struct in_addr *);
 #endif
@@ -690,17 +813,10 @@ void broadcast_socket(int sd);
    did). */
 int recvtime(int sd, char *buf, int len, int seconds, int *timedout);
 
-/* This attempts to calculate the round trip time (rtt) to a host by timing a
-   connect() to a port which isn't listening.  A better approach is to time a
-   ping (since it is more likely to get through firewalls (note, this isn't
-   always true nowadays --fyodor).  This is now 
-   implemented in isup() for users who are root.  */
-unsigned long calculate_sleep(struct in_addr target);
-
 /* Sets a pcap filter function -- makes SOCK_RAW reads easier */
 #ifndef WINIP_H
 typedef int (*PFILTERFN)(const char *packet, unsigned int len); /* 1 to keep */
-void set_pcap_filter(Target *target, pcap_t *pd, PFILTERFN filter, char *bpf, ...);
+void set_pcap_filter(const char *device, pcap_t *pd, char *bpf, ...);
 #endif
 
 /* Just accept everything ... TODO: Need a better approach than this flt_ 

@@ -1,6 +1,6 @@
 
 /***************************************************************************
- * service_scan.h -- Routines used for service fingerprinting to determine *
+ * service_scan.cc -- Routines used for service fingerprinting to determine *
  * what application-level protocol is listening on a given port            *
  * (e.g. snmp, http, ftp, smtp, etc.)                                      *
  *                                                                         *
@@ -98,13 +98,16 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: service_scan.cc,v 1.38 2004/11/06 03:41:53 fyodor Exp $ */
+/* $Id: service_scan.cc 3024 2005-12-31 00:32:42Z fyodor $ */
 
 
 #include "service_scan.h"
 #include "timing.h"
 #include "NmapOps.h"
 #include "nsock.h"
+
+#include "tty.h"
+
 #if HAVE_OPENSSL
 #include <openssl/ssl.h>
 #endif
@@ -123,6 +126,10 @@
 #include <algorithm>
 #include <list>
 
+/* Workaround for lack of namespace std on HP-UX 11.00 */
+namespace std {};
+using namespace std;
+
 // Because this file uses assert()s for some security checking, we can't
 // have anyone turning off debugging.
 #undef NDEBUG
@@ -136,7 +143,7 @@ public:
   ~ServiceNFO();
 
   // If a service response to a given probeName, this function adds
-  // the resonse the the fingerprint for that service.  The
+  // the response the the fingerprint for that service.  The
   // fingerprint can be printed when nothing matches the service.  You
   // can obtain the fingerprint (if any) via getServiceFingerprint();
   void addToServiceFingerprint(const char *probeName, const u8 *resp, 
@@ -155,11 +162,14 @@ public:
   Port *port; // The Port that this service represents (this copy is taken from inside Target)
   // if a match is found, it is placed here.  Otherwise NULL
   const char *probe_matched;
-  // If a match is found, any product/version/info is placed in these
-  // 3 strings.  Otherwise the string will be 0 length.
+  // If a match is found, any product/version/info/hostname/ostype/devicetype
+  // is placed in these 6 strings.  Otherwise the string will be 0 length.
   char product_matched[80];
   char version_matched[80];
   char extrainfo_matched[128];
+  char hostname_matched[128];
+  char ostype_matched[64];
+  char devicetype_matched[64];
   enum service_tunnel_type tunnel; /* SERVICE_TUNNEL_NONE, SERVICE_TUNNEL_SSL */
   // This stores our SSL session id, which will help speed up subsequent
   // SSL connections.  It's overwritten each time.  void* is used so we don't
@@ -200,8 +210,8 @@ public:
           
 private:
   // Adds a character to servicefp.  Takes care of word wrapping if
-  // neccessary at the given (wrapat) column.  Chars will only be
-  // written if there is enough space.  Oherwise it exits.
+  // necessary at the given (wrapat) column.  Chars will only be
+  // written if there is enough space.  Otherwise it exits.
   void addServiceChar(char c, int wrapat);
   // Like addServiceChar, but for a whole zero-terminated string
   void addServiceString(char *s, int wrapat);
@@ -256,6 +266,7 @@ ServiceProbeMatch::ServiceProbeMatch() {
   servicename = NULL;
   matchstr = NULL;
   product_template = version_template = info_template = NULL;
+  hostname_template = ostype_template = devicetype_template = NULL;
   regex_compiled = NULL;
   regex_extra = NULL;
   isInitialized = false;
@@ -271,6 +282,9 @@ ServiceProbeMatch::~ServiceProbeMatch() {
   if (product_template) free(product_template);
   if (version_template) free(version_template);
   if (info_template) free(info_template);
+  if (hostname_template) free(hostname_template);
+  if (ostype_template) free(ostype_template);
+  if (devicetype_template) free(devicetype_template);
   matchstrlen = 0;
   if (regex_compiled) pcre_free(regex_compiled);
   if (regex_extra) pcre_free(regex_extra);
@@ -286,7 +300,8 @@ ServiceProbeMatch::~ServiceProbeMatch() {
 // function will abort the program if there is a syntax problem.
 void ServiceProbeMatch::InitMatch(const char *matchtext, int lineno) {
   const char *p;
-  char delimchar;
+  char *tmptemplate;
+  char delimchar, modechar;
   int pcre_compile_ops = 0;
   const char *pcre_errptr = NULL;
   int pcre_erroffset = 0;
@@ -375,56 +390,40 @@ void ServiceProbeMatch::InitMatch(const char *matchtext, int lineno) {
     fatal("ServiceProbeMatch::InitMatch: parse error on line %d of nmap-service-probes: match string must begin with 'm'", lineno);
   }
 
-  /* OK!  Now we look for the optional version-detection
-     product/version info in the form v/productname/version/info/
-     (where '/' delimiter can be anything) */
+  /* OK! Now we look for any templates of the form ?/.../
+   * where ? is either p, v, i, h, o, or d. / is any
+   * delimiter character and ... is a template */
 
+  while(1) {
   while(isspace(*matchtext)) matchtext++;
-  if (isalnum(*matchtext)) {
-    if (isSoft)
-      fatal("ServiceProbeMatch::InitMatch: illegal trailing garbage on line %d of nmap-service-probes - note that softmatch lines cannot have a version specifier.", lineno);
-    if (*matchtext != 'v') 
-      fatal("ServiceProbeMatch::InitMatch: illegal trailing garbage (should be a version pattern match?) on line %d of nmap-service-probes", lineno);
-    delimchar = *(++matchtext);
-    ++matchtext;
-    // find the end of the productname
+    if (*matchtext == '\0' || *matchtext == '\r' || *matchtext == '\n') break;
+
+    modechar = *(matchtext++);
+    if (*matchtext == 0 || *matchtext == '\r' || *matchtext == '\n')
+      fatal("ServiceProbeMatch::InitMatch: parse error on line %d of nmap-service-probes", lineno);
+
+    delimchar = *(matchtext++);
+
     p = strchr(matchtext, delimchar);
-    if (!p) fatal("ServiceProbeMatch::InitMatch: parse error on line %d of nmap-service-probes (in the version pattern - productname section)", lineno);
+    if (!p) fatal("ServiceProbeMatch::InitMatch: parse error on line %d of nmap-service-probes", lineno);
+
+    tmptemplate = NULL;
     tmpbuflen = p - matchtext;
     if (tmpbuflen > 0) {
-      product_template = (char *) safe_malloc(tmpbuflen + 1);
-      memcpy(product_template, matchtext, tmpbuflen);
-      product_template[tmpbuflen] = '\0';
-    }
-    // Now lets go after the version info
-    matchtext = p+1;
-    p = strchr(matchtext, delimchar);
-    if (!p) fatal("ServiceProbeMatch::InitMatch: parse error on line %d of nmap-service-probes (in the version pattern - version section)", lineno);
-    tmpbuflen = p - matchtext;
-    if (tmpbuflen > 0) {
-      version_template = (char *) safe_malloc(tmpbuflen + 1);
-      memcpy(version_template, matchtext, tmpbuflen);
-      version_template[tmpbuflen] = '\0';
-    }
-    // And finally for the "info"
-    matchtext = p+1;
-    p = strchr(matchtext, delimchar);
-    if (!p) fatal("ServiceProbeMatch::InitMatch: parse error on line %d of nmap-service-probes (in the version pattern - info section)", lineno);
-    tmpbuflen = p - matchtext;
-    if (tmpbuflen > 0) {
-      info_template = (char *) safe_malloc(tmpbuflen + 1);
-      memcpy(info_template, matchtext, tmpbuflen);
-      info_template[tmpbuflen] = '\0';
+      tmptemplate = (char *) safe_malloc(tmpbuflen + 1);
+      memcpy(tmptemplate, matchtext, tmpbuflen);
+      tmptemplate[tmpbuflen] = '\0';
     }
 
-    // Insure there is no trailing junk after the version string
-    // (usually cased by delimchar accidently being in the
-    // product/version/info string).
-    p++;
-    while(*p && *p != '\r' && *p != '\n') {
-      if (!isspace((int) *(unsigned char *)p))  fatal("ServiceProbeMatch::InitMatch: illegal trailing garbage (accidental version delimeter in your v//// string?) on line %d of nmap-service-probes", lineno);
-      p++;
-    }
+    if (modechar == 'p') product_template = tmptemplate;
+    else if (modechar == 'v') version_template = tmptemplate;
+    else if (modechar == 'i') info_template = tmptemplate;
+    else if (modechar == 'h') hostname_template = tmptemplate;
+    else if (modechar == 'o') ostype_template = tmptemplate;
+    else if (modechar == 'd') devicetype_template = tmptemplate;
+    else fatal("ServiceProbeMatch::InitMatch: Unknown template specifier '%c' on line %d of nmap-service-probes", modechar, lineno);
+
+    matchtext = p + 1;
   }
 
   isInitialized = 1;
@@ -445,6 +444,9 @@ const struct MatchDetails *ServiceProbeMatch::testMatch(const u8 *buf, int bufle
   static char product[80];
   static char version[80];
   static char info[128];
+  static char hostname[80];
+  static char ostype[32];
+  static char devicetype[32];
   char *bufc = (char *) buf;
   int ovector[150]; // allows 50 substring matches (including the overall match)
   assert(isInitialized);
@@ -469,10 +471,14 @@ const struct MatchDetails *ServiceProbeMatch::testMatch(const u8 *buf, int bufle
   } else {
     // Yeah!  Match apparently succeeded.
     // Now lets get the version number if available
-    i = getVersionStr(buf, buflen, ovector, rc, product, sizeof(product), version, sizeof(version), info, sizeof(info));    
+    i = getVersionStr(buf, buflen, ovector, rc, product, sizeof(product), version, sizeof(version), info, sizeof(info),
+                      hostname, sizeof(hostname), ostype, sizeof(ostype), devicetype, sizeof(devicetype));    
     if (*product) MD_return.product = product;
     if (*version) MD_return.version = version;
     if (*info) MD_return.info = info;
+    if (*hostname) MD_return.hostname = hostname;
+    if (*ostype) MD_return.ostype = ostype;
+    if (*devicetype) MD_return.devicetype = devicetype;
   
     MD_return.serviceName = servicename;
   }
@@ -734,22 +740,28 @@ static int dotmplsubst(const u8 *subject, int subjectlen,
 }
 
 
-// Use the three version templates, and the match data included here
-// to put the version info into 'product', 'version', and 'info',
-// (as long as the given string sizes are sufficient).  Returns zero
-// for success.  If no template is available for product, version,
-// and/or info, that string will have zero length after the function
+// Use the six version templates and the match data included here
+// to put the version info into the given strings, (as long as the sizes
+// are sufficient).  Returns zero for success.  If no template is available
+// for a string, that string will have zero length after the function
 // call (assuming the corresponding length passed in is at least 1)
+
 int ServiceProbeMatch::getVersionStr(const u8 *subject, int subjectlen, 
 	    int *ovector, int nummatches, char *product, int productlen,
-	    char *version, int versionlen, char *info, int infolen) {
+	    char *version, int versionlen, char *info, int infolen,
+                  char *hostname, int hostnamelen, char *ostype, int ostypelen,
+                  char *devicetype, int devicetypelen) {
 
   int rc;
-  assert(productlen >= 0 && versionlen >= 0 && infolen >= 0);
+  assert(productlen >= 0 && versionlen >= 0 && infolen >= 0 &&
+         hostnamelen >= 0 && ostypelen >= 0 && devicetypelen >= 0);
   
   if (productlen > 0) *product = '\0';
   if (versionlen > 0) *version = '\0';
   if (infolen > 0) *info = '\0';
+  if (hostnamelen > 0) *hostname = '\0';
+  if (ostypelen > 0) *ostype = '\0';
+  if (devicetypelen > 0) *devicetype = '\0';
   int retval = 0;
 
   // Now lets get this started!  We begin with the product name
@@ -783,15 +795,48 @@ int ServiceProbeMatch::getVersionStr(const u8 *subject, int subjectlen,
     }
   }
   
+  if (hostname_template) {
+    rc = dotmplsubst(subject, subjectlen, ovector, nummatches, hostname_template, hostname, hostnamelen);
+    if (rc != 0) {
+      error("Warning: Servicescan failed to fill hostname_template (subjectlen: %d). Too long? Match string was line %d: h/%s/", subjectlen, deflineno, (hostname_template)? hostname_template : "");
+      if (hostnamelen > 0) *hostname = '\0';
+      retval = -1;
+    }
+  }
+
+  if (ostype_template) {
+    rc = dotmplsubst(subject, subjectlen, ovector, nummatches, ostype_template, ostype, ostypelen);
+    if (rc != 0) {
+      error("Warning: Servicescan failed to fill ostype_template (subjectlen: %d). Too long? Match string was line %d: p/%s/", subjectlen, deflineno, (ostype_template)? ostype_template : "");
+      if (ostypelen > 0) *ostype = '\0';
+      retval = -1;
+    }
+  }
+
+  if (devicetype_template) {
+    rc = dotmplsubst(subject, subjectlen, ovector, nummatches, devicetype_template, devicetype, devicetypelen);
+    if (rc != 0) {
+      error("Warning: Servicescan failed to fill devicetype_template (subjectlen: %d). Too long? Match string was line %d: d/%s/", subjectlen, deflineno, (devicetype_template)? devicetype_template : "");
+      if (devicetypelen > 0) *devicetype = '\0';
+      retval = -1;
+    }
+  }
+  
   return retval;
 }
 
 
 ServiceProbe::ServiceProbe() {
+  int i;
   probename = NULL;
   probestring = NULL;
   totalwaitms = DEFAULT_SERVICEWAITMS;
   probestringlen = 0; probeprotocol = -1;
+  // The default rarity level for a probe without a rarity
+  // directive - should almost never have to be relied upon.
+  rarity = 5;
+  fallbackStr = NULL;
+  for (i=0; i<MAXFALLBACKS+1; i++) fallbacks[i] = NULL;
 }
 
 ServiceProbe::~ServiceProbe() {
@@ -803,6 +848,8 @@ ServiceProbe::~ServiceProbe() {
   for(vi = matches.begin(); vi != matches.end(); vi++) {
     delete *vi;
   }
+
+  if (fallbackStr) free(fallbackStr);
 }
 
 void ServiceProbe::setName(const char *name) {
@@ -927,7 +974,7 @@ void ServiceProbe::setPortVector(vector<u16> *portv, const char *portstr,
   // SERVICE_TUNNEL_SSL.  Otherwise use SERVICE_TUNNEL_NONE.  The line
   // number is requested because this function will bail with an error
   // (giving the line number) if it fails to parse the string.  Ports
-  // are a comma seperated list of prots and ranges
+  // are a comma seperated list of ports and ranges
   // (e.g. 53,80,6000-6010).
 void ServiceProbe::setProbablePorts(enum service_tunnel_type tunnel,
 				    const char *portstr, int lineno) {
@@ -964,6 +1011,22 @@ bool ServiceProbe::serviceIsPossible(const char *sname) {
   return false;
 }
 
+
+// Takes a string following a Rarity directive in the probes file.
+// The string should contain a single integer between 1 and 9. The
+// default rarity is 5. This function will bail if the string is invalid.
+void ServiceProbe::setRarity(const char *portstr, int lineno) {
+  int tp;
+
+  tp = atoi(portstr);
+
+  if (tp < 1 || tp > 9)
+    fatal("ServiceProbe::setRarity: Rarity directive on line %d of nmap-service-probes must be between 1 and 9", lineno);
+
+  rarity = tp;
+}
+
+
   // Takes a match line in a probe description and adds it to the
   // list of matches for this probe.  This function should be passed
   // the whole line starting with "match" or "softmatch" in
@@ -998,10 +1061,18 @@ void parse_nmap_service_probe_file(AllProbes *AP, char *filename) {
     if (*line == '\n' || *line == '#')
       continue;
   
+    if (strncmp(line, "Exclude ", 8) == 0) {
+      if (AP->excludedports != NULL)
+        fatal("Only 1 Exclude directive is allowed in the nmap-service-probes file");
+
+      AP->excludedports = getpts(line+8);
+      continue;
+    }
+  
   anotherprobe:
   
     if (strncmp(line, "Probe ", 6) != 0)
-      fatal("Parse error on line %d of nmap-service-probes file: %s -- line was expected to begin with \"Probe \"", lineno, filename);
+      fatal("Parse error on line %d of nmap-service-probes file: %s -- line was expected to begin with \"Probe \" or \"Exclude \"", lineno, filename);
     
     newProbe = new ServiceProbe();
     newProbe->setProbeDetails(line + 6, lineno);
@@ -1024,6 +1095,10 @@ void parse_nmap_service_probe_file(AllProbes *AP, char *filename) {
 	newProbe->setProbablePorts(SERVICE_TUNNEL_NONE, line + 6, lineno);
       } else if (strncmp(line, "sslports ", 9) == 0) {
 	newProbe->setProbablePorts(SERVICE_TUNNEL_SSL, line + 9, lineno);
+      } else if (strncmp(line, "rarity ", 7) == 0) {
+	newProbe->setRarity(line + 7, lineno);
+      } else if (strncmp(line, "fallback ", 9) == 0) {
+	newProbe->fallbackStr = strdup(line + 9);
       } else if (strncmp(line, "totalwaitms ", 12) == 0) {
 	long waitms = strtol(line + 12, NULL, 10);
 	if (waitms < 100 || waitms > 300000)
@@ -1031,6 +1106,8 @@ void parse_nmap_service_probe_file(AllProbes *AP, char *filename) {
 	newProbe->totalwaitms = waitms;
       } else if (strncmp(line, "match ", 6) == 0 || strncmp(line, "softmatch ", 10) == 0) {
 	newProbe->addMatch(line, lineno);
+      } else if (strncmp(line, "Exclude ", 8) == 0) {
+        fatal("The Exclude directive must precede all Probes in nmap-service-probes");
       } else fatal("Parse error on line %d of nmap-service-probes file: %s -- unknown directive", lineno, filename);
     }
   }
@@ -1044,6 +1121,8 @@ void parse_nmap_service_probe_file(AllProbes *AP, char *filename) {
   }
   
   fclose(fp);
+
+  AP->compileFallbacks();
 }
 
 // Parses the nmap-service-probes file, and adds each probe to
@@ -1082,6 +1161,7 @@ const struct MatchDetails *ServiceProbe::testMatch(const u8 *buf, int buflen) {
 
 AllProbes::AllProbes() {
   nullProbe = NULL;
+  excludedports = NULL;
 }
 
 AllProbes::~AllProbes() {
@@ -1109,6 +1189,98 @@ ServiceProbe *AllProbes::getProbeByName(const char *name, int proto) {
   return NULL;
 }
 
+
+
+// Returns nonzero if port was specified in the excludeports
+// directive in nmap-service-probes. Zero otherwise.
+// Proto should be IPPROTO_TCP for TCP and IPPROTO_UDP for UDP
+// Note that although getpts() can set protocols (for protocol
+// scanning), this is ignored here because you can't version
+// scan protocols.
+int AllProbes::isExcluded(unsigned short port, int proto) {
+  unsigned short *p=NULL;
+  int count=-1,i;
+
+  if (!excludedports) return 0;
+
+  if (proto == IPPROTO_TCP) {
+    p = excludedports->tcp_ports;
+    count = excludedports->tcp_count;
+  } else if (proto == IPPROTO_UDP) {
+    p = excludedports->udp_ports;
+    count = excludedports->udp_count;
+  } else {
+    fatal("Bad proto number (%d) specified in AllProbes::isExcluded", proto);
+  }
+
+  for (i=0; i<count; i++)
+    if (p[i] == port)
+           return 1;
+
+  return 0;
+}
+
+
+// Before this function is called, the fallbacks exist as unparsed
+// comma-separated strings in the fallbackStr field of each probe.
+// This function fills out the fallbacks array in each probe with
+// an ordered list of pointers to which probes to try. This is both for
+// efficiency and to deal with odd cases like the NULL probe and falling
+// back to probes later in the file. This function also free()s all the
+// fallbackStrs.
+void AllProbes::compileFallbacks() {
+  vector<ServiceProbe *>::iterator curr;
+  char *tp;
+  int i;
+
+  curr = probes.begin();
+
+  // The NULL probe is a special case:
+  nullProbe->fallbacks[0] = nullProbe;
+
+  while (curr != probes.end()) {
+
+    if ((*curr)->fallbackStr == NULL) {
+      // A non-NULL probe without a fallback directive. We
+      // just use "Itself,NULL" unless it's UDP, then just "Itself".
+
+      (*curr)->fallbacks[0] = *curr;
+      if ((*curr)->getProbeProtocol() == IPPROTO_TCP)
+        (*curr)->fallbacks[1] = nullProbe;
+    } else {
+      // A non-NULL probe *with* a fallback directive. We use:
+      // TCP: "Itself,<directive1>,...,<directiveN>,NULL"
+      // UDP: "Itself,<directive1>,...,<directiveN>"
+
+      (*curr)->fallbacks[0] = *curr;
+      i = 1;
+      tp = strtok((*curr)->fallbackStr, ",\r\n\t "); // \r and \n because string will be terminated with them
+
+      while (tp != NULL && i<(MAXFALLBACKS-1)) {
+        (*curr)->fallbacks[i] = getProbeByName(tp, (*curr)->getProbeProtocol());
+	if ((*curr)->fallbacks[i] == NULL)
+          fatal("AllProbes::compileFallbacks: Unknown fallback specified in Probe %s: '%s'", (*curr)->getName(), tp);
+	i++;
+	tp = strtok(NULL, ",\r\n\t ");
+      }
+
+      if (i == MAXFALLBACKS-1)
+        fatal("AllProbes::compileFallbacks: MAXFALLBACKS exceeded on probe '%s'", (*curr)->getName());
+
+      if ((*curr)->getProbeProtocol() == IPPROTO_TCP)
+        (*curr)->fallbacks[i] = nullProbe;
+    }
+
+    if ((*curr)->fallbackStr) free((*curr)->fallbackStr);
+    (*curr)->fallbackStr = NULL;
+
+    curr++;
+  }
+
+}
+
+
+
 ServiceNFO::ServiceNFO(AllProbes *newAP) {
   target = NULL;
   probe_matched = NULL;
@@ -1120,6 +1292,7 @@ ServiceNFO::ServiceNFO(AllProbes *newAP) {
   currentresplen = 0;
   port = NULL;
   product_matched[0] = version_matched[0] = extrainfo_matched[0] = '\0';
+  hostname_matched[0] = ostype_matched[0] = devicetype_matched[0] = '\0';
   tunnel = SERVICE_TUNNEL_NONE;
   ssl_session = NULL;
   softMatchFound = false;
@@ -1141,8 +1314,8 @@ ServiceNFO::~ServiceNFO() {
 }
 
   // Adds a character to servicefp.  Takes care of word wrapping if
-  // neccessary at the given (wrapat) column.  Chars will only be
-  // written if there is enough space.  Oherwise it exits.
+  // necessary at the given (wrapat) column.  Chars will only be
+  // written if there is enough space.  Otherwise it exits.
 void ServiceNFO::addServiceChar(char c, int wrapat) {
 
   if (servicefpalloc - servicefplen < 6)
@@ -1200,7 +1373,7 @@ void ServiceNFO::addToServiceFingerprint(const char *probeName, const u8 *resp,
   if (servicefplen == 0) {
     timep = time(NULL);
     ltime = localtime(&timep);
-    servicefplen = snprintf(servicefp, spaceleft, "SF-Port%hu-%s:V=%s%s%%D=%d/%d%%Time=%X%%P=%s", portno, proto2ascii(proto, true), NMAP_VERSION, (tunnel == SERVICE_TUNNEL_SSL)? "%T=SSL" : "", ltime->tm_mon + 1, ltime->tm_mday, (int) timep, NMAP_PLATFORM);
+    servicefplen = snprintf(servicefp, spaceleft, "SF-Port%hu-%s:V=%s%s%%I=%d%%D=%d/%d%%Time=%X%%P=%s", portno, proto2ascii(proto, true), NMAP_VERSION, (tunnel == SERVICE_TUNNEL_SSL)? "%T=SSL" : "", o.version_intensity, ltime->tm_mon + 1, ltime->tm_mday, (int) timep, NMAP_PLATFORM);
   }
 
   // Note that we give the total length of the response, even though we 
@@ -1339,9 +1512,11 @@ bool dropdown = false;
    while (current_probe != AP->probes.end()) {
      // The protocol must be right, it must be a nonmatching port ('cause we did those),
      // and we better either have no soft match yet, or the soft service match must
-     // be available via this probe.
+     // be available via this probe. Also, the Probe's rarity must be <= to our
+     // version detection intensity level.
      if ((proto == (*current_probe)->getProbeProtocol()) && 
 	 !(*current_probe)->portIsProbable(tunnel, portno) &&
+	 (*current_probe)->getRarity() <= o.version_intensity &&
 	 (!softMatchFound || (*current_probe)->serviceIsPossible(probe_matched))) {
        // Valid, probe.  Let's do it!
        return *current_probe;
@@ -1480,8 +1655,18 @@ ServiceGroup::~ServiceGroup() {
    PORT_OPEN. */
 static void adjustPortStateIfNeccessary(ServiceNFO *svc) {
 
+  char host[128];
+
   if (svc->port->state == PORT_OPENFILTERED) {
     svc->target->ports.addPort(svc->portno, svc->proto, NULL, PORT_OPEN);
+
+    if (o.verbose || o.debugging > 1) {
+      svc->target->NameIP(host, sizeof(host));
+
+      log_write(LOG_STDOUT, "Discovered open|filtered port %hu/%s on %s is actually open\n",
+         svc->portno, proto2ascii(svc->proto), host);
+      log_flush(LOG_STDOUT);
+    }
   }
 
   return;
@@ -1618,6 +1803,7 @@ static int scanThroughTunnel(nsock_pool nsp, nsock_iod nsi, ServiceGroup *SG,
   svc->tunnel = SERVICE_TUNNEL_SSL;
   svc->probe_matched = NULL;
   svc->product_matched[0] = svc->version_matched[0] = svc->extrainfo_matched[0] = '\0';
+  svc->hostname_matched[0] = svc->ostype_matched[0] = svc->devicetype_matched[0] = '\0';
   svc->softMatchFound = false;
    svc->resetProbes(true);
   startNextProbe(nsp, nsi, SG, svc, true);
@@ -1626,6 +1812,14 @@ static int scanThroughTunnel(nsock_pool nsp, nsock_iod nsi, ServiceGroup *SG,
 
 /* Prints completion estimates and the like when appropriate */
 static void considerPrintingStats(ServiceGroup *SG) {
+   /* Check for status requests */
+   if (keyWasPressed()) {
+      SG->SPM->printStats(SG->services_finished.size() /
+                          ((double)SG->services_remaining.size() + SG->services_in_progress.size() + 
+                           SG->services_finished.size()), nsock_gettimeofday());
+   }
+
+
   /* Perhaps this should be made more complex, but I suppose it should be
      good enough for now. */
   if (SG->SPM->mayBePrinted(nsock_gettimeofday())) {
@@ -1768,6 +1962,14 @@ void servicescan_write_handler(nsock_pool nsp, nsock_event nse, void *mydata) {
   SG = (ServiceGroup *) nsp_getud(nsp);
   nsi = nse_iod(nse);
 
+  // Check if a status message was requsted
+  if (keyWasPressed()) {
+     SG->SPM->printStats(SG->services_finished.size() /
+                         ((double)SG->services_remaining.size() + SG->services_in_progress.size() + 
+                          SG->services_finished.size()), nsock_gettimeofday());
+  }
+  
+
   if (svc->target->timedOut(nsock_gettimeofday())) {
     end_svcprobe(nsp, PROBESTATE_INCOMPLETE, SG, svc, nsi);
     return;
@@ -1810,7 +2012,7 @@ void servicescan_read_handler(nsock_pool nsp, nsock_event nse, void *mydata) {
   const u8 *readstr;
   int readstrlen;
   const struct MatchDetails *MD;
-  bool nullprobecheat = false; // We cheated and found a match in the NULL probe to a non-null-probe response
+  int fallbackDepth=0;
 
   assert(type == NSE_TYPE_READ);
 
@@ -1823,17 +2025,10 @@ void servicescan_read_handler(nsock_pool nsp, nsock_event nse, void *mydata) {
     svc->appendtocurrentproberesponse(readstr, readstrlen);
     // now get the full version
     readstr = svc->getcurrentproberesponse(&readstrlen);
-    // Now let us try to match it.
-    MD = probe->testMatch(readstr, readstrlen);
 
-    // Sometimes a service doesn't respond quickly enough to the NULL
-    // scan, even though it would have match.  In that case, Nmap can
-    // end up tediously going through every probe without finding a
-    // match.  So we test the NULL probe matches if the probe-specific
-    // matches fail
-    if (!MD && !probe->isNullProbe() && probe->getProbeProtocol() == IPPROTO_TCP && svc->AP->nullProbe) {
-      MD = svc->AP->nullProbe->testMatch(readstr, readstrlen);
-      nullprobecheat = true;
+    for (MD = NULL; probe->fallbacks[fallbackDepth] != NULL; fallbackDepth++) {
+      MD = (probe->fallbacks[fallbackDepth])->testMatch(readstr, readstrlen);
+      if (MD && MD->serviceName) break; // Found one!
     }
 
     if (MD && MD->serviceName) {
@@ -1847,14 +2042,16 @@ void servicescan_read_handler(nsock_pool nsp, nsock_event nse, void *mydata) {
       } else {
 	if (o.debugging > 1)
 	  if (MD->product || MD->version || MD->info)
-	    printf("Service scan %smatch: %s:%hi is %s%s.  Version: |%s|%s|%s|\n", nullprobecheat? "NULL-CHEAT " : "", 
+	    printf("Service scan match (Probe %s matched with %s): %s:%hi is %s%s.  Version: |%s|%s|%s|\n",
+                   probe->getName(), (*probe->fallbacks[fallbackDepth]).getName(),
 		   svc->target->NameIP(), svc->portno, (svc->tunnel == SERVICE_TUNNEL_SSL)? "SSL/" : "", 
 		   MD->serviceName, (MD->product)? MD->product : "", (MD->version)? MD->version : "", 
 		   (MD->info)? MD->info : "");
 	  else
-	    printf("Service scan %s%s match: %s:%hi is %s%s\n", nullprobecheat? "NULL-CHEAT " : "", 
-		   (MD->isSoft)? "soft" : "hard", svc->target->NameIP(), 
-		   svc->portno, (svc->tunnel == SERVICE_TUNNEL_SSL)? "SSL/" : "", MD->serviceName);
+	    printf("Service scan %s match (Probe %s matched with %s): %s:%hi is %s%s\n",
+                   (MD->isSoft)? "soft" : "hard",
+                   probe->getName(), (*probe->fallbacks[fallbackDepth]).getName(),
+		   svc->target->NameIP(), svc->portno, (svc->tunnel == SERVICE_TUNNEL_SSL)? "SSL/" : "", MD->serviceName);
 	svc->probe_matched = MD->serviceName;
 	if (MD->product)
 	  Strncpy(svc->product_matched, MD->product, sizeof(svc->product_matched));
@@ -1862,6 +2059,12 @@ void servicescan_read_handler(nsock_pool nsp, nsock_event nse, void *mydata) {
 	  Strncpy(svc->version_matched, MD->version, sizeof(svc->version_matched));
 	if (MD->info) 
 	  Strncpy(svc->extrainfo_matched, MD->info, sizeof(svc->extrainfo_matched));
+	if (MD->hostname) 
+	  Strncpy(svc->hostname_matched, MD->hostname, sizeof(svc->hostname_matched));
+	if (MD->ostype) 
+	  Strncpy(svc->ostype_matched, MD->ostype, sizeof(svc->ostype_matched));
+	if (MD->devicetype) 
+	  Strncpy(svc->devicetype_matched, MD->devicetype, sizeof(svc->devicetype_matched));
 	svc->softMatchFound = MD->isSoft;
 	if (!svc->softMatchFound) {
 	  // We might be able to continue scan through a tunnel protocol 
@@ -1924,6 +2127,7 @@ void servicescan_read_handler(nsock_pool nsp, nsock_event nse, void *mydata) {
     case ECONNRESET:
     case ECONNREFUSED: // weird to get this on a connected socket (shrug) but 
                        // BSD sometimes gives it
+    case ECONNABORTED:
       // Jerk hung up on us.  Probably didn't like our probe.  We treat it as with EOF above.
       if (probe->isNullProbe()) {
 	// TODO:  Perhaps should do further verification before making this assumption
@@ -1965,6 +2169,22 @@ void servicescan_read_handler(nsock_pool nsp, nsock_event nse, void *mydata) {
   return;
 }
 
+
+// This is used in processResults to determine whether a FP
+// should be printed based on type of match, version intensity, etc.
+
+int shouldWePrintFingerprint(ServiceNFO *svc) {
+  // Never print FP if hardmatched
+  if (svc->probe_state == PROBESTATE_FINISHED_HARDMATCHED)
+    return 0;
+
+  // If we were called with a version_intensity less than
+  // the default, don't bother printing.
+  if (o.version_intensity < 7) return 0;
+
+  return 1;
+}
+
 // This is passed a completed ServiceGroup which contains the scanning results for every service.
 // The function iterates through each finished service and adds the results to Target structure for
 // Nmap to output later.
@@ -1973,26 +2193,21 @@ static void processResults(ServiceGroup *SG) {
 list<ServiceNFO *>::iterator svc;
 
  for(svc = SG->services_finished.begin(); svc != SG->services_finished.end(); svc++) {
-   if ((*svc)->probe_state == PROBESTATE_FINISHED_HARDMATCHED) {
+   if ((*svc)->probe_state != PROBESTATE_FINISHED_NOMATCH) {
      (*svc)->port->setServiceProbeResults((*svc)->probe_state, 
 					  (*svc)->probe_matched,
 					  (*svc)->tunnel,
 					  *(*svc)->product_matched? (*svc)->product_matched : NULL, 
 					  *(*svc)->version_matched? (*svc)->version_matched : NULL, 
 					  *(*svc)->extrainfo_matched? (*svc)->extrainfo_matched : NULL, 
-					  NULL);
-
-   } else if ((*svc)->probe_state == PROBESTATE_FINISHED_SOFTMATCHED) {
-    (*svc)->port->setServiceProbeResults((*svc)->probe_state, 
-					  (*svc)->probe_matched,
-					 (*svc)->tunnel,
-					  NULL, NULL, NULL, 
-					 (*svc)->getServiceFingerprint(NULL));
-
-   }  else if ((*svc)->probe_state == PROBESTATE_FINISHED_NOMATCH) {
+					  *(*svc)->hostname_matched? (*svc)->hostname_matched : NULL, 
+					  *(*svc)->ostype_matched? (*svc)->ostype_matched : NULL, 
+					  *(*svc)->devicetype_matched? (*svc)->devicetype_matched : NULL, 
+					  shouldWePrintFingerprint(*svc) ? (*svc)->getServiceFingerprint(NULL) : NULL);
+   }  else {
      if ((*svc)->getServiceFingerprint(NULL))
        (*svc)->port->setServiceProbeResults((*svc)->probe_state, NULL,
-					    (*svc)->tunnel, NULL, NULL, NULL, 
+					    (*svc)->tunnel, NULL, NULL, NULL, NULL, NULL, NULL,
 					    (*svc)->getServiceFingerprint(NULL));
    }
  }
@@ -2061,6 +2276,37 @@ static void startTimeOutClocks(ServiceGroup *SG) {
   }
 }
 
+
+
+// We iterate through SG->services_remaining and remove any with port/protocol
+// pairs that are excluded. We use AP->isExcluded() to determine which ports
+// are excluded.
+void remove_excluded_ports(AllProbes *AP, ServiceGroup *SG) {
+  list<ServiceNFO *>::iterator i, nxt;
+  ServiceNFO *svc;
+
+  for(i = SG->services_remaining.begin(); i != SG->services_remaining.end(); i=nxt) {
+    nxt = i;
+    nxt++;
+
+    svc = *i;
+    if (AP->isExcluded(svc->portno, svc->proto)) {
+
+      if (o.debugging) printf("EXCLUDING %d/%s\n", svc->portno, svc->proto==IPPROTO_TCP ? "tcp" : "udp");
+
+      svc->port->setServiceProbeResults(PROBESTATE_EXCLUDED, NULL, 
+					SERVICE_TUNNEL_NONE,
+                                        "Excluded from version scan", NULL,
+					NULL, NULL, NULL, NULL, NULL);
+
+      SG->services_remaining.erase(i);
+      SG->services_finished.push_back(svc);
+    }
+  }
+
+}
+
+
 /* Execute a service fingerprinting scan against all open ports of the
    Targets specified. */
 int service_scan(vector<Target *> &Targets) {
@@ -2085,6 +2331,13 @@ int service_scan(vector<Target *> &Targets) {
 
   // Now I convert the targets into a new ServiceGroup
   SG = new ServiceGroup(Targets, AP);
+
+  if (o.override_excludeports) {
+    if (o.debugging || o.verbose) printf("Overriding exclude ports option! Some undesirable ports may be version scanned!\n");
+  } else {
+    remove_excluded_ports(AP, SG);
+  }
+
   startTimeOutClocks(SG);
 
   if (SG->services_remaining.size() == 0) {
@@ -2100,10 +2353,10 @@ int service_scan(vector<Target *> &Targets) {
     bool plural = (Targets.size() != 1);
     if (!plural) {
       (*(Targets.begin()))->NameIP(targetstr, sizeof(targetstr));
-    } else snprintf(targetstr, sizeof(targetstr), "%d hosts", Targets.size());
+    } else snprintf(targetstr, sizeof(targetstr), "%u hosts", (unsigned) Targets.size());
 
-    log_write(LOG_STDOUT, "Initiating service scan against %d %s on %s at %02d:%02d\n", 
-	      SG->services_remaining.size(), 
+    log_write(LOG_STDOUT, "Initiating service scan against %u %s on %s at %02d:%02d\n", 
+	      (unsigned) SG->services_remaining.size(), 
 	      (SG->services_remaining.size() == 1)? "service" : "services", 
 	      targetstr, tm->tm_hour, tm->tm_min);
   }
@@ -2120,7 +2373,7 @@ int service_scan(vector<Target *> &Targets) {
 
   launchSomeServiceProbes(nsp, SG);
 
-  // How long do we have befor timing out?
+  // How long do we have before timing out?
   gettimeofday(&now, NULL);
   timeout = -1;
 
@@ -2136,11 +2389,11 @@ int service_scan(vector<Target *> &Targets) {
   if (o.verbose) {
     gettimeofday(&now, NULL);
     if (SG->num_hosts_timedout == 0)
-      log_write(LOG_STDOUT, "The service scan took %.2fs to scan %d %s on %d %s.\n", 
+      log_write(LOG_STDOUT, "The service scan took %.2fs to scan %u %s on %u %s.\n", 
 		TIMEVAL_MSEC_SUBTRACT(now, starttv) / 1000.0, 
-		SG->services_finished.size(),  
+		(unsigned) SG->services_finished.size(),  
 		(SG->services_finished.size() == 1)? "service" : "services", 
-		Targets.size(), (Targets.size() == 1)? "host" : "hosts");
+		(unsigned) Targets.size(), (Targets.size() == 1)? "host" : "hosts");
     else log_write(LOG_STDOUT, 
 		   "Finished service scan in %.2fs, but %d %s timed out.\n", 
 		   TIMEVAL_MSEC_SUBTRACT(now, starttv) / 1000.0, 

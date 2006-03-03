@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: charpool.h,v 1.11 2004/08/29 09:12:03 fyodor Exp $ */
+/* $Id: charpool.h 2396 2004-08-29 09:12:05Z fyodor $ */
 
 #ifndef CHARPOOL_H
 #define CHARPOOL_H

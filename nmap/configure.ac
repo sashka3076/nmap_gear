@@ -27,7 +27,7 @@ if test "$user_localdirs" = 1; then
    fi
 fi
 
-libpcapdir=libpcap-possiblymodified
+libpcapdir=libpcap
 AC_SUBST(libpcapdir)
 
 pcredir=libpcre
@@ -45,6 +45,44 @@ AC_PROG_CXX
 AC_CHECK_PROG(CXXPROG, "$CXX", "AVAILABLE", "MISSING")
 if test $CXXPROG = "MISSING"; then
   AC_MSG_ERROR([Could not locate a C++ compiler. If it exists, add it to your PATH or give configure the CXX=path_to_compiler argument.  Otherwise, install a C++ compiler such as g++ or install a binary package of Nmap (see http://www.insecure.org/nmap/nmap_download.html ))])
+fi
+
+nmap_gcc_major_version=0
+AC_MSG_CHECKING([whether the compiler is gcc 4 or greater])
+if test x"$GXX" = xno; then
+  AC_MSG_RESULT([no])
+else
+  # On some distros, there are snapshots available as gcc4
+  if test -z "$ac_cv_prog_CC" || test x"$CC" = xgcc4; then
+    our_gcc="$CC"
+  else
+    our_gcc="$ac_cv_prog_CC"
+  fi
+  # new major versions must be added here
+  case `$our_gcc --version | sed -e 's,\..*,.,' -e q` in
+    *4.)
+      nmap_gcc_major_version=4
+      ;;
+    *3.)
+      nmap_gcc_major_version=3
+      ;;
+    *2.)
+      nmap_gcc_major_version=2
+      ;;
+    *1.)
+      nmap_gcc_major_version=1
+      ;;
+  esac
+  if test "$nmap_gcc_major_version" -ge 4; then
+    AC_MSG_RESULT([yes])
+  else
+    AC_MSG_RESULT([no])
+  fi
+fi
+
+# Remember that all following tests will run with this CXXFLAGS by default
+if test "$nmap_gcc_major_version" -ge 4; then
+  CXXFLAGS="$CXXFLAGS -fno-strict-aliasing"
 fi
 
 dnl AC_PROG_INSTALL
@@ -143,7 +181,7 @@ case "$host" in
     AC_DEFINE(PCAP_TIMEOUT_IGNORED)  # libpcap doesn't even LOOK at
                                      # the timeout you give it under Linux
     ;;
-  *-freebsd* | *-kfreebsd*-gnu)
+  *-freebsd* | *-kfreebsd*-gnu | *-dragonfly*)
     AC_DEFINE(FREEBSD)
     ;;
   *-bsdi*)
@@ -158,7 +196,7 @@ esac
 
 dnl Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS(string.h getopt.h strings.h memory.h sys/param.h sys/sockio.h bstring.h sys/time.h pwd.h unistd.h )
+AC_CHECK_HEADERS(string.h getopt.h strings.h memory.h sys/param.h sys/sockio.h bstring.h sys/time.h sys/stat.h fcntl.h termios.h pwd.h unistd.h )
 AC_CHECK_HEADERS(netinet/in.h)
 AC_CHECK_HEADERS(sys/socket.h)
 AC_CHECK_HEADERS([net/if.h],[],[],
@@ -286,13 +324,16 @@ have_libpcap=no
 test "${with_libpcap+set}" != "set" && with_libpcap=yes
 
 AC_ARG_WITH(libpcap,
-[  --with-libpcap[=DIR]    Look for pcap in DIR/include and DIR/libs],
+[  --with-libpcap[=DIR]    Look for pcap in DIR/include and DIR/libs. Specify --with-libpcap=included to always use version included with Nmap],
 [  case "$with_libpcap" in
   yes)
     AC_CHECK_HEADER(pcap.h,[
       AC_CHECK_LIB(pcap, pcap_datalink,
       [have_libpcap=yes ])])
     ;;
+  included)
+    have_libpcap=no
+   ;;
   *)
     _cppflags=$CXXFLAGS
     _ldflags=$LDFLAGS
@@ -373,7 +414,7 @@ if test $have_libpcap = yes; then
 else
   if test "${LIBPCAP_INC+set}" = "set"; then
     LDFLAGS="-L$libpcapdir $_ldflags"
-    CXXFLAGS="$_cflags -I$libpcapdir"
+    CXXFLAGS="$_cflags -I$LIBPCAP_INC"
   else
     LDFLAGS="-L$libpcapdir $LDFLAGS"
     CXXFLAGS="$CXXFLAGS -I$libpcapdir"
@@ -440,6 +481,46 @@ AC_SUBST(PCRE_DEPENDS)
 AC_SUBST(PCRE_CLEAN)
 AC_SUBST(PCRE_DIST_CLEAN)
 
+have_dnet=no
+requested_included_dnet=no
+LIBDNETDIR=libdnet-stripped
+
+# First we test whether they specified libdnet explicitly
+AC_ARG_WITH(libdnet,
+[  --with-libdnet=DIR    Use an existing (compiled) dnet lib from DIR/include and DIR/lib.],
+[  case "$with_libdnet" in
+  yes)
+    ;;
+  included)
+    ;;
+  *)
+    CXXFLAGS="-I$with_libdnet/include $CXXFLAGS"
+    LDFLAGS="-L$with_libdnet/lib $LDFLAGS"
+    have_dnet=yes
+    ;;
+  esac]
+)
+
+# If they didn't provide location, we use the included one
+if test $have_dnet != yes ; then
+  AC_CONFIG_SUBDIRS( libdnet-stripped )
+  CXXFLAGS="-I$LIBDNETDIR/include $CXXFLAGS"
+  LIBDNET_LIBS="$LIBDNETDIR/src/.libs/libdnet.a"
+  DNET_DEPENDS="$LIBDNETDIR/src/.libs/libdnet.a"
+  DNET_CLEAN="dnet_clean"
+  DNET_DIST_CLEAN="dnet_dist_clean"
+else
+  LIBDNET_LIBS="-ldnet"
+  DNET_DEPENDS=""
+  DNET_CLEAN=""
+  DNET_DIST_CLEAN=""
+fi
+
+AC_SUBST(LIBDNET_LIBS)
+AC_SUBST(LIBDNETDIR)
+AC_SUBST(DNET_DEPENDS)
+AC_SUBST(DNET_CLEAN)
+AC_SUBST(DNET_DIST_CLEAN)
 
 dnl AC_HEADER_TIME
 
@@ -669,17 +750,17 @@ fi
 
 if test "${with_nmapfe}" = "yes"; then
 dnl Check for GTK+
-AC_PATH_PROG(GTK_CONFIG, gtk-config, no)
+AC_PATH_PROG(GTK_CONFIG, pkg-config, no)
 AC_MSG_CHECKING(If you have GTK+ installed)
 if test "$GTK_CONFIG" = "no" ; then
   AC_MSG_RESULT([no])
   AC_MSG_WARN([Gtk+ has not been installed -> nmapfe will not be made])
 else
-  GTK_NEEDED_MAJOR=1
-  GTK_NEEDED_MINOR=2
-  GTK_NEEDED_MICRO=7
+  GTK_NEEDED_MAJOR=2
+  GTK_NEEDED_MINOR=4
+  GTK_NEEDED_MICRO=0
   GTK_MINVERSION=$GTK_NEEDED_MAJOR.$GTK_NEEDED_MINOR.$GTK_NEEDED_MICRO
-  ver=`gtk-config --version`
+  ver=`pkg-config --modversion gtk+-2.0`
   dnl Extract the information.
   major=`echo $ver|sed 's/\([[0-9]]*\).\([[0-9]]*\).\([[0-9]]*\)/\1/'`
   minor=`echo $ver|sed 's/\([[0-9]]*\).\([[0-9]]*\).\([[0-9]]*\)/\2/'`
@@ -714,3 +795,8 @@ dnl    AC_CONFIG_SUBDIRS( $libpcapdir )
 dnl fi
 
 AC_OUTPUT(Makefile)
+# Krad ASCII ART#!#@$!@#$
+if test -f docs/leet-nmap-ascii-art.txt; then
+	cat docs/leet-nmap-ascii-art.txt
+fi
+echo "Configuration complete.  Type make (or gmake on some *BSD machines) to compile."

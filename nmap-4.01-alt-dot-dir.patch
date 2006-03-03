@@ -1,0 +1,18 @@
+--- nmap-4.01/nmap.cc.orig	2006-02-07 10:15:37 +0300
++++ nmap-4.01/nmap.cc	2006-03-03 04:39:24 +0300
+@@ -2222,6 +2222,7 @@ int nmap_fetchfile(char *filename_return
+ 	foundsomething = 1;
+     }
+   }
++#ifdef ENABLE_DOT_DIR_OPEN
+   if (foundsomething && (*filename_returned != '.')) {    
+     res = snprintf(dot_buffer, sizeof(dot_buffer), "./%s", file);
+     if (res > 0 && res < bufferlen) {
+@@ -2243,6 +2244,7 @@ int nmap_fetchfile(char *filename_return
+ 	foundsomething = 1;
+     }
+   }
++#endif /* ENABLE_DOT_DIR_OPEN */
+ 
+   if (!foundsomething) {
+     filename_returned[0] = '\0';

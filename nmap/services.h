@@ -1,6 +1,6 @@
 
 /***************************************************************************
- * services.c -- Various functions relating to reading the nmap-services   *
+ * services.h -- Various functions relating to reading the nmap-services   *
  * file and port <-> service mapping                                       *
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: services.h,v 1.13 2004/08/29 09:12:03 fyodor Exp $ */
+/* $Id: services.h 2891 2005-10-01 23:50:27Z fyodor $ */
 
 
 #ifndef SERVICES_H

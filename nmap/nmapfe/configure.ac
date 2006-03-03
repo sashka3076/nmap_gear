@@ -6,10 +6,7 @@ AC_INIT(nmapfe.c)
 
 AC_PROG_CC
 
-#AM_PATH_GTK(1.0.0,
-#            [LIBS="$LIBS $GTK_LIBS" CFLAGS="$CFLAGS $GTK_CFLAGS"],
-#            AC_MSG_ERROR(Cannot find GTK: Is gtk-config in path?))
-AM_PATH_GTK(1.0.0,
+AM_PATH_GTK_2_0(2.0.0,
             [LIBS="$LIBS $GTK_LIBS" CFLAGS="$CFLAGS $GTK_CFLAGS"],
             AC_DEFINE(MISSING_GTK) \
 	    AC_MSG_WARN(NMAPFE WILL NOT BE BUILT -- BUT NMAP SHOULD STILL WORK ))
@@ -83,7 +80,7 @@ case "$host" in
     AC_DEFINE(PCAP_TIMEOUT_IGNORED)  # libpcap doesn't even LOOK at
                                      # the timeout you give it under Linux
     ;;
-  *-freebsd* | *-kfreebsd*-gnu)
+  *-freebsd* | *-kfreebsd*-gnu | *-dragonfly*)
     AC_DEFINE(FREEBSD)
     ;;
   *-bsdi*)

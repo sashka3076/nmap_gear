@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: protocols.h,v 1.14 2004/08/29 09:12:03 fyodor Exp $ */
+/* $Id: protocols.h 2396 2004-08-29 09:12:05Z fyodor $ */
 
 #ifndef PROTOCOLS_H
 #define PROTOCOLS_H

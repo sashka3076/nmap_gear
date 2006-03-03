@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: scan_engine.h,v 1.12 2004/08/29 09:12:03 fyodor Exp $ */
+/* $Id: scan_engine.h 2762 2005-07-22 10:08:53Z fyodor $ */
 
 #ifndef SCAN_ENGINE_H
 #define SCAN_ENGINE_H
@@ -108,7 +108,7 @@
 #include "global_structures.h"
 
 /* 3rd generation Nmap scanning function.  Handles most Nmap port scan types */
-void ultra_scan(vector<Target *> &Targets, struct scan_lists *ports, 
+void ultra_scan(std::vector<Target *> &Targets, struct scan_lists *ports, 
 		stype scantype);
 
 /* Handles the "positive-response" scans (where we get a response

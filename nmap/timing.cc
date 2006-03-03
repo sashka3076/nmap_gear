@@ -99,7 +99,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: timing.cc,v 1.14 2004/10/18 16:59:37 fyodor Exp $ */
+/* $Id: timing.cc 3044 2006-01-12 04:47:03Z fyodor $ */
 
 #include "timing.h"
 #include "NmapOps.h"
@@ -192,13 +192,13 @@ void adjust_timeouts2(const struct timeval *sent,
     log_write(LOG_STDOUT, "delta %ld ==> srtt: %d rttvar: %d to: %d\n", delta, to->srtt, to->rttvar, to->timeout);
   }
 
-  if (to->srtt < 0 || to->rttvar < 0 || to->timeout < 0 || delta < -50000000 || 
+  /* if (to->srtt < 0 || to->rttvar < 0 || to->timeout < 0 || delta < -50000000 || 
       sent->tv_sec == 0 || received->tv_sec == 0 ) {
     fatal("Serious time computation problem in adjust_timeout ... received = (%ld, %ld) sent=(%ld,%ld) delta = %ld srtt = %d rttvar = %d to = %d", (long) received->tv_sec, (long)received->tv_usec, (long) sent->tv_sec, (long) sent->tv_usec, delta, to->srtt, to->rttvar, to->timeout);
-  }
+  } */
 }
 
-/* Sleeps if necessary to ensure that it isn't called twice withen less
+/* Sleeps if necessary to ensure that it isn't called twice within less
    time than o.send_delay.  If it is passed a non-null tv, the POST-SLEEP
    time is recorded in it */
 void enforce_scan_delay(struct timeval *tv) {
@@ -253,7 +253,7 @@ ScanProgressMeter::~ScanProgressMeter() {
 }
 
 /* Decides whether a timing report is likely to even be
-   printed.  There are stringint limitations on how often they are
+   printed.  There are stringent limitations on how often they are
    printed, as well as the verbosity level that must exist.  So you
    might as well check this before spending much time computing
    progress info.  now can be NULL if caller doesn't have the current
@@ -299,12 +299,9 @@ bool ScanProgressMeter::printStatsIfNeccessary(double perc_done,
   long time_used_ms;
   long time_needed_ms;
   long time_left_ms;
-  long sec_left;
   long prev_est_time_left_ms; /* Time left as per prev. estimate */
   long change_abs_ms; /* absolute value of change */
   bool printit = false;
-  time_t timet;
-  struct tm *ltime;
 
   if (!now) {
     gettimeofday(&tvtmp, NULL);
@@ -346,6 +343,33 @@ bool ScanProgressMeter::printStatsIfNeccessary(double perc_done,
   }
 
   if (printit) {
+     return printStats(perc_done, now);
+  } 
+  return false;
+}
+
+
+/* Prints an estimate of when this scan will complete.  */
+bool ScanProgressMeter::printStats(double perc_done, 
+                                   const struct timeval *now) {
+  struct timeval tvtmp;
+  long time_used_ms;
+  long time_needed_ms;
+  long time_left_ms;
+  long sec_left;
+  time_t timet;
+  struct tm *ltime;
+
+  if (!now) {
+    gettimeofday(&tvtmp, NULL);
+    now = (const struct timeval *) &tvtmp;
+  }
+  
+  /* OK, now lets estimate the time to finish */
+  time_used_ms = TIMEVAL_MSEC_SUBTRACT(*now, begin);
+  time_needed_ms = (int) ((double) time_used_ms / perc_done);
+  time_left_ms = time_needed_ms - time_used_ms;
+
     /* Here we go! */
     last_print = *now;
     TIMEVAL_MSEC_ADD(last_est, *now, time_left_ms);
@@ -359,7 +383,9 @@ bool ScanProgressMeter::printStatsIfNeccessary(double perc_done,
 	      (sec_left % 3600) / 60, sec_left % 60);
     log_flush(LOG_STDOUT);
     return true;
-  } 
-  return false;
 }
+
+
+
+
 

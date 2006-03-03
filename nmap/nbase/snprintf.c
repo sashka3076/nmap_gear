@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: snprintf.c,v 1.5 2003/09/06 09:10:55 fyodor Exp $ */
+/* $Id: snprintf.c 1971 2003-09-06 09:10:55Z fyodor $ */
 
 #if HAVE_CONFIG_H
 #include "nbase_config.h"
@@ -49,7 +49,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-     "@(#) $Header: /CVS/nbase/snprintf.c,v 1.5 2003/09/06 09:10:55 fyodor Exp $";
+     "@(#) $Header$";
 #endif
 
 #include <stdio.h>

@@ -97,11 +97,13 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_misc.c,v 1.13 2004/08/29 09:12:04 fyodor Exp $ */
+/* $Id: nbase_misc.c 2966 2005-12-05 21:31:10Z fyodor $ */
 
 #ifndef WIN32
 #include <errno.h>
+#ifndef errno
 extern int errno;
+#endif
 #else
 #include <winsock2.h>
 #endif

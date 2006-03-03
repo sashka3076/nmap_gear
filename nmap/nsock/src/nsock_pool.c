@@ -56,7 +56,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_pool.c,v 1.12 2004/08/29 09:12:05 fyodor Exp $ */
+/* $Id: nsock_pool.c 2396 2004-08-29 09:12:05Z fyodor $ */
 
 #include "nsock_internal.h"
 #include "gh_list.h"

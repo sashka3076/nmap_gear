@@ -53,7 +53,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_core.c,v 1.23 2005/01/31 20:40:45 fyodor Exp $ */
+/* $Id: nsock_core.c 2535 2005-01-31 20:40:45Z fyodor $ */
 
 #include "nsock_internal.h"
 #include "gh_list.h"

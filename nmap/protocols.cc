@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: protocols.cc,v 1.11 2004/08/29 09:12:03 fyodor Exp $ */
+/* $Id: protocols.cc 2396 2004-08-29 09:12:05Z fyodor $ */
 
 #include "protocols.h"
 #include "NmapOps.h"

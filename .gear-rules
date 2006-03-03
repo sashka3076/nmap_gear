@@ -1,4 +1,3 @@
-copy: *.menu
 copy: *.patch
-copy: *.xpm
+copy: *.png
 tar.bz2: nmap

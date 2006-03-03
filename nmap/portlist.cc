@@ -97,13 +97,15 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: portlist.cc,v 1.23 2004/11/12 20:25:06 fyodor Exp $ */
+/* $Id: portlist.cc 2964 2005-12-05 01:00:03Z fyodor $ */
 
 
 #include "portlist.h"
 #include "nmap_error.h"
 #include "nmap.h"
 #include "NmapOps.h"
+
+using namespace std;
 
 #if HAVE_STRINGS_H
 #include <strings.h>
@@ -121,6 +123,7 @@ Port::Port() {
   serviceprobe_results = PROBESTATE_INITIAL;
   serviceprobe_service = NULL;
   serviceprobe_product = serviceprobe_version = serviceprobe_extrainfo = NULL;
+  serviceprobe_hostname = serviceprobe_ostype = serviceprobe_devicetype = NULL;
   serviceprobe_tunnel = SERVICE_TUNNEL_NONE;
   serviceprobe_fp = NULL;
 }
@@ -134,6 +137,12 @@ Port::~Port() {
    free(serviceprobe_version);
  if (serviceprobe_extrainfo)
    free(serviceprobe_extrainfo);
+ if (serviceprobe_hostname)
+   free(serviceprobe_hostname);
+ if (serviceprobe_ostype)
+   free(serviceprobe_ostype);
+ if (serviceprobe_devicetype)
+   free(serviceprobe_devicetype);
  if (serviceprobe_service)
    free(serviceprobe_service);
  if (serviceprobe_fp)
@@ -144,43 +153,33 @@ Port::~Port() {
 // out sd->fullversion.  If unavailable, it will be set to zero length.
 static void populateFullVersionString(struct serviceDeductions *sd) {
   char *dst = sd->fullversion;
-  char *end = sd->fullversion + sizeof(sd->fullversion);
-  int len;
+  unsigned int spaceleft = sizeof(sd->fullversion) - 1;
 
-  if (sd->product) {
-    len = strlen(sd->product);
-    len = MIN((int) sizeof(sd->fullversion) - 1, len);
-    memcpy(dst, sd->product, len);
-    dst += len;
+  dst[0] = '\0';
+
+  if (sd->product && spaceleft >= strlen(sd->product)) {
+    strncat(dst, sd->product, spaceleft);
+    spaceleft -= strlen(sd->product);
   }
 
-  if (sd->version && dst < end - 1) {
-    if (dst != sd->fullversion)
-      *(dst++) = ' ';
-    len = strlen(sd->version);
-    len = MIN(len, end - dst - 1);
-    memcpy(dst, sd->version, len);
-    dst += len;
+  if (sd->version && spaceleft >= (strlen(sd->version) + 1)) {
+    strncat(dst, " ", spaceleft);
+    strncat(dst, sd->version, spaceleft);
+    spaceleft -= strlen(sd->version) + 1;
   }
 
-  if (sd->extrainfo && dst < end) {
-    len = strlen(sd->extrainfo);
-    if (len < end - dst - 4) { // 4 == " ()\0"
-      if (dst != sd->fullversion)
-	*(dst++) = ' ';
-      *(dst++) = '(';
-      memcpy(dst, sd->extrainfo, len);
-      dst += len;
-      *(dst++) = ')';
-    }
+  if (sd->extrainfo && spaceleft >= (strlen(sd->extrainfo) + 3)) {
+    strncat(dst, " (", spaceleft);
+    strncat(dst, sd->extrainfo, spaceleft);
+    strncat(dst, ")", spaceleft);
+    spaceleft -= strlen(sd->extrainfo) + 3;
   }
 
-  *(dst++) = '\0'; // Will always have space
 }
 
 
-// pass in an allocated struct serviceDeductions (don't wory about
-// initializing, and you don't have to free any inernal ptrs.  See the
+// pass in an allocated struct serviceDeductions (don't worry about
+// initializing, and you don't have to free any internal ptrs.  See the
 // serviceDeductions definition for the fields that are populated.
 // Returns 0 if at least a name is available.
 int Port::getServiceDeductions(struct serviceDeductions *sd) {
@@ -203,6 +202,9 @@ int Port::getServiceDeductions(struct serviceDeductions *sd) {
     sd->dtype = SERVICE_DETECTION_PROBED; // RPC counts as probed
     sd->version = serviceprobe_version;
     sd->extrainfo = serviceprobe_extrainfo;
+    sd->hostname = serviceprobe_hostname;
+    sd->ostype = serviceprobe_ostype;
+    sd->devicetype = serviceprobe_devicetype;
     populateFullVersionString(sd);
     return 0;
   } else if (serviceprobe_results == PROBESTATE_FINISHED_HARDMATCHED
@@ -214,6 +216,19 @@ int Port::getServiceDeductions(struct serviceDeductions *sd) {
     sd->product = serviceprobe_product;
     sd->version = serviceprobe_version;
     sd->extrainfo = serviceprobe_extrainfo;
+    sd->hostname = serviceprobe_hostname;
+    sd->ostype = serviceprobe_ostype;
+    sd->devicetype = serviceprobe_devicetype;
+    populateFullVersionString(sd);
+    return 0;
+  } else if (serviceprobe_results == PROBESTATE_EXCLUDED) {
+    service = nmap_getservbyport(htons(portno), (proto == IPPROTO_TCP)? "tcp" : "udp");
+
+    if (service) sd->name = service->s_name;
+
+    sd->name_confidence = 2;  // Since we didn't even check it, we aren't very confident
+    sd->dtype = SERVICE_DETECTION_TABLE;
+    sd->product = serviceprobe_product;  // Should have a string that says port was excluded
     populateFullVersionString(sd);
     return 0;
   } else if (serviceprobe_results == PROBESTATE_FINISHED_TCPWRAPPED) {
@@ -243,7 +258,7 @@ int Port::getServiceDeductions(struct serviceDeductions *sd) {
 // will be NULL if unavailable. Note that this function makes its
 // own copy of sname and product/version/extrainfo.  This function
 // also takes care of truncating the version strings to a
-// 'reasonable' length if neccessary, and cleaning up any unprinable
+// 'reasonable' length if neccessary, and cleaning up any unprintable
 // chars. (these tests are to avoid annoying DOS (or other) attacks
 // by malicious services).  The fingerprint should be NULL unless
 // one is available and the user should submit it.  tunnel must be
@@ -253,7 +268,8 @@ void Port::setServiceProbeResults(enum serviceprobestate sres,
 				  const char *sname,	
 				  enum service_tunnel_type tunnel, 
 				  const char *product, const char *version, 
-				  const char *extrainfo,
+				  const char *extrainfo, const char *hostname,
+				  const char *ostype, const char *devicetype,
 				  const char *fingerprint) {
 
   int slen;
@@ -302,6 +318,45 @@ void Port::setServiceProbeResults(enum serviceprobestate sres,
     }
   }
 
+  if (hostname) {
+    slen = strlen(hostname);
+    if (slen > 64) slen = 64;
+    serviceprobe_hostname = (char *) safe_malloc(slen + 1);
+    memcpy(serviceprobe_hostname, hostname, slen);
+    serviceprobe_hostname[slen] = '\0';
+    p = (unsigned char *) serviceprobe_hostname;
+    while(*p) {
+      if (!isprint((int)*p)) *p = '.';
+      p++;
+    }
+  }
+
+  if (ostype) {
+    slen = strlen(ostype);
+    if (slen > 64) slen = 64;
+    serviceprobe_ostype = (char *) safe_malloc(slen + 1);
+    memcpy(serviceprobe_ostype, ostype, slen);
+    serviceprobe_ostype[slen] = '\0';
+    p = (unsigned char *) serviceprobe_ostype;
+    while(*p) {
+      if (!isprint((int)*p)) *p = '.';
+      p++;
+    }
+  }
+  
+  if (devicetype) {
+    slen = strlen(devicetype);
+    if (slen > 64) slen = 64;
+    serviceprobe_devicetype = (char *) safe_malloc(slen + 1);
+    memcpy(serviceprobe_devicetype, devicetype, slen);
+    serviceprobe_devicetype[slen] = '\0';
+    p = (unsigned char *) serviceprobe_devicetype;
+    while(*p) {
+      if (!isprint((int)*p)) *p = '.';
+      p++;
+    }
+  }
+
 }
 
 /* Sets the results of an RPC scan.  if rpc_status is not
@@ -342,7 +397,6 @@ void Port::setRPCProbeResults(int rpcs, unsigned long rpcp,
 }
 
 PortList::PortList() {
-  udp_ports = tcp_ports = ip_prots = NULL;
   memset(state_counts, 0, sizeof(state_counts));
   memset(state_counts_udp, 0, sizeof(state_counts_udp));
   memset(state_counts_tcp, 0, sizeof(state_counts_tcp));
@@ -352,34 +406,22 @@ PortList::PortList() {
 }
 
 PortList::~PortList() {
-  int i;
 
-  if (tcp_ports) {  
-    for(i=0; i < 65536; i++) {
-      if (tcp_ports[i])
-	delete tcp_ports[i];
-    }
-    free(tcp_ports);
-    tcp_ports = NULL;
-  }
+  for(map<u16,Port*>::iterator iter = tcp_ports.begin(); iter != tcp_ports.end(); iter++)
+     {
+        delete iter->second;
+     }
+  
 
-  if (udp_ports) {  
-    for(i=0; i < 65536; i++) {
-      if (udp_ports[i])
-	delete udp_ports[i];
-    }
-    free(udp_ports);
-    udp_ports = NULL;
-  }
+  for(map<u16,Port*>::iterator iter = udp_ports.begin(); iter != udp_ports.end(); iter++)
+     {
+        delete iter->second;
+     }
 
-  if (ip_prots) {
-    for(i=0; i < 256; ++i) {
-      if (ip_prots[i])
-	delete ip_prots[i];
-    }
-    free(ip_prots);
-    ip_prots = NULL;
-  }
+  for(map<u16,Port*>::iterator iter = ip_prots.begin(); iter != ip_prots.end(); iter++)
+     {
+        delete iter->second;
+     }
 
   if (idstr) { 
     free(idstr);
@@ -391,7 +433,8 @@ PortList::~PortList() {
 
 int PortList::addPort(u16 portno, u8 protocol, char *owner, int state) {
   Port *current = NULL;
-  Port **portarray = NULL;
+  map < u16, Port* > *portarray = NULL;  // This has to be a pointer so that we change the original and not a copy
+  map <u16, Port *>::iterator pt;
   char msg[128];
 
   assert(state < PORT_HIGHEST_STATE);
@@ -405,14 +448,6 @@ int PortList::addPort(u16 portno, u8 protocol, char *owner, int state) {
 	      statenum2str(state), portno, 
 	      proto2ascii(protocol), msg, idstr? idstr : "");
     log_flush(LOG_STDOUT);
-    
-    /* Write out add port messages for XML format so wrapper libraries
-       can use it and not have to parse LOG_STDOUT ;), which is a
-       pain! REMOVED now that Nmap scans multiple hosts in parallel.
-       This addport does not even tell which host the new port was
-       on. */    
-    //    log_write(LOG_XML, "<addport state=\"%s\" portid=\"%hu\" protocol=\"%s\" owner=\"%s\"/>\n", statenum2str(state), portno, proto2ascii(protocol), ((owner && *owner) ? owner : ""));
-    log_flush(LOG_XML); 
   }
 
 
@@ -423,27 +458,19 @@ int PortList::addPort(u16 portno, u8 protocol, char *owner, int state) {
     fatal("addPort: attempt to add port number %d with illegal state %d\n", portno, state);
 
   if (protocol == IPPROTO_TCP) {
-    if (!tcp_ports) {
-      tcp_ports = (Port **) safe_zalloc(65536 * sizeof(Port *));
-    }
-    portarray = tcp_ports;
+    portarray = &tcp_ports;
   } else if (protocol == IPPROTO_UDP) {
-    if (!udp_ports) {
-      udp_ports = (Port **) safe_zalloc(65536 * sizeof(Port *));
-    }
-    portarray = udp_ports;
+    portarray = &udp_ports;
   } else if (protocol == IPPROTO_IP) {
     assert(portno < 256);
-    if (!ip_prots) {
-      ip_prots = (Port **) safe_zalloc(256 * sizeof(Port *));
-    }
-    portarray = ip_prots;
+    portarray = &ip_prots;
   } else fatal("addPort: attempted port insertion with invalid protocol");
 
-  if (portarray[portno]) {
+  pt = portarray->find(portno);
+  if (pt != portarray->end()) {
     /* We must discount our statistics from the old values.  Also warn
        if a complete duplicate */
-    current = portarray[portno];    
+    current = pt->second;
     if (o.debugging && current->state == state && (!owner || !*owner)) {
       error("Duplicate port (%hu/%s)\n", portno, proto2ascii(protocol));
     } 
@@ -455,8 +482,8 @@ int PortList::addPort(u16 portno, u8 protocol, char *owner, int state) {
     } else
       state_counts_ip[current->state]--;
   } else {
-    portarray[portno] = new Port();
-    current = portarray[portno];
+    current = new Port();
+    (*portarray)[portno] = current;
     numports++;
     current->portno = portno;
   }
@@ -476,23 +503,26 @@ int PortList::addPort(u16 portno, u8 protocol, char *owner, int state) {
       free(current->owner);
     current->owner = strdup(owner);
   }
-
+  
   return 0; /*success */
 }
 
 int PortList::removePort(u16 portno, u8 protocol) {
   Port *answer = NULL;
 
-  if (protocol == IPPROTO_TCP && tcp_ports) {
+  printf("Removed %d\n", portno);
+
+  if (protocol == IPPROTO_TCP) {
    answer = tcp_ports[portno];
-   tcp_ports[portno] = NULL;
+   tcp_ports.erase(portno);
   }
 
-  if (protocol == IPPROTO_UDP && udp_ports) {  
+  if (protocol == IPPROTO_UDP) {  
     answer = udp_ports[portno];
-    udp_ports[portno] = NULL;
-  } else if (protocol == IPPROTO_IP && ip_prots) {
-    answer = ip_prots[portno] = NULL;
+    udp_ports.erase(portno);
+  } else if (protocol == IPPROTO_IP) {
+    answer = ip_prots[portno];
+    ip_prots.erase(portno);
   }
 
   if (!answer)
@@ -510,7 +540,7 @@ int PortList::removePort(u16 portno, u8 protocol) {
 }
 
   /* Saves an identification string for the target containing these
-     ports (an IP addrss might be a good example, but set what you
+     ports (an IP address might be a good example, but set what you
      want).  Only used when printing new port updates.  Optional.  A
      copy is made. */
 void PortList::setIdStr(const char *id) {
@@ -524,15 +554,24 @@ void PortList::setIdStr(const char *id) {
 }
 
 Port *PortList::lookupPort(u16 portno, u8 protocol) {
+  map <u16, Port *>::iterator pt;
+  if (protocol == IPPROTO_TCP) {
+    pt = tcp_ports.find(portno);
+    if (pt != tcp_ports.end())
+      return pt->second;
+  }
 
-  if (protocol == IPPROTO_TCP && tcp_ports)
-    return tcp_ports[portno];
+  else if (protocol == IPPROTO_UDP) {
+    pt = udp_ports.find(portno);
+    if (pt != udp_ports.end())
+      return pt->second;
+  }
 
-  if (protocol == IPPROTO_UDP && udp_ports)
-    return udp_ports[portno];
-
-  if (protocol == IPPROTO_IP && ip_prots)
-    return ip_prots[portno];
+  else if (protocol == IPPROTO_IP) {
+    pt = ip_prots.find(portno);
+    if (pt != ip_prots.end())
+      return pt->second;
+  }
 
   return NULL;
 }
@@ -570,46 +609,63 @@ int PortList::getIgnoredPortState() {
 Port *PortList::nextPort(Port *afterthisport, 
 			 u8 allowed_protocol, int allowed_state, 
 			 bool allow_portzero) {
-
+  
   /* These two are chosen because they come right "before" port 1/tcp */
-unsigned int current_portno = 0;
-unsigned int current_proto = IPPROTO_TCP;
+  map<u16,Port*>::iterator iter;
+  
+  if (afterthisport) {
+    if (afterthisport->proto == IPPROTO_TCP) {
+      iter = tcp_ports.find(afterthisport->portno);
+      assert(iter != tcp_ports.end());
+      iter++;
+      while(iter != tcp_ports.end()) {
+	if (!allowed_state || iter->second->state == allowed_state)
+	  return iter->second;
+	iter++;
+      }
+      /* No more TCP ports ... */
+      if (allowed_protocol != 0)
+	return NULL;
+      
+      iter = udp_ports.begin();
+    } else {
+      assert(afterthisport->proto == IPPROTO_UDP);
+      iter = udp_ports.find(afterthisport->portno);
+      assert(iter != udp_ports.end());
+      iter++;
+    }
+    while(iter != udp_ports.end()) {
+      if (!allowed_state || iter->second->state == allowed_state)
+	return iter->second;
+      iter++;
+    }
+    return NULL;
+  } 
 
-if (afterthisport) {
-  current_portno = afterthisport->portno;
-  current_proto = afterthisport->proto;  /* (afterthisport->proto == IPPROTO_TCP)? IPPROTO_TCP : IPPROTO_UDP; */
-  current_portno++; /* Start on the port after the one we were given */ 
-} 
-
- if (!allow_portzero && current_portno == 0) current_portno++;
-
-/* First we look for TCP ports ... */
-if (current_proto == IPPROTO_TCP) {
- if ((allowed_protocol == 0 || allowed_protocol == IPPROTO_TCP) && 
-    current_proto == IPPROTO_TCP && tcp_ports)
-  for(; current_portno < 65536; current_portno++) {
-    if (tcp_ports[current_portno] &&
-	(!allowed_state || tcp_ports[current_portno]->state == allowed_state))
-      return tcp_ports[current_portno];
+  // First-time call - try TCP ports first
+  if (allowed_protocol == 0 || allowed_protocol == IPPROTO_TCP) {
+    iter = tcp_ports.begin();
+    while (iter != tcp_ports.end()) {
+      if (!allowed_state || iter->second->state == allowed_state)
+	return iter->second;
+      iter++;
+    }
   }
-
-  /*  Uh-oh.  We have tried all tcp ports, lets move to udp */
-  current_portno = 0;
-  current_proto = IPPROTO_UDP;
-}
-
-if ((allowed_protocol == 0 || allowed_protocol == IPPROTO_UDP) && 
-    current_proto == IPPROTO_UDP && udp_ports) {
-  for(; current_portno < 65536; current_portno++) {
-    if (udp_ports[current_portno] &&
-	(!allowed_state || udp_ports[current_portno]->state == allowed_state))
-      return udp_ports[current_portno];
+  
+  // Maybe we'll have better luck with UDP
+  if (allowed_protocol == 0 || allowed_protocol == IPPROTO_UDP) {
+    iter = udp_ports.begin();
+    while (iter != udp_ports.end()) {
+      if (!allowed_state || iter->second->state == allowed_state)
+	return iter->second;
+      iter++;
+    }
   }
+  
+  // Nuthing found
+  return NULL;
 }
 
-/*  No more ports */
-return NULL;
-}
 
 // Move some popular TCP ports to the beginning of the portlist, because
 // that can speed up certain scans.  You should have already done any port

@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: global_structures.h,v 1.53 2004/08/29 09:12:03 fyodor Exp $ */
+/* $Id: global_structures.h 3024 2005-12-31 00:32:42Z fyodor $ */
 
 
 #ifndef GLOBAL_STRUCTURES_H
@@ -228,6 +228,6 @@ struct scan_lists {
 	int prot_count;
 };
 
-typedef enum { ACK_SCAN, SYN_SCAN, FIN_SCAN, XMAS_SCAN, UDP_SCAN, CONNECT_SCAN, NULL_SCAN, WINDOW_SCAN, RPC_SCAN, MAIMON_SCAN, IPPROT_SCAN } stype;
+typedef enum { ACK_SCAN, SYN_SCAN, FIN_SCAN, XMAS_SCAN, UDP_SCAN, CONNECT_SCAN, NULL_SCAN, WINDOW_SCAN, RPC_SCAN, MAIMON_SCAN, IPPROT_SCAN, PING_SCAN, PING_SCAN_ARP, IDLE_SCAN, BOUNCE_SCAN, SERVICE_SCAN, OS_SCAN} stype;
 
 #endif /*GLOBAL_STRUCTURES_H */

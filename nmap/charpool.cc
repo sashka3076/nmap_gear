@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: charpool.cc,v 1.7 2004/08/29 09:12:03 fyodor Exp $ */
+/* $Id: charpool.cc 2396 2004-08-29 09:12:05Z fyodor $ */
 
 
 /* Character pool memory allocation */

@@ -36,11 +36,11 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: inet_aton.c,v 1.4 2000/11/30 07:53:28 fyodor Exp $ */
+/* $Id: inet_aton.c 903 2000-11-30 07:53:28Z fyodor $ */
 
 #ifndef lint
 static const char rcsid[] =
-     "@(#) $Header: /CVS/nbase/inet_aton.c,v 1.4 2000/11/30 07:53:28 fyodor Exp $";
+     "@(#) $Header$";
 #endif
 
 #if HAVE_CONFIG_H

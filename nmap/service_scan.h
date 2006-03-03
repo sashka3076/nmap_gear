@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: service_scan.h,v 1.19 2004/11/24 20:13:01 fyodor Exp $ */
+/* $Id: service_scan.h 2891 2005-10-01 23:50:27Z fyodor $ */
 
 #ifndef SERVICE_SCAN_H
 #define SERVICE_SCAN_H
@@ -112,10 +112,6 @@
 #else
 # include <pcre.h>
 #endif
-
-/* Workaround for lack of namespace std on HP-UX 11.00 */
-namespace std {};
-using namespace std;
 
 /**********************  DEFINES/ENUMS ***********************************/
 #define DEFAULT_SERVICEWAITMS 5000
@@ -140,6 +136,11 @@ struct MatchDetails {
   const char *product;
   const char *version;
   const char *info;
+
+  // More information from a match. Zero-terminated strings or NULL.
+  const char *hostname;
+  const char *ostype;
+  const char *devicetype;
 };
 
 /**********************  CLASSES     ***********************************/
@@ -189,21 +190,26 @@ class ServiceProbeMatch {
   char *product_template;
   char *version_template;
   char *info_template;
+  // More templates:
+  char *hostname_template;
+  char *ostype_template;
+  char *devicetype_template;
   // The anchor is for SERVICESCAN_STATIC matches.  If the anchor is not -1, the match must
   // start at that zero-indexed position in the response str.
   int matchops_anchor;
 // Details to fill out and return for testMatch() calls
   struct MatchDetails MD_return;
 
-  // Use the three version templates, and the match data included here
-  // to put the version info into 'product', 'version', and 'info',
-  // (as long as the given string sizes are sufficient).  Returns zero
-  // for success.  If no template is available for product, version,
-  // and/or info, that string will have zero length after the function
+  // Use the six version templates and the match data included here
+  // to put the version info into the given strings, (as long as the sizes
+  // are sufficient).  Returns zero for success.  If no template is available
+  // for a string, that string will have zero length after the function
   // call (assuming the corresponding length passed in is at least 1)
   int getVersionStr(const u8 *subject, int subjectlen, int *ovector, 
 		  int nummatches, char *product, int productlen,
-		  char *version, int versionlen, char *info, int infolen);
+		  char *version, int versionlen, char *info, int infolen,
+                  char *hostname, int hostnamelen, char *ostype, int ostypelen,
+                  char *devicetype, int devicetypelen);
 };
 
 
@@ -231,7 +237,7 @@ class ServiceProbe {
 
   // obtains the probe string (in raw binary form) and the length.  The string will be 
   // NUL-terminated, but there may be other \0 in the string, so the termination is only
-  // done for easo of printing ASCII probes in debugging cases.
+  // done for ease of printing ASCII probes in debugging cases.
   const u8 *getProbeString(int *stringlen) { *stringlen = probestringlen; return probestring; }
   void setProbeString(const u8 *ps, int stringlen);
 
@@ -248,7 +254,7 @@ class ServiceProbe {
   // SERVICE_TUNNEL_SSL.  Otherwise use SERVICE_TUNNEL_NONE.  The line
   // number is requested because this function will bail with an error
   // (giving the line number) if it fails to parse the string.  Ports
-  // are a comma seperated list of prots and ranges
+  // are a comma seperated list of ports and ranges
   // (e.g. 53,80,6000-6010).
   void setProbablePorts(enum service_tunnel_type tunnel,
 			const char *portstr, int lineno);
@@ -260,6 +266,14 @@ class ServiceProbe {
   // Returns true if the passed in service name is among those that can
   // be detected by the matches in this probe;
   bool serviceIsPossible(const char *sname);
+
+  // Takes a string following a Rarity directive in the probes file.
+  // The string should contain a single integer between 1 and 9. The
+  // default rarity is 5. This function will bail if the string is invalid.
+  void setRarity(const char *portstr, int lineno);
+
+  // Simply returns the rarity of this probe
+  const int getRarity() { return rarity; }
 
   // Takes a match line in a probe description and adds it to the
   // list of matches for this probe.  This function should be passed
@@ -280,18 +294,22 @@ class ServiceProbe {
   // return NULL if there are no match lines at all in this probe.
   const struct MatchDetails *testMatch(const u8 *buf, int buflen);
 
+  char *fallbackStr;
+  ServiceProbe *fallbacks[MAXFALLBACKS+1];
+
  private:
-  void setPortVector(vector<u16> *portv, const char *portstr, 
+  void setPortVector(std::vector<u16> *portv, const char *portstr, 
 				 int lineno);
   char *probename;
 
   u8 *probestring;
   int probestringlen;
-  vector<u16> probableports;
-  vector<u16> probablesslports;
-  vector<const char *> detectedServices;
+  std::vector<u16> probableports;
+  std::vector<u16> probablesslports;
+  int rarity;
+  std::vector<const char *> detectedServices;
   int probeprotocol;
-  vector<ServiceProbeMatch *> matches; // first-ever use of STL in Nmap!
+  std::vector<ServiceProbeMatch *> matches; // first-ever use of STL in Nmap!
 };
 
 class AllProbes {
@@ -301,22 +319,30 @@ public:
   // Tries to find the probe in this AllProbes class which have the
   // given name and protocol.  It can return the NULL probe.
   ServiceProbe *getProbeByName(const char *name, int proto);
-  vector<ServiceProbe *> probes; // All the probes except nullProbe
+  std::vector<ServiceProbe *> probes; // All the probes except nullProbe
   ServiceProbe *nullProbe; // No probe text - just waiting for banner
+
+  // Before this function is called, the fallbacks exist as unparsed
+  // comma-separated strings in the fallbackStr field of each probe.
+  // This function fills out the fallbacks array in each probe with
+  // an ordered list of pointers to which probes to try. This is both for
+  // efficiency and to deal with odd cases like the NULL probe and falling
+  // back to probes later in the file. This function also free()s all the
+  // fallbackStrs.
+  void compileFallbacks();
+
+  int isExcluded(unsigned short port, int proto);
+  struct scan_lists *excludedports;
 };
 
 /**********************  PROTOTYPES  ***********************************/
 
 /* Execute a service fingerprinting scan against all open ports of the
    Targets specified. */
-int service_scan(vector<Target *> &Targets);
+int service_scan(std::vector<Target *> &Targets);
 
 // Parses the given nmap-service-probes file into the AP class
 void parse_nmap_service_probe_file(AllProbes *AP, char *filename);
 
 #endif /* SERVICE_SCAN_H */
-
-
-
-
 

@@ -53,7 +53,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_connect.c,v 1.20 2004/08/29 09:12:05 fyodor Exp $ */
+/* $Id: nsock_connect.c 2866 2005-09-12 05:35:14Z fyodor $ */
 
 #include "nsock.h"
 #include "nsock_internal.h"
@@ -79,7 +79,7 @@ static void nsock_connect_internal(mspool *ms, msevent *nse, int proto,
 #endif
 
 /* Now it is time to actually attempt the connection */
-  if ((nse->iod->sd = socket(sin->sin_family, 
+  if ((nse->iod->sd = (int) socket(sin->sin_family, 
 			     (proto == IPPROTO_UDP)? SOCK_DGRAM : SOCK_STREAM, 
 			     proto)) == -1) {
     perror("Socket troubles");

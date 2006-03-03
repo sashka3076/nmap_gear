@@ -54,7 +54,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock.h,v 1.22 2004/08/29 09:12:04 fyodor Exp $ */
+/* $Id: nsock.h 2866 2005-09-12 05:35:14Z fyodor $ */
 
 #ifndef NSOCK_H
 #define NSOCK_H
@@ -64,7 +64,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <time.h>
+#include <sys/time.h>
 #endif
 
 #ifdef __cplusplus

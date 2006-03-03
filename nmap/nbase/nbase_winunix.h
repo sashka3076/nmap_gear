@@ -96,7 +96,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_winunix.h,v 1.12 2004/10/12 09:34:12 fyodor Exp $ */
+/* $Id: nbase_winunix.h 2966 2005-12-05 21:31:10Z fyodor $ */
 
 #ifndef NBASE_WINUNIX_H
 #define NBASE_WINUNIX_H
@@ -110,7 +110,7 @@
 
 #include <windows.h>
 #include <winsock2.h>
-/* #include <ws2tcpip.h> */ /* IPv6 stuff */
+#include <ws2tcpip.h> /* IPv6 stuff */
 #include <time.h>
 #include <iptypes.h>
 #include <stdlib.h>
@@ -155,8 +155,6 @@ typedef unsigned int ssize_t;
   I should try to fix this with casts at some point */
 /* #pragma warning(disable: 4761) */
 
-extern struct winops wo;
-
 #define munmap(ptr, len) win32_munmap(ptr, len)
 int nmapwin_isroot();
 
@@ -164,6 +162,7 @@ int nmapwin_isroot();
 #define ECONNABORTED    WSAECONNABORTED
 #define ECONNRESET      WSAECONNRESET
 #define ECONNREFUSED    WSAECONNREFUSED
+#undef  EAGAIN
 #define EAGAIN		WSAEWOULDBLOCK
 #define EHOSTUNREACH	WSAEHOSTUNREACH
 #define ENETDOWN	WSAENETDOWN
@@ -172,27 +171,32 @@ int nmapwin_isroot();
 #define ETIMEDOUT	WSAETIMEDOUT
 #define EHOSTDOWN	WSAEHOSTDOWN
 #define EINPROGRESS	WSAEINPROGRESS
+#undef  EINVAL
 #define EINVAL          WSAEINVAL      /* Invalid argument */
+#undef  EPERM
 #define EPERM           WSAEACCES      /* Operation not permitted */
+#undef  EACCES
 #define EACCES          WSAEACCES     /* Operation not permitted */
+#undef  EINTR
 #define EINTR           WSAEINTR      /* Interrupted system call */
 #define ENOBUFS         WSAENOBUFS     /* No buffer space available */
+#undef  ENOENT
 #define ENOENT          WSAENOENT      /* No such file or directory */
 #define EMSGSIZE        WSAEMSGSIZE    /* Message too long */
+#undef  ENOMEM
 #define ENOMEM          WSAENOBUFS
+#undef  EIO
 #define EIO             WSASYSCALLFAILURE
+
 #define close(x) my_close(x)
 /* #define read(x,y,z) recv(x,(char*)(y),z,0) */
-int my_close(int sd);
+
+#ifdef __cplusplus
+  extern "C" int my_close(int sd);
+#else
+  int my_close(int sd);
+#endif
 
 typedef unsigned short u_short_t;
-
-int win32_sendto(int sd, const char *packet, int len, 
-	   unsigned int flags, struct sockaddr *to, int tolen);
-
-int win32_socket(int af, int type, int proto);
-
-#define socket(af, type, proto) win32_socket(af, type, proto)
-#define sendto(sd, packet, len, flags, to, tolen) win32_sendto(sd, packet, len, flags, to, tolen)
 
 #endif /* NBASE_WINUNIX_H */

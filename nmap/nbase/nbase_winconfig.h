@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_winconfig.h,v 1.17 2005/02/05 22:37:57 fyodor Exp $ */
+/* $Id: nbase_winconfig.h 3051 2006-01-20 18:36:52Z fyodor $ */
 
 #ifndef NBASE_WINCONFIG_H
 #define NBASE_WINCONFIG_H
@@ -106,7 +106,8 @@
 /* It doesn't really have strucct IP, but we use a different one instead
 	of the one that comes with Nmap */
 #define HAVE_STRUCT_IP 1
-#define HAVE_STRUCT_ICMP 1
+/* #define HAVE_STRUCT_ICMP 1 */
+#define HAVE_STRNCASECMP 1
 #define HAVE_IP_IP_SUM 1
 #define STDC_HEADERS 1
 #define HAVE_STRING_H 1
@@ -117,7 +118,9 @@
 #define HAVE_MEMCPY 1
 #define HAVE_STRERROR 1
 #define HAVE_SYS_SOCKIO_H 1
+/* #undef HAVE_TERMIOS_H */
 #define HAVE_ERRNO_H 1
+#define HAVE_GAI_STRERROR 1
 /* #define HAVE_STRCASESTR 1 */
 #define HAVE_STRCASECMP 1
 #define HAVE_NETINET_IN_SYSTEM_H 1

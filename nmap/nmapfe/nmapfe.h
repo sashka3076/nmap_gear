@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmapfe.h,v 1.17 2004/08/29 09:12:04 fyodor Exp $ */
+/* $Id: nmapfe.h 3057 2006-01-21 00:41:19Z fyodor $ */
 
 /* Original Author: Zach
  * Mail: key@aye.net
@@ -120,6 +120,12 @@
 #include <gtk/gtk.h>
 
 /* #define DEBUG(str) { fprintf(stderr, str); fflush(stderr); } */
+
+typedef struct {
+    gchar       *scan;
+    gint        scantype;
+    gboolean    rootonly;
+} Entry;
 
 
 /* main menu entries */
@@ -164,77 +170,61 @@ enum {
 };
 
 
-/* define this > 0 to be able to use the comfortable callback */
-#define THROTTLE_OFFSET  1
-
-/* throttle types: used as actions in a factory-generated menu */
+/* Throttle types */
 enum {
-  NO_THROTTLE,
-  PARANOID_THROTTLE = THROTTLE_OFFSET,
+  PARANOID_THROTTLE,
   SNEAKY_THROTTLE,
   POLITE_THROTTLE,
   NORMAL_THROTTLE,
   AGRESSIVE_THROTTLE,
-  INSANE_THROTTLE
+  INSANE_THROTTLE,
+  NO_THROTTLE
 };
 
-
-/* define this > 0 to be able to use the comfortable callback */
-#define RESOLVE_OFFSET 1
-
-/* reverse resolving options */
+/* Reverse resolving options */
 enum {
-  NO_RESOLVE,
-  ALWAYS_RESOLVE = RESOLVE_OFFSET,
+  ALWAYS_RESOLVE,
   DEFAULT_RESOLVE,
-  NEVER_RESOLVE
+  NEVER_RESOLVE,
+  NO_RESOLVE
 };
-
-
-/* define this > 0 to be able to use the comfortable callback */
-#define PROTPORT_OFFSET 1
 
 /* scanning mode (which ports/protocols) options */
 enum {
-  NO_PROTPORT,
-  DEFAULT_PROTPORT = PROTPORT_OFFSET,
+  DEFAULT_PROTPORT,
   ALL_PROTPORT,
   FAST_PROTPORT,
-  GIVEN_PROTPORT
+  GIVEN_PROTPORT,
+  NO_PROTPORT
 };
-
-
-/* define this > 0 to be able to use the comfortable callback */
-#define VERBOSE_OFFSET 1
 
 /* verbosity options */
 enum {
-  NO_VERBOSE,
-  QUIET_VERBOSE = VERBOSE_OFFSET,
+  QUIET_VERBOSE,
   V1_VERBOSE,
   V2_VERBOSE,
   D1_VERBOSE,
-  D2_VERBOSE
+  D2_VERBOSE,
+  NO_VERBOSE
 };
 
 
-/* define this > 0 to be able to use the comfortable callback */
-#define OUTPUT_OFFSET 1
-
 /* output format options */
 enum {
-  NO_OUTPUT,
-  NORMAL_OUTPUT = OUTPUT_OFFSET,
+  NORMAL_OUTPUT,
   GREP_OUTPUT,
   XML_OUTPUT,
   ALL_OUTPUT,
+#if GTK_CHECK_VERSION(2,6,0)
+  SEPARATOR,
+#endif
   SKIDS_OUTPUT
 };
 
 
 struct NmapFEoptions {
   GtkWidget *scanButton;
-  GtkWidget *output;
+  GtkTextBuffer *buffer;
   GtkWidget *targetHost;
   GtkWidget *commandEntry;
   gboolean appendLog;
@@ -253,7 +243,6 @@ struct NmapFEoptions {
   guint protportValue;
   /* optional scan extensions */
   GtkWidget *RPCInfo;
-  GtkWidget *IdentdInfo;
   GtkWidget *OSInfo;
   GtkWidget *VersionInfo;
   /* ping types */

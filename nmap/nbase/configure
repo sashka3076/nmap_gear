@@ -2561,7 +2561,7 @@ _ACEOF
   # libpcap doesn't even LOOK at
                                      # the timeout you give it under Linux
     ;;
-  *-freebsd* | *-kfreebsd*-gnu)
+  *-freebsd* | *-kfreebsd*-gnu | *-dragonfly*)
     cat >>confdefs.h <<\_ACEOF
 #define FREEBSD 1
 _ACEOF
@@ -3531,26 +3531,28 @@ if test "${ac_cv___attribute__+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
 
-cat >conftest.$ac_ext <<_ACEOF
+  cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-#include <stdlib.h>
+	#include <stdlib.h>
+
+	static void foo(void) __attribute__ ((noreturn));
+
+	static void
+	foo(void)
+	{
+	  exit(1);
+	}
 
 int
 main ()
 {
 
-static void foo(void) __attribute__ ((noreturn));
-
-static void
-foo(void)
-{
-  exit(1);
-}
+	  foo();
 
   ;
   return 0;
@@ -3584,8 +3586,10 @@ else
 sed 's/^/| /' conftest.$ac_ext >&5
 
 ac_cv___attribute__=no
+
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+
 fi
 
 if test "$ac_cv___attribute__" = "yes"; then
@@ -3597,7 +3601,6 @@ _ACEOF
 fi
 echo "$as_me:$LINENO: result: $ac_cv___attribute__" >&5
 echo "${ECHO_T}$ac_cv___attribute__" >&6
-
 
 
 

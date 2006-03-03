@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: utils.cc,v 1.22 2004/08/29 09:12:04 fyodor Exp $ */
+/* $Id: utils.cc 3061 2006-01-21 23:57:49Z fyodor $ */
 
 #include "utils.h"
 #include "NmapOps.h"
@@ -207,6 +207,25 @@ char *chomp(char *string) {
     string[len-2] = '\0';
   } else string[len-1] = '\0';
   return string;
+}
+
+/* Compare a canonical option name (e.g. "max-scan-delay") with a
+   user-generated option such as "max_scan_delay" and returns 0 if the
+   two values are considered equivalant (for example, - and _ are
+   considered to be the same), nonzero otherwise. */
+int optcmp(const char *a, const char *b) {
+  while(*a && *b) {
+    if (*a == '_' || *a == '-') {
+      if (*b != '_' && *b != '-')
+	return 1;
+    }
+    else if (*a != *b)
+      return 1;
+    a++; b++;
+  }
+  if (*a || *b)
+    return 1;
+  return 0;
 }
 
 /* Convert a comma-separated list of ASCII u16-sized numbers into the
@@ -330,6 +349,7 @@ if (num_elem < 2)
  
  for(i= num_elem - 1; i > 0 ; i--) {
    num = get_random_ushort() % (i + 1);
+   if (i == num) continue;
    tmp = arr[i];
    arr[i] = arr[num];
    arr[num] = tmp;
@@ -438,7 +458,7 @@ unsigned int gcd_n_uint(int nvals, unsigned int *val)
    into an argv[] style char **, which it sets the argv parameter to.
    The function returns the number of items filled up in the array
    (argc), or -1 in the case of an error.  This function allocates
-   memmory for argv and thus it must be freed -- use argv_parse_free()
+   memory for argv and thus it must be freed -- use argv_parse_free()
    for that.  If arg_parse returns <1, then argv does not need to be freed.
    The returned arrays are always terminated with a NULL pointer */
 int arg_parse(const char *command, char ***argv) {
@@ -506,6 +526,28 @@ void arg_parse_free(char **argv) {
     current++;
   }
   free(argv);
+}
+
+/* Converts an Nmap time specification string into milliseconds.  If
+   the string is a plain non-negative number, it is considered to
+   already be in milliseconds and is returned.  If it is a number
+   followed by 's' (for seconds), 'm' (minutes), or 'h' (hours), the
+   number is converted to milliseconds and returned.  If Nmap cannot
+   parse the string, it is returned instead. */
+long tval2msecs(char *tspec) {
+  long l;
+  char *endptr = NULL;
+  l = strtol(tspec, &endptr, 10);
+  if (l < 0 || !endptr) return -1;
+  if (*endptr == '\0') return l;
+  if (*endptr == 's' || *endptr == 'S') return l * 1000;
+  if ((*endptr == 'm' || *endptr == 'M')) {
+    if (*(endptr + 1) == 's' || *(endptr + 1) == 'S') 
+      return l;
+    return l * 60000;
+  }
+  if (*endptr == 'h' || *endptr == 'H') return l * 3600000;
+  return -1;
 }
 
 // A simple function to form a character from 2 hex digits in ASCII form

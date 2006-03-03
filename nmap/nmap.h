@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.h,v 1.108 2005/02/05 22:37:55 fyodor Exp $ */
+/* $Id: nmap.h 3014 2005-12-28 08:58:56Z fyodor $ */
 
 #ifndef NMAP_H
 #define NMAP_H
@@ -218,15 +218,15 @@ void *realloc();
 #include <pwd.h>
 #endif
 
-#ifndef NETINET_IN_SYSTEM_H  /* why the HELL does OpenBSD not do this? */
+#ifndef NETINET_IN_SYSTEM_H  /* why does OpenBSD not do this? */
 #include <netinet/in_systm.h> /* defines n_long needed for netinet/ip.h */
 #define NETINET_IN_SYSTEM_H
 #endif
-#ifndef NETINET_IP_H  /* why the HELL does OpenBSD not do this? */
+#ifndef NETINET_IP_H  /* why does OpenBSD not do this? */
 #include <netinet/ip.h> 
 #define NETINET_IP_H
 #endif
-#include <netinet/ip_icmp.h> 
+// #include <netinet/ip_icmp.h> 
 
 #if HAVE_ARPA_INET_H
 #include <arpa/inet.h>
@@ -237,7 +237,7 @@ void *realloc();
 #ifndef __FAVOR_BSD
 #define __FAVOR_BSD
 #endif
-#ifndef NETINET_TCP_H  /* why the HELL does OpenBSD not do this? */
+#ifndef NETINET_TCP_H  /* why does OpenBSD not do this? */
 #include <netinet/tcp.h>          /*#include <netinet/ip_tcp.h>*/
 #define NETINET_TCP_H
 #endif
@@ -247,18 +247,18 @@ void *realloc();
 #endif
 
 /*#include <net/if_arp.h> *//* defines struct arphdr needed for if_ether.h */
-#if HAVE_NET_IF_H
-#ifndef NET_IF_H  /* why doesn't OpenBSD do this?! */
-#include <net/if.h>
-#define NET_IF_H
-#endif
-#endif
-#if HAVE_NETINET_IF_ETHER_H 
-#ifndef NETINET_IF_ETHER_H
-#include <netinet/if_ether.h>
-#define NETINET_IF_ETHER_H
-#endif /* NETINET_IF_ETHER_H */
-#endif /* HAVE_NETINET_IF_ETHER_H */
+// #if HAVE_NET_IF_H
+// #ifndef NET_IF_H  /* why doesn't OpenBSD do this?! */
+// #include <net/if.h>
+// #define NET_IF_H
+// #endif
+// #endif
+// #if HAVE_NETINET_IF_ETHER_H 
+// #ifndef NETINET_IF_ETHER_H
+// #include <netinet/if_ether.h>
+// #define NETINET_IF_ETHER_H
+// #endif /* NETINET_IF_ETHER_H */
+// #endif /* HAVE_NETINET_IF_ETHER_H */
 
 /*******  DEFINES  ************/
 
@@ -304,10 +304,7 @@ void *realloc();
 
 #define MAX_DECOYS 128 /* How many decoys are allowed? */
 
-#ifndef MAX_RTT_TIMEOUT
-#define MAX_RTT_TIMEOUT 10000 /* Never allow more than 10 secs for packet round
-				 trip */
-#endif
+#define MAXFALLBACKS 20 /* How many comma separated fallbacks are allowed in the service-probes file? */
 
 /* Default maximum send delay between probes to the same host */
 #ifndef MAX_TCP_SCAN_DELAY
@@ -318,6 +315,10 @@ void *realloc();
 #define MAX_UDP_SCAN_DELAY 1000
 #endif
 
+/* Maximum number of extra hostnames, OSs, and devices, we
+   consider when outputing the extra service info fields */
+#define MAX_SERVICE_INFO_FIELDS 5
+
 /* We wait at least 100 ms for a response by default - while that
    seems aggressive, waiting too long can cause us to fail to detect
    drops until many probes later on extremely low-latency
@@ -326,8 +327,17 @@ void *realloc();
 #define MIN_RTT_TIMEOUT 100 
 #endif
 
+#ifndef MAX_RTT_TIMEOUT
+#define MAX_RTT_TIMEOUT 10000 /* Never allow more than 10 secs for packet round
+				 trip */
+#endif
+
 #define INITIAL_RTT_TIMEOUT 1000 /* Allow 1 second initially for packet responses */
 #define HOST_TIMEOUT    0 /* By default allow unlimited time to scan each host */
+
+#ifndef MAX_RETRANSMISSIONS
+#define MAX_RETRANSMISSIONS 10    /* 11 probes to port at maximum */
+#endif
 
 /* If nmap is called with one of the names below, it will start up in interactive mode -- alternatively, you can rename Nmap any of the following names to have it start up interactivey by default.  */
 #define INTERACTIVE_NAMES { "BitchX", "Calendar", "X", "awk", "bash", "bash2", "calendar", "cat", "csh", "elm", "emacs", "ftp", "fvwm", "g++", "gcc", "gimp", "httpd", "irc", "man", "mutt", "nc", "ncftp", "netscape", "perl", "pine", "ping", "sleep", "slirp", "ssh", "sshd", "startx", "tcsh", "telnet", "telnetd", "tia", "top", "vi", "vim", "xdvi", "xemacs", "xterm", "xv" }
@@ -335,7 +345,7 @@ void *realloc();
 /* Number of hosts we pre-ping and then scan.  We do a lot more if
    randomize_hosts is set.  Every one you add to this leads to ~1K of
    extra always-resident memory in nmap */
-#define PING_GROUP_SZ 1024
+#define PING_GROUP_SZ 2048
 
 /* DO NOT change stuff after this point */
 #define UC(b)   (((int)b)&0xff)
@@ -357,7 +367,9 @@ void *realloc();
 #define PINGTYPE_RAWTCP 128
 #define PINGTYPE_CONNECTTCP 256
 #define PINGTYPE_UDP  512
+#define PINGTYPE_ARP 1024
 
+#define DEFAULT_PING_TYPES PINGTYPE_TCP|PINGTYPE_TCP_USE_ACK|PINGTYPE_ICMP_PING
 /* TCP/IP ISN sequence prediction classes */
 #define SEQ_UNKNOWN 0
 #define SEQ_64K 1
@@ -387,16 +399,6 @@ void *realloc();
 #ifndef MAXHOSTNAMELEN
 #define MAXHOSTNAMELEN 64
 #endif
-
-#ifndef BSDFIX
-#if FREEBSD || BSDI || NETBSD
-#define BSDFIX(x) x
-#define BSDUFIX(x) x
-#else
-#define BSDFIX(x) htons(x)
-#define BSDUFIX(x) ntohs(x)
-#endif
-#endif /* BSDFIX */
 
 #ifndef recvfrom6_t
 #  define recvfrom6_t int
@@ -429,8 +431,6 @@ void printusage(char *name, int rc);
 /* print Interactive usage information */
 void printinteractiveusage();
 
-/* Scan helper functions */
-unsigned long calculate_sleep(struct in_addr target);
 int check_ident_port(struct in_addr target);
 
 int ftp_anon_connect(struct ftpinfo *ftp);

@@ -101,7 +101,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase.h,v 1.40 2004/10/12 09:34:12 fyodor Exp $ */
+/* $Id: nbase.h 2966 2005-12-05 21:31:10Z fyodor $ */
 
 #ifndef NBASE_H
 #define NBASE_H
@@ -295,6 +295,14 @@ extern "C" int vsnprintf (char *, size_t, const char *, va_list);
 
 #define stat _stat /* wtf was ms thinking? */
 #define execve _execve
+#define getpid _getpid
+#define dup _dup
+#define dup2 _dup2
+#define strdup _strdup
+#define write _write
+#define open _open
+#define stricmp _stricmp
+#define putenv _putenv
 
 #if !defined(__GNUC__)
 #define snprintf _snprintf

@@ -55,7 +55,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_internal.h,v 1.19 2004/10/12 09:34:12 fyodor Exp $ */
+/* $Id: nsock_internal.h 2443 2004-10-12 09:34:12Z fyodor $ */
 
 #ifndef NSOCK_INTERNAL_H
 #define NSOCK_INTERNAL_H

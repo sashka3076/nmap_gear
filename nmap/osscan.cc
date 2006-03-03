@@ -98,12 +98,13 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: osscan.cc,v 1.26 2004/10/12 09:34:11 fyodor Exp $ */
+/* $Id: osscan.cc 3039 2006-01-11 01:32:04Z fyodor $ */
 
 
 #include "osscan.h"
 #include "timing.h"
 #include "NmapOps.h"
+#include "tty.h"
 
 #if TIME_WITH_SYS_TIME
 # include <sys/time.h>
@@ -117,9 +118,118 @@
 #endif
 
 extern NmapOps o;
-/*  predefined filters -- I need to kill these globals at some pont. */
-extern unsigned long flt_dsthost, flt_srchost;
-extern unsigned short flt_baseport;
+
+/* Note that a sport of 0 really will (try to) use zero as the source
+   port rather than choosing a random one */
+struct udpprobeinfo *send_closedudp_probe(int sd, struct eth_nfo *eth,
+					  const struct in_addr *victim,
+					  u16 sport, u16 dport) {
+
+static struct udpprobeinfo upi;
+static int myttl = 0;
+static u8 patternbyte = 0;
+static u16 id = 0; 
+u8 packet[328]; /* 20 IP hdr + 8 UDP hdr + 300 data */
+struct ip *ip = (struct ip *) packet;
+udphdr_bsd *udp = (udphdr_bsd *) (packet + sizeof(struct ip));
+struct in_addr *source;
+int datalen = 300;
+unsigned char *data = packet + 28;
+unsigned short realcheck; /* the REAL checksum */
+int res;
+int decoy;
+struct pseudo_udp_hdr {
+  struct in_addr source;
+  struct in_addr dest;        
+  u8 zero;
+  u8 proto;        
+  u16 length;
+} *pseudo = (struct pseudo_udp_hdr *) ((char *)udp - 12) ;
+
+if (!patternbyte) patternbyte = (get_random_uint() % 60) + 65;
+memset(data, patternbyte, datalen);
+
+while(!id) id = get_random_uint();
+
+/* check that required fields are there and not too silly */
+if ( !victim || !dport || (!eth && sd < 0)) {
+  fprintf(stderr, "send_closedudp_probe: One or more of your parameters suck!\n");
+  return NULL;
+}
+
+if (!myttl)  myttl = (time(NULL) % 14) + 51;
+
+for(decoy=0; decoy < o.numdecoys; decoy++) {
+  source = &o.decoys[decoy];
+
+  memset((char *) packet, 0, sizeof(struct ip) + sizeof(udphdr_bsd));
+
+  udp->uh_sport = htons(sport);
+  udp->uh_dport = htons(dport);
+  udp->uh_ulen = htons(8 + datalen);
+
+  /* Now the pseudo header for checksuming */
+  pseudo->source.s_addr = source->s_addr;
+  pseudo->dest.s_addr = victim->s_addr;
+  pseudo->proto = IPPROTO_UDP;
+  pseudo->length = htons(sizeof(udphdr_bsd) + datalen);
+  
+  /* OK, now we should be able to compute a valid checksum */
+  realcheck = in_cksum((unsigned short *)pseudo, 20 /* pseudo + UDP headers */ +
+		       datalen);
+#if STUPID_SOLARIS_CHECKSUM_BUG
+  udp->uh_sum = sizeof(udphdr_bsd) + datalen;
+#else
+  udp->uh_sum = realcheck;
+#endif
+
+  if ( o.badsum )
+    udp->uh_sum++;
+
+  /* Goodbye, pseudo header! */
+  memset(pseudo, 0, sizeof(*pseudo));
+  
+  /* Now for the ip header */
+  ip->ip_v = 4;
+  ip->ip_hl = 5;
+  ip->ip_len = htons(sizeof(struct ip) + sizeof(udphdr_bsd) + datalen);
+  ip->ip_id = id;
+  ip->ip_ttl = myttl;
+  ip->ip_p = IPPROTO_UDP;
+  ip->ip_src.s_addr = source->s_addr;
+  ip->ip_dst.s_addr= victim->s_addr;
+  
+  upi.ipck = in_cksum((unsigned short *)ip, sizeof(struct ip));
+#if HAVE_IP_IP_SUM
+  ip->ip_sum = upi.ipck;
+#endif
+  
+  /* OK, now if this is the real she-bang (ie not a decoy) then
+     we stick all the inph0 in our upi */
+  if (decoy == o.decoyturn) {   
+    upi.iptl = 28 + datalen;
+    upi.ipid = id;
+    upi.sport = sport;
+    upi.dport = dport;
+    upi.udpck = realcheck;
+    upi.udplen = 8 + datalen;
+    upi.patternbyte = patternbyte;
+    upi.target.s_addr = ip->ip_dst.s_addr;
+  }
+  if (TCPIP_DEBUGGING > 1) {
+    log_write(LOG_STDOUT, "Raw UDP packet creation completed!  Here it is:\n");
+    readudppacket(packet,1);
+  }
+  
+  if ((res = send_ip_packet(sd, eth, packet, ntohs(ip->ip_len))) == -1)
+    {
+      perror("send_ip_packet in send_closedupd_probe");
+      return NULL;
+    }
+}
+
+return &upi;
+}
 
 
 FingerPrint *get_fingerprint(Target *target, struct seq_info *si) {
@@ -144,7 +254,7 @@ int testno;
 int  timeout;
 int avnum;
 unsigned int sequence_base;
-unsigned int openport;
+unsigned long openport;
 unsigned int bytes;
 unsigned int closedport = 31337;
 Port *tport = NULL;
@@ -162,6 +272,8 @@ int seq_packets_sent = 0;
 int seq_response_num; /* response # for sequencing */
 double avg_ts_hz = 0.0; /* Avg. amount that timestamps incr. each second */
 struct link_header linkhdr;
+struct eth_nfo eth;
+struct eth_nfo *ethptr; // for passing to send_ functions 
 
 if (target->timedOut(NULL))
   return NULL;
@@ -175,14 +287,24 @@ si->lastboot = 0;
 /* Init our fingerprint tests to each be NULL */
 memset(FPtests, 0, sizeof(FPtests)); 
 get_random_bytes(&sequence_base, sizeof(unsigned int));
-/* Init our raw socket */
- if ((rawsd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0 )
-   pfatal("socket trobles in get_fingerprint");
- unblock_socket(rawsd);
- broadcast_socket(rawsd);
+ if ((o.sendpref & PACKET_SEND_ETH) &&  target->ifType() == devt_ethernet) {
+   memcpy(eth.srcmac, target->SrcMACAddress(), 6);
+   memcpy(eth.dstmac, target->NextHopMACAddress(), 6);
+   eth.ethsd = eth_open(target->deviceName());
+   rawsd = -1;
+   ethptr = &eth;
+  } else {
+    /* Init our raw socket */
+    if ((rawsd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0 )
+      pfatal("socket troubles in get_fingerprint");
+    unblock_socket(rawsd);
+    broadcast_socket(rawsd);
 #ifndef WIN32
- sethdrinclude(rawsd);
+    sethdrinclude(rawsd);
 #endif
+    ethptr = NULL;
+    eth.ethsd = NULL;
+  }
 
  /* Now for the pcap opening nonsense ... */
  /* Note that the snaplen is 152 = 64 byte max IPhdr + 24 byte max link_layer
@@ -192,17 +314,14 @@ get_random_bytes(&sequence_base, sizeof(unsigned int));
 ossofttimeout = MAX(200000, target->to.timeout);
 oshardtimeout = MAX(500000, 5 * target->to.timeout);
 
- pd = my_pcap_open_live(target->device, /*650*/ 8192,  (o.spoofsource)? 1 : 0, (ossofttimeout + 500)/ 1000);
+ pd = my_pcap_open_live(target->deviceName(), /*650*/ 8192,  (o.spoofsource)? 1 : 0, (ossofttimeout + 500)/ 1000);
 
 if (o.debugging > 1)
    log_write(LOG_STDOUT, "Wait time is %dms\n", (ossofttimeout +500)/1000);
 
- flt_srchost = target->v4host().s_addr;
- flt_dsthost = target->v4source().s_addr;
-
 snprintf(filter, sizeof(filter), "dst host %s and (icmp or (tcp and src host %s))", inet_ntoa(target->v4source()), target->targetipstr());
  
- set_pcap_filter(target, pd, flt_icmptcp, filter);
+ set_pcap_filter(target->deviceName(), pd, filter);
  target->osscan_performed = 1; /* Let Nmap know that we did try an OS scan */
 
  /* Lets find an open port to use */
@@ -227,7 +346,7 @@ snprintf(filter, sizeof(filter), "dst host %s and (icmp or (tcp and src host %s)
  }
 
 if (o.verbose && openport != (unsigned long) -1)
-  log_write(LOG_STDOUT, "For OSScan assuming port %d is open, %d is closed, and neither are firewalled\n", openport, closedport);
+  log_write(LOG_STDOUT, "For OSScan assuming port %lu is open, %d is closed, and neither are firewalled\n", openport, closedport);
 
  current_port = o.magic_port + NUM_SEQ_SAMPLES +1;
  
@@ -241,28 +360,31 @@ if (o.verbose && openport != (unsigned long) -1)
      /* Test 1 */
      if (!FPtests[1]) {     
        if (o.scan_delay) enforce_scan_delay(NULL);
-       send_tcp_raw_decoys(rawsd, target->v4hostip(), o.ttl, current_port, 
-			   openport, sequence_base, 0,TH_ECE|TH_SYN, 0, (u8 *) "\003\003\012\001\002\004\001\011\010\012\077\077\077\077\000\000\000\000\000\000" , 20, NULL, 0);
+       send_tcp_raw_decoys(rawsd, ethptr, target->v4hostip(), o.ttl, 
+			   current_port, openport, sequence_base, 0, 
+			   TH_ECE|TH_SYN, 0, (u8 *) "\003\003\012\001\002\004\001\011\010\012\077\077\077\077\000\000\000\000\000\000" , 20, NULL, 0);
      }
      
      /* Test 2 */
      if (!FPtests[2]) {     
        if (o.scan_delay) enforce_scan_delay(NULL);
-       send_tcp_raw_decoys(rawsd, target->v4hostip(), o.ttl, current_port +1, 
+       send_tcp_raw_decoys(rawsd, ethptr, target->v4hostip(), o.ttl, 
+			   current_port +1, 
 			   openport, sequence_base, 0,0, 0, (u8 *) "\003\003\012\001\002\004\001\011\010\012\077\077\077\077\000\000\000\000\000\000" , 20, NULL, 0);
      }
 
      /* Test 3 */
      if (!FPtests[3]) {     
        if (o.scan_delay) enforce_scan_delay(NULL);
-       send_tcp_raw_decoys(rawsd, target->v4hostip(), o.ttl, current_port +2, 
+       send_tcp_raw_decoys(rawsd, ethptr, target->v4hostip(), o.ttl, current_port +2, 
 			   openport, sequence_base, 0,TH_SYN|TH_FIN|TH_URG|TH_PUSH, 0,(u8 *) "\003\003\012\001\002\004\001\011\010\012\077\077\077\077\000\000\000\000\000\000" , 20, NULL, 0);
      }
 
      /* Test 4 */
      if (!FPtests[4]) {     
        if (o.scan_delay) enforce_scan_delay(NULL);
-       send_tcp_raw_decoys(rawsd, target->v4hostip(), o.ttl, current_port +3, 
+       send_tcp_raw_decoys(rawsd, ethptr, target->v4hostip(), o.ttl, 
+			   current_port +3, 
 			   openport, sequence_base, 0,TH_ACK, 0, (u8 *) "\003\003\012\001\002\004\001\011\010\012\077\077\077\077\000\000\000\000\000\000" , 20, NULL, 0);
      }
    }
@@ -270,28 +392,31 @@ if (o.verbose && openport != (unsigned long) -1)
    /* Test 5 */
    if (!FPtests[5]) {   
      if (o.scan_delay) enforce_scan_delay(NULL);
-     send_tcp_raw_decoys(rawsd, target->v4hostip(), o.ttl, current_port +4,
+     send_tcp_raw_decoys(rawsd, ethptr, target->v4hostip(), o.ttl, 
+			 current_port +4,
 			 closedport, sequence_base, 0,TH_SYN, 0, (u8 *) "\003\003\012\001\002\004\001\011\010\012\077\077\077\077\000\000\000\000\000\000" , 20, NULL, 0);
    }
 
      /* Test 6 */
    if (!FPtests[6]) {   
      if (o.scan_delay) enforce_scan_delay(NULL);
-     send_tcp_raw_decoys(rawsd, target->v4hostip(), o.ttl, current_port +5, 
+     send_tcp_raw_decoys(rawsd, ethptr, target->v4hostip(), o.ttl, 
+			 current_port +5, 
 			 closedport, sequence_base, 0,TH_ACK, 0, (u8 *) "\003\003\012\001\002\004\001\011\010\012\077\077\077\077\000\000\000\000\000\000" , 20, NULL, 0);
    }
 
      /* Test 7 */
    if (!FPtests[7]) {
      if (o.scan_delay) enforce_scan_delay(NULL);   
-     send_tcp_raw_decoys(rawsd, target->v4hostip(), o.ttl, current_port +6, 
+     send_tcp_raw_decoys(rawsd, ethptr, target->v4hostip(), o.ttl, 
+			 current_port +6, 
 			 closedport, sequence_base, 0,TH_FIN|TH_PUSH|TH_URG, 0, (u8 *) "\003\003\012\001\002\004\001\011\010\012\077\077\077\077\000\000\000\000\000\000" , 20, NULL, 0);
    }
 
    /* Test 8 */
    if (!FPtests[8]) {
      if (o.scan_delay) enforce_scan_delay(NULL);
-     upi = send_closedudp_probe(rawsd, target->v4hostip(), o.magic_port, closedport);
+     upi = send_closedudp_probe(rawsd, ethptr, target->v4hostip(), o.magic_port, closedport);
    }
    gettimeofday(&t1, NULL);
    timeout = 0;
@@ -370,7 +495,7 @@ if (o.verbose && openport != (unsigned long) -1)
 	 usleep(remaining_us);
        }
      }
-     send_tcp_raw_decoys(rawsd, target->v4hostip(), o.ttl, 
+     send_tcp_raw_decoys(rawsd, ethptr, target->v4hostip(), o.ttl, 
 			 o.magic_port + seq_packets_sent + 1, 
 			 openport, 
 			 sequence_base + seq_packets_sent + 1, 0, 
@@ -379,7 +504,7 @@ if (o.verbose && openport != (unsigned long) -1)
      t1 = seq_send_times[seq_packets_sent];
      seq_packets_sent++;
    
-     /* Now we collect  the replies */
+     /* Now we collect the replies */
      while(si->responses < seq_packets_sent && !timeout) {
        
        if (seq_packets_sent == NUM_SEQ_SAMPLES)
@@ -422,7 +547,7 @@ if (o.verbose && openport != (unsigned long) -1)
 	 if ((tcp->th_flags & TH_RST)) {
 	   /*	 readtcppacket((char *) ip, ntohs(ip->ip_len));*/	 
 	   if (si->responses == 0) {	 
-	     fprintf(stderr, "WARNING:  RST from port %hu -- is this port really open?\n", openport);
+	     fprintf(stderr, "WARNING:  RST from port %lu -- is this port really open?\n", openport);
 	     /* We used to quit in this case, but left-overs from a SYN
 		scan or lame-ass TCP wrappers can cause this! */
 	   } 
@@ -437,7 +562,7 @@ if (o.verbose && openport != (unsigned long) -1)
 	     /* BzzT! Value out of range */
 	     if (o.debugging) {
 	       error("Unable to associate os scan response with sent packet (received ack: %lX; sequence base: %lX. Packet:", (unsigned long) ntohl(tcp->th_ack), (unsigned long) sequence_base);
-	       readtcppacket((unsigned char *)ip,BSDUFIX(ip->ip_len));
+	       readtcppacket((unsigned char *)ip,ntohs(ip->ip_len));
 	     }
 	     seq_response_num = si->responses;
 	   }
@@ -738,7 +863,11 @@ for(i=0; i < 9; i++) {
  osscan_timedout:
  if (target->timedOut(NULL))
    FP = NULL;
- close(rawsd);
+ if (rawsd >= 0)
+   close(rawsd);
+ if (ethptr) {
+   eth_close(ethptr->ethsd);
+ }
  pcap_close(pd);
  return FP;
 }
@@ -914,7 +1043,7 @@ double compare_fingerprints(FingerPrint *referenceFP, FingerPrint *observedFP,
 }
 
 /* Takes a fingerprint and looks for matches inside reference_FPs[].
-   The results are stored in in FPR (which must point to an instantiated
+   The results are stored in FPR (which must point to an instantiated
    FingerPrintResults class) -- results will be reverse-sorted by
    accuracy.  No results below accuracy_threshhold will be included.
    The max matches returned is the maximum that fits in a
@@ -1155,6 +1284,15 @@ int bestaccidx;
  if (target->timedOut(NULL))
    return 1;
  
+o.scantype = OS_SCAN;
+
+#ifdef WIN32
+  if (target->ifType() == devt_loopback) {
+    log_write(LOG_STDOUT, "Skipping OS Scan against %s because it doesn't work against your own machine (localhost)\n", target->NameIP());
+    return 1;
+  }
+#endif
+
  if (o.debugging > 2) {
    starttimems = o.TimeSinceStartMS();
    log_write(LOG_STDOUT|LOG_NORMAL|LOG_SKID, "Initiating OS Detection against %s at %.3fs\n", target->targetipstr(), starttimems / 1000.0);
@@ -1180,6 +1318,11 @@ int bestaccidx;
    gettimeofday(&now, NULL);
    if (target->timedOut(&now))
      return 1;
+
+   // Check if a status message is requested
+   if (keyWasPressed()) {
+      // Do nothing because the keyWasPressed Method prints out the basic status line
+   }
 
    target->FPR->FPs[itry] = get_fingerprint(target, &si[itry]); 
 
@@ -1684,132 +1827,6 @@ return AVs;
 }
 
 
-struct udpprobeinfo *send_closedudp_probe(int sd, const struct in_addr *victim,
-					  u16 sport, u16 dport) {
-
-static struct udpprobeinfo upi;
-static int myttl = 0;
-static u8 patternbyte = 0;
-static u16 id = 0; 
-u8 packet[328]; /* 20 IP hdr + 8 UDP hdr + 300 data */
-struct ip *ip = (struct ip *) packet;
-udphdr_bsd *udp = (udphdr_bsd *) (packet + sizeof(struct ip));
-struct in_addr *source;
-int datalen = 300;
-unsigned char *data = packet + 28;
-unsigned short realcheck; /* the REAL checksum */
-int res;
-struct sockaddr_in sock;
-int decoy;
-struct pseudo_udp_hdr {
-  struct in_addr source;
-  struct in_addr dest;        
-  u8 zero;
-  u8 proto;        
-  u16 length;
-} *pseudo = (struct pseudo_udp_hdr *) ((char *)udp - 12) ;
-
-if (!patternbyte) patternbyte = (get_random_uint() % 60) + 65;
-memset(data, patternbyte, datalen);
-
-while(!id) id = get_random_uint();
-
-/* check that required fields are there and not too silly */
-if ( !victim || !sport || !dport || sd < 0) {
-  fprintf(stderr, "send_closedudp_probe: One or more of your parameters suck!\n");
-  return NULL;
-}
-
-if (!myttl)  myttl = (time(NULL) % 14) + 51;
-/* It was a tough decision whether to do this here for every packet
-   or let the calling function deal with it.  In the end I grudgingly decided
-   to do it here and potentially waste a couple microseconds... */
-sethdrinclude(sd); 
-
- for(decoy=0; decoy < o.numdecoys; decoy++) {
-   source = &o.decoys[decoy];
-
-   /*do we even have to fill out this damn thing?  This is a raw packet, 
-     after all */
-   sock.sin_family = AF_INET;
-   sock.sin_port = htons(dport);
-   sock.sin_addr.s_addr = victim->s_addr;
-
-
-   memset((char *) packet, 0, sizeof(struct ip) + sizeof(udphdr_bsd));
-
-   udp->uh_sport = htons(sport);
-   udp->uh_dport = htons(dport);
-   udp->uh_ulen = htons(8 + datalen);
-
-   /* Now the psuedo header for checksuming */
-   pseudo->source.s_addr = source->s_addr;
-   pseudo->dest.s_addr = victim->s_addr;
-   pseudo->proto = IPPROTO_UDP;
-   pseudo->length = htons(sizeof(udphdr_bsd) + datalen);
-
-   /* OK, now we should be able to compute a valid checksum */
-realcheck = in_cksum((unsigned short *)pseudo, 20 /* pseudo + UDP headers */ +
- datalen);
-#if STUPID_SOLARIS_CHECKSUM_BUG
- udp->uh_sum = sizeof(udphdr_bsd) + datalen;
-#else
-udp->uh_sum = realcheck;
-#endif
-
-   /* Goodbye, pseudo header! */
-   memset(pseudo, 0, sizeof(*pseudo));
-
-   /* Now for the ip header */
-   ip->ip_v = 4;
-   ip->ip_hl = 5;
-   ip->ip_len = BSDFIX(sizeof(struct ip) + sizeof(udphdr_bsd) + datalen);
-   ip->ip_id = id;
-   ip->ip_ttl = myttl;
-   ip->ip_p = IPPROTO_UDP;
-   ip->ip_src.s_addr = source->s_addr;
-   ip->ip_dst.s_addr= victim->s_addr;
-
-   upi.ipck = in_cksum((unsigned short *)ip, sizeof(struct ip));
-#if HAVE_IP_IP_SUM
-   ip->ip_sum = upi.ipck;
-#endif
-
-   /* OK, now if this is the real she-bang (ie not a decoy) then
-      we stick all the inph0 in our upi */
-   if (decoy == o.decoyturn) {   
-     upi.iptl = 28 + datalen;
-     upi.ipid = id;
-     upi.sport = sport;
-     upi.dport = dport;
-     upi.udpck = realcheck;
-     upi.udplen = 8 + datalen;
-     upi.patternbyte = patternbyte;
-     upi.target.s_addr = ip->ip_dst.s_addr;
-   }
-   if (TCPIP_DEBUGGING > 1) {
-     log_write(LOG_STDOUT, "Raw UDP packet creation completed!  Here it is:\n");
-     readudppacket(packet,1);
-   }
-   if (TCPIP_DEBUGGING > 1)     
-     log_write(LOG_STDOUT, "\nTrying sendto(%d , packet, %d, 0 , %s , %d)\n",
-	    sd, BSDUFIX(ip->ip_len), inet_ntoa(*victim),
-	    (int) sizeof(struct sockaddr_in));
-
-   if ((res = sendto(sd, (const char *) packet, BSDUFIX(ip->ip_len), 0,
-		     (struct sockaddr *)&sock, (int) sizeof(struct sockaddr_in))) == -1)
-     {
-       perror("sendto in send_udp_raw_decoys");
-       return NULL;
-     }
-
-   if (TCPIP_DEBUGGING > 1) log_write(LOG_STDOUT, "successfully sent %d bytes of raw_tcp!\n", res);
- }
-
-return &upi;
-
-}
-
 struct AVal *fingerprint_portunreach(struct ip *ip, struct udpprobeinfo *upi) {
 struct icmp *icmp;
 struct ip *ip2;
@@ -1890,10 +1907,6 @@ current_testno++;
    overwrite our ip_id */
 #if !defined(SOLARIS) && !defined(SUNOS) && !defined(IRIX) && !defined(HPUX)
 
-#ifdef WIN32
-if(!winip_corruption_possible()) {
-#endif
-
 /* Now lets see how they treated the ID we sent ... */
 AVs[current_testno].attribute = "RID";
 if (ntohs(ip2->ip_id) == 0)
@@ -1903,10 +1916,6 @@ else if (ip2->ip_id == upi->ipid)
 else strcpy(AVs[current_testno].value, "F"); /* They fucked it up */
 
 current_testno++;
-
-#ifdef WIN32
-}
-#endif
 
 #endif
 
@@ -2016,7 +2025,7 @@ int ipid_sequence(int numSamples, u16 *ipids, int islocalhost) {
 	if (ipid_diffs[i] % 256 == 0) /* Stupid MS */
 	  ipid_diffs[i] -= 256;
 	else
-	  ipid_diffs[i]--; /* Because on localhost the RST sent back ues an IPID */
+	  ipid_diffs[i]--; /* Because on localhost the RST sent back use an IPID */
       }
     }
   }

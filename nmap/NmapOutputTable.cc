@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOutputTable.cc,v 1.6 2004/08/29 09:12:03 fyodor Exp $ */
+/* $Id: NmapOutputTable.cc 2891 2005-10-01 23:50:27Z fyodor $ */
 
 #include "NmapOutputTable.h"
 #include "utils.h"
@@ -136,7 +136,7 @@ NmapOutputTable::~NmapOutputTable() {
   if (tableout) free(tableout);
 }
 
-void NmapOutputTable::addItem(unsigned int row, unsigned int column, bool copy, char *item, 
+void NmapOutputTable::addItem(unsigned int row, unsigned int column, bool copy, const char *item, 
 			      int itemlen) {
   struct NmapOutputTableCell *cell;
 
@@ -160,7 +160,7 @@ void NmapOutputTable::addItem(unsigned int row, unsigned int column, bool copy, 
     memcpy(cell->str, item, itemlen);
     cell->str[itemlen] = '\0';
   } else {
-    cell->str = item;
+    cell->str = (char *) item;
   }
   cell->weAllocated = copy;
 
@@ -170,7 +170,7 @@ void NmapOutputTable::addItem(unsigned int row, unsigned int column, bool copy, 
   return;
 }
 
-// Like addItem except this version takes a prinf-style format string 
+// Like addItem except this version takes a printf-style format string 
 // followed by varargs
 void NmapOutputTable::addItemFormatted(unsigned int row, 
 					  unsigned int column, 
@@ -211,8 +211,8 @@ int NmapOutputTable::printableSize() {
  // This function sticks the entire table into a character buffer.
  // Note that the buffer is likely to be reused if you call the
  // function again, and it will also be invalidated if you free the
- // Table.  if size is not NULL, it will be filled with the size of
- // the ASCII table in bytes (not including the terminating NUL
+ // table. If size is not NULL, it will be filled with the size of
+ // the ASCII table in bytes (not including the terminating NUL)
 
 char *NmapOutputTable::printableTable(int *size) {
   unsigned int col, row;

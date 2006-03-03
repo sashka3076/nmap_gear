@@ -97,10 +97,13 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOps.cc,v 1.30 2005/02/07 08:52:52 fyodor Exp $ */
+/* $Id: NmapOps.cc 3062 2006-01-22 20:30:17Z fyodor $ */
 #include "nmap.h"
 #include "nbase.h"
 #include "NmapOps.h"
+#ifdef WIN32
+#include "winfix.h"
+#endif
 
 NmapOps o;
 
@@ -160,7 +163,7 @@ const struct in_addr *NmapOps::v4sourceip() {
 }
 
 // Number of milliseconds since getStartTime().  The current time is an
-// optional argument to avoid an extre gettimeofday() call.
+// optional argument to avoid an extra gettimeofday() call.
 int NmapOps::TimeSinceStartMS(struct timeval *now) {
   struct timeval tv;
   if (!now)
@@ -178,15 +181,18 @@ void NmapOps::Initialize() {
 # ifdef __amigaos__
     isr00t = 1;
 # else
-    isr00t = !(geteuid());
+    if (getenv("NMAP_PRIVILEGED"))
+      isr00t = 1;
+    else
+      isr00t = !(geteuid());
 # endif // __amigaos__
 #else
   isr00t = 1;
-  winip_init();	/* wrapper for all win32 initialization */
 #endif
   debugging = DEBUGGING;
   verbose = DEBUGGING;
   randomize_hosts = 0;
+  sendpref = PACKET_SEND_NOPREF;
   spoofsource = 0;
   device[0] = '\0';
   interactivemode = 0;
@@ -202,8 +208,9 @@ void NmapOps::Initialize() {
   max_rtt_timeout = MAX_RTT_TIMEOUT;
   min_rtt_timeout = MIN_RTT_TIMEOUT;
   initial_rtt_timeout = INITIAL_RTT_TIMEOUT;
+  max_retransmissions = MAX_RETRANSMISSIONS;
   min_host_group_sz = 1;
-  max_host_group_sz = 100000; // don't want to be restrictive unles user sets
+  max_host_group_sz = 100000; // don't want to be restrictive unless user sets
   max_tcp_scan_delay = MAX_TCP_SCAN_DELAY;
   max_udp_scan_delay = MAX_UDP_SCAN_DELAY;
   max_ips_to_scan = 0;
@@ -218,6 +225,8 @@ void NmapOps::Initialize() {
   decoyturn = -1;
   osscan = 0;
   servicescan = 0;
+  override_excludeports = 0;
+  version_intensity = 7;
   pingtype = PINGTYPE_UNKNOWN;
   listscan = pingscan = allowall = ackscan = bouncescan = connectscan = 0;
   rpcscan = nullscan = xmasscan = fragscan = synscan = windowscan = 0;
@@ -225,6 +234,7 @@ void NmapOps::Initialize() {
   force = append_output = 0;
   memset(logfd, 0, sizeof(FILE *) * LOG_TYPES);
   ttl = -1;
+  badsum = 0;
   nmap_stdout = stdout;
   gettimeofday(&start_time, NULL);
   pTrace = vTrace = false;
@@ -237,6 +247,11 @@ void NmapOps::Initialize() {
 #endif
   if (xsl_stylesheet) free(xsl_stylesheet);
   xsl_stylesheet = strdup(tmpxsl);
+  spoof_mac_set = false;
+  mass_dns = true;
+  resolve_all = 0;
+  dns_servers = NULL;
+  noninteractive = false;
 }
 
 bool NmapOps::TCPScan() {
@@ -262,9 +277,13 @@ bool NmapOps::RawScan() {
 
 
 void NmapOps::ValidateOptions() {
-
+#ifdef WIN32
+	const char *privreq = "that WinPcap version 3.1 or higher and iphlpapi.dll be installed. You seem to be missing one or both of these.  Winpcap is available from http://www.winpcap.org.  iphlpapi.dll comes with Win98 and later operating sytems and NT 4.0 with SP4 or greater.  For previous windows versions, you may be able to take iphlpapi.dll from anotyer system and place it in your system32 dir (e.g. c:\\windows\\system32)";
+#else
+	const char *privreq = "root privileges";
+#endif
   if (pingtype == PINGTYPE_UNKNOWN) {
-    if (isr00t && af() == AF_INET) pingtype = PINGTYPE_TCP|PINGTYPE_TCP_USE_ACK|PINGTYPE_ICMP_PING;
+    if (isr00t && af() == AF_INET) pingtype = DEFAULT_PING_TYPES;
     else pingtype = PINGTYPE_TCP; // if nonr00t or IPv6
     num_ping_ackprobes = 1;
     ping_ackprobes[0] = DEFAULT_TCP_PROBE_PORT;
@@ -276,6 +295,21 @@ void NmapOps::ValidateOptions() {
       synscan++;
     else connectscan++;
     //    if (verbose) error("No tcp, udp, or ICMP scantype specified, assuming %s scan. Use -sP if you really don't want to portscan (and just want to see what hosts are up).", synscan? "SYN Stealth" : "vanilla tcp connect()");
+  }
+
+  if ((pingtype & PINGTYPE_TCP) && (!o.isr00t || o.af() != AF_INET)) {
+    /* We will have to do a connect() style ping */
+    if (num_ping_synprobes && num_ping_ackprobes) {
+      fatal("Cannot use both SYN and ACK ping probes if you are nonroot or using IPv6");
+    }
+    
+    if (num_ping_ackprobes > 0) { 
+      memcpy(ping_synprobes, ping_ackprobes, num_ping_ackprobes * sizeof(*ping_synprobes));
+      num_ping_synprobes = num_ping_ackprobes;
+      num_ping_ackprobes = 0;
+    }
+    pingtype &= ~PINGTYPE_TCP_USE_ACK;
+    pingtype |= PINGTYPE_TCP_USE_SYN;
   }
 
   if (pingtype != PINGTYPE_NONE && spoofsource) {
@@ -299,18 +333,6 @@ void NmapOps::ValidateOptions() {
    fatal("Sorry, UDP Ping (-PU) only works if you are root (because we need to read raw responses off the wire) and only for IPv4 (cause fyodor is too lazy right now to add IPv6 support and nobody has sent a patch)");
  }
 
- if ((pingtype & PINGTYPE_TCP) && (!o.isr00t || o.af() != AF_INET)) {
-   /* We will have to do a connect() style ping */
-   if (num_ping_synprobes && num_ping_ackprobes) {
-     fatal("Cannot use both SYN and ACK ping probes if you are nonroot or using IPv6");
-   }
-
-   if (num_ping_ackprobes > 0) { 
-     memcpy(ping_synprobes, ping_ackprobes, num_ping_ackprobes * sizeof(*ping_synprobes));
-     num_ping_synprobes = num_ping_ackprobes;
-     num_ping_ackprobes = 0;
-   }
- }
 
  if (ipprotscan + (TCPScan() || UDPScan()) + listscan + pingscan > 1) {
    fatal("Sorry, the IPProtoscan, Listscan, and Pingscan (-sO, -sL, -sP) must currently be used alone rather than combined with other scan types.");
@@ -324,6 +346,13 @@ void NmapOps::ValidateOptions() {
    fatal("Ping scan is not valid with any other scan types (the other ones all include a ping scan");
  }
 
+ if (sendpref == PACKET_SEND_NOPREF) {
+#ifdef WIN32
+   sendpref = PACKET_SEND_ETH_STRONG;
+#else
+   sendpref = PACKET_SEND_IP_WEAK;
+#endif
+ }
 /* We start with stuff users should not do if they are not root */
   if (!isr00t) {
 
@@ -340,35 +369,19 @@ void NmapOps::ValidateOptions() {
 #endif
     
     if (ackscan|finscan|idlescan|ipprotscan|maimonscan|nullscan|synscan|udpscan|windowscan|xmasscan) {
-#ifndef WIN32
-      fatal("You requested a scan type which requires r00t privileges, and you do not have them.\n");
-#else
-      winip_barf(0);
-#endif
+      fatal("You requested a scan type which requires %s.  Sorry dude.\n", privreq);
     }
     
     if (numdecoys > 0) {
-#ifndef WIN32
-      fatal("Sorry, but you've got to be r00t to use decoys, boy!");
-#else
-      winip_barf(0);
-#endif
+      fatal("Sorry, but decoys (-D) require %s.\n", privreq);
     }
     
     if (fragscan) {
-#ifndef WIN32
-      fatal("Sorry, but fragscan requires r00t privileges\n");
-#else
-      winip_barf(0);
-#endif
+      fatal("Sorry, but fragscan requires %s\n", privreq);
     }
     
     if (osscan) {
-#ifndef WIN32
-      fatal("TCP/IP fingerprinting (for OS scan) requires root privileges which you do not appear to possess.  Sorry, dude.\n");
-#else
-      winip_barf(0);
-#endif
+      fatal("TCP/IP fingerprinting (for OS scan) requires %s.  Sorry, dude.\n", privreq);
     }
   }
   
@@ -414,12 +427,15 @@ void NmapOps::ValidateOptions() {
   }
 
   if (max_parallelism && min_parallelism && (min_parallelism > max_parallelism)) {
-    fatal("--min_parallelism must be less than or equal to --max_parallelism");
+    fatal("--min-parallelism must be less than or equal to --max-parallelism");
   }
   
   if (af() == AF_INET6 && (numdecoys|osscan|bouncescan|fragscan|ackscan|finscan|idlescan|ipprotscan|maimonscan|nullscan|rpcscan|synscan|udpscan|windowscan|xmasscan)) {
     fatal("Sorry -- IPv6 support is currently only available for connect() scan (-sT), ping scan (-sP), and list scan (-sL).  Further support is under consideration.");
   }
+
+  if (af() != AF_INET) mass_dns = false;
+
 }
   
 void NmapOps::setMaxRttTimeout(int rtt) 
@@ -432,7 +448,7 @@ void NmapOps::setMaxRttTimeout(int rtt)
 
 void NmapOps::setMinRttTimeout(int rtt) 
 { 
-  if (rtt < 0) fatal("NmapOps::setMaxRttTimeout(): minimum round trip time must be at least 0");
+  if (rtt < 0) fatal("NmapOps::setMinRttTimeout(): minimum round trip time must be at least 0");
   min_rtt_timeout = rtt; 
   if (rtt > max_rtt_timeout) max_rtt_timeout = rtt;  
   if (rtt > initial_rtt_timeout) initial_rtt_timeout = rtt;
@@ -440,11 +456,19 @@ void NmapOps::setMinRttTimeout(int rtt)
 
 void NmapOps::setInitialRttTimeout(int rtt) 
 { 
-  if (rtt <= 0) fatal("NmapOps::setMaxRttTimeout(): initial round trip time must be greater than 0");
+  if (rtt <= 0) fatal("NmapOps::setInitialRttTimeout(): initial round trip time must be greater than 0");
   initial_rtt_timeout = rtt; 
   if (rtt > max_rtt_timeout) max_rtt_timeout = rtt;  
   if (rtt < min_rtt_timeout) min_rtt_timeout = rtt;
 }
+
+void NmapOps::setMaxRetransmissions(int max_retransmit)
+{
+    if (max_retransmit < 0)
+        fatal("NmapOps::setMaxRetransmissions(): must be positive");
+    max_retransmissions = max_retransmit;
+}
+
 
 void NmapOps::setMinHostGroupSz(unsigned int sz) {
   if (sz > max_host_group_sz)
@@ -467,4 +491,9 @@ void NmapOps::setMaxHostGroupSz(unsigned int sz) {
 void NmapOps::setXSLStyleSheet(char *xslname) {
   if (xsl_stylesheet) free(xsl_stylesheet);
   xsl_stylesheet = xslname? strdup(xslname) : NULL;
+}
+
+void NmapOps::setSpoofMACAddress(u8 *mac_data) {
+  memcpy(spoof_mac, mac_data, 6);
+  spoof_mac_set = true;
 }

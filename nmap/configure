@@ -310,8 +310,9 @@ ac_includes_default="\
 #endif"
 
 ac_subdirs_all="$ac_subdirs_all libpcre"
+ac_subdirs_all="$ac_subdirs_all libdnet-stripped"
 ac_subdirs_all="$ac_subdirs_all $nmap_cfg_subdirs"
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS libpcapdir pcredir CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT CXX CXXFLAGS ac_ct_CXX CXXPROG COMPAT_OBJS COMPAT_SRCS build build_cpu build_vendor build_os host host_cpu host_vendor host_os CPP EGREP TARGETNMAPFE INSTALLNMAPFE OPENSSL_LIBS PCAP_DEPENDS PCAP_CLEAN PCAP_DIST_CLEAN LIBPCAP_LIBS subdirs LIBPCRE_LIBS LIBPCREDIR PCRE_DEPENDS PCRE_CLEAN PCRE_DIST_CLEAN NBASEDIR LIBNBASE_LIBS NSOCKDIR LIBNSOCK_LIBS GTK_CONFIG LIBOBJS LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS libpcapdir pcredir CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT CXX CXXFLAGS ac_ct_CXX CXXPROG COMPAT_OBJS COMPAT_SRCS build build_cpu build_vendor build_os host host_cpu host_vendor host_os CPP EGREP TARGETNMAPFE INSTALLNMAPFE OPENSSL_LIBS PCAP_DEPENDS PCAP_CLEAN PCAP_DIST_CLEAN LIBPCAP_LIBS subdirs LIBPCRE_LIBS LIBPCREDIR PCRE_DEPENDS PCRE_CLEAN PCRE_DIST_CLEAN LIBDNET_LIBS LIBDNETDIR DNET_DEPENDS DNET_CLEAN DNET_DIST_CLEAN NBASEDIR LIBNBASE_LIBS NSOCKDIR LIBNSOCK_LIBS GTK_CONFIG LIBOBJS LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -857,8 +858,9 @@ Optional Packages:
   --with-localdirs        Explicitly ask compiler to use /usr/local/{include,libs} if they exist
   --without-nmapfe    skip nmapfe X-window GUI
   --with-openssl=DIR    Use optional openssl libs and includes from DIR/lib/ and DIR/include/openssl/)
-  --with-libpcap=DIR    Look for pcap in DIR/include and DIR/libs
+  --with-libpcap=DIR    Look for pcap in DIR/include and DIR/libs. Specify --with-libpcap=included to always use version included with Nmap
   --with-libpcre=DIR    Use an existing (compiled) pcre lib from DIR/include and DIR/lib.  Specify --with-libpcre=included to always use the version included with Nmap
+  --with-libdnet=DIR    Use an existing (compiled) dnet lib from DIR/include and DIR/lib.
   --with-libnbase=DIR     Look for nbase include/libs in DIR
   --with-libnsock=DIR     Compile and link to libnsock in DIR
 
@@ -1339,7 +1341,7 @@ if test "$user_localdirs" = 1; then
    fi
 fi
 
-libpcapdir=libpcap-possiblymodified
+libpcapdir=libpcap
 
 
 pcredir=libpcre
@@ -2678,6 +2680,48 @@ echo "$as_me: error: Could not locate a C++ compiler. If it exists, add it to yo
    { (exit 1); exit 1; }; }
 fi
 
+nmap_gcc_major_version=0
+echo "$as_me:$LINENO: checking whether the compiler is gcc 4 or greater" >&5
+echo $ECHO_N "checking whether the compiler is gcc 4 or greater... $ECHO_C" >&6
+if test x"$GXX" = xno; then
+  echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+else
+  # On some distros, there are snapshots available as gcc4
+  if test -z "$ac_cv_prog_CC" || test x"$CC" = xgcc4; then
+    our_gcc="$CC"
+  else
+    our_gcc="$ac_cv_prog_CC"
+  fi
+  # new major versions must be added here
+  case `$our_gcc --version | sed -e 's,\..*,.,' -e q` in
+    *4.)
+      nmap_gcc_major_version=4
+      ;;
+    *3.)
+      nmap_gcc_major_version=3
+      ;;
+    *2.)
+      nmap_gcc_major_version=2
+      ;;
+    *1.)
+      nmap_gcc_major_version=1
+      ;;
+  esac
+  if test "$nmap_gcc_major_version" -ge 4; then
+    echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+  else
+    echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+  fi
+fi
+
+# Remember that all following tests will run with this CXXFLAGS by default
+if test "$nmap_gcc_major_version" -ge 4; then
+  CXXFLAGS="$CXXFLAGS -fno-strict-aliasing"
+fi
+
 
 
 
@@ -2985,7 +3029,7 @@ _ACEOF
   # libpcap doesn't even LOOK at
                                      # the timeout you give it under Linux
     ;;
-  *-freebsd* | *-kfreebsd*-gnu)
+  *-freebsd* | *-kfreebsd*-gnu | *-dragonfly*)
     cat >>confdefs.h <<\_ACEOF
 #define FREEBSD 1
 _ACEOF
@@ -3505,7 +3549,10 @@ done
 
 
 
-for ac_header in string.h getopt.h strings.h memory.h sys/param.h sys/sockio.h bstring.h sys/time.h pwd.h unistd.h
+
+
+
+for ac_header in string.h getopt.h strings.h memory.h sys/param.h sys/sockio.h bstring.h sys/time.h sys/stat.h fcntl.h termios.h pwd.h unistd.h
 do
 as_ac_Header=`echo "ac_cv_header_$ac_header" | $as_tr_sh`
 if eval "test \"\${$as_ac_Header+set}\" = set"; then
@@ -5488,6 +5535,9 @@ fi
 
 
     ;;
+  included)
+    have_libpcap=no
+   ;;
   *)
     _cppflags=$CXXFLAGS
     _ldflags=$LDFLAGS
@@ -5812,7 +5862,7 @@ _ACEOF
 else
   if test "${LIBPCAP_INC+set}" = "set"; then
     LDFLAGS="-L$libpcapdir $_ldflags"
-    CXXFLAGS="$_cflags -I$libpcapdir"
+    CXXFLAGS="$_cflags -I$LIBPCAP_INC"
   else
     LDFLAGS="-L$libpcapdir $LDFLAGS"
     CXXFLAGS="$CXXFLAGS -I$libpcapdir"
@@ -6302,6 +6352,52 @@ else
   PCRE_DIST_CLEAN=""
 fi
 
+
+
+
+
+
+
+have_dnet=no
+requested_included_dnet=no
+LIBDNETDIR=libdnet-stripped
+
+# First we test whether they specified libdnet explicitly
+
+# Check whether --with-libdnet or --without-libdnet was given.
+if test "${with_libdnet+set}" = set; then
+  withval="$with_libdnet"
+    case "$with_libdnet" in
+  yes)
+    ;;
+  included)
+    ;;
+  *)
+    CXXFLAGS="-I$with_libdnet/include $CXXFLAGS"
+    LDFLAGS="-L$with_libdnet/lib $LDFLAGS"
+    have_dnet=yes
+    ;;
+  esac
+
+fi;
+
+# If they didn't provide location, we use the included one
+if test $have_dnet != yes ; then
+
+
+subdirs="$subdirs libdnet-stripped "
+
+  CXXFLAGS="-I$LIBDNETDIR/include $CXXFLAGS"
+  LIBDNET_LIBS="$LIBDNETDIR/src/.libs/libdnet.a"
+  DNET_DEPENDS="$LIBDNETDIR/src/.libs/libdnet.a"
+  DNET_CLEAN="dnet_clean"
+  DNET_DIST_CLEAN="dnet_dist_clean"
+else
+  LIBDNET_LIBS="-ldnet"
+  DNET_DEPENDS=""
+  DNET_CLEAN=""
+  DNET_DIST_CLEAN=""
+fi
 
 
 
@@ -7601,8 +7697,8 @@ fi
 
 
 if test "${with_nmapfe}" = "yes"; then
-# Extract the first word of "gtk-config", so it can be a program name with args.
-set dummy gtk-config; ac_word=$2
+# Extract the first word of "pkg-config", so it can be a program name with args.
+set dummy pkg-config; ac_word=$2
 echo "$as_me:$LINENO: checking for $ac_word" >&5
 echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6
 if test "${ac_cv_path_GTK_CONFIG+set}" = set; then
@@ -7649,11 +7745,11 @@ echo "${ECHO_T}no" >&6
   { echo "$as_me:$LINENO: WARNING: Gtk+ has not been installed -> nmapfe will not be made" >&5
 echo "$as_me: WARNING: Gtk+ has not been installed -> nmapfe will not be made" >&2;}
 else
-  GTK_NEEDED_MAJOR=1
-  GTK_NEEDED_MINOR=2
-  GTK_NEEDED_MICRO=7
+  GTK_NEEDED_MAJOR=2
+  GTK_NEEDED_MINOR=4
+  GTK_NEEDED_MICRO=0
   GTK_MINVERSION=$GTK_NEEDED_MAJOR.$GTK_NEEDED_MINOR.$GTK_NEEDED_MICRO
-  ver=`gtk-config --version`
+  ver=`pkg-config --modversion gtk+-2.0`
     major=`echo $ver|sed 's/\([0-9]*\).\([0-9]*\).\([0-9]*\)/\1/'`
   minor=`echo $ver|sed 's/\([0-9]*\).\([0-9]*\).\([0-9]*\)/\2/'`
   micro=`echo $ver|sed 's/\([0-9]*\).\([0-9]*\).\([0-9]*\)/\3/'`
@@ -8329,6 +8425,11 @@ s,@LIBPCREDIR@,$LIBPCREDIR,;t t
 s,@PCRE_DEPENDS@,$PCRE_DEPENDS,;t t
 s,@PCRE_CLEAN@,$PCRE_CLEAN,;t t
 s,@PCRE_DIST_CLEAN@,$PCRE_DIST_CLEAN,;t t
+s,@LIBDNET_LIBS@,$LIBDNET_LIBS,;t t
+s,@LIBDNETDIR@,$LIBDNETDIR,;t t
+s,@DNET_DEPENDS@,$DNET_DEPENDS,;t t
+s,@DNET_CLEAN@,$DNET_CLEAN,;t t
+s,@DNET_DIST_CLEAN@,$DNET_DIST_CLEAN,;t t
 s,@NBASEDIR@,$NBASEDIR,;t t
 s,@LIBNBASE_LIBS@,$LIBNBASE_LIBS,;t t
 s,@NSOCKDIR@,$NSOCKDIR,;t t
@@ -8999,3 +9100,8 @@ echo "$as_me: error: $ac_sub_configure failed for $ac_dir" >&2;}
   done
 fi
 
+# Krad ASCII ART#!#@$!@#$
+if test -f docs/leet-nmap-ascii-art.txt; then
+	cat docs/leet-nmap-ascii-art.txt
+fi
+echo "Configuration complete.  Type make (or gmake on some *BSD machines) to compile."

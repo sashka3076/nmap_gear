@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: FingerPrintResults.cc,v 1.7 2004/08/29 09:12:02 fyodor Exp $ */
+/* $Id: FingerPrintResults.cc 2396 2004-08-29 09:12:05Z fyodor $ */
 
 #include "FingerPrintResults.h"
 #include "osscan.h"

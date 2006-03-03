@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: getaddrinfo.c,v 1.6 2004/08/29 09:12:04 fyodor Exp $ */
+/* $Id: getaddrinfo.c 3085 2006-01-25 07:49:28Z fyodor $ */
 
 #include "nbase.h"
 
@@ -118,7 +118,11 @@
 #include <assert.h>
 
 
-#ifndef HAVE_GAI_STRERROR
+#if !defined(HAVE_GAI_STRERROR) || defined(__MINGW32__)
+#ifdef __MINGW32__
+#undef gai_strerror
+#endif
+
 const char *gai_strerror(int errcode) {
   static char customerr[64];
   switch (errcode) {
@@ -133,6 +137,13 @@ const char *gai_strerror(int errcode) {
     return "unknown error.";
   }
   return NULL; /* unreached */
+}
+#endif
+
+#ifdef __MINGW32__
+char* WSAAPI gai_strerrorA (int errcode)
+{
+  return gai_strerror(errcode);
 }
 #endif
 
