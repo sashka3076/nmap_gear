@@ -388,10 +388,10 @@ void replacenonprintable(char *str, int strlength, char replchar);
 
 /* A few simple wrappers for the most common memory allocation routines which will exit() if the
 	allocation fails, so you don't always have to check -- see nbase_memalloc.c */
-void *safe_malloc(int size);
+void *safe_malloc(size_t size);
 void *safe_realloc(void *ptr, size_t size);
 /* Zero-initializing version of safe_malloc */
-void *safe_zalloc(int size);
+void *safe_zalloc(size_t size);
 
   /* Some routines for obtaining simple (not secure on systems that
      lack /dev/random and friends' "random" numbers */

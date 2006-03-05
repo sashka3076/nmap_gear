@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmapfe_error.c 2396 2004-08-29 09:12:05Z fyodor $ */
+/* $Id: nmapfe_error.c 3195 2006-03-04 04:17:32Z fyodor $ */
 
 #ifdef WIN32
 #include <windows.h>
@@ -147,15 +147,4 @@ void pfatal(char *err, ...) {
 #endif /* WIN32 perror() compatability switch */
 	fflush(stderr);
 	exit(1);
-}
-
-
-void gh_perror(char *err, ...) {
-	va_list  ap;va_start(ap, err);
-	fflush(stdout);
-	vfprintf(stderr, err, ap);
-	va_end(ap);
-	perror(" ");
-	fflush(stderr);
-	return;
 }

@@ -101,7 +101,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: idle_scan.cc 3120 2006-02-07 07:15:32Z fyodor $ */
+/* $Id: idle_scan.cc 3194 2006-03-03 23:12:14Z fyodor $ */
 
 #include "idle_scan.h"
 #include "scan_engine.h"
@@ -372,6 +372,8 @@ void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
     memcpy(proxy->eth.srcmac, proxy->host.SrcMACAddress(), 6);
     memcpy(proxy->eth.dstmac, proxy->host.NextHopMACAddress(), 6);
     proxy->eth.ethsd = eth_open(proxy->host.deviceName());
+    if (proxy->eth.ethsd == NULL)
+      fatal("%s: Failed to open ethernet device (%s)", __FUNCTION__, proxy->host.deviceName());
     proxy->rawsd = -1;
     proxy->ethptr = &proxy->eth;
   } else {
@@ -665,6 +667,8 @@ int idlescan_countopen2(struct idle_proxy_info *proxy,
     memcpy(eth.srcmac, target->SrcMACAddress(), 6);
     memcpy(eth.dstmac, target->NextHopMACAddress(), 6);
     eth.ethsd = eth_open(target->deviceName());
+    if (eth.ethsd == NULL)
+      fatal("%s: Failed to open ethernet device (%s)", __FUNCTION__, target->deviceName());
   } else eth.ethsd = NULL;
 
   /* I start by sending out the SYN pr0bez */

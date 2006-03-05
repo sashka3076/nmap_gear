@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOps.cc 3062 2006-01-22 20:30:17Z fyodor $ */
+/* $Id: NmapOps.cc 3195 2006-03-04 04:17:32Z fyodor $ */
 #include "nmap.h"
 #include "nbase.h"
 #include "NmapOps.h"
@@ -177,17 +177,13 @@ void NmapOps::Initialize() {
   char tmpxsl[MAXPATHLEN];
 
   setaf(AF_INET);
-#ifndef WIN32
-# ifdef __amigaos__
-    isr00t = 1;
-# else
-    if (getenv("NMAP_PRIVILEGED"))
-      isr00t = 1;
-    else
-      isr00t = !(geteuid());
-# endif // __amigaos__
-#else
+#if defined WIN32 || defined __amigaos__
   isr00t = 1;
+#else
+  if (getenv("NMAP_PRIVILEGED"))
+    isr00t = 1;
+  else
+    isr00t = !(geteuid());
 #endif
   debugging = DEBUGGING;
   verbose = DEBUGGING;
@@ -232,7 +228,7 @@ void NmapOps::Initialize() {
   rpcscan = nullscan = xmasscan = fragscan = synscan = windowscan = 0;
   maimonscan = idlescan = finscan = udpscan = ipprotscan = noresolve = 0;
   force = append_output = 0;
-  memset(logfd, 0, sizeof(FILE *) * LOG_TYPES);
+  memset(logfd, 0, sizeof(FILE *) * LOG_NUM_FILES);
   ttl = -1;
   badsum = 0;
   nmap_stdout = stdout;
@@ -249,6 +245,7 @@ void NmapOps::Initialize() {
   xsl_stylesheet = strdup(tmpxsl);
   spoof_mac_set = false;
   mass_dns = true;
+  log_errors = false;
   resolve_all = 0;
   dns_servers = NULL;
   noninteractive = false;

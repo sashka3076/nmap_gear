@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: service_scan.cc 3024 2005-12-31 00:32:42Z fyodor $ */
+/* $Id: service_scan.cc 3194 2006-03-03 23:12:14Z fyodor $ */
 
 
 #include "service_scan.h"
@@ -1785,10 +1785,7 @@ static int scanThroughTunnel(nsock_pool nsp, nsock_iod nsi, ServiceGroup *SG,
     return 0;
   }
 
-#ifndef HAVE_OPENSSL
-  return 0;
-#endif
-
+#ifdef HAVE_OPENSSL
   if (svc->tunnel != SERVICE_TUNNEL_NONE) {
     // Another tunnel type has already been tried.  Let's not go recursive.
     return 0;
@@ -1808,6 +1805,9 @@ static int scanThroughTunnel(nsock_pool nsp, nsock_iod nsi, ServiceGroup *SG,
    svc->resetProbes(true);
   startNextProbe(nsp, nsi, SG, svc, true);
   return 1;
+#else
+  return 0;
+#endif
 }
 
 /* Prints completion estimates and the like when appropriate */

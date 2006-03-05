@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: utils.cc 3061 2006-01-21 23:57:49Z fyodor $ */
+/* $Id: utils.cc 3194 2006-03-03 23:12:14Z fyodor $ */
 
 #include "utils.h"
 #include "NmapOps.h"
@@ -197,15 +197,13 @@ char *strerror(int errnum) {
 /* Like the perl equivialent -- It removes the terminating newline from string
    IF one exists.  It then returns the POSSIBLY MODIFIED string */
 char *chomp(char *string) {
-  int len;
-  len = strlen(string);
-  if (len < 1)
-    return string;
-  if (string[len - 1] != '\n')
-    return string;  
-  if (len > 1 && string[len-2] == '\r') {
-    string[len-2] = '\0';
-  } else string[len-1] = '\0';
+  int len = strlen(string);
+  if (len && string[len - 1] == '\n') {
+    if (len > 1 && string[len - 2] == '\r')
+      string[len - 2] = '\0';
+    else
+      string[len - 1] = '\0';
+  }
   return string;
 }
 

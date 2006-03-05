@@ -1,6 +1,6 @@
-diff -upk.orig nmap-4.01.orig/MACLookup.cc nmap-4.01/MACLookup.cc
---- nmap-4.01.orig/MACLookup.cc	2006-03-03 00:05:09 +0000
-+++ nmap-4.01/MACLookup.cc	2006-03-03 00:05:26 +0000
+diff -upk.orig nmap-4.02Alpha1.orig/MACLookup.cc nmap-4.02Alpha1/MACLookup.cc
+--- nmap-4.02Alpha1.orig/MACLookup.cc	2006-03-05 01:10:19 +0000
++++ nmap-4.02Alpha1/MACLookup.cc	2006-03-05 02:09:57 +0000
 @@ -105,6 +105,7 @@
  #include "MACLookup.h"
  #include "nmap.h"
@@ -9,18 +9,9 @@ diff -upk.orig nmap-4.01.orig/MACLookup.cc nmap-4.01/MACLookup.cc
  
  struct MAC_entry {
    int prefix; /* -1 means none set */
-@@ -128,7 +129,7 @@ static inline int MACTableHash(int prefi
-   return prefix % table_capacity;
- }
- 
--static void mac_prefix_init() {
-+void mac_prefix_init() {
-   static int initialized = 0;
-   if (initialized) return;
-   initialized = 1;
-diff -upk.orig nmap-4.01.orig/Makefile.in nmap-4.01/Makefile.in
---- nmap-4.01.orig/Makefile.in	2006-02-10 02:22:27 +0000
-+++ nmap-4.01/Makefile.in	2006-03-03 00:05:26 +0000
+diff -upk.orig nmap-4.02Alpha1.orig/Makefile.in nmap-4.02Alpha1/Makefile.in
+--- nmap-4.02Alpha1.orig/Makefile.in	2006-02-17 01:23:58 +0000
++++ nmap-4.02Alpha1/Makefile.in	2006-03-05 02:09:57 +0000
 @@ -46,11 +46,11 @@ TARGET = nmap
  TARGETNMAPFE=@TARGETNMAPFE@
  INSTALLNMAPFE=@INSTALLNMAPFE@
@@ -36,37 +27,98 @@ diff -upk.orig nmap-4.01.orig/Makefile.in nmap-4.01/Makefile.in
  
  
  # %.o : %.cc -- nope this is a GNU extension
-diff -upk.orig nmap-4.01.orig/configure.ac nmap-4.01/configure.ac
---- nmap-4.01.orig/configure.ac	2006-03-03 00:05:09 +0000
-+++ nmap-4.01/configure.ac	2006-03-03 00:05:26 +0000
-@@ -648,6 +648,7 @@ if test $ac_cv_ip_has_ip_sum = yes ; the
+diff -upk.orig nmap-4.02Alpha1.orig/configure.ac nmap-4.02Alpha1/configure.ac
+--- nmap-4.02Alpha1.orig/configure.ac	2006-03-05 01:10:19 +0000
++++ nmap-4.02Alpha1/configure.ac	2006-03-05 12:58:44 +0000
+@@ -669,6 +669,51 @@ if test $ac_cv_ip_has_ip_sum = yes ; the
          AC_DEFINE(HAVE_IP_IP_SUM, 1, [Define to 1 for ip_sum member])
  fi
  
-+AC_CHECK_LIB(cap, cap_from_text)
++try_drop_priv=no
++AC_CHECK_HEADERS(grp.h sys/capability.h sys/prctl.h)
++AC_CHECK_FUNC(chroot)
++AC_CHECK_FUNC(prctl,
++  [AC_CHECK_FUNC(setgid,
++    [AC_CHECK_FUNC(setgroups,
++      [AC_CHECK_FUNC(seteuid,
++        [AC_CHECK_FUNC(setreuid,
++          [try_drop_priv=yes
++	  AC_CHECK_LIB(cap, cap_from_text, , [try_drop_priv=no])]
++	)]
++      )]
++    )]
++  )]
++)
++
++AC_ARG_WITH(user,
++  [  --with-user=USERNAME    Lower root privileges by switching to user USERNAME])
++AC_MSG_CHECKING([whether to lower root privileges by default])
++if test -z "$with_user" -o "$try_drop_priv" = "no"; then
++       AC_MSG_RESULT(no)
++else
++       AC_DEFINE_UNQUOTED(NMAP_USER, "$withval", [Define user to switch during lowering privileges])
++       AC_MSG_RESULT(to \"$withval\")
++fi
++
++AC_ARG_WITH(chroot-empty,
++  [  --with-chroot-empty=DIRECTORY When lowering privileges and -n option is given, chroot to empty DIRECTORY])
++AC_MSG_CHECKING([whether to chroot when -n option is given])
++if test -z "$with_chroot_empty" -o "$try_drop_priv" = "no" -o "$ac_cv_func_chroot" = no; then
++       AC_MSG_RESULT(no)
++else
++       AC_DEFINE_UNQUOTED(NMAP_CHROOT_EMPTY, "$withval", [Define directory to chroot during lowering privileges if -n option is given])
++       AC_MSG_RESULT(to \"$withval\")
++fi
++
++AC_ARG_WITH(chroot-resolv,
++  [  --with-chroot-resolv=DIRECTORY When lowering privileges and -n option is not given, chroot to resolver DIRECTORY])
++AC_MSG_CHECKING([whether to chroot when -n option is not given])
++if test -z "$with_chroot_resolv" -o "$try_drop_priv" = "no" -o "$ac_cv_func_chroot" = no; then
++       AC_MSG_RESULT(no)
++else
++       AC_DEFINE_UNQUOTED(NMAP_CHROOT_RESOLV, "$withval", [Define directory to chroot during lowering privileges if -n option is not given])
++       AC_MSG_RESULT(to \"$withval\")
++fi
  
  dnl Checks for library functions.
  dnl AC_TYPE_SIGNAL
-diff -upk.orig nmap-4.01.orig/droppriv.cc nmap-4.01/droppriv.cc
---- nmap-4.01.orig/droppriv.cc	1970-01-01 00:00:00 +0000
-+++ nmap-4.01/droppriv.cc	2006-03-03 00:05:26 +0000
-@@ -0,0 +1,71 @@
-+#include <stdlib.h>
-+#include <unistd.h>
-+#include <pwd.h>
-+#include <grp.h>
-+#include <sys/capability.h>
-+#include <sys/prctl.h>
-+
+diff -upk.orig nmap-4.02Alpha1.orig/droppriv.cc nmap-4.02Alpha1/droppriv.cc
+--- nmap-4.02Alpha1.orig/droppriv.cc	1970-01-01 00:00:00 +0000
++++ nmap-4.02Alpha1/droppriv.cc	2006-03-05 02:12:49 +0000
+@@ -0,0 +1,90 @@
 +#include "nmap.h"
 +#include "droppriv.h"
++
++#ifndef NMAP_USER
++
++void drop_priv(void) {}
++
++#else
++
++#if HAVE_GRP_H
++# include <grp.h>
++#endif
++#if HAVE_SYS_CAPABILITY_H
++# include <sys/capability.h>
++#endif
++#if HAVE_SYS_PRCTL_H
++# include <sys/prctl.h>
++#endif
++
 +#include "NmapOps.h"
-+
-+#define NMAP_USER "nmapuser"
-+#define NMAP_CHROOT_EMPTY "/var/empty"
-+#define NMAP_CHROOT_RESOLV "/var/resolv"
-+
 +extern NmapOps o;		/* option structure */
++
++#ifndef NMAP_CHROOT_EMPTY
++# ifdef NMAP_CHROOT_RESOLV
++#  define NMAP_CHROOT_EMPTY NMAP_CHROOT_RESOLV
++# else
++#  define NMAP_CHROOT_EMPTY NULL
++# endif
++#endif
++
++#ifndef NMAP_CHROOT_RESOLV
++# define NMAP_CHROOT_RESOLV NULL
++#endif
 +
 +void
 +drop_priv(void)
@@ -122,9 +174,11 @@ diff -upk.orig nmap-4.01.orig/droppriv.cc nmap-4.01/droppriv.cc
 +	if (setreuid(pw->pw_uid, pw->pw_uid) < 0)
 +		fatal("setreuid failed");
 +}
-diff -upk.orig nmap-4.01.orig/droppriv.h nmap-4.01/droppriv.h
---- nmap-4.01.orig/droppriv.h	1970-01-01 00:00:00 +0000
-+++ nmap-4.01/droppriv.h	2006-03-03 00:05:26 +0000
++
++#endif /* NMAP_USER */
+diff -upk.orig nmap-4.02Alpha1.orig/droppriv.h nmap-4.02Alpha1/droppriv.h
+--- nmap-4.02Alpha1.orig/droppriv.h	1970-01-01 00:00:00 +0000
++++ nmap-4.02Alpha1/droppriv.h	2006-03-05 02:09:57 +0000
 @@ -0,0 +1,16 @@
 +#ifndef NMAP_DROPPRIV_H__
 +#define NMAP_DROPPRIV_H__
@@ -142,9 +196,9 @@ diff -upk.orig nmap-4.01.orig/droppriv.h nmap-4.01/droppriv.h
 +
 +#endif /* NMAP_DROPPRIV_H__ */
 +
-diff -upk.orig nmap-4.01.orig/nmap.cc nmap-4.01/nmap.cc
---- nmap-4.01.orig/nmap.cc	2006-02-07 07:15:37 +0000
-+++ nmap-4.01/nmap.cc	2006-03-03 00:05:26 +0000
+diff -upk.orig nmap-4.02Alpha1.orig/nmap.cc nmap-4.02Alpha1/nmap.cc
+--- nmap-4.02Alpha1.orig/nmap.cc	2006-03-04 04:17:39 +0000
++++ nmap-4.02Alpha1/nmap.cc	2006-03-05 02:09:57 +0000
 @@ -105,6 +105,7 @@
  #include "scan_engine.h"
  #include "idle_scan.h"
@@ -153,7 +207,7 @@ diff -upk.orig nmap-4.01.orig/nmap.cc nmap-4.01/nmap.cc
  #include "NmapOps.h"
  #include "MACLookup.h"
  #include "tty.h"
-@@ -928,6 +929,8 @@ int nmap_main(int argc, char *argv[]) {
+@@ -932,6 +933,8 @@ int nmap_main(int argc, char *argv[]) {
        o.sendpref = PACKET_SEND_ETH_STRONG;
    }
  
@@ -162,9 +216,9 @@ diff -upk.orig nmap-4.01.orig/nmap.cc nmap-4.01/nmap.cc
    if (!ports) {
      if (o.ipprotscan) {
        ports = getdefaultprots();
-diff -upk.orig nmap-4.01.orig/nmap_dns.cc nmap-4.01/nmap_dns.cc
---- nmap-4.01.orig/nmap_dns.cc	2006-03-03 00:05:09 +0000
-+++ nmap-4.01/nmap_dns.cc	2006-03-03 00:05:50 +0000
+diff -upk.orig nmap-4.02Alpha1.orig/nmap_dns.cc nmap-4.02Alpha1/nmap_dns.cc
+--- nmap-4.02Alpha1.orig/nmap_dns.cc	2006-03-05 01:10:19 +0000
++++ nmap-4.02Alpha1/nmap_dns.cc	2006-03-05 02:09:57 +0000
 @@ -1002,7 +1002,7 @@ char *lookup_etchosts(u32 ip) {
  }
  
@@ -174,9 +228,9 @@ diff -upk.orig nmap-4.01.orig/nmap_dns.cc nmap-4.01/nmap_dns.cc
    static int initialized = 0;
    if (initialized) return;
    initialized = 1;
-diff -upk.orig nmap-4.01.orig/nmap_rpc.cc nmap-4.01/nmap_rpc.cc
---- nmap-4.01.orig/nmap_rpc.cc	2006-03-03 00:05:09 +0000
-+++ nmap-4.01/nmap_rpc.cc	2006-03-03 00:05:26 +0000
+diff -upk.orig nmap-4.02Alpha1.orig/nmap_rpc.cc nmap-4.02Alpha1/nmap_rpc.cc
+--- nmap-4.02Alpha1.orig/nmap_rpc.cc	2006-03-05 01:10:19 +0000
++++ nmap-4.02Alpha1/nmap_rpc.cc	2006-03-05 02:09:57 +0000
 @@ -103,6 +103,7 @@
  
  
@@ -194,9 +248,9 @@ diff -upk.orig nmap-4.01.orig/nmap_rpc.cc nmap-4.01/nmap_rpc.cc
    static int services_initialized = 0;
    if (services_initialized) return;
    services_initialized = 1;
-diff -upk.orig nmap-4.01.orig/protocols.cc nmap-4.01/protocols.cc
---- nmap-4.01.orig/protocols.cc	2006-03-03 00:05:09 +0000
-+++ nmap-4.01/protocols.cc	2006-03-03 00:05:26 +0000
+diff -upk.orig nmap-4.02Alpha1.orig/protocols.cc nmap-4.02Alpha1/protocols.cc
+--- nmap-4.02Alpha1.orig/protocols.cc	2006-03-05 01:10:19 +0000
++++ nmap-4.02Alpha1/protocols.cc	2006-03-05 02:09:57 +0000
 @@ -100,13 +100,14 @@
  /* $Id: protocols.cc 2396 2004-08-29 09:12:05Z fyodor $ */
  
@@ -213,9 +267,9 @@ diff -upk.orig nmap-4.01.orig/protocols.cc nmap-4.01/protocols.cc
    static int protocols_initialized = 0;
    if (protocols_initialized) return 0;
  
-diff -upk.orig nmap-4.01.orig/service_scan.cc nmap-4.01/service_scan.cc
---- nmap-4.01.orig/service_scan.cc	2006-03-03 00:05:09 +0000
-+++ nmap-4.01/service_scan.cc	2006-03-03 00:05:26 +0000
+diff -upk.orig nmap-4.02Alpha1.orig/service_scan.cc nmap-4.02Alpha1/service_scan.cc
+--- nmap-4.02Alpha1.orig/service_scan.cc	2006-03-05 01:10:19 +0000
++++ nmap-4.02Alpha1/service_scan.cc	2006-03-05 02:09:57 +0000
 @@ -105,6 +105,7 @@
  #include "timing.h"
  #include "NmapOps.h"
@@ -224,7 +278,7 @@ diff -upk.orig nmap-4.01.orig/service_scan.cc nmap-4.01/service_scan.cc
  
  #include "tty.h"
  
-@@ -1137,7 +1138,7 @@ static void parse_nmap_service_probes(Al
+@@ -1137,7 +1138,7 @@ void parse_nmap_service_probes(AllProbes
    parse_nmap_service_probe_file(AP, filename);
  }
  
@@ -233,9 +287,9 @@ diff -upk.orig nmap-4.01.orig/service_scan.cc nmap-4.01/service_scan.cc
  {
    static AllProbes *AP;
  
-diff -upk.orig nmap-4.01.orig/services.cc nmap-4.01/services.cc
---- nmap-4.01.orig/services.cc	2006-03-03 00:05:09 +0000
-+++ nmap-4.01/services.cc	2006-03-03 00:05:26 +0000
+diff -upk.orig nmap-4.02Alpha1.orig/services.cc nmap-4.02Alpha1/services.cc
+--- nmap-4.02Alpha1.orig/services.cc	2006-03-05 01:10:19 +0000
++++ nmap-4.02Alpha1/services.cc	2006-03-05 02:09:57 +0000
 @@ -100,6 +100,7 @@
  /* $Id: services.cc 2396 2004-08-29 09:12:05Z fyodor $ */
  
@@ -253,9 +307,9 @@ diff -upk.orig nmap-4.01.orig/services.cc nmap-4.01/services.cc
    static int services_initialized = 0;
    if (services_initialized) return 0;
  
-diff -upk.orig nmap-4.01.orig/tcpip.cc nmap-4.01/tcpip.cc
---- nmap-4.01.orig/tcpip.cc	2006-02-07 07:15:37 +0000
-+++ nmap-4.01/tcpip.cc	2006-03-03 00:05:26 +0000
+diff -upk.orig nmap-4.02Alpha1.orig/tcpip.cc nmap-4.02Alpha1/tcpip.cc
+--- nmap-4.02Alpha1.orig/tcpip.cc	2006-03-03 23:12:21 +0000
++++ nmap-4.02Alpha1/tcpip.cc	2006-03-05 02:09:57 +0000
 @@ -102,6 +102,7 @@
  
  #include <dnet.h>
@@ -264,7 +318,7 @@ diff -upk.orig nmap-4.01.orig/tcpip.cc nmap-4.01/tcpip.cc
  #include "NmapOps.h"
  
  #if HAVE_SYS_TIME_H
-@@ -2027,6 +2028,14 @@ void set_pcap_filter(const char *device,
+@@ -2039,6 +2040,14 @@ void set_pcap_filter(const char *device,
      fatal("Failed to set the pcap filter: %s\n", pcap_geterr(pd));
  }
  
@@ -279,7 +333,7 @@ diff -upk.orig nmap-4.01.orig/tcpip.cc nmap-4.01/tcpip.cc
  /* The 'dev' passed in must be at least 32 bytes long */
  int ipaddr2devname( char *dev, const struct in_addr *addr ) {
  struct interface_info *mydevs;
-@@ -2403,7 +2412,6 @@ struct sys_route *getsysroutes(int *howm
+@@ -2415,7 +2424,6 @@ struct sys_route *getsysroutes(int *howm
    int route_capacity = 128;
    static struct sys_route *routes = NULL;
    static int numroutes = 0;
@@ -287,7 +341,7 @@ diff -upk.orig nmap-4.01.orig/tcpip.cc nmap-4.01/tcpip.cc
    char buf[1024];
    char iface[16];
    char *p, *endptr;
-@@ -2418,7 +2426,7 @@ struct sys_route *getsysroutes(int *howm
+@@ -2430,7 +2438,7 @@ struct sys_route *getsysroutes(int *howm
      routes = (struct sys_route *) safe_zalloc(route_capacity * sizeof(struct sys_route));
      ifaces = getinterfaces(&numifaces);
      /* First let us try Linux-style /proc/net/route */
@@ -296,7 +350,7 @@ diff -upk.orig nmap-4.01.orig/tcpip.cc nmap-4.01/tcpip.cc
      if (routefp) {
        fgets(buf, sizeof(buf), routefp); /* Kill the first line (column headers) */
        while(fgets(buf,sizeof(buf), routefp)) {
-@@ -2501,6 +2509,8 @@ struct sys_route *getsysroutes(int *howm
+@@ -2513,6 +2521,8 @@ struct sys_route *getsysroutes(int *howm
  	  routes = (struct sys_route *) realloc(routes, route_capacity * sizeof(struct sys_route));
  	}
        }

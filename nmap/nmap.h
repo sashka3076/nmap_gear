@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.h 3014 2005-12-28 08:58:56Z fyodor $ */
+/* $Id: nmap.h 3194 2006-03-03 23:12:14Z fyodor $ */
 
 #ifndef NMAP_H
 #define NMAP_H
@@ -454,7 +454,6 @@ int listen_icmp(int icmpsock, unsigned short outports[],
 int nmap_main(int argc, char *argv[]);
 
 /* general helper functions */
-void *safe_malloc(int size);
 char *grab_next_host_spec(FILE *inputfd, int argc, char **fakeargv);
 int parse_targets(struct targets *targets, char *h);
 char *statenum2str(int state);

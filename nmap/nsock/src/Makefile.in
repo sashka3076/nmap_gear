@@ -40,13 +40,11 @@ DEPS = error.h filespace.h gh_list.h nsock_internal.h nsock_utils.h netutils.h .
 all: $(TARGET) 
 
 $(TARGET): $(DEPS) $(OBJS)
-	@echo Compiling libnsock
 	rm -f $@
 	$(AR) cr $@ $(OBJS)
 	$(RANLIB) $@
 
 $(NBASEDIR)/libnbase.a: $(NBASEDIR)/Makefile
-	@echo Compiling libnbase;
 	cd $(NBASEDIR) && $(MAKE)
 
 clean:

@@ -2,7 +2,7 @@
 .\" It was generated using the DocBook XSL Stylesheets (version 1.69.1).
 .\" Instead of manually editing it, you probably should edit the DocBook XML
 .\" source for it and then use the DocBook XSL Stylesheets to regenerate it.
-.TH "NMAP" "1" "02/09/2006" "" "Nmap Reference Guide"
+.TH "NMAP" "1" "03/03/2006" "" "Nmap Reference Guide"
 .\" disable hyphenation
 .nh
 .\" disable justification (adjust text to left margin only)
@@ -192,7 +192,7 @@ CIDR notation is short but not always flexible enough. For example, you might wa
 IPv6 addresses can only be specified by their fully qualified IPv6 address or hostname. CIDR and octet ranges aren't supported for IPv6 because they are rarely useful.
 .PP
 Nmap accepts multiple host specifications on the command line, and they don't need to be the same type. The command
-\fBnmap scanme.nmap.org 192.168.0.0/8 10.0.0,1,3\-7.0\-255\fR
+\fBnmap scanme.nmap.org 192.168.0.0/16 10.0.0,1,3\-7.0\-255\fR
 does what you would expect.
 .PP
 While targets are usually specified on the command lines, the following options are also available to control target selection:
@@ -362,12 +362,12 @@ Tells Nmap to
 \fIalways\fR
 do reverse DNS resolution on the target IP addresses. Normally this is only performed when a machine is found to be alive.
 .TP
-\fB\-\-system_dns\fR (Use system DNS resolver)
+\fB\-\-system\-dns\fR (Use system DNS resolver)
 By default, Nmap resolves IP addresses by sending queries directly to the name servers configured on your host and then listening for responses. Many requests (often dozens) are performed in parallel for performance. Specify this option if you wish to use your system resolver instead (one IP at a time via the getnameinfo() call). This is slower and rarely useful unless there is a bug in the Nmap DNS code \-\- please contact us if that is the case. The system resolver is always used for IPv6 scans.
 .TP
-\fB\-\-dns_servers <server1[,server2],...> \fR (Servers to use for reverse DNS queries)
+\fB\-\-dns\-servers <server1[,server2],...> \fR (Servers to use for reverse DNS queries)
 Normally Nmap will try to determine the DNS servers from your resolv.conf file (UNIX) or the registry (Win32). Alternatively, you may use this option to specify your own servers. This option is not honored if you are using
-\fB\-\-system_dns\fR
+\fB\-\-system\-dns\fR
 or an IPv6 scan. Using multiple DNS servers is often faster than querying just one.
 .SH "PORT SCANNING BASICS"
 .PP
@@ -656,7 +656,7 @@ database contains probes for querying various services and match expressions to 
 open|filtered
 state after a UDP port scan is unable to determine whether the port is open or filtered. Version detection will try to elicit a response from these ports (just as it does with open ports), and change the state to open if it succeeds.
 open|filtered
-TCP ports are treaded the same way. Note that the Nmap
+TCP ports are treated the same way. Note that the Nmap
 \fB\-A\fR
 option enables version detection among other things. A paper documenting the workings, usage, and customization of version detection is available at
 \fI\%http://www.insecure.org/nmap/vscan/\fR.
@@ -685,7 +685,7 @@ When performing a version scan (\fB\-sV\fR), nmap sends a series of probes, each
 \fInmap\-service\-probes\fRports
 directive, that probe is tried regardless of intensity level. This ensures that the DNS probes will always be attempted against any open port 53, the SSL probe will be done against 443, etc.
 .TP
-\fB\-\-version\-light\fR (Enablie light mode)
+\fB\-\-version\-light\fR (Enable light mode)
 This is a convenience alias for
 \fB\-\-version\-intensity 2\fR. This light mode makes version scanning much faster, but it is slightly less likely to identify services.
 .TP
@@ -744,6 +744,16 @@ When Nmap is unable to detect a perfect OS match, it sometimes offers up near\-m
 One of my highest Nmap development priorities has always been performance. A default scan (\fBnmap \fR\fB\fIhostname\fR\fR) of a host on my local network takes a fifth of a second. That is barely enough time to blink, but adds up when you are scanning tens or hundreds of thousands of hosts. Moreover, certain scan options such as UDP scanning and version detection can increase scan times substantially. So can certain firewall configurations, particularly response rate limiting. While Nmap utilizes parallelism and many advanced algorithms to accelerate these scans, the user has ultimate control over how Nmap runs. Expert users carefully craft Nmap commands to obtain only the information they care about while meeting their time constraints.
 .PP
 Techniques for improving scan times include omitting non\-critical tests, and upgrading to the latest version of Nmap (performance enhancements are made frequently). Optimizing timing parameters can also make a substantial difference. Those options are listed below.
+.PP
+Some options accept a
+time
+parameter. This is specified in milliseconds by default, though you can append \(oqs\(cq, \(oqm\(cq, or \(oqh\(cq to the value to specify seconds, minutes, or hours. So the
+\fB\-\-host\-timeout\fR
+arguments
+900000,
+900s, and
+15m
+all do the same thing.
 .TP
 \fB\-\-min\-hostgroup <numhosts>\fR; \fB\-\-max\-hostgroup <numhosts>\fR (Adjust parallel scan group sizes)
 Nmap has the ability to port scan or version scan multiple hosts in parallel. Nmap does this by dividing the target IP space into groups and then scanning one group at a time. In general, larger groups are more efficient. The downside is that host results can't be provided until the whole group is finished. So if Nmap started out with a group size of 50, the user would not receive any reports (except for the updates offered in verbose mode) until the first 50 hosts are completed.
@@ -770,14 +780,10 @@ option is sometimes set to one to prevent Nmap from sending more than one probe 
 \fB\-\-scan\-delay\fR
 (discussed later), although the latter usually serves the purpose well enough by itself.
 .TP
-\fB\-\-min_rtt_timeout <time>\fR, \fB\-\-max\-rtt\-timeout <time>\fR, \fB\-\-initial\-rtt\-timeout <time>\fR (Adjust probe timeouts)
+\fB\-\-min\-rtt\-timeout <time>\fR, \fB\-\-max\-rtt\-timeout <time>\fR, \fB\-\-initial\-rtt\-timeout <time>\fR (Adjust probe timeouts)
 Nmap maintains a running timeout value for determining how long it will wait for a probe response before giving up or retransmitting the probe. This is calculated based on the response times of previous probes. If the network latency shows itself to be significant and variable, this timeout can grow to several seconds. It also starts at a conservative (high) level and may stay that way for a while when Nmap scans unresponsive hosts.
 .sp
-These options take a value in milliseconds, or you can append
-s,
-m, or
-h
-to the argument to specify a time in seconds, minutes, or hours. Specifying a lower
+Specifying a lower
 \fB\-\-max\-rtt\-timeout\fR
 and
 \fB\-\-initial\-rtt\-timeout\fR
@@ -790,7 +796,7 @@ value. If routing is involved, ping a host on the network first with the ICMP pi
 and triple or quadruple it for the
 \fB\-\-max\-rtt\-timeout\fR. I generally do not set the maximum rtt below 100ms, no matter what the ping times are. Nor do I exceed 1000ms.
 .sp
-\fB\-\-min_rtt_timeout\fR
+\fB\-\-min\-rtt\-timeout\fR
 is a rarely used option that could be useful when a network is so unreliable that even Nmap's default is too aggressive. Since Nmap only reduces the timeout down to the minimum when the network seems to be reliable, this need is unusual and should be reported as a bug to the nmap\-dev mailing list.
 .TP
 \fB\-\-max\-retries <numtries>\fR (Specify the maximum number of port scan probe retransmissions)
@@ -809,22 +815,14 @@ expire and losing all information about the target.
 \fB\-\-host\-timeout <time>\fR (Give up on slow target hosts)
 Some hosts simply take a
 \fIlong\fR
-time to scan. This may be due to poorly performing or unreliable networking hardware or software, packet rate limiting, or a restrictive firewall. The slowest few percent of the scanned hosts can eat up a majority of the scan time. Sometimes it is best to cut your losses and skip those hosts initially. This can be done by specifying
+time to scan. This may be due to poorly performing or unreliable networking hardware or software, packet rate limiting, or a restrictive firewall. The slowest few percent of the scanned hosts can eat up a majority of the scan time. Sometimes it is best to cut your losses and skip those hosts initially. Specify
 \fB\-\-host\-timeout\fR
-with the number of milliseconds you are willing to wait. Alternatively, you can append
-s,
-m, or
-h
-to the argument to specify a timeout in seconds, minutes, or hours. I often specify
+with the maximum amoung of time you are willing to wait. I often specify
 30m
 to ensure that Nmap doesn't waste more than half an hour on a single host. Note that Nmap may be scanning other hosts at the same time during that half an hour as well, so it isn't a complete loss. A host that times out is skipped. No port table, OS detection, or version detection results are printed for that host.
 .TP
 \fB\-\-scan\-delay <time>\fR; \fB\-\-max_scan\-delay <time>\fR (Adjust delay between probes)
-This option causes Nmap to wait at least the given number of milliseconds between each probe it sends to a given host. As with many other timing options, you can append
-s,
-m, or
-h
-to the argument to specify a delay in seconds, minutes, or hours instead. This is particularly useful in the case of rate limiting. Solaris machines (among many others) will usually respond to UDP scan probe packets with only one ICMP message per second. Any more than that sent by Nmap will be wasteful. A
+This option causes Nmap to wait at least the given amount of time between each probe it sends to a given host. This is particularly useful in the case of rate limiting. Solaris machines (among many others) will usually respond to UDP scan probe packets with only one ICMP message per second. Any more than that sent by Nmap will be wasteful. A
 \fB\-\-scan\-delay\fR
 of
 1s
@@ -887,7 +885,7 @@ does the equivalent of
 and sets the maximum TCP scan delay to 10 milliseconds.
 \fBT5\fR
 does the equivalent of
-\fB\-\-max\-rtt\-timeout 300 \-\-min_rtt_timeout 50 \-\-initial\-rtt\-timeout 250 \-\-max\-retries 2 \-\-host\-timeout 900000\fR
+\fB\-\-max\-rtt\-timeout 300 \-\-min\-rtt\-timeout 50 \-\-initial\-rtt\-timeout 250 \-\-max\-retries 2 \-\-host\-timeout 15m\fR
 as well as setting the maximum TCP scan delay to 5ms.
 .SH "FIREWALL/IDS EVASION AND SPOOFING"
 .PP
@@ -1140,6 +1138,9 @@ instead.
 .TP
 \fB\-\-iflist\fR (List interfaces and routes)
 Prints the interface list and system routes as detected by Nmap. This is useful for debugging routing problems or device mischaracterization (such as Nmap treating a PPP connection as Ethernet).
+.TP
+\fB\-\-log\-errors\fR (Log errors/warnings to normal mode output file)
+Warnings and errors printed by Nmap usually go only to the screen (interactive output), leaving any specified normal\-fomat output files uncluttered. But when you do want to see those messages in the normal output file you specified, add this option. It is useful when you aren't watching the interactive output or are trying to debug a problem. The messages will also still appear in interactive mode. This will not work for most errors related to bad command\-line arguments, as Nmap may not have initialized its output files yet. In addition, some Nmap error/warning messages use a different system that does not yet support this option. An alternative to using this option is redirecting interactive output (including the standard error stream) to a file. While most UNIX shells make that approach easy, it can be difficult on Windows.
 .PP
 \fBMiscellaneous output options\fR
 .TP
@@ -1251,7 +1252,7 @@ During the execution of nmap, all key presses are captured. This allows you to i
 \fIlowercase letters increase\fR
 the amount of printing, and
 \fIuppercase letters decrease\fR
-the printing. You may also press \(oq\fI?\fR\(cq for
+the printing. You may also press \(oq\fI?\fR\(cq for help.
 .TP
 \fBv\fR / \fBV\fR
 Increase / Decrease the Verbosity

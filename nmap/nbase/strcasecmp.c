@@ -108,65 +108,46 @@
 #ifndef HAVE_STRCASECMP
 int strcasecmp(const char *s1, const char *s2)
 {
-  int ret;
+	int i, ret;
+	char *cp1, *cp2;
   
-  char *cp1,*cp2;
-  int i=0;
-  
-  cp1=malloc(strlen(s1)+1);
-  memset(cp1,0,strlen(s1)+1);
-  memcpy(cp1,s1,strlen(s1));
-  for (i=0; cp1[i]>0; i++)
-    {
-      if ('a' <= cp1[i] && cp1[i] <= 'z')
-	cp1[i] -= 32;
-    }
-  
-  cp2=malloc(strlen(s2)+1);
-  memset(cp2,0,strlen(s2)+1);
-  memcpy(cp2,s2,strlen(s2));
-  for (i=0; cp2[i]>0; i++)
-    {
-      if ('a' <= cp2[i] && cp2[i] <= 'z')
-	cp2[i] -= 32;
-    }
+	cp1 = malloc(strlen(s1) + 1);
+	cp2 = malloc(strlen(s2) + 1);
 
-  ret=strcmp(cp1,cp2);
+	for (i = 0; i < strlen(s1) + 1; i++)
+		cp1[i] = tolower(s1[i]);
+	for (i = 0; i < strlen(s2) + 1; i++)
+		cp2[i] = tolower(s2[i]);
   
-  free(cp1);
-  free(cp2);
-  return ret;
+	ret = strcmp(cp1, cp2);
+  
+	free(cp1);
+	free(cp2);
+
+	return ret;
 }
 #endif
 
 #ifndef HAVE_STRNCASECMP
 int strncasecmp(const char *s1, const char *s2, size_t n)
 {
-  int ret;
-  char *cp1,*cp2;
-  int i=0;
+	int i, ret;
+	char *cp1, *cp2;
   
-  cp1= (char *) malloc(strlen(s1)+1);
-  memset(cp1,0,strlen(s1)+1);
-  memcpy(cp1,s1,strlen(s1));
-  for (i=0; cp1[i]>0; i++)
-    {
-      if ('a' <= cp1[i] && cp1[i] <= 'z')
-	cp1[i] -= 32;
-    }
+	cp1 = malloc(strlen(s1) + 1);
+	cp2 = malloc(strlen(s2) + 1);
+
+	for (i = 0; i < strlen(s1) + 1; i++)
+		cp1[i] = tolower(s1[i]);
+	for (i = 0; i < strlen(s2) + 1; i++)
+		cp2[i] = tolower(s2[i]);
   
-  cp2= (char *) malloc(strlen(s2)+1);
-  memset(cp2,0,strlen(s2)+1);
-  memcpy(cp2,s2,strlen(s2));
-  for (i=0; cp2[i]>0; i++)
-    {
-      if ('a' <= cp2[i] && cp2[i] <= 'z')
-	cp2[i] -= 32;
-    }
+	ret = strncmp(cp1, cp2, n);
   
-  ret=strncmp(cp1,cp2,n);
-  free(cp1);
-  free(cp2);
-  return ret;
+	free(cp1);
+	free(cp2);
+
+	return ret;
 }
 #endif
+

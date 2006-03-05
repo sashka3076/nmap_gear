@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmapfe_error.h 2396 2004-08-29 09:12:05Z fyodor $ */
+/* $Id: nmapfe_error.h 3195 2006-03-04 04:17:32Z fyodor $ */
 
 
 #ifndef NMAPFE_ERROR_H
@@ -118,6 +118,5 @@
 void fatal(char *fmt, ...);
 void error(char *fmt, ...);
 void pfatal(char *err, ...);
-void gh_perror(char *err, ...);
 #endif /* NMAPFE_ERROR_H */
 

@@ -15,7 +15,7 @@ diff -upk.orig nmap-4.01.orig/MACLookup.cc nmap-4.01/MACLookup.cc
  }
  
 -void InitializeTable() {
-+static void mac_prefix_init() {
++void mac_prefix_init() {
 +  static int initialized = 0;
    if (initialized) return;
    initialized = 1;
@@ -263,15 +263,6 @@ diff -upk.orig nmap-4.01.orig/protocols.cc nmap-4.01/protocols.cc
 diff -upk.orig nmap-4.01.orig/service_scan.cc nmap-4.01/service_scan.cc
 --- nmap-4.01.orig/service_scan.cc	2006-02-10 02:04:50 +0000
 +++ nmap-4.01/service_scan.cc	2006-03-03 00:00:01 +0000
-@@ -1127,7 +1127,7 @@ void parse_nmap_service_probe_file(AllPr
- 
- // Parses the nmap-service-probes file, and adds each probe to
- // the already-created 'probes' vector.
--void parse_nmap_service_probes(AllProbes *AP) {
-+static void parse_nmap_service_probes(AllProbes *AP) {
-   char filename[256];
- 
-   if (nmap_fetchfile(filename, sizeof(filename), "nmap-service-probes") == -1){
 @@ -1137,6 +1137,17 @@ void parse_nmap_service_probes(AllProbes
    parse_nmap_service_probe_file(AP, filename);
  }

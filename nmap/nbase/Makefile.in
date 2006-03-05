@@ -27,7 +27,6 @@ OBJS = @LIBOBJS@
 all: $(TARGET) 
 
 $(TARGET): $(DEPS) $(OBJS)
-	@echo Compiling libnbase
 	rm -f $@
 	$(AR) cr $@ $(OBJS)
 	$(RANLIB) $@

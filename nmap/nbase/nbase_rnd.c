@@ -117,9 +117,10 @@ int get_random_bytes(void *buf, int numbytes) {
   static int bytesleft = 0;
 #if HAVE_OPENSSL
   static int prng_seeded = 0;
+#else
+  int tmp;
 #endif
   int res;
-  int tmp;
   struct timeval tv;
   FILE *fp = NULL;
   unsigned int i;
@@ -127,10 +128,10 @@ int get_random_bytes(void *buf, int numbytes) {
   
   if (numbytes < 0 || numbytes > 0xFFFF) return -1;
   
+#if HAVE_OPENSSL
  /* If we have OpenSSL, then let's use it's internal PRNG for random
     numbers, rather than opening /dev/urandom and friends.  The PRNG,
     once seeded, should never empty. */
-#if HAVE_OPENSSL
   if ( prng_seeded ) {
     if ( RAND_bytes((unsigned char*) buf, numbytes) ) {
       return(0);
@@ -175,10 +176,10 @@ int get_random_bytes(void *buf, int numbytes) {
     } else fclose(fp);
   }
   
+#if HAVE_OPENSSL
   /* If we have OpenSSL, use these bytes to seed the PRNG.  If it's satisfied
      (RAND_status) then set prng_seeded and re-run ourselves to actually fill
      the buffer with random data. */
-#if HAVE_OPENSSL
   RAND_seed( bytebuf, sizeof(bytebuf) );
   if ( RAND_status() ) {
     prng_seeded=1;
@@ -186,8 +187,7 @@ int get_random_bytes(void *buf, int numbytes) {
     prng_seeded=0;
   }
   return get_random_bytes((char *)buf, numbytes);
-#endif
-
+#else
   /* We're not OpenSSL, do things the 'old fashioned way' */
   if (numbytes <= bytesleft) { /* we can cover it */
     memcpy(buf, bytebuf + (sizeof(bytebuf) - bytesleft), numbytes);
@@ -200,6 +200,7 @@ int get_random_bytes(void *buf, int numbytes) {
   tmp = bytesleft;
   bytesleft = 0;
   return get_random_bytes((char *)buf + tmp, numbytes - tmp);
+#endif
 }
 
 int get_random_int() {

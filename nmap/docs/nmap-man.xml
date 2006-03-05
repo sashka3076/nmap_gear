@@ -262,7 +262,7 @@ IPv6 because they are rarely useful.</para>
 
 <para>Nmap accepts multiple host specifications on the command line,
 and they don't need to be the same type.  The command <command moreinfo="none">nmap
-scanme.nmap.org 192.168.0.0/8 10.0.0,1,3-7.0-255</command> does what
+scanme.nmap.org 192.168.0.0/16 10.0.0,1,3-7.0-255</command> does what
 you would expect.</para>
 
 <para>While targets are usually specified on the command lines, the following options are also available to control target selection:</para>
@@ -747,7 +747,7 @@ you would expect.</para>
 
       <varlistentry>
         <term>
-          <option>--system_dns</option> (Use system DNS resolver)
+          <option>--system-dns</option> (Use system DNS resolver)
         </term>
         <listitem>
           <para>By default, Nmap resolves IP addresses by sending
@@ -764,7 +764,7 @@ you would expect.</para>
 
       <varlistentry>
         <term>
-          <option>--dns_servers &lt;server1[,server2],...&gt;
+          <option>--dns-servers &lt;server1[,server2],...&gt;
           </option> (Servers to use for reverse DNS queries)
         </term>
         <listitem>
@@ -772,7 +772,7 @@ you would expect.</para>
           from your resolv.conf file (UNIX) or the registry (Win32).
           Alternatively, you may use this option to specify your own
           servers.  This option is not honored if you are using
-          <option>--system_dns</option> or an IPv6 scan. Using
+          <option>--system-dns</option> or an IPv6 scan. Using
           multiple DNS servers is often faster than querying
           just one.</para>
         </listitem>
@@ -1459,7 +1459,7 @@ way.</para>
     unable to determine whether the port is open or filtered. Version
     detection will try to elicit a response from these ports (just as
     it does with open ports), and change the state to open if it
-    succeeds. <literal moreinfo="none">open|filtered</literal> TCP ports are treaded
+    succeeds. <literal moreinfo="none">open|filtered</literal> TCP ports are treated
     the same way.  Note that the Nmap <option>-A</option> option
     enables version detection among other things.  A paper documenting
     the workings, usage, and customization of version detection is
@@ -1536,7 +1536,7 @@ way.</para>
 
       <varlistentry>
         <term>
-          <option>--version-light</option> (Enablie light mode)
+          <option>--version-light</option> (Enable light mode)
         </term>
         <listitem>
           <para>This is a convenience alias for
@@ -1710,6 +1710,12 @@ constraints.</para>
     parameters can also make a substantial difference.  Those options
     are listed below.</para>
 
+<para>Some options accept a <literal moreinfo="none">time</literal> parameter.  This
+is specified in milliseconds by default, though you can append &#x2018;s&#x2019;, &#x2018;m&#x2019;,
+or &#x2018;h&#x2019; to the value to specify seconds, minutes, or hours. So the
+<option>--host-timeout</option> arguments <literal moreinfo="none">900000</literal>,
+<literal moreinfo="none">900s</literal>, and <literal moreinfo="none">15m</literal> all do the same thing.</para>
+
     <variablelist>
 
       <varlistentry>
@@ -1789,7 +1795,7 @@ enough by itself.</para>
 
       <varlistentry>
         <term>
-        <option>--min_rtt_timeout &lt;time&gt;</option>, 
+        <option>--min-rtt-timeout &lt;time&gt;</option>, 
         <option>--max-rtt-timeout &lt;time&gt;</option>, 
         <option>--initial-rtt-timeout
         &lt;time&gt;</option> (Adjust probe timeouts)</term>
@@ -1804,9 +1810,7 @@ timeout can grow to several seconds.  It also starts at a conservative
 (high) level and may stay that way for a while when Nmap scans
 unresponsive hosts.</para>
 
-<para>These options take a value in milliseconds, or you can append
-<literal moreinfo="none">s</literal>, <literal moreinfo="none">m</literal>, or <literal moreinfo="none">h</literal> to
-the argument to specify a time in seconds, minutes, or hours.
+<para>
 Specifying a lower <option>--max-rtt-timeout</option> and
 <option>--initial-rtt-timeout</option> than the defaults can cut scan
 times significantly.  This is particularly true for pingless
@@ -1826,7 +1830,7 @@ the <option>--max-rtt-timeout</option>.  I generally do not set the
 maximum rtt below 100ms, no matter what the ping times are.  Nor do I
 exceed 1000ms.</para>
 
-<para><option>--min_rtt_timeout</option> is a rarely used option that
+<para><option>--min-rtt-timeout</option> is a rarely used option that
 could be useful when a network is so unreliable that even Nmap's
 default is too aggressive.  Since Nmap only reduces the timeout down to
 the minimum when the network seems to be reliable, this need is
@@ -1883,11 +1887,9 @@ This may be due to poorly performing or unreliable networking hardware
 or software, packet rate limiting, or a restrictive firewall.  The
 slowest few percent of the scanned hosts can eat up a majority of the
 scan time.  Sometimes it is best to cut your losses and skip those
-hosts initially.  This can be done by specifying
-<option>--host-timeout</option> with the number of milliseconds you
-are willing to wait.  Alternatively, you can append
-<literal moreinfo="none">s</literal>, <literal moreinfo="none">m</literal>, or <literal moreinfo="none">h</literal> to
-the argument to specify a timeout in seconds, minutes, or hours.  I
+hosts initially.  Specify 
+<option>--host-timeout</option> with the maximum amoung of time you
+are willing to wait.  I
 often specify <literal moreinfo="none">30m</literal> to ensure that Nmap doesn't waste
 more than half an hour on a single host.  Note that Nmap may be
 scanning other hosts at the same time during that half an hour as
@@ -1905,11 +1907,8 @@ for that host.</para>
         &lt;time&gt;</option> (Adjust delay between probes)</term>
         <listitem>
 
-<para>This option causes Nmap to wait at least the given number of
-milliseconds between each probe it sends to a given host.  As with
-many other timing options, you can append <literal moreinfo="none">s</literal>,
-<literal moreinfo="none">m</literal>, or <literal moreinfo="none">h</literal> to the argument to
-specify a delay in seconds, minutes, or hours instead.  This is
+<para>This option causes Nmap to wait at least the given amount of
+time between each probe it sends to a given host.  This is
 particularly useful in the case of rate limiting.  Solaris machines
 (among many others) will usually respond to UDP scan probe packets
 with only one ICMP message per second.  Any more than that sent by
@@ -2000,8 +1999,8 @@ default behavior, which includes parallelization.  <option>T4</option>
 does the equivalent of <option>--max-rtt-timeout 1250
 --initial-rtt-timeout 500 --max-retries 6</option> and sets the maximum TCP scan delay
 to 10 milliseconds.  <option>T5</option> does the equivalent of
-<option>--max-rtt-timeout 300 --min_rtt_timeout 50
---initial-rtt-timeout 250 --max-retries 2 --host-timeout 900000</option> as well as
+<option>--max-rtt-timeout 300 --min-rtt-timeout 50
+--initial-rtt-timeout 250 --max-retries 2 --host-timeout 15m</option> as well as
 setting the maximum TCP scan delay to 5ms.</para>
 
         </listitem>
@@ -2906,7 +2905,7 @@ increased.</para>
     <emphasis>lowercase letters increase</emphasis> the
     amount of printing, and 
     <emphasis>uppercase letters decrease</emphasis> the
-    printing.  You may also press &#x2018;<emphasis>?</emphasis>&#x2019; for </para>
+    printing.  You may also press &#x2018;<emphasis>?</emphasis>&#x2019; for help.</para>
     <variablelist>
       <varlistentry>
         <term>

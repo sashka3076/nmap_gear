@@ -118,10 +118,10 @@ va_end(ap);
 exit(1);
 }
 
-void *safe_malloc(int size)
+void *safe_malloc(size_t size)
 {
   void *mymem;
-  if (size < 0)
+  if ((int) size < 0)  /* Catch caller errors */
     fatal("Tried to malloc negative amount of memory!!!");
   mymem = malloc(size);
   if (mymem == NULL)
@@ -132,7 +132,7 @@ void *safe_malloc(int size)
 void *safe_realloc(void *ptr, size_t size)
 {
   void *mymem;
-  if (size < 0)
+  if ((int) size < 0) /* Catch caller errors */
     fatal("Tried to realloc negative amount of memory!!!");
   mymem = realloc(ptr, size);
   if (mymem == NULL)
@@ -141,10 +141,10 @@ void *safe_realloc(void *ptr, size_t size)
 }
 
 /* Zero-initializing version of safe_malloc */
-void *safe_zalloc(int size)
+void *safe_zalloc(size_t size)
 {
   void *mymem;
-  if (size < 0)
+  if ((int) size < 0)
     fatal("Tried to malloc negative amount of memory!!!");
   mymem = calloc(1, size);
   if (mymem == NULL)
