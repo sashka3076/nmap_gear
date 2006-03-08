@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap_amigaos.h 2396 2004-08-29 09:12:05Z fyodor $ */
+/* $Id: nmap_amigaos.h 3199 2006-03-05 21:31:04Z fyodor $ */
 
 #ifndef _NMAP_AMIGAOS_H_
 #define _NMAP_AMIGAOS_H_
@@ -146,8 +146,5 @@ struct addrinfo {
   struct sockaddr	*ai_addr;	/* binary address */
   struct addrinfo	*ai_next;	/* next structure in linked list */
 };
-
-
-#define exit(x); {CloseLibs();exit(x);}
 
 #endif /* _NMAP_AMIGAOS_H_ */

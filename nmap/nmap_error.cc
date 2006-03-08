@@ -96,7 +96,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap_error.cc 3195 2006-03-04 04:17:32Z fyodor $ */
+/* $Id: nmap_error.cc 3199 2006-03-05 21:31:04Z fyodor $ */
 
 #include "nmap_error.h"
 #include "output.h"
@@ -108,10 +108,6 @@ extern NmapOps o;
 #include <windows.h>
 #endif /* WIN32 */
 
-#ifdef __amigaos__
-extern void CloseLibs(void);
-#endif
-
 void fatal(const char *fmt, ...) {
   va_list  ap;
   va_start(ap, fmt);
@@ -122,7 +118,7 @@ void fatal(const char *fmt, ...) {
     log_vwrite(LOG_NORMAL, fmt, ap);
     va_end(ap);
   }
-  log_write(o.log_errors? LOG_NORMAL|LOG_STDERR : LOG_STDERR, "QUITTING!\n");
+  log_write(o.log_errors? LOG_NORMAL|LOG_STDERR : LOG_STDERR, "\nQUITTING!\n");
   exit(1);
 }
 
@@ -138,7 +134,7 @@ void error(const char *fmt, ...) {
     log_vwrite(LOG_NORMAL, fmt, ap);
     va_end(ap);
   }
-  
+  log_write(o.log_errors? LOG_NORMAL|LOG_STDERR : LOG_STDERR, "\n");
   return;
 }
 

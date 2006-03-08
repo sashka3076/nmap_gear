@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: utils.h 3048 2006-01-19 07:29:12Z fyodor $ */
+/* $Id: utils.h 3200 2006-03-05 23:59:46Z fyodor $ */
 
 #ifndef UTILS_H
 #define UTILS_H
@@ -117,7 +117,6 @@
 #include <netinet/in.h>
 #endif
 
-#include <sys/time.h>
 #include <assert.h>
 #include <sys/mman.h>
 #include "config.h"
@@ -207,11 +206,6 @@ char *chomp(char *string);
 // is sent.  Returns -1 if there is an error, or len if the full length was sent.
 int Send(int sd, const void *msg, size_t len, int flags);
 
-ssize_t Write(int fd, const void *buf, size_t count);
-
-unsigned long gcd_ulong(unsigned long a, unsigned long b);
-unsigned int gcd_uint(unsigned int a, unsigned int b);
-unsigned long gcd_n_ulong(long nvals, unsigned long *val);
 unsigned int gcd_n_uint(int nvals, unsigned int *val);
 
 int arg_parse(const char *command, char ***argv);
@@ -231,12 +225,6 @@ long tval2msecs(char *tspec);
    stored in newlen.  If parsing fails, NULL is returned, otherwise
    str is returned. */
 char *cstring_unescape(char *str, unsigned int *len);
-
-#ifndef HAVE_USLEEP
-#ifdef HAVE_NANOSLEEP
-void usleep(unsigned long usec);
-#endif
-#endif
 
 #ifndef HAVE_STRERROR
 char *strerror(int errnum);

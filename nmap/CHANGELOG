@@ -1,4 +1,41 @@
-# Nmap Changelog ($Id: CHANGELOG 3195 2006-03-04 04:17:32Z fyodor $); -*-text-*-
+# Nmap Changelog ($Id: CHANGELOG 3200 2006-03-05 23:59:46Z fyodor $); -*-text-*-
+Nmap 4.02ALPHA2
+
+o Updated to a newer XSL stylesheet (for XML to HTML output
+  tranformation) by Benjamin Erb.  This new version includes IP
+  address sorting, removal of javascript requirements, some new
+  address, hostname, and Nmap version information, and various minor
+  tweaks and fixes.
+
+o Cleaned up the Amiga port code to use atexit() rather than the
+  previous macro hack.  Thanks to Kris Katterjohn (kjak(a)ispwest.com)
+  for the patch.  Applied maybe half a dozen new other code cleanup
+  patches from him as well.
+
+o Made some changes to various Nmap initialization functions which
+  help ALT Linux (altlinux.org) and Owl (openwall.com) developers run
+  Nmap in a chroot environment.  Thanks to Dmitry V. Levin
+  (ldv(a)altlinux.org) for the patch.
+
+o Cleaned up the code a bit by making a bunch (nearly 100) global
+  symols (mostly function calls) static.  I was also able to removed
+  some unused functions and superfluous config.h.in defines.  Thanks
+  to Dmitry V. Levin (ldv(a)altlinux.org) for sending a list of
+  candidate symbols.
+
+o Nmap now tests for the existence of data files using stat(2) rather
+  than testing whether they can be opened for reading (with fopen).
+  This is because some device files (tape drives, etc.) may react badly
+  to being opened at all.  Thanks to Dmitry V. Levin
+  (ldv(a)altlinux.org) for the suggestion.
+
+o Changed Nmap to cache interface information rather than opening and
+  closing it (with dnet's eth_open and eth_close functions) all the
+  time.
+
+o Applied a one-character Visual Studio 2005 compatability patch from
+  kx (kxmail(a)gmail.com).  It changed getch() into _getch() on Windows.
+
 Nmap 4.02ALPHA1
 
 o Added the --log-errors option, which causes most warnings and error

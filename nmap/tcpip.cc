@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: tcpip.cc 3194 2006-03-03 23:12:14Z fyodor $ */
+/* $Id: tcpip.cc 3200 2006-03-05 23:59:46Z fyodor $ */
 
 #include <dnet.h>
 #include "tcpip.h"
@@ -133,10 +133,6 @@
 
 extern NmapOps o;
 
-#ifdef __amigaos__
-extern void CloseLibs(void);
-#endif
-
 #ifdef WIN32
 #include "pcap-int.h"
 
@@ -148,6 +144,10 @@ int if2nameindex(int ifi);
 #endif
 
 static PacketCounter PktCt;
+
+/* These two are for eth_open_cached() and eth_close_cached() */
+static char etht_cache_device_name[64];
+static eth_t *etht_cache_device = NULL;
 
 void sethdrinclude(int sd) {
 #ifdef IP_HDRINCL
@@ -182,9 +182,9 @@ static char *ll2shortascii(unsigned long long bytes, char *buf, int buflen) {
   if (buflen < 2 || !buf) fatal("Bogus parameter passed to ll2shortascii");
 
   if (bytes > 1000000) {
-    snprintf(buf, buflen, "%.3gMB", bytes / 1000000.0);
+    snprintf(buf, buflen, "%.3fMB", bytes / 1000000.0);
   } else if (bytes > 10000) {
-    snprintf(buf, buflen, "%.3gKB", bytes / 1000.0);
+    snprintf(buf, buflen, "%.3fKB", bytes / 1000.0);
   } else snprintf(buf, buflen, "%uB", (unsigned int) bytes);
     
   return buf;
@@ -260,156 +260,13 @@ void PacketTrace::traceArp(pdirection pdir, const u8 *frame, u32 len,
   return;
 }
 
-  /* Takes an IP PACKET and prints it if packet tracing is enabled.
-     'packet' must point to the IPv4 header. The direction must be
-     PacketTrace::SENT or PacketTrace::RCVD .  Optional 'now' argument
-     makes this function slightly more efficient by avoiding a gettimeofday()
-     call. */
-void PacketTrace::trace(pdirection pdir, const u8 *packet, u32 len,
-			struct timeval *now) {
-  struct timeval tv;
-
-  if (pdir == SENT) {
-    PktCt.sendPackets++;
-    PktCt.sendBytes += len;
-  } else {
-    PktCt.recvPackets++;
-    PktCt.recvBytes += len;
-  }
-
-  if (!o.packetTrace()) return;
-
-  if (now)
-    tv = *now;
-  else gettimeofday(&tv, NULL);
-
-  if (len < 20) {
-    error("Packet tracer: tiny packet encountered");
-    return;
-  }
-
-  log_write(LOG_STDOUT|LOG_NORMAL, "%s (%.4fs) %s\n", (pdir == SENT)? "SENT" : "RCVD",  o.TimeSinceStartMS(&tv) / 1000.0, ippackethdrinfo(packet, len));
-
-  return;
-}
-
-/* Adds a trace entry when a connect() is attempted if packet tracing
-   is enabled.  Pass IPPROTO_TCP or IPPROTO_UDP as the protocol.  The
-   sock may be a sockaddr_in or sockaddr_in6.  The return code of
-   connect is passed in connectrc.  If the return code is -1, get the
-   errno and pass that as connect_errno. */
-void PacketTrace::traceConnect(u8 proto, const struct sockaddr *sock, 
-			       int socklen, int connectrc, int connect_errno,
-			       const struct timeval *now) {
-  struct sockaddr_in *sin = (struct sockaddr_in *) sock;
-#if HAVE_IPV6
-  struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) sock;
-#endif
-  struct timeval tv;
-  char errbuf[64] = "";
-  char targetipstr[INET6_ADDRSTRLEN] = "";
-  u16 targetport = 0;
-
-  if (!o.packetTrace()) return;
-  
-  if (now)
-    tv = *now;
-  else gettimeofday(&tv, NULL);
-
-  assert(proto == IPPROTO_TCP || proto == IPPROTO_UDP);
-
-  if (connectrc == 0)
-    Strncpy(errbuf, "Connected", sizeof(errbuf));
-  else {
-    snprintf(errbuf, sizeof(errbuf), "%s", strerror(connect_errno));
-  }
-
-  if (sin->sin_family == AF_INET) {
-    if (inet_ntop(sin->sin_family, (char *) &sin->sin_addr, targetipstr, 
-		  sizeof(targetipstr)) == NULL)
-      fatal("Failed to convert target IPv4 address to presentation format!?!");
-    targetport = ntohs(sin->sin_port);
-  } else {
-#if HAVE_IPV6
-    assert(sin->sin_family == AF_INET6);
-    if (inet_ntop(sin->sin_family, (char *) &sin6->sin6_addr, targetipstr, 
-		  sizeof(targetipstr)) == NULL)
-      fatal("Failed to convert target IPv4 address to presentation format!?!");
-    targetport = ntohs(sin6->sin6_port);
-#else
-    assert(0);
-#endif
-  }
-
-  log_write(LOG_STDOUT|LOG_NORMAL, "CONN (%.4fs) %s localhost > %s:%d => %s\n",
-	    o.TimeSinceStartMS(&tv) / 1000.0, 
-	    (proto == IPPROTO_TCP)? "TCP" : "UDP", targetipstr, targetport, 
-	    errbuf);
-}
-
-
-
-
-
-
-/* Converts an IP address given in a sockaddr_storage to an IPv4 or
-   IPv6 IP address string.  Since a static buffer is returned, this is
-   not thread-safe and can only be used once in calls like printf() 
-*/
-const char *inet_socktop(struct sockaddr_storage *ss) {
-  static char buf[INET6_ADDRSTRLEN];
-  struct sockaddr_in *sin = (struct sockaddr_in *) ss;
-#if HAVE_IPV6
-  struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) ss;
-#endif
-
-  if (inet_ntop(sin->sin_family, (sin->sin_family == AF_INET)? 
-                (char *) &sin->sin_addr : 
-#if HAVE_IPV6
-				(char *) &sin6->sin6_addr, 
-#else
-                (char *) NULL,
-#endif /* HAVE_IPV6 */
-                buf, sizeof(buf)) == NULL) {
-    fatal("Failed to convert target address to presentation format in inet_socktop!?!  Error: %s", strerror(socket_errno()));
-  }
-  return buf;
-}
-
-/* Tries to resolve the given name (or literal IP) into a sockaddr
-   structure.  The af should be PF_INET (for IPv4) or PF_INET6.  Returns 0
-   if hostname cannot be resolved.  It is OK to pass in a sockaddr_in or 
-   sockaddr_in6 casted to a sockaddr_storage as long as you use the matching 
-   pf.*/
-int resolve(char *hostname, struct sockaddr_storage *ss, size_t *sslen,
-	    int pf) {
-
-  struct addrinfo hints;
-  struct addrinfo *result;
-  int rc;
-
-  assert(ss);
-  assert(sslen);
-  memset(&hints, 0, sizeof(hints));
-  hints.ai_family = pf;
-  rc = getaddrinfo(hostname, NULL, &hints, &result);
-  if (rc != 0)
-    return 0;
-  assert(result->ai_addrlen > 0 && result->ai_addrlen <= (int) sizeof(struct sockaddr_storage));
-  *sslen = result->ai_addrlen;
-  memcpy(ss, result->ai_addr, *sslen);
-  freeaddrinfo(result);
-  return 1;
-}
-
-
 /* Returns a buffer of ASCII information about a packet that may look
    like "TCP 127.0.0.1:50923 > 127.0.0.1:3 S ttl=61 id=39516 iplen=40
    seq=625950769" or "ICMP PING (0/1) ttl=61 id=39516 iplen=40".
    Since this is a static buffer, don't use threads or call twice
    within (say) printf().  And certainly don't try to free() it!  The
    returned buffer is NUL-terminated */
-const char *ippackethdrinfo(const u8 *packet, u32 len) {
+static const char *ippackethdrinfo(const u8 *packet, u32 len) {
   static char protoinfo[256];
   struct ip *ip = (struct ip *) packet;
   struct tcphdr *tcp;
@@ -623,6 +480,148 @@ const char *ippackethdrinfo(const u8 *packet, u32 len) {
   return protoinfo;
 }
 
+  /* Takes an IP PACKET and prints it if packet tracing is enabled.
+     'packet' must point to the IPv4 header. The direction must be
+     PacketTrace::SENT or PacketTrace::RCVD .  Optional 'now' argument
+     makes this function slightly more efficient by avoiding a gettimeofday()
+     call. */
+void PacketTrace::trace(pdirection pdir, const u8 *packet, u32 len,
+			struct timeval *now) {
+  struct timeval tv;
+
+  if (pdir == SENT) {
+    PktCt.sendPackets++;
+    PktCt.sendBytes += len;
+  } else {
+    PktCt.recvPackets++;
+    PktCt.recvBytes += len;
+  }
+
+  if (!o.packetTrace()) return;
+
+  if (now)
+    tv = *now;
+  else gettimeofday(&tv, NULL);
+
+  if (len < 20) {
+    error("Packet tracer: tiny packet encountered");
+    return;
+  }
+
+  log_write(LOG_STDOUT|LOG_NORMAL, "%s (%.4fs) %s\n", (pdir == SENT)? "SENT" : "RCVD",  o.TimeSinceStartMS(&tv) / 1000.0, ippackethdrinfo(packet, len));
+
+  return;
+}
+
+/* Adds a trace entry when a connect() is attempted if packet tracing
+   is enabled.  Pass IPPROTO_TCP or IPPROTO_UDP as the protocol.  The
+   sock may be a sockaddr_in or sockaddr_in6.  The return code of
+   connect is passed in connectrc.  If the return code is -1, get the
+   errno and pass that as connect_errno. */
+void PacketTrace::traceConnect(u8 proto, const struct sockaddr *sock, 
+			       int socklen, int connectrc, int connect_errno,
+			       const struct timeval *now) {
+  struct sockaddr_in *sin = (struct sockaddr_in *) sock;
+#if HAVE_IPV6
+  struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) sock;
+#endif
+  struct timeval tv;
+  char errbuf[64] = "";
+  char targetipstr[INET6_ADDRSTRLEN] = "";
+  u16 targetport = 0;
+
+  if (!o.packetTrace()) return;
+  
+  if (now)
+    tv = *now;
+  else gettimeofday(&tv, NULL);
+
+  assert(proto == IPPROTO_TCP || proto == IPPROTO_UDP);
+
+  if (connectrc == 0)
+    Strncpy(errbuf, "Connected", sizeof(errbuf));
+  else {
+    snprintf(errbuf, sizeof(errbuf), "%s", strerror(connect_errno));
+  }
+
+  if (sin->sin_family == AF_INET) {
+    if (inet_ntop(sin->sin_family, (char *) &sin->sin_addr, targetipstr, 
+		  sizeof(targetipstr)) == NULL)
+      fatal("Failed to convert target IPv4 address to presentation format!?!");
+    targetport = ntohs(sin->sin_port);
+  } else {
+#if HAVE_IPV6
+    assert(sin->sin_family == AF_INET6);
+    if (inet_ntop(sin->sin_family, (char *) &sin6->sin6_addr, targetipstr, 
+		  sizeof(targetipstr)) == NULL)
+      fatal("Failed to convert target IPv4 address to presentation format!?!");
+    targetport = ntohs(sin6->sin6_port);
+#else
+    assert(0);
+#endif
+  }
+
+  log_write(LOG_STDOUT|LOG_NORMAL, "CONN (%.4fs) %s localhost > %s:%d => %s\n",
+	    o.TimeSinceStartMS(&tv) / 1000.0, 
+	    (proto == IPPROTO_TCP)? "TCP" : "UDP", targetipstr, targetport, 
+	    errbuf);
+}
+
+
+
+
+
+
+/* Converts an IP address given in a sockaddr_storage to an IPv4 or
+   IPv6 IP address string.  Since a static buffer is returned, this is
+   not thread-safe and can only be used once in calls like printf() 
+*/
+const char *inet_socktop(struct sockaddr_storage *ss) {
+  static char buf[INET6_ADDRSTRLEN];
+  struct sockaddr_in *sin = (struct sockaddr_in *) ss;
+#if HAVE_IPV6
+  struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) ss;
+#endif
+
+  if (inet_ntop(sin->sin_family, (sin->sin_family == AF_INET)? 
+                (char *) &sin->sin_addr : 
+#if HAVE_IPV6
+				(char *) &sin6->sin6_addr, 
+#else
+                (char *) NULL,
+#endif /* HAVE_IPV6 */
+                buf, sizeof(buf)) == NULL) {
+    fatal("Failed to convert target address to presentation format in inet_socktop!?!  Error: %s", strerror(socket_errno()));
+  }
+  return buf;
+}
+
+/* Tries to resolve the given name (or literal IP) into a sockaddr
+   structure.  The af should be PF_INET (for IPv4) or PF_INET6.  Returns 0
+   if hostname cannot be resolved.  It is OK to pass in a sockaddr_in or 
+   sockaddr_in6 casted to a sockaddr_storage as long as you use the matching 
+   pf.*/
+int resolve(char *hostname, struct sockaddr_storage *ss, size_t *sslen,
+	    int pf) {
+
+  struct addrinfo hints;
+  struct addrinfo *result;
+  int rc;
+
+  assert(ss);
+  assert(sslen);
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family = pf;
+  rc = getaddrinfo(hostname, NULL, &hints, &result);
+  if (rc != 0)
+    return 0;
+  assert(result->ai_addrlen > 0 && result->ai_addrlen <= (int) sizeof(struct sockaddr_storage));
+  *sslen = result->ai_addrlen;
+  memcpy(ss, result->ai_addr, *sslen);
+  freeaddrinfo(result);
+  return 1;
+}
+
 
 int islocalhost(const struct in_addr * const addr) {
 char dev[128];
@@ -788,6 +787,46 @@ int resolve(char *hostname, struct in_addr *ip) {
   return 0;
 }
 
+/* A simple function that caches the eth_t from dnet for one device,
+   to avoid opening, closing, and re-opening it thousands of tims.  If
+   you give a different device, this function will close the first
+   one.  Thus this should never be used by programs that need to deal
+   with multiple devices at once.  In addition, you MUST NEVER
+   eth_close() A DEVICE OBTAINED FROM THIS FUNCTION.  Instead, you can
+   call eth_close_cached() to close whichever device (if any) is
+   cached.  Returns NULL if it fails to open the device. */
+eth_t *eth_open_cached(const char *device) {
+  if (!device) fatal("eth_open_cached() called with NULL device name!");
+  if (!*device) fatal("eth_open_cached() called with empty device name!");
+
+  if (strcmp(device, etht_cache_device_name) == 0) {
+    /* Yay, we have it cached. */
+    return etht_cache_device;
+  }
+
+  if (*etht_cache_device_name) {
+    eth_close(etht_cache_device);
+    etht_cache_device_name[0] = '\0';
+    etht_cache_device = NULL;
+  }
+
+  etht_cache_device = eth_open(device);
+  if (etht_cache_device)
+    Strncpy(etht_cache_device_name, device, sizeof(etht_cache_device_name));
+
+  return etht_cache_device;
+}
+
+/* See the description for eth_open_cached */
+void eth_close_cached() {
+  if (etht_cache_device) {
+    eth_close(etht_cache_device);
+    etht_cache_device = NULL;
+    etht_cache_device_name[0] = '\0';
+  }
+  return;
+}
+
 int send_tcp_raw_decoys( int sd, struct eth_nfo *eth, 
 			 const struct in_addr *victim, int ttl,
 			 u16 sport, u16 dport, u32 seq, u32 ack, u8 flags,
@@ -941,6 +980,87 @@ int send_tcp_raw( int sd, struct eth_nfo *eth, const struct in_addr *source,
   return res;
 }
 
+/* Create and send all fragments of a pre-built IPv4 packet
+ * Minimal MTU for IPv4 is 68 and maximal IPv4 header size is 60
+ * which gives us a right to cut TCP header after 8th byte
+ * (shouldn't we inflate the header to 60 bytes too?) */
+int send_frag_ip_packet(int sd, struct eth_nfo *eth, u8 *packet, 
+			unsigned int packetlen, unsigned int mtu)
+{
+  struct ip *ip = (struct ip *) packet;
+  int headerlen = ip->ip_hl * 4; // better than sizeof(struct ip)
+  unsigned int datalen = packetlen - headerlen;
+  int fdatalen = 0, res = 0;
+
+  assert(headerlen <= (int) packetlen);
+  assert(headerlen >= 20 && headerlen <= 60); // sanity check (RFC791)
+  assert(mtu > 0 && mtu % 8 == 0); // otherwise, we couldn't set Fragment offset (ip->ip_off) correctly
+
+  if (datalen <= mtu) {
+    error("Warning: fragmentation (mtu=%i) requested but the payload is too small already (%i)", mtu, datalen);
+    return send_ip_packet(sd, eth, packet, packetlen);
+  }
+
+  u8 *fpacket = (u8 *) safe_malloc(headerlen + mtu);
+  memcpy(fpacket, packet, headerlen + mtu);
+  ip = (struct ip *) fpacket;
+
+  // create fragments and send them
+  for (int fragment = 1; fragment * mtu < datalen + mtu; fragment++) {
+    fdatalen = (fragment * mtu <= datalen ? mtu : datalen % mtu);
+    ip->ip_len = htons(headerlen + fdatalen);
+    ip->ip_off = htons((fragment-1) * mtu / 8);
+    if ((fragment-1) * mtu + fdatalen < datalen)
+      ip->ip_off |= htons(IP_MF);
+#if HAVE_IP_IP_SUM
+    ip->ip_sum = in_cksum((unsigned short *)ip, headerlen);
+#endif
+    if (fragment > 1) // copy data payload
+      memcpy(fpacket + headerlen, packet + headerlen + (fragment - 1) * mtu, fdatalen);
+    res = send_ip_packet(sd, eth, fpacket, headerlen + fdatalen);
+    if (res == -1)
+      break;
+  }
+  free(fpacket);
+  return res;
+}
+
+static int Sendto(char *functionname, int sd, const unsigned char *packet, 
+		  int len, unsigned int flags, struct sockaddr *to, int tolen) {
+
+struct sockaddr_in *sin = (struct sockaddr_in *) to;
+int res;
+int retries = 0;
+int sleeptime = 0;
+
+do {
+  if ((res = sendto(sd, (const char *) packet, len, flags, to, tolen)) == -1) {
+    int err = socket_errno();
+
+    error("sendto in %s: sendto(%d, packet, %d, 0, %s, %d) => %s",
+	  functionname, sd, len, inet_ntoa(sin->sin_addr), tolen,
+	  strerror(err));
+#if WIN32
+	return -1;
+#else
+    if (retries > 2 || err == EPERM || err == EACCES || err == EADDRNOTAVAIL
+	|| err == EINVAL)
+      return -1;
+    sleeptime = 15 * (1 << (2 * retries));
+    error("Sleeping %d seconds then retrying", sleeptime);
+    fflush(stderr);
+    sleep(sleeptime);
+#endif
+  }
+  retries++;
+} while( res == -1);
+
+ PacketTrace::trace(PacketTrace::SENT, packet, len); 
+
+return res;
+}
+
+
 /* Send a pre-built IPv4 packet */
 int send_ip_packet(int sd, struct eth_nfo *eth, u8 *packet, unsigned int packetlen) {
   struct sockaddr_in sock;
@@ -963,15 +1083,14 @@ int send_ip_packet(int sd, struct eth_nfo *eth, u8 *packet, unsigned int packetl
     memcpy(eth_frame + 14, packet, packetlen);
     eth_pack_hdr(eth_frame, eth->dstmac, eth->srcmac, ETH_TYPE_IP);
     if (!eth->ethsd) {
-      ethsd = eth_open(eth->devname);
+      ethsd = eth_open_cached(eth->devname);
       if (!ethsd) 
 	fatal("send_ip_packet: Failed to open ethernet device (%s)", eth->devname);
       ethsd_opened = true;
     } else ethsd = eth->ethsd;
     res = eth_send(ethsd, eth_frame, 14 + packetlen);
     PacketTrace::trace(PacketTrace::SENT, packet, packetlen); 
-    if (ethsd_opened)
-      eth_close(ethsd);
+    /* No need to close ethsd due to caching */
     free(eth_frame);
     eth_frame = NULL;
     return res;
@@ -1009,53 +1128,6 @@ int send_ip_packet(int sd, struct eth_nfo *eth, u8 *packet, unsigned int packetl
   res = Sendto("send_ip_packet", sd, packet, packetlen, 0,
 	       (struct sockaddr *)&sock,  (int)sizeof(struct sockaddr_in));
   return res;
-}
-
-/* Create and send all fragments of a pre-built IPv4 packet
- * Minimal MTU for IPv4 is 68 and maximal IPv4 header size is 60
- * which gives us a right to cut TCP header after 8th byte
- * (shouldn't we inflate the header to 60 bytes too?) */
-int send_frag_ip_packet(int sd, struct eth_nfo *eth, u8 *packet, 
-			unsigned int packetlen, unsigned int mtu)
-{
-    struct ip *ip = (struct ip *) packet;
-    int headerlen = ip->ip_hl * 4; // better than sizeof(struct ip)
-    unsigned int datalen = packetlen - headerlen;
-    int fdatalen = 0, res = 0;
-
-    assert(headerlen <= (int) packetlen);
-    assert(headerlen >= 20 && headerlen <= 60); // sanity check (RFC791)
-    assert(mtu > 0 && mtu % 8 == 0); // otherwise, we couldn't set Fragment offset (ip->ip_off) correctly
-
-    if (datalen <= mtu) {
-        error("Warning: fragmentation (mtu=%i) requested but the payload is too small already (%i)", mtu, datalen);
-        return send_ip_packet(sd, eth, packet, packetlen);
-    }
-
-    u8 *fpacket = (u8 *) safe_malloc(headerlen + mtu);
-    memcpy(fpacket, packet, headerlen + mtu);
-    ip = (struct ip *) fpacket;
-
-    // create fragments and send them
-    for (int fragment = 1; fragment * mtu < datalen + mtu; fragment++) {
-        fdatalen = (fragment * mtu <= datalen ? mtu : datalen % mtu);
-        ip->ip_len = htons(headerlen + fdatalen);
-        ip->ip_off = htons((fragment-1) * mtu / 8);
-        if ((fragment-1) * mtu + fdatalen < datalen)
-            ip->ip_off |= htons(IP_MF);
-#if HAVE_IP_IP_SUM
-        ip->ip_sum = in_cksum((unsigned short *)ip, headerlen);
-#endif
-        if (fragment > 1) // copy data payload
-            memcpy(fpacket + headerlen, packet + headerlen + (fragment - 1) * mtu, fdatalen);
-        res = send_ip_packet(sd, eth, fpacket, headerlen + fdatalen);
-        if (res == -1)
-            break;
-    }
-
-    free(fpacket);
-
-    return res;
 }
 
 /* Builds an ICMP packet (including an IP header) by packing the fields
@@ -1117,19 +1189,6 @@ return build_ip_raw(source, victim, o.ttl, IPPROTO_ICMP, get_random_u16(),
 		    ping, icmplen, packetlen);
 }
 
-void readippacket(const u8 *packet, int readdata) {
-  struct ip *ip = (struct ip *) packet;
-  switch(ip->ip_p) {
-  case IPPROTO_UDP:
-    readudppacket(packet, readdata);
-    break;
-    /* Should add ICMP here at some point */
-  default:
-    readtcppacket(packet, readdata);
-    break;
-  }
-
-}
 
 /* A simple function I wrote to help in debugging, shows the important fields
    of a TCP packet*/
@@ -1663,7 +1722,9 @@ bool pcap_recv_timeval_valid() {
    with the given ip (ss) and mac address.  An existing entry for the
    IP ss will be overwritten with the new MAC address.  true is always
    returned for the set command. */
-bool NmapArpCache(int command, struct sockaddr_storage *ss, u8 *mac) {
+#define ARPCACHE_GET 1
+#define ARPCACHE_SET 2
+static bool NmapArpCache(int command, struct sockaddr_storage *ss, u8 *mac) {
   struct sockaddr_in *sin = (struct sockaddr_in *) ss;
   struct ArpCache { 
     u32 ip; /* Network byte order */
@@ -1860,7 +1921,7 @@ int setTargetMACIfAvailable(Target *target, struct link_header *linkhdr,
    broadcast MAC address.  The transmission is attempted up to 3
    times.  If none of these elicit a response, false will be returned.
    If the mac is determined, true is returned. */
-bool doArp(const char *dev, const u8 *srcmac, 
+static bool doArp(const char *dev, const u8 *srcmac, 
 	   const struct sockaddr_storage *srcip, 
 	   const struct sockaddr_storage *targetip, u8 *targetmac) {
   /* timeouts in microseconds ... the first ones are retransmit times, while 
@@ -1888,7 +1949,7 @@ bool doArp(const char *dev, const u8 *srcmac,
   set_pcap_filter(dev, pd, "arp and ether dst host %02X:%02X:%02X:%02X:%02X:%02X", srcmac[0], srcmac[1], srcmac[2], srcmac[3], srcmac[4], srcmac[5]);
 
   /* Prepare probe and sending stuff */
-  ethsd = eth_open(dev);
+  ethsd = eth_open_cached(dev);
   if (!ethsd) fatal("%s: failed to open device %s", __FUNCTION__, dev);
   eth_pack_hdr(frame, ETH_ADDR_BROADCAST, *srcmac, ETH_TYPE_ARP);
   arp_pack_hdr_ethip(frame + ETH_HDR_LEN, ARP_OP_REQUEST, *srcmac, 
@@ -1930,7 +1991,7 @@ bool doArp(const char *dev, const u8 *srcmac,
 
   /* OK - let's close up shop ... */
   pcap_close(pd);
-  eth_close(ethsd);
+  /* No need to close ethsd due to caching */
   return foundit;
 }
 
@@ -2088,7 +2149,7 @@ struct dnet_collector_route_nfo {
   int numifaces;
 };
 
-int collect_dnet_routes(const struct route_entry *entry, void *arg) {
+static int collect_dnet_routes(const struct route_entry *entry, void *arg) {
   struct dnet_collector_route_nfo *dcrn = (struct dnet_collector_route_nfo *) arg;
   int i;
 
@@ -2126,7 +2187,8 @@ int collect_dnet_routes(const struct route_entry *entry, void *arg) {
   return 0;
 }
 
-int collect_dnet_interfaces(const struct intf_entry *entry, void *arg) {
+#if WIN32
+static int collect_dnet_interfaces(const struct intf_entry *entry, void *arg) {
   struct dnet_collector_route_nfo *dcrn = (struct dnet_collector_route_nfo *) arg;
   int i;
   int numifaces = dcrn->numifaces;
@@ -2175,6 +2237,7 @@ int collect_dnet_interfaces(const struct intf_entry *entry, void *arg) {
    dcrn->numifaces++;
    return 0;
 }
+#endif /* WIN32 */
 
 struct interface_info *getinterfaces(int *howmany) {
   static bool initialized = 0;
@@ -2315,7 +2378,7 @@ int sd;
 	  memcpy(mydevs[numifaces].mac, &tmpifr.ifr_addr.sa_data, 6);
 #else
 	/* Let's just let libdnet handle it ... */
-	eth_t *ethsd = eth_open(mydevs[numifaces].devname);
+	eth_t *ethsd = eth_open_cached(mydevs[numifaces].devname);
 	eth_addr_t ethaddr;
 
 	if (!ethsd) 
@@ -2842,41 +2905,6 @@ int gettcpopt_ts(struct tcphdr *tcp, u32 *timestamp, u32 *echots) {
 if (timestamp) *timestamp = 0;
 if (echots) *echots = 0;
 return 0;
-}
-
-int Sendto(char *functionname, int sd, const unsigned char *packet, int len, 
-	   unsigned int flags, struct sockaddr *to, int tolen) {
-
-struct sockaddr_in *sin = (struct sockaddr_in *) to;
-int res;
-int retries = 0;
-int sleeptime = 0;
-
-do {
-  if ((res = sendto(sd, (const char *) packet, len, flags, to, tolen)) == -1) {
-    int err = socket_errno();
-
-    error("sendto in %s: sendto(%d, packet, %d, 0, %s, %d) => %s",
-	  functionname, sd, len, inet_ntoa(sin->sin_addr), tolen,
-	  strerror(err));
-#if WIN32
-	return -1;
-#else
-    if (retries > 2 || err == EPERM || err == EACCES || err == EADDRNOTAVAIL
-	|| err == EINVAL)
-      return -1;
-    sleeptime = 15 * (1 << (2 * retries));
-    error("Sleeping %d seconds then retrying", sleeptime);
-    fflush(stderr);
-    sleep(sleeptime);
-#endif
-  }
-  retries++;
-} while( res == -1);
-
- PacketTrace::trace(PacketTrace::SENT, packet, len); 
-
-return res;
 }
 
 IPProbe::IPProbe() {

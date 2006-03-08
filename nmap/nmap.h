@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.h 3194 2006-03-03 23:12:14Z fyodor $ */
+/* $Id: nmap.h 3200 2006-03-05 23:59:46Z fyodor $ */
 
 #ifndef NMAP_H
 #define NMAP_H
@@ -173,10 +173,6 @@ void *realloc();
 
 /* BSDI needs this to insure the correct struct ip */
 #undef _IP_VHL
-
-#if HAVE_STRINGS_H
-#include <strings.h>
-#endif
 
 #include <stdio.h>
 
@@ -426,8 +422,6 @@ void *realloc();
 
 /***********************PROTOTYPES**********************************/
 
-/* print usage information and exit */
-void printusage(char *name, int rc);
 /* print Interactive usage information */
 void printinteractiveusage();
 
@@ -454,7 +448,6 @@ int listen_icmp(int icmpsock, unsigned short outports[],
 int nmap_main(int argc, char *argv[]);
 
 /* general helper functions */
-char *grab_next_host_spec(FILE *inputfd, int argc, char **fakeargv);
 int parse_targets(struct targets *targets, char *h);
 char *statenum2str(int state);
 char *scantype2str(stype scantype);
@@ -469,13 +462,11 @@ char *tsseqclass2ascii(int seqclass);
    into a difficulty string like "Worthy Challenge */
 const char *seqidx2difficultystr(unsigned long idx);
 int nmap_fetchfile(char *filename_returned, int bufferlen, char *file);
-int fileexistsandisreadable(char *pathname);
 int gather_logfile_resumption_state(char *fname, int *myargc, char ***myargv);
 
 /* From glibc 2.0.6 because Solaris doesn't seem to have this function */
 #ifndef HAVE_INET_ATON
 int inet_aton(register const char *, struct in_addr *);
 #endif
-
 
 #endif /* NMAP_H */

@@ -115,10 +115,6 @@
 #if HAVE_ARPA_INET_H
 #include <arpa/inet.h>
 #endif
-#if HAVE_NETDB_H
-#include <netdb.h>
-#endif
-
 
 int getnameinfo(const struct sockaddr *sa, size_t salen,
 		char *host, size_t hostlen,

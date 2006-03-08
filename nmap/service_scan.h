@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: service_scan.h 2891 2005-10-01 23:50:27Z fyodor $ */
+/* $Id: service_scan.h 3200 2006-03-05 23:59:46Z fyodor $ */
 
 #ifndef SERVICE_SCAN_H
 #define SERVICE_SCAN_H
@@ -340,9 +340,6 @@ public:
 /* Execute a service fingerprinting scan against all open ports of the
    Targets specified. */
 int service_scan(std::vector<Target *> &Targets);
-
-// Parses the given nmap-service-probes file into the AP class
-void parse_nmap_service_probe_file(AllProbes *AP, char *filename);
 
 #endif /* SERVICE_SCAN_H */
 

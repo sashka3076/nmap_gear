@@ -1,6 +1,6 @@
 Name: nmap
 Version: 4.02
-Release: alt0.1
+Release: alt0.2
 Serial: 20020501
 
 Summary: Network exploration tool and security scanner
@@ -9,18 +9,18 @@ Group: Monitoring
 Url: http://www.insecure.org/nmap
 Packager: Nmap Development Team <nmap@packages.altlinux.org>
 
-%define srcname nmap-%{version}Alpha1
+%define srcname nmap-%{version}Alpha2
 Source: %url/dist/%srcname.tar.bz2
 Source1: nmapfe-16.png
 Source2: nmapfe-32.png
 Source3: nmapfe-48.png
 
-Patch1: nmap-4.01-alt-autoheader.patch
+Patch1: nmap-4.02-alt-autoheader.patch
 Patch2: nmap-4.01-alt-owl-libpcap.patch
-Patch3: nmap-4.01-alt-init.patch
-Patch4: nmap-4.02-alt-owl-drop-priv.patch
-Patch5: nmap-4.01-alt-nmapfe.desktop.patch
-Patch6: nmap-4.01-alt-dot-dir.patch
+Patch3: nmap-4.02-alt-owl-drop-priv.patch
+Patch4: nmap-4.01-alt-nmapfe.desktop.patch
+Patch5: nmap-4.01-alt-dot-dir.patch
+Patch6: nmap-4.02-alt-fileexistsandisreadable.patch
 
 PreReq: shadow-utils
 Requires: chrooted-resolv
@@ -62,9 +62,7 @@ autoheader
 autoconf
 
 export ac_cv_header_libiberty_h=no
-export LDFLAGS=-Wl,--as-needed
 %configure \
-	--with-libpcre=yes \
 	--with-user=nmapuser \
 	--with-chroot-empty=/var/empty \
 	--with-chroot-resolv=/var/resolv \
@@ -98,6 +96,10 @@ install -pD -m644 %_sourcedir/nmapfe-48.png %buildroot%_liconsdir/nmapfe.png
 %_liconsdir/*
 
 %changelog
+* Thu Mar 09 2006 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.02-alt0.2
+- Updated to 4.02Alpha2.
+- Updated patches.
+
 * Sun Mar 05 2006 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.02-alt0.1
 - Updated to 4.02Alpha1.
 - Made droppriv patch portable.

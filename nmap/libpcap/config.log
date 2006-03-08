@@ -541,9 +541,9 @@ configure:3966: $? = 0
 configure:3978: result: yes
 configure:3890: checking for strlcpy
 configure:3947: gcc -o conftest -g -O2   conftest.c  >&5
-/tmp/fyodor/ccCYo7zr.o(.text+0x9): In function `main':
+/tmp/fyodor/ccSiAw9S.o(.text+0x9): In function `main':
 /home/fyodor/nmap/libpcap/conftest.c:64: undefined reference to `strlcpy'
-/tmp/fyodor/ccCYo7zr.o(.data+0x0): undefined reference to `strlcpy'
+/tmp/fyodor/ccSiAw9S.o(.data+0x0): undefined reference to `strlcpy'
 collect2: ld returned 1 exit status
 configure:3953: $? = 1
 configure: failed program was:
@@ -655,7 +655,7 @@ configure:4363: $? = 0
 configure:4433: result: none required
 configure:4510: checking for library containing putmsg
 configure:4540: gcc -o conftest -g -O2   conftest.c  >&5
-/tmp/fyodor/ccIIjwGO.o(.text+0x7): In function `main':
+/tmp/fyodor/ccs4Qryx.o(.text+0x7): In function `main':
 /home/fyodor/nmap/libpcap/conftest.c:37: warning: warning: putmsg is not implemented and will always fail
 configure:4546: $? = 0
 configure:4550: test -z 
