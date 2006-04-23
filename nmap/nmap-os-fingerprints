@@ -1,5 +1,5 @@
 # Nmap OS Fingerprint List. -*- mode: fundamental; -*-
-# $Id: nmap-os-fingerprints 3194 2006-03-03 23:12:14Z fyodor $ 
+# $Id: nmap-os-fingerprints 3224 2006-03-25 23:56:48Z fyodor $ 
 #
 # Contributions to this database are welcome.  If Nmap obtains a new
 # fingerprint (and test conditions are favorable), it will print out a
@@ -12987,7 +12987,7 @@ T7(Resp=N)
 PU(DF=Y%TOS=C0%IPLEN=164%RIPTL=148%RID=E%RIPCK=E%UCK=E%ULEN=134%DAT=E)
 
 # Linux ubuntu 2.6.8.1-5-386 #1 Sat Feb 12 00:19:31 UTC 2005 i686 GNU/Linux
-Fingerprint Linux 2.6.8 (ubuntu)
+Fingerprint Linux 2.6.8 (Ubuntu)
 Class Linux | Linux | 2.6.X | general purpose
 TSeq(Class=RI%gcd=<6%SI=<10F66C0&>2B6A6%IPID=Z%TS=1000HZ)
 T1(DF=Y%W=16A0%ACK=S++%Flags=AS%Ops=MNNTNW)
@@ -20002,7 +20002,7 @@ T6(Resp=Y%DF=N%W=400%ACK=S++%Flags=AR%Ops=)
 T7(Resp=Y%DF=N%W=400%ACK=S++%Flags=AR%Ops=)
 PU(Resp=N)
 
-Fingerprint Sony AIBO ERS-7 running AIBO MInd 2
+Fingerprint Sony AIBO ERS-7 running AIBO Mind 2
 Class Sony | embedded || robotic pet
 TSeq(Class=TR|TD%gcd=<186A4%SI=<64%IPID=I%TS=U)
 T1(DF=N%W=2000%ACK=S++%Flags=AS%Ops=M)

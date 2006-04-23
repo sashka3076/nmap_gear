@@ -142,6 +142,10 @@
 #define HAVE_AF_INET6 1
 #define HAVE_SOCKADDR_STORAGE 1
 
+/* Without this, Windows will give us all sorts of crap about using functions
+   like strcpy() even if they are done safely */
+#define _CRT_SECURE_NO_DEPRECATE 1
+
 #ifdef __GNUC__
 #define bzero(addr, num) __builtin_memset (addr, '\0', num)
 #else

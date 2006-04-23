@@ -1,5 +1,5 @@
 # Nmap service detection probe list -*- mode: fundamental; -*-
-# $Id: nmap-service-probes 3083 2006-01-25 07:23:05Z fyodor $ 
+# $Id: nmap-service-probes 3212 2006-03-20 21:49:15Z fyodor $ 
 #
 # This is a database of custom probes and expected responses that the
 # Nmap Security Scanner ( http://www.insecure.org/nmap/ ) uses to
@@ -491,7 +491,7 @@ match ftp-proxy m|^220 Welcome to ([\w-_.]+) Ftp Proxy Service\.\r\n| p/Proxy Su
 # TODO kerio?
 #match ftp m|^421 Service not available \(The FTP server is not responding\.\)\n$| v/unknown FTP server//service not responding/
 match vdr m|^220 (\S+) SVDRP VideoDiskRecorder (\d[^\;]+);| p/VDR/ h/$1/ v/$2/ d/media device/
-
+softmatch ftp m/^220 Welcome to ([-.\w]+) FTP.*\r\n$/i h/$1/
 softmatch ftp m/^220 ([-.\w]+) [-.\w ]+ftp.*\r\n$/i h/$1/
 softmatch ftp m/^220-([-.\w]+) [-.\w ]+ftp.*\r\n220/i h/$1/
 softmatch ftp m/^220 [-.\w ]+ftp.*\r\n$/i

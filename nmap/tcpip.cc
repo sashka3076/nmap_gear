@@ -98,8 +98,10 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: tcpip.cc 3200 2006-03-05 23:59:46Z fyodor $ */
-
+/* $Id: tcpip.cc 3274 2006-04-22 23:00:09Z fyodor $ */
+#ifdef WIN32
+#include "nmap_winconfig.h"
+#endif
 #include <dnet.h>
 #include "tcpip.h"
 #include "NmapOps.h"
@@ -718,9 +720,9 @@ fatal("Call to pcap_open_live(%s, %d, %d, %d) failed three times. Reported error
           "*BSD:  If you are getting device not configured, you need to recompile your kernel with Berkeley Packet Filter support.  If you are getting No such file or directory, try creating the device (eg cd /dev; MAKEDEV <device>; or use mknod).\n"
           "SOLARIS:  If you are trying to scan localhost and getting '/dev/lo0: No such file or directory', complain to Sun.  I don't think Solaris can support advanced localhost scans.  You can probably use \"-P0 -sT localhost\" though.\n\n", pcapdev, snaplen, promisc, to_ms, err0r);
       } else {
-	error("pcap_open_live(%s, %d, %d, %d) FAILLED. Reported error: %s.  Will wait %d seconds then retry.", pcapdev, snaplen, promisc, to_ms, err0r, (int) pow(5, failed));	
+	error("pcap_open_live(%s, %d, %d, %d) FAILED. Reported error: %s.  Will wait %d seconds then retry.", pcapdev, snaplen, promisc, to_ms, err0r, (int) pow(5.0, failed));	
       }
-      sleep((int) pow(5, failed));
+      sleep((int) pow(5.0, failed));
     }
   } while (!pt);
 

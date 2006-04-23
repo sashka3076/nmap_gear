@@ -98,7 +98,11 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: scan_engine.cc 3201 2006-03-06 00:15:49Z fyodor $ */
+/* $Id: scan_engine.cc 3274 2006-04-22 23:00:09Z fyodor $ */
+
+#ifdef WIN32
+#include "nmap_winconfig.h"
+#endif
 
 #include <dnet.h>
 
@@ -1232,7 +1236,8 @@ void UltraScanInfo::Init(vector<Target *> &Targets, struct scan_lists *pts, styp
      again if they are).  when will be now, if the function returns
      true */
 bool UltraScanInfo::sendOK(struct timeval *when) {
-  struct timeval lowhtime, tmptv;
+  struct timeval lowhtime = {0};
+  struct timeval tmptv;
   list<HostScanStats *>::iterator host;
   bool ggood = false;
   bool hgood = false;
@@ -3227,7 +3232,7 @@ static void processData(UltraScanInfo *USI) {
   int expire_us = 0;
 
   bool tryno_capped = false, tryno_mayincrease = false;
-  struct timeval tv_start;
+  struct timeval tv_start = {0};
   if (o.debugging) {
     gettimeofday(&USI->now, NULL);
     tv_start = USI->now;

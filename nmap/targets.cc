@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: targets.cc 3201 2006-03-06 00:15:49Z fyodor $ */
+/* $Id: targets.cc 3274 2006-04-22 23:00:09Z fyodor $ */
 
 
 #include "targets.h"
@@ -1797,7 +1797,7 @@ if (hs->randomize) {
 	 !hs->hostbatch[i]->timedOut(&now))
        if (!setTargetNextHopMAC(hs->hostbatch[i]))
 	 fatal("%s: Failed to determine dst MAC address for target %s", 
-	       __FUNCTION__, hs->hostbatch[hidx]->NameIP());
+	       __FUNCTION__, hs->hostbatch[i]->NameIP());
  }
 
  /* TODO: Maybe I should allow real ping scan of directly connected

@@ -100,12 +100,7 @@
 #define TIMEVAL_MSEC_SUBTRACT(a,b) ((((a).tv_sec - (b).tv_sec) * 1000) + ((a).tv_usec - (b).tv_usec) / 1000)
 /* Timeval subtract in seconds; truncate towards zero */
 #define TIMEVAL_SEC_SUBTRACT(a,b) ((a).tv_sec - (b).tv_sec + (((a).tv_usec < (b).tv_usec) ? - 1 : 0))
-/* Timeval subtract in milliseconds */
-#define TIMEVAL_NSEC_SUBTRACT(a,b) ((((a).tv_sec - (b).tv_sec) * 1000) + ((a).tv_usec - (b).tv_usec) / 1000)
 /* assign one timeval to another timeval plus some msecs: a = b + msecs */
 #define TIMEVAL_MSEC_ADD(a, b, msecs) (a).tv_sec = (b).tv_sec + ((msecs) / 1000); (a).tv_usec = (b).tv_usec + ((msecs) % 1000) * 1000; (a).tv_sec += (a).tv_usec / 1000000; (a).tv_usec %= 1000000
-/* timeval a = timeval b + nsecs nanoseconds.  If you want to += the time
-   onto a single timeval, pass the same timeval as a and b */
-#define TIMEVAL_NSEC_ADD(a, b, nsecs) (a).tv_sec = (b).tv_sec + ((nsecs) / 1000); (a).tv_usec = (b).tv_usec + ((nsecs) % 1000) * 1000; (a).tv_sec += (a).tv_usec / 1000000; (a).tv_usec %= 1000000
 
 #endif

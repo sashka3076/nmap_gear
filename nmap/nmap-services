@@ -1,7 +1,7 @@
 # Well known service port numbers -*- mode: fundamental; -*-
 # From the Nmap security scanner ( http://www.insecure.org/nmap/ )
 #
-# $Id: nmap-services 2992 2005-12-13 06:12:02Z fyodor $
+# $Id: nmap-services 3274 2006-04-22 23:00:09Z fyodor $
 # For a HUGE list of services (including these and others), 
 # see http://www.graffiti.com/services
 tcpmux            1/tcp      # TCP Port Service Multiplexer [rfc-1078]
@@ -2243,6 +2243,8 @@ ciscopop          45000/udp  # Cisco Postoffice Protocol for Cisco Secure IDS
 dbbrowse          47557/tcp  # Databeam Corporation
 dbbrowse          47557/udp  # Databeam Corporation
 compaqdiag        49400/tcp  # Compaq Web-based management
+iiimsf            50000/tcp  # Internet/Intranet Input Method Server Framework
+iiimsf            50002/tcp  # Internet/Intranet Input Method Server Framework
 bo2k              54320/tcp  # Back Orifice 2K Default Port
 bo2k              54321/udp  # Back Orifice 2K Default Port
 netprowler-manager 61439/tcp

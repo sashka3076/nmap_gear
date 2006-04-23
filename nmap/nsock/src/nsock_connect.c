@@ -271,7 +271,7 @@ int nsi_getlastcommunicationinfo(nsock_iod ms_iod, int *protocol,
   msiod *nsi = (msiod *) ms_iod;
   int ret = 1;
   struct sockaddr_storage sock;
-  int slen = sizeof(struct sockaddr_storage);
+  socklen_t slen = sizeof(struct sockaddr_storage);
   int res;
 
   assert(socklen > 0);

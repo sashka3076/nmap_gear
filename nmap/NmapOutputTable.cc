@@ -97,7 +97,11 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOutputTable.cc 2891 2005-10-01 23:50:27Z fyodor $ */
+/* $Id: NmapOutputTable.cc 3274 2006-04-22 23:00:09Z fyodor $ */
+
+#ifdef WIN32
+#include "nmap_winconfig.h"
+#endif
 
 #include "NmapOutputTable.h"
 #include "utils.h"

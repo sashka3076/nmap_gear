@@ -108,7 +108,7 @@ static int wait_for_events(mspool *ms, int msec_timeout) {
     if (ms->evl.next_ev.tv_sec == 0) {
       event_msecs = -1; /* None of the events specified a timeout */
     } else {
-      event_msecs = MAX(0, TIMEVAL_NSEC_SUBTRACT(ms->evl.next_ev, nsock_tod));
+      event_msecs = MAX(0, TIMEVAL_MSEC_SUBTRACT(ms->evl.next_ev, nsock_tod));
     }
 
     /* We cast to unsigned because we want -1 to be very high (since it means 
@@ -209,7 +209,8 @@ static int wait_for_events(mspool *ms, int msec_timeout) {
 void handle_connect_result(mspool *ms, msevent *nse, 
 				  enum nse_status status)
   {
-  int optval, optlen = sizeof(int);
+  int optval;
+  socklen_t optlen = sizeof(int);
   char buf[1024];
   msiod *iod = nse->iod;
 #if HAVE_OPENSSL
@@ -695,7 +696,7 @@ static void iterate_through_event_lists(mspool *nsp) {
 	      handle_connect_result(nsp, nse, NSE_STATUS_SUCCESS);
 	    } 
 	    if (!nse->event_done && nse->timeout.tv_sec &&
-		TIMEVAL_NSEC_SUBTRACT(nse->timeout, nsock_tod) <= 0) {
+		TIMEVAL_MSEC_SUBTRACT(nse->timeout, nsock_tod) <= 0) {
 	      handle_connect_result(nsp, nse, NSE_STATUS_TIMEOUT);
 	    }
 	    break;
@@ -714,7 +715,7 @@ static void iterate_through_event_lists(mspool *nsp) {
 	      handle_read_result(nsp, nse, NSE_STATUS_SUCCESS);
 	    
 	    if (!nse->event_done && nse->timeout.tv_sec &&
-		TIMEVAL_NSEC_SUBTRACT(nse->timeout, nsock_tod) <= 0) {
+		TIMEVAL_MSEC_SUBTRACT(nse->timeout, nsock_tod) <= 0) {
 	      handle_read_result(nsp, nse, NSE_STATUS_TIMEOUT);
 	    }
 	    break;
@@ -734,14 +735,14 @@ static void iterate_through_event_lists(mspool *nsp) {
 	      handle_write_result(nsp, nse, NSE_STATUS_SUCCESS);
 
 	    if (!nse->event_done && nse->timeout.tv_sec &&
-		TIMEVAL_NSEC_SUBTRACT(nse->timeout, nsock_tod) <= 0) {
+		TIMEVAL_MSEC_SUBTRACT(nse->timeout, nsock_tod) <= 0) {
 	      handle_write_result(nsp, nse, NSE_STATUS_TIMEOUT);
 	    }
 	    break;
 	    
 	  case NSE_TYPE_TIMER:
 	    if (nse->timeout.tv_sec && 
-		TIMEVAL_NSEC_SUBTRACT(nse->timeout, nsock_tod) <= 0) {
+		TIMEVAL_MSEC_SUBTRACT(nse->timeout, nsock_tod) <= 0) {
 	      handle_timer_result(nsp, nse, NSE_STATUS_SUCCESS);
 	    }
 	    break;
@@ -763,7 +764,7 @@ static void iterate_through_event_lists(mspool *nsp) {
 	  if (nse->timeout.tv_sec != 0) {
 	    if (nsp->evl.next_ev.tv_sec == 0)
 	      nsp->evl.next_ev = nse->timeout;
-	    else if (TIMEVAL_NSEC_SUBTRACT(nsp->evl.next_ev, nse->timeout) > 0)
+	    else if (TIMEVAL_MSEC_SUBTRACT(nsp->evl.next_ev, nse->timeout) > 0)
 	      nsp->evl.next_ev = nse->timeout;
 	  }
 	}
@@ -789,12 +790,11 @@ enum nsock_loopstatus quitstatus = NSOCK_LOOP_ERROR;
 
 gettimeofday(&nsock_tod, NULL);
 
- if (msec_timeout > 0) { 
-   TIMEVAL_NSEC_ADD(loop_timeout, nsock_tod, msec_timeout);
- } else if (msec_timeout < -1) {
+ if (msec_timeout < -1) {
    ms->errnum = EINVAL;
    return NSOCK_LOOP_ERROR;
  }
+ TIMEVAL_MSEC_ADD(loop_timeout, nsock_tod, msec_timeout);
  msecs_left = msec_timeout;
  
  if (ms->tracelevel > 1) {
@@ -816,7 +816,7 @@ while(1) {
   }
  
   if (msec_timeout > 0) {
-    msecs_left = MAX(0, TIMEVAL_NSEC_SUBTRACT(loop_timeout, nsock_tod));
+    msecs_left = MAX(0, TIMEVAL_MSEC_SUBTRACT(loop_timeout, nsock_tod));
     if (msecs_left == 0 && loopnum > 0) {
       quitstatus = NSOCK_LOOP_TIMEOUT;
       break;
@@ -867,7 +867,7 @@ void nsp_add_event(mspool *nsp, msevent *nse) {
     if (nse->timeout.tv_sec != 0) {
       if (nsp->evl.next_ev.tv_sec == 0) {
 	nsp->evl.next_ev = nse->timeout;
-      } else if (TIMEVAL_NSEC_SUBTRACT(nsp->evl.next_ev, nse->timeout) > 0) {
+      } else if (TIMEVAL_MSEC_SUBTRACT(nsp->evl.next_ev, nse->timeout) > 0) {
 	nsp->evl.next_ev = nse->timeout;
       }
     }

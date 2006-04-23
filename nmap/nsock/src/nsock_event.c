@@ -301,7 +301,7 @@ msevent *msevent_new(mspool *nsp, enum nse_type type, msiod *msiod,
   }
   if (timeout_msecs != -1) {
     assert(timeout_msecs >= 0);
-    TIMEVAL_NSEC_ADD(nse->timeout, nsock_tod, timeout_msecs);
+    TIMEVAL_MSEC_ADD(nse->timeout, nsock_tod, timeout_msecs);
   }
   nse->iod = msiod;
   nse->handler = handler;

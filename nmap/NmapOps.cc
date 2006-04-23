@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOps.cc 3195 2006-03-04 04:17:32Z fyodor $ */
+/* $Id: NmapOps.cc 3274 2006-04-22 23:00:09Z fyodor $ */
 #include "nmap.h"
 #include "nbase.h"
 #include "NmapOps.h"
@@ -310,7 +310,7 @@ void NmapOps::ValidateOptions() {
   }
 
   if (pingtype != PINGTYPE_NONE && spoofsource) {
-    error("WARNING:  If -S is being used to fake your source address, you may also have to use -e <iface> and -P0 .  If you are using it to specify your real source address, you can ignore this warning.");
+    error("WARNING:  If -S is being used to fake your source address, you may also have to use -e <interface> and -P0 .  If you are using it to specify your real source address, you can ignore this warning.");
   }
 
   if (pingtype != PINGTYPE_NONE && idlescan) {
@@ -432,6 +432,10 @@ void NmapOps::ValidateOptions() {
   }
 
   if (af() != AF_INET) mass_dns = false;
+
+  /* Prevent performance values from getting out of whack */
+  if (min_parallelism > max_parallelism)
+    max_parallelism = min_parallelism;
 
 }
   

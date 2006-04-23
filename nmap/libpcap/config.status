@@ -495,7 +495,7 @@ s,@EGREP@,grep -E,;t t
 s,@LIBOBJS@,,;t t
 s,@RANLIB@,ranlib,;t t
 s,@ac_ct_RANLIB@,ranlib,;t t
-s,@V_CCOPT@,-g -O2,;t t
+s,@V_CCOPT@,-g -O2 -fno-strict-aliasing,;t t
 s,@V_DEFS@, -D_U_="__attribute__((unused))",;t t
 s,@V_INCLS@,,;t t
 s,@V_LIBS@,,;t t

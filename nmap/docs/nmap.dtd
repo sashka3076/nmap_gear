@@ -1,7 +1,7 @@
 <!--
     nmap.dtd
     This is the DTD for nmap's XML output (-oX) format.
-    $Id: nmap.dtd 2947 2005-11-22 23:21:55Z fyodor $
+    $Id: nmap.dtd 3274 2006-04-22 23:00:09Z fyodor $
 
     Originally written by:
     William McVey <wam@cisco.com> <wam+nmap@wamber.net>
@@ -66,7 +66,7 @@
 <!-- I don't know exactly what these are, but the values were enumerated via:
      grep "conf=" *
 --> 
-<!ENTITY % service_confs  "( 3 | 5 | 10)" >
+<!ENTITY % service_confs  "( 0 | 3 | 5 | 10)" >
 
 <!-- This element was started in nmap.c:nmap_main().
      It represents to the topmost element of the output document.
@@ -166,15 +166,13 @@
 			rpcnum		%attr_numeric;	#IMPLIED
 			lowver		%attr_numeric;	#IMPLIED
 			highver		%attr_numeric;	#IMPLIED
->
-
-
-<!-- these elements are written by output.c: printosscanoutput() -->
-
                         hostname        CDATA           #IMPLIED
                         ostype          CDATA           #IMPLIED
                         devicetype      CDATA           #IMPLIED
-<!ELEMENT os		( portused* , osclass*, osmatch* ) >
+                        servicefp       CDATA           #IMPLIED
+>
+
+<!ELEMENT os		( portused* , osclass*, osmatch*, osfingerprint* ) >
 
 <!ELEMENT portused	EMPTY >
 <!ATTLIST portused
@@ -197,6 +195,11 @@
 			name		CDATA		#REQUIRED
 			accuracy	%attr_numeric;	#REQUIRED
 			line    	%attr_numeric;	#REQUIRED
+>
+
+<!ELEMENT osfingerprint	EMPTY >
+<!ATTLIST osfingerprint
+			fingerprint	CDATA		#REQUIRED
 >
 
 <!ELEMENT uptime	EMPTY >

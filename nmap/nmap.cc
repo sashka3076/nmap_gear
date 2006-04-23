@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.cc 3201 2006-03-06 00:15:49Z fyodor $ */
+/* $Id: nmap.cc 3224 2006-03-25 23:56:48Z fyodor $ */
 
 #include "nmap.h"
 #include "osscan.h"
@@ -2104,6 +2104,8 @@ void reaper(int signo) {
 void sigdie(int signo) {
   int abt = 0;
 
+  fflush(stdout);
+
   switch(signo) {
   case SIGINT:
     fprintf(stderr, "caught SIGINT signal, cleaning up\n");
@@ -2140,7 +2142,7 @@ void sigdie(int signo) {
     abt = 1;
     break;
   }
-  fflush(stdout);
+
   fflush(stderr);
   log_close(LOG_MACHINE|LOG_NORMAL|LOG_SKID);
   if (abt) abort();

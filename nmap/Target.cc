@@ -98,7 +98,12 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: Target.cc 2891 2005-10-01 23:50:27Z fyodor $ */
+/* $Id: Target.cc 3274 2006-04-22 23:00:09Z fyodor $ */
+
+#ifdef WIN32
+#include "nmap_winconfig.h"
+#endif
+
 #include <dnet.h>
 
 #include "Target.h"
@@ -277,8 +282,6 @@ void Target::setHostName(char *name) {
     hostname = NULL;
   }
   if (name) {
-    if (strchr(name, '%')) {
-    }
     p = hostname = strdup(name);
     while (*p) {
       // I think only a-z A-Z 0-9 . and - are allowed, but I'll be a little more

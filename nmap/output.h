@@ -101,7 +101,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: output.h 3200 2006-03-05 23:59:46Z fyodor $ */
+/* $Id: output.h 3274 2006-04-22 23:00:09Z fyodor $ */
 
 #ifndef OUTPUT_H
 #define OUTPUT_H
@@ -203,4 +203,5 @@ void printStatusMessage();
 void printfinaloutput();
 
 char* xml_convert (const char* str);
+char* xml_sf_convert (const char* str);
 #endif /* OUTPUT_H */
