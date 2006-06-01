@@ -1,3 +1,3 @@
 copy: *.patch
 copy: *.png
-tar.bz2: nmap
+tar: nmap name=nmap-4.04BETA1

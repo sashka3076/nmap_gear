@@ -101,7 +101,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: idle_scan.cc 3224 2006-03-25 23:56:48Z fyodor $ */
+/* $Id: idle_scan.cc 3354 2006-05-14 05:00:58Z fyodor $ */
 
 #include "idle_scan.h"
 #include "scan_engine.h"
@@ -1028,7 +1028,7 @@ void idle_scan(Target *target, u16 *portarray, int numports,
   /* Now we go through the ports which were not determined were scanned
      but not determined to be open, and add them in the "closed" state */
   for(portidx = 0; portidx < numports; portidx++) {
-    if (target->ports.lookupPort(portarray[portidx], IPPROTO_TCP) == NULL) {
+    if (target->ports.getPortEntry(portarray[portidx], IPPROTO_TCP) == NULL) {
       target->ports.addPort(portarray[portidx], IPPROTO_TCP, NULL,
 	      PORT_CLOSEDFILTERED);
     }

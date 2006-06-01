@@ -1,4 +1,119 @@
-# Nmap Changelog ($Id: CHANGELOG 3274 2006-04-22 23:00:09Z fyodor $); -*-text-*-
+# Nmap Changelog ($Id: CHANGELOG 3410 2006-05-31 23:55:47Z fyodor $); -*-text-*-
+
+Nmap 4.04BETA1
+
+o Integrated all of your submissions (about a thousand) from the first
+  quarter of this year!  Please keep 'em coming!  The DB has increased
+  from 3,153 signatures representing 381 protocols in 4.03 to 3,441
+  signatures representing 401 protocols.  No other tool comes close!
+  Many of the already existing match lines were improved too.  Thanks
+  to Version Detection Czar Doug Hoyte for doing this.
+
+o Nmap now allows multiple ingored port states.  If a 65K-port scan
+  had, 64K filtered ports, 1K closed ports, and a few dozen open
+  ports, Nmap used to list the dozen open ones among a thousand lines
+  of closed ports.  Now Nmap will give reports like "Not shown: 64330
+  filtered ports, 1000 closed ports" or "All 2051 scanned ports on
+  192.168.0.69 are closed (1051) or filtered (1000)", and omit all of
+  those ports from the table.  Open ports are never ignored.  XML
+  output can now have multiple <extraports> directive (one for each
+  ignored state).  The number of ports in a single state before it is
+  consolidated defaults to 26 or more, though that number increases as
+  you add -v or -d options.  With -d3 or higher, no ports will be
+  consolidated.  The XML output should probably be augmented to give
+  the extraports directive 'ip', 'tcp', and 'udp' attributes which
+  specify the corresponding port numbers in the given state in the
+  same listing format as the nmaprun.scaninfo.services attribute, but
+  that part hasn't yet been implemented.  If you absoultely need the
+  exact port numbers for each state in the XML, use -d3 for now.
+
+o Nmap now ignores certain ICMP error message rate limiting (rather
+  than slowing down to accomidate it) in cases such as SYN scan where
+  an ICMP message and no response mean the same thing (port filtered).
+  This is currently only done at timing level Aggressive (-T4) or
+  higher, though we may make it the default if we don't hear problems
+  with it.  In addition, the --defeat-rst-ratelimit option has been
+  added, which causes Nmap not to slow down to accomidate RST rate
+  limits when encountered.  For a SYN scan, this may cause closed
+  ports to be labeled 'filtered' becuase Nmap refused to slow down
+  enough to correspond to the rate limiting.  Learn more about this
+  new option at http://www.insecure.org/nmap/man/ .  Thanks to Martin
+  Macok (martin.macok(a)underground.cz) for writing the patch that
+  these changes were based on.
+
+o Moved my Nmap development environment to Visual C++ 2005 Express
+  edition.  In typical "MS Upgrade Treadmill" fashion, Visual Studio
+  2003 users will no longer be able to compile Nmap using the new
+  solution files.  The compilation, installation, and execution
+  instructions at
+  http://www.insecure.org/nmap/install/inst-windows.html have been
+  upgraded.  
+
+o Automated my Windows build system so that I just have to type a
+  single make command in the mswin32 directory.  Thanks to Scott
+  Worley (smw(a)pobox.com>, Shane & Jenny Walters
+  (yfisaqt(a)waltersinamerica.com), and Alex Prinsier
+  (aphexer(a)mailhaven.com) for reading my appeal in the 4.03
+  CHANGELOG and assisting.
+
+o Changed the PortList class to use much more efficient data
+  structures and algorithms which take advantage of Nmap-specific
+  behavior patterns.  Thanks to Marek Majkowski
+  (majek(a)forest.one.pl) for the patch.
+
+o Fixed a bug which prevented certain TCP+UDP scan commands, such as
+  "nmap -sSU -p1-65535 localhost" from scanning both TCP and UDP.
+  Instead they gave the error message "WARNING: UDP scan was requested,
+  but no udp ports were specified.  Skipping this scan type".  Thanks to
+  Doug Hoyte for the patch.
+
+o Nmap has traditionally required you to specify -T* timing options
+  before any more granular options like --max-rtt-timeout, otherwise the
+  general timing option would overwrite the value from your more
+  specific request.  This has now been fixed so that the more specific
+  options always have precendence.  Thanks to Doug Hoyte for this patch.
+
+o Fixed a couple possible memory leaks reported by Ted Kremenek
+ (kremenek(a)cs.stanford.edu) from the Stanford University sofware
+ static analysis lab ("Checker" project).
+
+o Nmap now prints a warning when you specify a target name which
+  resolves to multiple IP addresses.  Nmap proceeds to scan only the
+  first of those addresses (as it always has done).  Thanks to Doug
+  Hoyte for the patch.  The warning looks like this:
+  Warning: Hostname google.com resolves to 3 IPs. Using 66.102.7.99.
+
+o Disallow --host-timeout values of less than 1500ms, print a warning
+  for values less than 15s.
+
+o Changed all instances of inet_aton() into calls to inet_pton()
+  instead.  This allowed us to remove inet_aton.c from nbase.  Thanks to
+  KX (kxmail(a)gmail.com) for the patch.
+
+o When debugging (-d) is specified, Nmap now prints a report on the
+  timing variables in use.  Thanks to Doug Hoyte for the patch.  The
+  report loos like this:
+  ---------- Timing report ----------
+    hostgroups: min 1, max 100000
+    rtt-timeouts: init 250, min 50, max 300
+    scan-delay: TCP 5, UDP 1000
+    parallelism: min 0, max 0
+    max-retries: 2, host-timeout 900000
+  -----------------------------------
+
+o Modified the WinPcap installer file to explicitly uninstall an
+  existing WinPcap (if you select that you wish to replace it) rather
+  than just overwriting the old version.  Thanks to Doug Hoyte for
+  making this change.
+
+o Added some P2P application ports to the nmap-services file.  Thanks
+  to Martin Macok for the patch.
+
+o The write buffer length increased in 4.03 was increased even further
+  when the debugging or verbosity levels are more than 2 (e.g. -d3).
+  Thanks to Brandon Enright (bmenrigh(a)ucsd.edu) for the patch.  The
+  goal is to prevent you from ever seeing the fatal error:
+  "log_vwrite: write buffer not large enough -- need to increase"
 
 Nmap 4.03
 
@@ -8,26 +123,34 @@ o Updated the LibPCRE build system to add the -fno-thread-jumps option
   people have reported on such systems.  Thanks to Kurt Grutzmacher
   (grutz(a)jingojango.net) for sending the configure.ac patch.
 
-o Increased a write buffer length to avoid Nmap from quitting with the
-  message "log_vwrite: write buffer not large enough -- need to
-  increase".  Thanks to Dave (dmarcher(a)pobox.com) for reporting the
-  issue.
-
 o Made some portability fixes to keep Nmap compiling with the newest
   Visual Studio 2005.  Thanks to KX (kxmail(a)gmail.com) for
   suggesting them.
 
 o Service fingerprints are now provided in the XML output whenever
   they would appear in the interactive output (i.e. when a service
-  respons with data but is unrecognized).  They are shown in a new
+  response with data but is unrecognized).  They are shown in a new
   'servicefp' attribute to the 'service' tag.  Thanks to Brandon Enright
   (bmenrigh(a)ucsd.edu) for sending the patch.
 
-o WinPcap 3.1 binaries are now shipped in the Nmap tarball, along with
-  a customized (for Nmap) installer written by Doug Hoyte.  That new
-  WinPcap installer is now used in the Nmap self-installer.
+o Improved the Windows build system -- mswin32/Makefile now takes care
+  of packaging Nmap and creating the installers once Visual Studio (GUI)
+  is done building the Release version of mswin32/nmap.sln.  If someone
+  knows how to do this (build) step on the command line (using the
+  Makefile), please let me know.  Or if you know how to at least make
+  'Release' (rather than Debug) the default configuration, that would be
+  valuable.
 
-o Fixed (I hope) a problem where aggresive --min-parallelization
+o WinPcap 3.1 binaries are now shipped in the Nmap tarball, along with
+  a customized installer written by Doug Hoyte.  That new WinPcap
+  installer is now used by the Nmap self-installer (if you request
+  WinPcap installation).  Some Nmap users were uncomfortable with a
+  "phone home" feature of the official WinPcap installer.  It connects
+  back to CACE Technologies, ostensibly to display news and (more
+  recently) advertisements.  Our new installer omits that feature, but
+  should be otherwise perfectly compatible with WinPcap 3.1.
+
+o Fixed (I hope) a problem where aggressive --min-parallelization
   option values could cause Nmap to quit with the message "box(300, 100,
   15) called (min,max,num)".  Thanks to  Richard van den Berg
   (richard.vandenberg(a)ins.com) for reporting the problem.
@@ -35,10 +158,15 @@ o Fixed (I hope) a problem where aggresive --min-parallelization
 o Fixed a rare crash bug thanks to a report and patch from Ganga
   Bhavani (GBhavani(a)everdreamcorp.com)
 
+o Increased a write buffer length to keep Nmap from quitting with the
+  message "log_vwrite: write buffer not large enough -- need to
+  increase".  Thanks to Dave (dmarcher(a)pobox.com) for reporting the
+  issue.
+
 Nmap 4.02ALPHA2
 
 o Updated to a newer XSL stylesheet (for XML to HTML output
-  tranformation) by Benjamin Erb.  This new version includes IP
+  transformation) by Benjamin Erb.  This new version includes IP
   address sorting, removal of javascript requirements, some new
   address, hostname, and Nmap version information, and various minor
   tweaks and fixes.
@@ -54,7 +182,7 @@ o Made some changes to various Nmap initialization functions which
   (ldv(a)altlinux.org) for the patch.
 
 o Cleaned up the code a bit by making a bunch (nearly 100) global
-  symols (mostly function calls) static.  I was also able to removed
+  symbols (mostly function calls) static.  I was also able to removed
   some unused functions and superfluous config.h.in defines.  Thanks
   to Dmitry V. Levin (ldv(a)altlinux.org) for sending a list of
   candidate symbols.
@@ -69,7 +197,7 @@ o Changed Nmap to cache interface information rather than opening and
   closing it (with dnet's eth_open and eth_close functions) all the
   time.
 
-o Applied a one-character Visual Studio 2005 compatability patch from
+o Applied a one-character Visual Studio 2005 compatibility patch from
   kx (kxmail(a)gmail.com).  It changed getch() into _getch() on Windows.
 
 Nmap 4.02ALPHA1
@@ -83,8 +211,7 @@ o Added the --log-errors option, which causes most warnings and error
   different system that does not yet support this option.
 
 o Rewrote much of the Nmap results output functions to be more
-  efficient and support --log-errors.  I hope I didn't break
-  anything.
+  efficient and support --log-errors.
 
 o Fixed a flaw in the scan engine which could (in rare cases)
   lead to a deadlock situation that prevents a scan from completing.
@@ -3092,7 +3219,7 @@ o On the suggestion of the ever-helpful LaMont Jones (lamont(a)hp.com),
   libpcap/nbase use symlinks rather than copeis of the file
 
 o Applied patch from LaMont Jones (lamont(a)hp.com) which makes Nmap
-  compatable with gcc 3.0 (apparently printf() is a macro in that
+  compatible with gcc 3.0 (apparently printf() is a macro in that
   version)
 
 o Applied patch from Colin Phipps (cph(a)netcraft.com) which fixes a
@@ -3256,7 +3383,7 @@ o Added XML output (-oX).  Hopefully this will help those of you
 
 o Applied patch from Stefan Rapp (s.rapp(a)hrz.uni-dortmund.de) which
   fixes a variable argument integer promotion problem in the new
-  snprintf compatability file.  This is important for Redhat 7
+  snprintf compatibility file.  This is important for Redhat 7
   systems.
 
 o Reorganized output-related routines so that they now reside in
@@ -3265,11 +3392,11 @@ o Reorganized output-related routines so that they now reside in
 
 Nmap 2.54BETA5
 
-o Revamped the 'compatability libraries' subsystem.  Moved all of that
+o Revamped the 'compatibility libraries' subsystem.  Moved all of that
   to a new library called 'libnbase' and changed Nmap and NmapFE to
   use that.  I included a better version of *snprintf and some other
-  compatability files.  Obviously I cannot test these changes on every
-  whacked OS that needs this compatability cruft, so please let me
+  compatibility files.  Obviously I cannot test these changes on every
+  whacked OS that needs this compatibility cruft, so please let me
   know if you run into compilation problems.
 
 o Fixed a problem found by Martyn Tovey (martyn(a)netcraft.com) when
@@ -3296,7 +3423,7 @@ o I tried to install Nmap on yet another machine without lex/yacc or
 o Applied patch by Jay Freeman (saurik) (saurik(a)saurik.com) to make
   Nmap C++-clean (this was lot of tedious work!  Thanks!).  Note that
   Nmap still uses a normal C compiler by default, but Nmap derivatives
-  may appreciate C++ compatability.  Note that this only applies to
+  may appreciate C++ compatibility.  Note that this only applies to
   "Nmap proper", not libpcap.
 
 o Added a HACKING file for people who want to help with Nmap
@@ -3516,7 +3643,7 @@ o Added "Host: [machinename] (ip) Status: Down" to machine logs when
   the verbose option is given (just like down hosts are reported to
   stdout when verbose is given).  Suggested by Alek Komarnitsky.
 
-o Applied NetBSD compatability patch provided by Mipam (reinoud at
+o Applied NetBSD compatibility patch provided by Mipam (reinoud at
   ibbnet.org) which changes an autoconf macro to check for
   getopt_long_only instead of getopt_long.
 

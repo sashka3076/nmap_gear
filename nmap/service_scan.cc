@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: service_scan.cc 3201 2006-03-06 00:15:49Z fyodor $ */
+/* $Id: service_scan.cc 3354 2006-05-14 05:00:58Z fyodor $ */
 
 
 #include "service_scan.h"
@@ -1606,8 +1606,7 @@ ServiceGroup::ServiceGroup(vector<Target *> &Targets, AllProbes *AP) {
       num_hosts_timedout++;
       continue;
     }
-    while((nxtport = Targets[targetno]->ports.nextPort(nxtport, 0, PORT_OPEN,
-			      true))) {
+    while((nxtport = Targets[targetno]->ports.nextPort(nxtport, TCPANDUDP, PORT_OPEN))) {
       svc = new ServiceNFO(AP);
       svc->target = Targets[targetno];
       svc->portno = nxtport->portno;
@@ -1625,8 +1624,7 @@ ServiceGroup::ServiceGroup(vector<Target *> &Targets, AllProbes *AP) {
     if (Targets[targetno]->timedOut(&now)) {
       continue;
     }
-    while((nxtport = Targets[targetno]->ports.nextPort(nxtport, 0, 
-						       PORT_OPENFILTERED, true))) {
+    while((nxtport = Targets[targetno]->ports.nextPort(nxtport, TCPANDUDP, PORT_OPENFILTERED))) {
       svc = new ServiceNFO(AP);
       svc->target = Targets[targetno];
       svc->portno = nxtport->portno;

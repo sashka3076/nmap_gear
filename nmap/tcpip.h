@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: tcpip.h 3224 2006-03-25 23:56:48Z fyodor $ */
+/* $Id: tcpip.h 3363 2006-05-16 21:46:41Z fyodor $ */
 
 
 #ifndef TCPIP_H
@@ -749,10 +749,6 @@ char *readip_pcap(pcap_t *pd, unsigned int *len, long to_usec,
    -1 or exits if ther is an error. */
 int read_arp_reply_pcap(pcap_t *pd, u8 *sendermac, struct in_addr *senderIP,
 		       long to_usec, struct timeval *rcvdtime);
-
-#ifndef HAVE_INET_ATON
-int inet_aton(register const char *, struct in_addr *);
-#endif
 
 /* Examines the given tcp packet and obtains the TCP timestamp option
    information if available.  Note that the CALLER must ensure that

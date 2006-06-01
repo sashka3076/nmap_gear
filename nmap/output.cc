@@ -101,7 +101,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: output.cc 3274 2006-04-22 23:00:09Z fyodor $ */
+/* $Id: output.cc 3408 2006-05-31 23:01:19Z fyodor $ */
 
 #include "output.h"
 #include "osscan.h"
@@ -379,11 +379,7 @@ void printportoutput(Target *currenths, PortList *plist) {
   int first = 1;
   struct protoent *proto;
   Port *current;
-  int numignoredports;
-  int portno;
   char hostname[1200];
-  int istate = plist->getIgnoredPortState();
-  numignoredports = plist->state_counts[istate];
   struct serviceDeductions sd;
   NmapOutputTable *Tbl = NULL;
   int portcol = -1; // port or IP protocol #
@@ -394,23 +390,38 @@ void printportoutput(Target *currenths, PortList *plist) {
   int colno = 0;
   unsigned int rowno;
   int numrows;
+  int numignoredports = plist->numIgnoredPorts();
+
   vector<const char *> saved_servicefps;
 
-  //cout << numignoredports << " " << plist->numports << endl;
-  assert(numignoredports <= plist->numports);
-
-
-  log_write(LOG_XML, "<ports><extraports state=\"%s\" count=\"%d\" />\n", 
-	    statenum2str(istate), 
-	    numignoredports);
+  log_write(LOG_XML, "<ports>");
+  int prevstate = PORT_UNKNOWN;
+  int istate;
+  while ((istate = plist->nextIgnoredState(prevstate)) != PORT_UNKNOWN) {
+    log_write(LOG_XML, "<extraports state=\"%s\" count=\"%d\" />\n", 
+	    statenum2str(istate), plist->getStateCounts(istate));
+    prevstate = istate;
+  }
 
   if (numignoredports == plist->numports) {
     log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,
-              "%s %d scanned %s on %s %s: %s\n",
+              "%s %d scanned %s on %s %s ",
 	      (numignoredports == 1)? "The" : "All", numignoredports,
 	      (numignoredports == 1)? "port" : "ports", 
 	      currenths->NameIP(hostname, sizeof(hostname)), 
-	      (numignoredports == 1)? "is" : "are", statenum2str(istate));
+	      (numignoredports == 1)? "is" : "are");
+    if (plist->numIgnoredStates() == 1) {
+      log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, statenum2str(plist->nextIgnoredState(PORT_UNKNOWN)));
+    } else {
+      prevstate = PORT_UNKNOWN;
+      while ((istate = plist->nextIgnoredState(prevstate)) != PORT_UNKNOWN) {
+	if (prevstate != PORT_UNKNOWN) log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, " or ");
+	log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "%s (%d)", statenum2str(istate), plist->getStateCounts(istate));
+	prevstate = istate;
+      }
+    }
+    log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "\n");
+
     log_write(LOG_MACHINE,"Host: %s (%s)\tStatus: Up", 
 	      currenths->targetipstr(), currenths->HostName());
     log_write(LOG_XML, "</ports>\n");
@@ -423,9 +434,18 @@ void printportoutput(Target *currenths, PortList *plist) {
   log_write(LOG_MACHINE,"Host: %s (%s)", currenths->targetipstr(), 
 	    currenths->HostName());
   
-  if (numignoredports > 0) {
-    log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"(The %d %s%s scanned but not shown below %s in state: %s)\n", numignoredports, o.ipprotscan?"protocol":"port", (numignoredports == 1)? "" : "s", (numignoredports == 1)? "is" : "are", statenum2str(istate));
+  /* Show line like:
+     Not shown: 3995 closed ports, 514 filtered ports
+     if appropriate (note that states are reverse-sorted by # of ports) */
+  prevstate = PORT_UNKNOWN;
+  while ((istate = plist->nextIgnoredState(prevstate)) != PORT_UNKNOWN) {
+    if (prevstate == PORT_UNKNOWN) 
+      log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "Not shown: ");
+    else log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, ", ");
+    log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "%d %s %s", plist->getStateCounts(istate), statenum2str(istate), o.ipprotscan? "protocols": "ports");
+    prevstate = istate;
   }
+  if (prevstate != PORT_UNKNOWN) log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "\n");
 
   /* OK, now it is time to deal with the service table ... */
   colno = 0;
@@ -437,13 +457,8 @@ void printportoutput(Target *currenths, PortList *plist) {
   if (o.servicescan || o.rpcscan)
     versioncol = colno++;
 
-  numrows = plist->state_counts[PORT_CLOSED] + 
-    plist->state_counts[PORT_OPEN] + plist->state_counts[PORT_FILTERED] + 
-    plist->state_counts[PORT_UNFILTERED] + 
-    plist->state_counts[PORT_OPENFILTERED] + 
-    plist->state_counts[PORT_CLOSEDFILTERED];
-  if (istate != PORT_UNKNOWN)
-    numrows -=  plist->state_counts[istate];
+  numrows = plist->numports - numignoredports;
+
   assert(numrows > 0);
   numrows++; // The header counts as a row
 
@@ -463,20 +478,18 @@ void printportoutput(Target *currenths, PortList *plist) {
 
   log_write(LOG_MACHINE,"\t%s: ", (o.ipprotscan)? "Protocols" : "Ports" );
   
-  current = NULL;
   rowno = 1;
   if (o.ipprotscan) {
-    for (portno = 0; portno < 256; portno++) {
-      if (!plist->ip_prots[portno]) continue;
-      current = plist->ip_prots[portno];
-      if (current->state != istate) {
+    current = NULL;
+    while( (current=plist->nextPort(current, IPPROTO_IP, 0))!=NULL ) {
+      if (!plist->isIgnoredState(current->state)) {
 	if (!first) log_write(LOG_MACHINE,", ");
 	else first = 0;
 	state = statenum2str(current->state);
 	proto = nmap_getprotbynum(htons(current->portno));
 	snprintf(portinfo, sizeof(portinfo), "%-24s",
 		 proto?proto->p_name: "unknown");
-	Tbl->addItemFormatted(rowno, portcol, "%d", portno);
+	Tbl->addItemFormatted(rowno, portcol, "%d", current->portno);
 	Tbl->addItem(rowno, statecol, true, state);
 	Tbl->addItem(rowno, servicecol, true, portinfo);
 	log_write(LOG_MACHINE,"%d/%s/%s/", current->portno, state, 
@@ -489,21 +502,9 @@ void printportoutput(Target *currenths, PortList *plist) {
       }
     }
   } else {
-    map<u16,Port*>::iterator tcpIter = plist->tcp_ports.begin();
-    map<u16,Port*>::iterator udpIter = plist->udp_ports.begin();
-
-    while (tcpIter != plist->tcp_ports.end() || udpIter != plist->udp_ports.end()) {
-
-      // If the udp iterator is at the end, then we always read from tcp and vica-versa
-      if (tcpIter != plist->tcp_ports.end() && (udpIter == plist->udp_ports.end() || tcpIter->first <= udpIter->first)) {
-	current = tcpIter->second;
-	tcpIter++;
-      } else {
-	current = udpIter->second;
-	udpIter++;
-      }
-
-      if (current->state != istate) {    
+    current = NULL;
+    while( (current=plist->nextPort(current, TCPANDUDP, 0))!=NULL ) {
+      if (!plist->isIgnoredState(current->state)) {
 	if (!first) log_write(LOG_MACHINE,", ");
 	else first = 0;
 	strcpy(protocol,(current->proto == IPPROTO_TCP)? "tcp": "udp");
@@ -605,8 +606,8 @@ void printportoutput(Target *currenths, PortList *plist) {
     
   }
   /*  log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"\n"); */
-  if (plist->state_counts[istate] > 0)
-    log_write(LOG_MACHINE, "\tIgnored State: %s (%d)", statenum2str(istate), plist->state_counts[istate]);
+  if (plist->getStateCounts(istate) > 0)
+    log_write(LOG_MACHINE, "\tIgnored State: %s (%d)", statenum2str(istate), plist->getStateCounts(istate));
   log_write(LOG_XML, "</ports>\n");
 
   // Now we write the table for the user
@@ -673,13 +674,17 @@ char* xml_convert (const char* str) {
    In addition, YOU MUST SANDWHICH EACH EXECUTION IF THIS CALL BETWEEN
    va_start() AND va_end() calls. */
 void log_vwrite(int logt, const char *fmt, va_list ap) {
-  static char *writebuf = NULL;;
+  static char *writebuf = NULL;
   int writebuflen = 65536;
   bool skid_noxlate = false;
   int rc = 0;
   int len;
   int fileidx = 0;
   int l;
+
+  /* Account for extended output under high debugging/verbosity */
+  if (o.debugging > 2 || o.verbose > 2)
+    writebuflen *= 8;
 
   if (!writebuf)
     writebuf = (char *) safe_malloc(writebuflen);
@@ -1402,7 +1407,7 @@ void printserviceinfooutput(Target *currenths) {
   for (i=0; i<MAX_SERVICE_INFO_FIELDS; i++)
     hostname_tbl[i][0] = ostype_tbl[i][0] = devicetype_tbl[i][0] = '\0';
 
-  while ((p = currenths->ports.nextPort(p, 0, PORT_OPEN, false))) {
+  while ((p = currenths->ports.nextPort(p, TCPANDUDP, PORT_OPEN))) {
     // The following 2 lines (from portlist.h) tell us that we don't
     // need to worry about free()ing anything in the serviceDeductions struct.
       // pass in an allocated struct serviceDeductions (don't wory about initializing, and
@@ -1493,7 +1498,7 @@ void printStatusMessage() {
   log_write(LOG_STDOUT, 
 	    "Stats: %d:%02d:%02d elapsed; %d hosts completed (%d up), %d undergoing %s\n", 
 	    time/60/24, time/60 % 24, time % 60, o.numhosts_scanned - o.numhosts_scanning, 
-	    o.numhosts_up, o.numhosts_scanning, scantype2str(o.scantype));
+	    o.numhosts_up, o.numhosts_scanning, scantype2str(o.current_scantype));
 }
 
 

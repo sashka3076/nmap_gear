@@ -56,7 +56,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_event.c 2452 2004-10-18 16:59:37Z fyodor $ */
+/* $Id: nsock_event.c 3292 2006-04-29 06:20:45Z fyodor $ */
 
 #include "nsock_internal.h"
 #include "gh_list.h"

@@ -53,7 +53,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_connect.c 2866 2005-09-12 05:35:14Z fyodor $ */
+/* $Id: nsock_connect.c 3292 2006-04-29 06:20:45Z fyodor $ */
 
 #include "nsock.h"
 #include "nsock_internal.h"

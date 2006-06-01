@@ -3,7 +3,7 @@
  * nbase.h -- The main include file exposing the external API for          *
  * libnbase, a library of base (often compatability) routines.  Programs   *
  * using libnbase can guarantee the availability of functions like         *
- * (v)snprintf and inet_aton.  This library also provides consistency and  *
+ * (v)snprintf and inet_pton.  This library also provides consistency and  *
  * extended features for some functions.  It was originally written for    *
  * use in the Nmap Security Scanner ( http://www.insecure.org/nmap/ ).     *
  *                                                                         *
@@ -112,7 +112,7 @@
  * * 'inline' is defined to what is neccessary for the C compiler being
  *   used (which may be nothing)
  *
- * * snprintf, inet_aton, inet_pton, inet_aton, memcpy, and bzero are 
+ * * snprintf, inet_pton, memcpy, and bzero are 
  *   provided if you don't have them (prototypes for these are 
  *   included either way).
  *
@@ -367,11 +367,6 @@ int gettimeofday(struct timeval *tv, struct timeval *tz);
 
 #ifndef HAVE_SLEEP
 unsigned int sleep(unsigned int seconds);
-#endif
-
-#ifndef HAVE_INET_ATON
-struct in_addr;
-int inet_aton(const char *cp, struct in_addr *addr);
 #endif
 
 /* Strncpy is like strcpy() except it ALWAYS zero-terminates, even if

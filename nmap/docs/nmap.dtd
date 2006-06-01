@@ -1,7 +1,7 @@
 <!--
     nmap.dtd
     This is the DTD for nmap's XML output (-oX) format.
-    $Id: nmap.dtd 3274 2006-04-22 23:00:09Z fyodor $
+    $Id: nmap.dtd 3391 2006-05-27 08:57:03Z fyodor $
 
     Originally written by:
     William McVey <wam@cisco.com> <wam+nmap@wamber.net>
@@ -78,7 +78,7 @@
 			start		%attr_numeric;	#IMPLIED
 			startstr	CDATA	        #IMPLIED
 			version		CDATA		#REQUIRED
-			xmloutputversion (1.01)		#REQUIRED
+			xmloutputversion (1.02)		#REQUIRED
 >
 
 <!-- this element is written in output.c:doscaninfo() -->
@@ -133,7 +133,7 @@
 
 <!-- these elements are written by output.c:printportoutput() -->
 
-<!ELEMENT ports		(extraports? , port*) >
+<!ELEMENT ports		(extraports* , port*) >
 
 <!ELEMENT extraports	EMPTY >
 <!ATTLIST extraports

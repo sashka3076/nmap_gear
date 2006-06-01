@@ -95,7 +95,10 @@ nsock_iod nsi_new2(nsock_pool nsockp, int sd, void *userdata) {
     nsi->state = NSIOD_STATE_INITIAL;
   } else {
     nsi->sd = dup(sd);
-    if (nsi->sd == -1) return NULL;
+    if (nsi->sd == -1) {
+      free(nsi);
+      return NULL;
+    }
     nsock_unblock_socket(nsi->sd);
     nsi->state = NSIOD_STATE_UNKNOWN;
   }

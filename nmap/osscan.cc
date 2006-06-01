@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: osscan.cc 3224 2006-03-25 23:56:48Z fyodor $ */
+/* $Id: osscan.cc 3354 2006-05-14 05:00:58Z fyodor $ */
 
 
 #include "osscan.h"
@@ -581,16 +581,16 @@ static FingerPrint *get_fingerprint(Target *target, struct seq_info *si) {
   target->FPR->osscan_opentcpport = -1;
   target->FPR->osscan_closedtcpport = -1;
   tport = NULL;
-  if ((tport = target->ports.nextPort(NULL, IPPROTO_TCP, PORT_OPEN, false))) {
+  if ((tport = target->ports.nextPort(NULL, IPPROTO_TCP, PORT_OPEN))) {
     openport = tport->portno;
     target->FPR->osscan_opentcpport = tport->portno;
   }
  
   /* Now we should find a closed port */
-  if ((tport = target->ports.nextPort(NULL, IPPROTO_TCP, PORT_CLOSED, false))) {
+  if ((tport = target->ports.nextPort(NULL, IPPROTO_TCP, PORT_CLOSED))) {
     closedport = tport->portno;
     target->FPR->osscan_closedtcpport = tport->portno;
-  } else if ((tport = target->ports.nextPort(NULL, IPPROTO_TCP, PORT_UNFILTERED, false))) {
+  } else if ((tport = target->ports.nextPort(NULL, IPPROTO_TCP, PORT_UNFILTERED))) {
     /* Well, we will settle for unfiltered */
     closedport = tport->portno;
   } else {
@@ -1427,7 +1427,7 @@ int bestaccidx;
  if (target->timedOut(NULL))
    return 1;
  
-o.scantype = OS_SCAN;
+o.current_scantype = OS_SCAN;
 
 #ifdef WIN32
   if (target->ifType() == devt_loopback) {
@@ -1445,9 +1445,9 @@ o.scantype = OS_SCAN;
    target->FPR = new FingerPrintResults;
 
  memset(si, 0, sizeof(si));
- if (target->ports.state_counts_tcp[PORT_OPEN] == 0 ||
-     (target->ports.state_counts_tcp[PORT_CLOSED] == 0 &&
-      target->ports.state_counts_tcp[PORT_UNFILTERED] == 0)) {
+ if (target->ports.getStateCounts(IPPROTO_TCP, PORT_OPEN) == 0 ||
+     (target->ports.getStateCounts(IPPROTO_TCP, PORT_CLOSED) == 0 &&
+      target->ports.getStateCounts(IPPROTO_TCP, PORT_UNFILTERED) == 0)) {
    if (o.osscan_limit) {
      if (o.verbose)
        log_write(LOG_STDOUT|LOG_NORMAL|LOG_SKID, "Skipping OS Scan due to absence of open (or perhaps closed) ports\n");

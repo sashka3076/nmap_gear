@@ -806,13 +806,17 @@ you would expect.</para>
         </term>
         <listitem>
           <indexterm significance="normal"><primary>--dns-servers</primary></indexterm>
-          <para>Normally Nmap will try to determine the DNS servers
-          from your resolv.conf file (UNIX) or the registry (Win32).
-          Alternatively, you may use this option to specify your own
-          servers.  This option is not honored if you are using
-          <option>--system-dns</option> or an IPv6 scan. Using
-          multiple DNS servers is often faster than querying
-          just one.</para>
+
+          <para>By default Nmap will try to determine your DNS servers
+          (for rDNS resolution) from your resolv.conf file (UNIX) or
+          the registry (Win32).  Alternatively, you may use this
+          option to specify alternate servers.  This option is not
+          honored if you are using <option>--system-dns</option> or an
+          IPv6 scan. Using multiple DNS servers is often faster and
+          more stealthy than querying just one.  The best performance
+          is often obtained by specifying all of the authoritative
+          servers for the target IP space.</para>
+
         </listitem>
       </varlistentry>
     </variablelist>
@@ -2010,7 +2014,7 @@ works best.</para>
 
 <para>When Nmap adjusts the scan delay upward to cope with rate
 limiting, the scan slows down dramatically.  The
-<option>--max_scan-delay</option> option specifies the largest delay
+<option>--max-scan-delay</option> option specifies the largest delay
 that Nmap will allow.  Setting this value too low can lead to wasteful
 packet retransmissions and possible missed ports when the target
 implements strict rate limiting.</para>
@@ -2018,6 +2022,34 @@ implements strict rate limiting.</para>
 <para>Another use of <option>--scan-delay</option> is to evade
 threshold based intrusion detection and prevention systems (IDS/IPS).</para>
 
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>--defeat-rst-ratelimit</option></term>
+        <listitem>
+
+<indexterm significance="normal"><primary>--defeat-rst-ratelimit</primary></indexterm>
+
+<para>Many hosts have long used rate limiting to reduce the number
+of ICMP error messages (such as port-unreachable errors) they send.
+Some systems now apply similar rate limits to the RST (reset)
+packets they generate.  This can slow Nmap down dramatically as it
+adjusts its timing to reflect those rate limits.  You can tell Nmap to
+ignore those rate limits (for port scans such as SYN scan which
+<emphasis>don't</emphasis> treat nonresponsive ports as
+<literal moreinfo="none">open</literal>) by specifying
+<option>--defeat-rst-ratelimit</option>.</para>
+
+<para>Using this option can reduce accuracy, as some ports will appear
+nonresponse because Nmap didn't wait long enough for a rate-limited
+RST response.  With a SYN
+scan, the non-response results in the port being labeled
+<literal moreinfo="none">filtered</literal> rather than the <literal moreinfo="none">closed</literal>
+state we see when RST packets are received.  This optional is useful
+when you only care about open ports, and distinguishing between
+<literal moreinfo="none">closed</literal> and <literal moreinfo="none">filtered</literal> ports isn't
+worth the extra time.</para>
         </listitem>
       </varlistentry>
 
@@ -2053,12 +2085,12 @@ grained control options do not currently exist.  For example,
 <option>-T4</option> prohibits the dynamic scan delay from exceeding
 10ms for TCP ports and <option>-T5</option> caps that value at 5
 milliseconds.  Templates can be used in combination with fine grained
-controls, as long as the template is specified first.  Otherwise the
-standard values for the template may override the values you specify.
-I recommend using <option>-T4</option> when scanning reasonably modern
-and reliable networks.  Keep that option (at the beginning of the
-command line) even when you add fine grained controls so that you
-benefit from those extra minor optimizations that it enables.</para>
+controls, and the fine-grained controls will you specify will take
+precedence over the timing template default for that parameter.  I
+recommend using <option>-T4</option> when scanning reasonably modern
+and reliable networks.  Keep that option even when you add fine
+grained controls so that you benefit from those extra minor
+optimizations that it enables.</para>
 
 <para>If you are on a decent broadband or ethernet connection, I would
 recommend always using <option>-T4</option>.  Some people love

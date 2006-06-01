@@ -2,7 +2,7 @@
 .\" It was generated using the DocBook XSL Stylesheets (version 1.69.1).
 .\" Instead of manually editing it, you probably should edit the DocBook XML
 .\" source for it and then use the DocBook XSL Stylesheets to regenerate it.
-.TH "NMAP" "1" "04/22/2006" "" "Nmap Reference Guide"
+.TH "NMAP" "1" "05/31/2006" "" "Nmap Reference Guide"
 .\" disable hyphenation
 .nh
 .\" disable justification (adjust text to left margin only)
@@ -377,9 +377,9 @@ do reverse DNS resolution on the target IP addresses. Normally this is only perf
 By default, Nmap resolves IP addresses by sending queries directly to the name servers configured on your host and then listening for responses. Many requests (often dozens) are performed in parallel for performance. Specify this option if you wish to use your system resolver instead (one IP at a time via the getnameinfo() call). This is slower and rarely useful unless there is a bug in the Nmap DNS code \-\- please contact us if that is the case. The system resolver is always used for IPv6 scans.
 .TP
 \fB\-\-dns\-servers <server1[,server2],...> \fR (Servers to use for reverse DNS queries)
-Normally Nmap will try to determine the DNS servers from your resolv.conf file (UNIX) or the registry (Win32). Alternatively, you may use this option to specify your own servers. This option is not honored if you are using
+By default Nmap will try to determine your DNS servers (for rDNS resolution) from your resolv.conf file (UNIX) or the registry (Win32). Alternatively, you may use this option to specify alternate servers. This option is not honored if you are using
 \fB\-\-system\-dns\fR
-or an IPv6 scan. Using multiple DNS servers is often faster than querying just one.
+or an IPv6 scan. Using multiple DNS servers is often faster and more stealthy than querying just one. The best performance is often obtained by specifying all of the authoritative servers for the target IP space.
 .SH "PORT SCANNING BASICS"
 .PP
 While Nmap has grown in functionality over the years, it began as an efficient port scanner, and that remains its core function. The simple command
@@ -847,6 +847,23 @@ Another use of
 \fB\-\-scan\-delay\fR
 is to evade threshold based intrusion detection and prevention systems (IDS/IPS).
 .TP
+\fB\-\-defeat\-rst\-ratelimit\fR
+Many hosts have long used rate limiting to reduce the number of ICMP error messages (such as port\-unreachable errors) they send. Some systems now apply similar rate limits to the RST (reset) packets they generate. This can slow Nmap down dramatically as it adjusts its timing to reflect those rate limits. You can tell Nmap to ignore those rate limits (for port scans such as SYN scan which
+\fIdon't\fR
+treat nonresponsive ports as
+open) by specifying
+\fB\-\-defeat\-rst\-ratelimit\fR.
+.sp
+Using this option can reduce accuracy, as some ports will appear nonresponse because Nmap didn't wait long enough for a rate\-limited RST response. With a SYN scan, the non\-response results in the port being labeled
+filtered
+rather than the
+closed
+state we see when RST packets are received. This optional is useful when you only care about open ports, and distinguishing between
+closed
+and
+filtered
+ports isn't worth the extra time.
+.TP
 \fB\-T <Paranoid|Sneaky|Polite|Normal|Aggressive|Insane>\fR (Set a timing template)
 While the fine grained timing controls discussed in the previous section are powerful and effective, some people find them confusing. Moreover, choosing the appropriate values can sometimes take more time than the scan you are trying to optimize. So Nmap offers a simpler approach, with six timing templates. You can specify them with the
 \fB\-T\fR
@@ -858,9 +875,9 @@ These templates allow the user to specify how aggressive they wish to be, while 
 \fB\-T4\fR
 prohibits the dynamic scan delay from exceeding 10ms for TCP ports and
 \fB\-T5\fR
-caps that value at 5 milliseconds. Templates can be used in combination with fine grained controls, as long as the template is specified first. Otherwise the standard values for the template may override the values you specify. I recommend using
+caps that value at 5 milliseconds. Templates can be used in combination with fine grained controls, and the fine\-grained controls will you specify will take precedence over the timing template default for that parameter. I recommend using
 \fB\-T4\fR
-when scanning reasonably modern and reliable networks. Keep that option (at the beginning of the command line) even when you add fine grained controls so that you benefit from those extra minor optimizations that it enables.
+when scanning reasonably modern and reliable networks. Keep that option even when you add fine grained controls so that you benefit from those extra minor optimizations that it enables.
 .sp
 If you are on a decent broadband or ethernet connection, I would recommend always using
 \fB\-T4\fR. Some people love

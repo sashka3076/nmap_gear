@@ -206,7 +206,7 @@ int getaddrinfo(const char *node, const char *service,
     return 0;
   }
   
-  if (inet_aton(node, &ip)) {
+  if (inet_pton(AF_INET, node, &ip)) {
     *res = new_ai(portno, ip.s_addr);
     return 0;
   }

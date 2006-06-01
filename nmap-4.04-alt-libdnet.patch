@@ -1,0 +1,20 @@
+--- nmap-4.04BETA1/configure.ac.orig	2006-05-16 05:20:32 +0000
++++ nmap-4.04BETA1/configure.ac	2006-06-01 21:12:47 +0000
+@@ -490,12 +490,15 @@ AC_ARG_WITH(libdnet,
+ [  --with-libdnet=DIR    Use an existing (compiled) dnet lib from DIR/include and DIR/lib.],
+ [  case "$with_libdnet" in
+   yes)
++    have_dnet=yes
+     ;;
+   included)
+     ;;
+   *)
+-    CXXFLAGS="-I$with_libdnet/include $CXXFLAGS"
+-    LDFLAGS="-L$with_libdnet/lib $LDFLAGS"
++    if test "$with_libdnet" != "/usr"; then
++      CXXFLAGS="-I$with_libdnet/include $CXXFLAGS"
++      LDFLAGS="-L$with_libdnet/lib $LDFLAGS"
++    fi
+     have_dnet=yes
+     ;;
+   esac]

@@ -125,7 +125,6 @@ nsock_event_id nsock_printf(nsock_pool ms_pool, nsock_iod ms_iod,
   res = vsnprintf(buf, sizeof(buf), format, ap);
   va_end(ap);
 
-
   if (res != -1) {
     if (res > sizeof(buf)) {
       buf2 = (char * ) safe_malloc(res + 16);
@@ -166,6 +165,10 @@ nsock_event_id nsock_printf(nsock_pool ms_pool, nsock_iod ms_iod,
     else 
       nsock_trace(nsp, "Write request for %d bytes to IOD #%li EID %li (peer unspecified)%s", strlength, 
 		  nsi->id, nse->id, displaystr);
+  }
+
+  if (buf2 != buf) {
+    free(buf2);
   }
 
   nsp_add_event(nsp, nse);

@@ -1,5 +1,5 @@
 # Nmap OS Fingerprint List. -*- mode: fundamental; -*-
-# $Id: nmap-os-fingerprints 3224 2006-03-25 23:56:48Z fyodor $ 
+# $Id: nmap-os-fingerprints 3408 2006-05-31 23:01:19Z fyodor $ 
 #
 # Contributions to this database are welcome.  If Nmap obtains a new
 # fingerprint (and test conditions are favorable), it will print out a
@@ -18119,7 +18119,7 @@ PU(DF=N%TOS=0%IPLEN=38%RIPTL=148%RID=F%RIPCK=F%UCK=E%ULEN=134%DAT=E)
 # OpenBSD 3.6-stable on SPARC
 # OpenBSD 3.6 GENERIC#304 sparc64
 # OpenBSD 3.7 GENERIC#50 i386
-Fingerprint OpenBSD 3.5 - 3.7
+Fingerprint OpenBSD 3.5 - 3.9
 Class OpenBSD | OpenBSD | 3.X | general purpose
 TSeq(Class=TR%gcd=<6%IPID=RD%TS=2HZ)
 T1(DF=Y%W=4000%ACK=S++%Flags=AS%Ops=MNWNNT)

@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_winconfig.h 3051 2006-01-20 18:36:52Z fyodor $ */
+/* $Id: nbase_winconfig.h 3293 2006-04-29 06:21:04Z fyodor $ */
 
 #ifndef NBASE_WINCONFIG_H
 #define NBASE_WINCONFIG_H

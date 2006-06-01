@@ -1,6 +1,6 @@
 Name: nmap
-Version: 4.03
-Release: alt1
+Version: 4.04
+Release: alt0.1
 Serial: 20020501
 
 Summary: Network exploration tool and security scanner
@@ -9,23 +9,24 @@ Group: Monitoring
 Url: http://www.insecure.org/nmap
 Packager: Nmap Development Team <nmap@packages.altlinux.org>
 
-%define srcname nmap-%version
-Source: %url/dist/%srcname.tar.bz2
+%define srcname nmap-%{version}BETA1
+Source: %url/dist/%srcname.tar
 Source1: nmapfe-16.png
 Source2: nmapfe-32.png
 Source3: nmapfe-48.png
 
 Patch1: nmap-4.02-alt-autoheader.patch
 Patch2: nmap-4.01-alt-owl-libpcap.patch
-Patch3: nmap-4.02-alt-owl-drop-priv.patch
-Patch4: nmap-4.01-alt-nmapfe.desktop.patch
-Patch5: nmap-4.01-alt-dot-dir.patch
-Patch6: nmap-4.02-alt-fileexistsandisreadable.patch
+Patch3: nmap-4.04-alt-libdnet.patch
+Patch4: nmap-4.02-alt-owl-drop-priv.patch
+Patch5: nmap-4.01-alt-nmapfe.desktop.patch
+Patch6: nmap-4.01-alt-dot-dir.patch
+Patch7: nmap-4.02-alt-fileexistsandisreadable.patch
 
 PreReq: shadow-utils
-Requires: chrooted-resolv
-BuildRequires: libpcap-devel >= 2:0.8
-BuildRequires: gcc-c++ libcap-devel libgtk+2-devel libpcap-devel libpcre-devel libssl-devel
+Requires: chrooted-resolv, libdnet >= 0:1.11-alt4
+BuildRequires: gcc-c++, libcap-devel, libdnet-devel, libgtk+2-devel
+BuildRequires: libpcap-devel >= 2:0.8, libpcre-devel, libssl-devel
 
 %package frontend
 Summary: Gtk+ frontend for nmap
@@ -53,6 +54,7 @@ This package includes nmapfe, a Gtk+ frontend for nmap.
 %patch4 -p1
 %patch5 -p1
 %patch6 -p1
+%patch7 -p1
 find -type f -name \*.orig -delete -print
 bzip2 -9k CHANGELOG
 
@@ -63,6 +65,7 @@ autoconf
 
 export ac_cv_header_libiberty_h=no
 %configure \
+	--with-libdnet \
 	--with-user=nmapuser \
 	--with-chroot-empty=/var/empty \
 	--with-chroot-resolv=/var/resolv \
@@ -96,6 +99,10 @@ install -pD -m644 %_sourcedir/nmapfe-48.png %buildroot%_liconsdir/nmapfe.png
 %_liconsdir/*
 
 %changelog
+* Thu Jun 01 2006 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.04-alt0.1
+- Updated to 4.04BETA1.
+- Patched to build with system libdnet.
+
 * Sun Apr 23 2006 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.03-alt1
 - Updated to 4.03.
 

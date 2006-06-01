@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.h 3224 2006-03-25 23:56:48Z fyodor $ */
+/* $Id: nmap.h 3363 2006-05-16 21:46:41Z fyodor $ */
 
 #ifndef NMAP_H
 #define NMAP_H
@@ -463,10 +463,5 @@ char *tsseqclass2ascii(int seqclass);
 const char *seqidx2difficultystr(unsigned long idx);
 int nmap_fetchfile(char *filename_returned, int bufferlen, char *file);
 int gather_logfile_resumption_state(char *fname, int *myargc, char ***myargv);
-
-/* From glibc 2.0.6 because Solaris doesn't seem to have this function */
-#ifndef HAVE_INET_ATON
-int inet_aton(register const char *, struct in_addr *);
-#endif
 
 #endif /* NMAP_H */

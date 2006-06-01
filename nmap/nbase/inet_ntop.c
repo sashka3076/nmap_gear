@@ -17,7 +17,7 @@
 /* Modified by Fyodor (fyodor@insecure.org) for inclusion in the Nmap 
  * Security Scanner.
  *
- * $Id: inet_ntop.c 3085 2006-01-25 07:49:28Z fyodor $
+ * $Id: inet_ntop.c 3293 2006-04-29 06:21:04Z fyodor $
  */
 
 #include "nbase.h"

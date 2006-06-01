@@ -53,7 +53,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_core.c 2535 2005-01-31 20:40:45Z fyodor $ */
+/* $Id: nsock_core.c 3292 2006-04-29 06:20:45Z fyodor $ */
 
 #include "nsock_internal.h"
 #include "gh_list.h"
@@ -944,7 +944,7 @@ void nsock_trace_handler_callback(mspool *ms, msevent *nse) {
   int strlength = 0;
   char displaystr[256];
   char errstr[256];
-
+  
   if (ms->tracelevel == 0)
     return;
 
@@ -964,12 +964,17 @@ void nsock_trace_handler_callback(mspool *ms, msevent *nse) {
     break;
 
   case NSE_TYPE_READ:
-    if (nse->status != NSE_STATUS_SUCCESS)
-      nsock_trace(ms, "Callback: %s %s %sfor EID %li [%s:%hi]", 
+    if (nse->status != NSE_STATUS_SUCCESS) {
+      if (nsi->peerlen > 0)
+	 nsock_trace(ms, "Callback: %s %s %sfor EID %li [%s:%hi]", 
 		  nse_type2str(nse->type), nse_status2str(nse->status), 
 		  errstr, nse->id, inet_ntop_ez(&nsi->peer, nsi->peerlen), 
 		  nsi_peerport(nsi));
-    else {    
+      else
+	 nsock_trace(ms, "Callback: %s %s %sfor EID %li (peer unspecified)",
+		     nse_type2str(nse->type), nse_status2str(nse->status),
+		     errstr, nse->id);
+    } else {    
       str = nse_readbuf(nse, &strlength);
       if (ms->tracelevel > 1 && strlength < 80) {
 	memcpy(displaystr, ": ", 2);
@@ -977,11 +982,17 @@ void nsock_trace_handler_callback(mspool *ms, msevent *nse) {
 	displaystr[2 + strlength] = '\0';
 	replacenonprintable(displaystr + 2, strlength, '.');
       } else displaystr[0] = '\0';
-      nsock_trace(ms, "Callback: %s %s for EID %li [%s:%hi] %s(%d bytes)%s", 
-		  nse_type2str(nse->type), nse_status2str(nse->status), 
-		  nse->id, inet_ntop_ez(&nsi->peer, nsi->peerlen), 
-		  nsi_peerport(nsi), nse_eof(nse)? "[EOF]" : "", strlength, 
-		  displaystr);
+      
+      if (nsi->peerlen > 0)
+	nsock_trace(ms, "Callback: %s %s for EID %li [%s:%hi] %s(%d bytes)%s", 
+      		    nse_type2str(nse->type), nse_status2str(nse->status), 
+      		    nse->id, inet_ntop_ez(&nsi->peer, nsi->peerlen), 
+      		    nsi_peerport(nsi), nse_eof(nse)? "[EOF]" : "", strlength, 
+      		    displaystr);
+      else
+	nsock_trace(ms, "Callback %s %s for EID %li (peer unspecified) %s(%d bytes)%s",
+		    nse_type2str(nse->type), nse_status2str(nse->status),
+		    nse->id, nse_eof(nse)? "[EOF]" : "", strlength, displaystr);
     }
     break;
 

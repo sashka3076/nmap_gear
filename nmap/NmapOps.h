@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOps.h 3195 2006-03-04 04:17:32Z fyodor $ */
+/* $Id: NmapOps.h 3355 2006-05-15 22:37:31Z fyodor $ */
 
 class NmapOps {
  public:
@@ -240,6 +240,10 @@ class NmapOps {
 		    FIN scan into a PSH scan.  Sort of a hack, but can
 		    be very useful sometimes. */
 
+  int defeat_rst_ratelimit; /* Solaris 9 rate-limits RSTs so scanning is very
+            slow against it. If we don't distinguish between closed and filtered ports,
+            we can get the list of open ports very fast */
+
   struct in_addr resume_ip; /* The last IP in the log file if user 
 			       requested --restore .  Otherwise 
 			       restore_ip.s_addr == 0.  Also 
@@ -292,7 +296,7 @@ class NmapOps {
   int numhosts_scanned;
   int numhosts_up;
   int numhosts_scanning;
-  stype scantype;
+  stype current_scantype;
   bool noninteractive;
 
  private:
