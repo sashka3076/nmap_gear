@@ -1,5 +1,5 @@
 %define name nmap
-%define version 4.04BETA1
+%define version 4.10
 %define release 1
 %define prefix /usr
 

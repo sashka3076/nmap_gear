@@ -1,6 +1,6 @@
 Name: nmap
-Version: 4.04
-Release: alt0.1
+Version: 4.10
+Release: alt1
 Serial: 20020501
 
 Summary: Network exploration tool and security scanner
@@ -9,7 +9,7 @@ Group: Monitoring
 Url: http://www.insecure.org/nmap
 Packager: Nmap Development Team <nmap@packages.altlinux.org>
 
-%define srcname nmap-%{version}BETA1
+%define srcname nmap-%version
 Source: %url/dist/%srcname.tar
 Source1: nmapfe-16.png
 Source2: nmapfe-32.png
@@ -99,6 +99,9 @@ install -pD -m644 %_sourcedir/nmapfe-48.png %buildroot%_liconsdir/nmapfe.png
 %_liconsdir/*
 
 %changelog
+* Wed Jun 14 2006 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.10-alt1
+- Updated to 4.10.
+
 * Thu Jun 01 2006 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.04-alt0.1
 - Updated to 4.04BETA1.
 - Patched to build with system libdnet.

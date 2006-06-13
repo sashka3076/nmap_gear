@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: scan_engine.cc 3355 2006-05-15 22:37:31Z fyodor $ */
+/* $Id: scan_engine.cc 3437 2006-06-10 21:23:27Z fyodor $ */
 
 #ifdef WIN32
 #include "nmap_winconfig.h"
@@ -3092,6 +3092,14 @@ static bool get_pcap_result(UltraScanInfo *USI, struct timeval *stime) {
 	    hss->target->v4sourceip()->s_addr != ip->ip_dst.s_addr)
 	  continue;
 	
+	/* Sometimes we get false results when scanning localhost with
+	   -p- because we scan localhost with src port = dst port and
+	   see our outgoing packet and think it is a response. */
+	if (probe->dport() == probe->sport() && 
+	    ip->ip_src.s_addr == ip->ip_dst.s_addr && 
+	    probe->ipid() == ip->ip_id)
+	  continue; /* We saw the packet we ourselves sent */
+
 	newstate = PORT_OPEN;
 	goodone = true;
       }

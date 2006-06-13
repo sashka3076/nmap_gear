@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: service_scan.cc 3354 2006-05-14 05:00:58Z fyodor $ */
+/* $Id: service_scan.cc 3437 2006-06-10 21:23:27Z fyodor $ */
 
 
 #include "service_scan.h"
@@ -1908,6 +1908,7 @@ static int launchSomeServiceProbes(nsock_pool nsp, ServiceGroup *SG) {
   ServiceProbe *nextprobe;
   struct sockaddr_storage ss;
   size_t ss_len;
+  static int warn_no_scanning=1;
 
   while (SG->services_in_progress.size() < SG->ideal_parallelism &&
 	 !SG->services_remaining.empty()) {
@@ -1918,6 +1919,16 @@ static int launchSomeServiceProbes(nsock_pool nsp, ServiceGroup *SG) {
       continue;
     }
     nextprobe = svc->nextProbe(true);
+
+    if (nextprobe == NULL) {
+      if (warn_no_scanning && o.debugging) {
+        printf("Service scan: Not probing some ports due to low intensity\n");
+        warn_no_scanning=0;
+      }
+      end_svcprobe(nsp, PROBESTATE_FINISHED_NOMATCH, SG, svc, NULL);
+      continue;
+    }
+
     // We start by requesting a connection to the target
     if ((svc->niod = nsi_new(nsp, svc)) == NULL) {
       fatal("Failed to allocate Nsock I/O descriptor in launchSomeServiceProbes()");
