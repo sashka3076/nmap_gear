@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: service_scan.cc 3437 2006-06-10 21:23:27Z fyodor $ */
+/* $Id: service_scan.cc 3516 2006-06-19 04:19:52Z fyodor $ */
 
 
 #include "service_scan.h"
@@ -851,11 +851,6 @@ ServiceProbe::~ServiceProbe() {
   if (fallbackStr) free(fallbackStr);
 }
 
-void ServiceProbe::setName(const char *name) {
-  if (probename) free(probename);
-  probename = strdup(name);
-}
-
   // Parses the "probe " line in the nmap-service-probes file.  Pass the rest of the line
   // after "probe ".  The format better be:
   // [TCP|UDP] [probename] q|probetext|
@@ -1043,7 +1038,9 @@ void ServiceProbe::addMatch(const char *match, int lineno) {
 }
 
 // Parses the given nmap-service-probes file into the AP class
-static void parse_nmap_service_probe_file(AllProbes *AP, char *filename) {
+/* Must NOT be static because I have externam maintenance tools (servicematch)
+  which use this */
+void parse_nmap_service_probe_file(AllProbes *AP, char *filename) {
   ServiceProbe *newProbe;
   char line[2048];
   int lineno = 0;

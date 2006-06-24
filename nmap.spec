@@ -1,5 +1,5 @@
 Name: nmap
-Version: 4.10
+Version: 4.11
 Release: alt1
 Serial: 20020501
 
@@ -15,10 +15,10 @@ Source1: nmapfe-16.png
 Source2: nmapfe-32.png
 Source3: nmapfe-48.png
 
-Patch1: nmap-4.02-alt-autoheader.patch
+Patch1: nmap-4.11-alt-autoheader.patch
 Patch2: nmap-4.01-alt-owl-libpcap.patch
 Patch3: nmap-4.04-alt-libdnet.patch
-Patch4: nmap-4.02-alt-owl-drop-priv.patch
+Patch4: nmap-4.11-alt-owl-drop-priv.patch
 Patch5: nmap-4.01-alt-nmapfe.desktop.patch
 Patch6: nmap-4.01-alt-dot-dir.patch
 Patch7: nmap-4.02-alt-fileexistsandisreadable.patch
@@ -99,6 +99,9 @@ install -pD -m644 %_sourcedir/nmapfe-48.png %buildroot%_liconsdir/nmapfe.png
 %_liconsdir/*
 
 %changelog
+* Sat Jun 24 2006 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.11-alt1
+- Updated to 4.11.
+
 * Wed Jun 14 2006 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.10-alt1
 - Updated to 4.10.
 

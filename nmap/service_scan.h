@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: service_scan.h 3200 2006-03-05 23:59:46Z fyodor $ */
+/* $Id: service_scan.h 3516 2006-06-19 04:19:52Z fyodor $ */
 
 #ifndef SERVICE_SCAN_H
 #define SERVICE_SCAN_H
@@ -218,7 +218,6 @@ class ServiceProbe {
   ServiceProbe();
   ~ServiceProbe();
   const char *getName() { return probename; }
-  void setName(const char *name); // a copy of name will be made and stored
   // Returns true if this is the "null" probe, meaning it sends no probe and
   // only listens for a banner.  Only TCP services have this.
   bool isNullProbe() { return (probestringlen == 0); }

@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: tcpip.cc 3363 2006-05-16 21:46:41Z fyodor $ */
+/* $Id: tcpip.cc 3516 2006-06-19 04:19:52Z fyodor $ */
 #ifdef WIN32
 #include "nmap_winconfig.h"
 #endif
@@ -952,11 +952,6 @@ ip->ip_dst.s_addr= victim->s_addr;
 ip->ip_sum = in_cksum((unsigned short *)ip, sizeof(struct ip));
 #endif
 
-if (TCPIP_DEBUGGING > 1) {
-  log_write(LOG_STDOUT, "Raw TCP packet creation completed!  Here it is:\n");
-  readtcppacket(packet,ntohs(ip->ip_len));
-}
-
  *packetlen = ntohs(ip->ip_len);
  return packet;
 
@@ -1398,11 +1393,6 @@ u8 *build_udp_raw(struct in_addr *source, const struct in_addr *victim,
   ip->ip_sum = in_cksum((unsigned short *)ip, sizeof(struct ip));
 #endif
   
-  if (TCPIP_DEBUGGING > 1) {
-    printf("Raw UDP packet creation completed!  Here it is:\n");
-    readudppacket(packet,1);
-  }
-  
   *packetlen = ntohs(ip->ip_len);
   return packet;
 }
@@ -1475,11 +1465,6 @@ ip->ip_sum = in_cksum((unsigned short *)ip, sizeof(struct ip));
  /* We should probably copy the data over too */
  if (data)
    memcpy(packet + sizeof(struct ip), data, datalen);
-
-if (TCPIP_DEBUGGING > 1) {
-  printf("Raw IP packet creation completed!  Here it is:\n");
-  hdump(packet, ntohs(ip->ip_len));
-}
 
  *packetlen = ntohs(ip->ip_len);
  return packet;

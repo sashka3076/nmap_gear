@@ -209,7 +209,6 @@ AC_CHECK_SIZEOF(long, 4)
 dnl Checks for library functions.
 dnl AC_TYPE_SIGNAL
 AC_CHECK_FUNCS( bzero snprintf vsnprintf memcpy nanosleep strerror strcasestr strcasecmp strncasecmp signal )
-AC_REPLACE_FUNCS(inet_aton)
 
 needsnprintf=no
 AC_CHECK_FUNCS(vsnprintf snprintf asprintf asnprintf vasprintf vasnprintf,,
