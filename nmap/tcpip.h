@@ -6,17 +6,17 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2004 Insecure.Com LLC. Nmap       *
- * is also a registered trademark of Insecure.Com LLC.  This program is    *
- * free software; you may redistribute and/or modify it under the          *
- * terms of the GNU General Public License as published by the Free        *
- * Software Foundation; Version 2.  This guarantees your right to use,     *
- * modify, and redistribute this software under certain conditions.  If    *
- * you wish to embed Nmap technology into proprietary software, we may be  *
- * willing to sell alternative licenses (contact sales@insecure.com).      *
- * Many security scanner vendors already license Nmap technology such as  *
- * our remote OS fingerprinting database and code, service/version         *
- * detection system, and port scanning code.                               *
+ * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
  *                                                                         *
  * Note that the GPL places important restrictions on "derived works", yet *
  * it does not provide a detailed definition of that term.  To avoid       *
@@ -39,7 +39,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://www.insecure.org/nmap/ to download Nmap.                         *
+ * http://insecure.org/nmap/ to download Nmap.                             *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -51,10 +51,10 @@
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
  * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to many    *
- * security vendors, and generally include a perpetual license as well as  *
- * providing for priority support and updates as well as helping to fund   *
- * the continued development of Nmap technology.  Please email             *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
  * sales@insecure.com for further information.                             *
  *                                                                         *
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: tcpip.h 3363 2006-05-16 21:46:41Z fyodor $ */
+/* $Id: tcpip.h 4209 2006-11-20 07:56:38Z fyodor $ */
 
 
 #ifndef TCPIP_H
@@ -239,11 +239,6 @@ typedef enum { devt_ethernet, devt_loopback, devt_p2p, devt_other  } devtype;
 #include "utils.h"
 #include "nmap.h"
 #include "global_structures.h"
-
-
-#ifndef DEBUGGING
-#define DEBUGGING 0
-#endif
 
 #ifndef TCPIP_DEBUGGING
 #define TCPIP_DEBUGGING 0
@@ -476,55 +471,6 @@ struct icmp
 };
 #endif /* HAVE_STRUCT_ICMP */
 
-/* Represents a single probe packet, such as a SYN to port 80 or an
-   ICMP netmask request packet. Values are still in network byte order. */
-class IPProbe {
- public:
-  IPProbe();
-  ~IPProbe();
-/* Takes an IP packet and stores _a copy_ of it, in this Probe,
-   adjusting proper header pointers and such */
-  int storePacket(u8 *ippacket, u32 len);
-  u32 packetbuflen; /* Length of the whole packet */
-  u8 *packetbuf; /* The packet itself */
-  struct ip *ipv4; /* IP header of packet */
-  struct icmp *icmp; /* icmp, tcp, and udp are NULL if the packet has no such header */
-  struct tcphdr *tcp;
-  udphdr_bsd *udp;
-
-  u8 af; /* AF_INET or AF_INET6 */
-  /* Resets everything to NULL.  Frees packetbuf if it is filled.  You
-     can reuse a Probe by calling Reset() and then a new
-     storePacket(). */
-  void Reset(); 
- private:
-
-};
-
-/* Handles an *IPv4* Arp probe */
-class ArpProbe {
- public:
-  ArpProbe();
-  ~ArpProbe();
-/* Takes an ARP packet and stores _a copy_ of it, in this Probe,
-   adjusting proper header pointers and such.  Then length better
-   equal 42! */
-  int storePacket(u8 *arppacket, u32 len);
-  u32 packetbuflen; /* Length of the whole packet */
-  u8 *packetbuf; /* The packet itself */
-  struct in_addr *ipquery; /* IP address this ARP seeks */
-  /* Resets everything to NULL.  Frees packetbuf if it is filled.  You
-     can reuse a Probe by calling Reset() and then a new
-     storePacket(). */
-  void Reset(); 
- private:
-
-};
-
- /* This ideally should be a port that isn't in use for any protocol on our machine or on the target */
-#define MAGIC_PORT 49724
-#define TVAL2LONG(X)  X.tv_sec * 1e6 + X.tv_usec
-#define SA struct sockaddr
 
 /* Prototypes */
 /* Converts an IP address given in a sockaddr_storage to an IPv4 or
@@ -559,7 +505,7 @@ bool route_dst(const struct sockaddr_storage *const dst, struct route_nfo *rnfo)
    be set to 1 if dst is directly connected on the ifentry network and
    0 if it requires routing.  If nexthop_ip is not NULL, and routing
    is required, the next hop is filled into nexthop_ip.  This function
-   returns false if no apporpiate interface or route was found and
+   returns false if no appropiate interface or route was found and
    true if it succeeds. */
 bool routethrough(const struct sockaddr_storage * const dest, 
 		  struct intf_entry *ifentry, 
@@ -569,17 +515,25 @@ unsigned short in_cksum(u16 *ptr,int nbytes);
 
 /* Build and send a raw tcp packet.  If TTL is -1, a partially random
    (but likely large enough) one is chosen */
-int send_tcp_raw( int sd, struct eth_nfo *eth, const struct in_addr *source, 
-		  const struct in_addr *victim, int ttl, 
-		  u16 sport, u16 dport, u32 seq, u32 ack, u8 flags,
-		  u16 window, u8 *options, int optlen, char *data, 
-		  u16 datalen);
-int send_udp_raw( int sd, struct eth_nfo *eth, struct in_addr *source, 
-		  const struct in_addr *victim, int ttl, u16 sport, 
-		  u16 dport, u16 ipid, char *data, u16 datalen);
+int send_tcp_raw( int sd, struct eth_nfo *eth,
+		  const struct in_addr *source, const struct in_addr *victim, 
+		  int ttl, bool df,
+		  u8* ipopt, int ipoptlen,
+		  u16 sport, u16 dport,
+		  u32 seq, u32 ack, u8 reserved, u8 flags, u16 window, u16 urp,
+		  u8 *options, int optlen,
+		  char *data, u16 datalen);
+int send_udp_raw( int sd, struct eth_nfo *eth,
+		  struct in_addr *source, const struct in_addr *victim,
+		  int ttl, u16 ipid,
+		  u8* ipopt, int ipoptlen,
+		  u16 sport, u16 dport,
+		  char *data, u16 datalen);
 
-int send_ip_raw( int sd, struct eth_nfo *eth, struct in_addr *source, 
-		 const struct in_addr *victim, int ttl, u8 proto, 
+int send_ip_raw( int sd, struct eth_nfo *eth,
+		 struct in_addr *source, const struct in_addr *victim,
+		 u8 proto, int ttl,
+		 u8* ipopt, int ipoptlen,
 		 char *data, u16 datalen);
 
 /* Builds a TCP packet (including an IP header) by packing the fields
@@ -588,11 +542,14 @@ int send_ip_raw( int sd, struct eth_nfo *eth, struct in_addr *source,
    actually sent by this function.  Caller must delete the buffer when
    finished with the packet.  The packet length is returned in
    packetlen, which must be a valid int pointer. */
-u8 *build_tcp_raw(const struct in_addr *source, 
-		  const struct in_addr *victim, int ttl, 
-		  u16 ipid, u16 sport, u16 dport, u32 seq, u32 ack, u8 flags,
-		  u16 window, u8 *options, int optlen, char *data, 
-		  u16 datalen, u32 *packetlen);
+u8 *build_tcp_raw(const struct in_addr *source, const struct in_addr *victim,
+		  int ttl, u16 ipid, u8 tos, bool df,
+		  u8* ipopt, int ipoptlen,
+		  u16 sport, u16 dport,
+		  u32 seq, u32 ack, u8 reserved, u8 flags, u16 window, u16 urp,
+		  u8 *options, int optlen,
+		  char *data, u16 datalen,
+		  u32 *packetlen);
 
 /* Builds a UDP packet (including an IP header) by packing the fields
    with the given information.  It allocates a new buffer to store the
@@ -601,18 +558,25 @@ u8 *build_tcp_raw(const struct in_addr *source,
    finished with the packet.  The packet length is returned in
    packetlen, which must be a valid int pointer. */
 u8 *build_udp_raw(struct in_addr *source, const struct in_addr *victim,
- 		  int ttl, u16 sport, u16 dport, u16 ipid, char *data, 
-		  u16 datalen, u32 *packetlen);
+ 		  int ttl, u16 ipid, u8 tos, bool df,
+		  u8* ipopt, int ipoptlen,
+ 		  u16 sport, u16 dport, 
+ 		  char *data, u16 datalen,
+ 		  u32 *packetlen);
 
-/* Builds an ICMP packet (including an IP header) by packing the fields
-   with the given information.  It allocates a new buffer to store the
-   packet contents, and then returns that buffer.  The packet is not
-   actually sent by this function.  Caller must delete the buffer when
-   finished with the packet.  The packet length is returned in
-   packetlen, which must be a valid int pointer. */
+/* Builds an ICMP packet (including an IP header) by packing the
+   fields with the given information.  It allocates a new buffer to
+   store the packet contents, and then returns that buffer.  The
+   packet is not actually sent by this function.  Caller must delete
+   the buffer when finished with the packet.  The packet length is
+   returned in packetlen, which must be a valid int pointer. The
+   id/seq will be converted to network byte order (if it differs from
+   HBO) */
 u8 *build_icmp_raw(const struct in_addr *source, const struct in_addr *victim, 
-		   int ttl, u16 ipid, u16 seq, unsigned short id, u8 ptype, 
-		   u8 pcode, char *data, u16 datalen, u32 *packetlen);
+		   int ttl, u16 ipid, u8 tos, bool df,
+		   u8* ipopt, int ipoptlen,
+		   u16 seq, unsigned short id, u8 ptype, u8 pcode,
+		   char *data, u16 datalen, u32 *packetlen);
 
 /* Builds an IP packet (including an IP header) by packing the fields
    with the given information.  It allocates a new buffer to store the
@@ -621,7 +585,10 @@ u8 *build_icmp_raw(const struct in_addr *source, const struct in_addr *victim,
    finished with the packet.  The packet length is returned in
    packetlen, which must be a valid int pointer. */
 u8 *build_ip_raw(const struct in_addr *source, const struct in_addr *victim, 
-		 int ttl, u8 proto, u16 ipid, char *data, u16 datalen, 
+		 u8 proto,
+		 int ttl, u16 ipid, u8 tos, bool df,
+		 u8* ipopt, int ipoptlen,
+		 char *data, u16 datalen, 
 		 u32 *packetlen);
 
 /* Send a pre-built IPv4 packet */
@@ -630,21 +597,38 @@ int send_ip_packet(int sd, struct eth_nfo *eth, u8 *packet,
 
 /* Decoy versions of the raw packet sending functions ... */
 int send_tcp_raw_decoys( int sd, struct eth_nfo *eth, 
-			 const struct in_addr *victim, int ttl,
-			 u16 sport, u16 dport, u32 seq, u32 ack, u8 flags,
-			 u16 window, u8 *options, int optlen, char *data,
-			 u16 datalen);
+			 const struct in_addr *victim,
+			 int ttl, bool df, 
+			 u8* ipopt, int ipoptlen,
+			 u16 sport, u16 dport,
+			 u32 seq, u32 ack, u8 reserved, u8 flags, u16 window, u16 urp,
+			 u8 *options, int optlen,
+			 char *data, u16 datalen);
 
 int send_udp_raw_decoys( int sd, struct eth_nfo *eth, 
-			 const struct in_addr *victim, int ttl, 
-			 u16 sport, u16 dport, u16 ipid, char *data, 
-			 u16 datalen);
+			 const struct in_addr *victim,
+			 int ttl, u16 ipid,
+			 u8* ipops, int ip,
+			 u16 sport, u16 dport,
+			 char *data, u16 datalen);
 
 
 /* Calls pcap_open_live and spits out an error (and quits) if the call fails.
    So a valid pcap_t will always be returned. */
 pcap_t *my_pcap_open_live(const char *device, int snaplen, int promisc, 
 			  int to_ms);
+
+// Returns whether the system supports pcap_get_selectable_fd() properly
+bool pcap_selectable_fd_valid();
+
+/* Call this instead of pcap_get_selectable_fd directly (or your code
+   won't compile on Windows).  On systems which don't seem to support
+   the pcap_get_selectable_fd() function properly, returns -1,
+   otherwise simply calls pcap_selectable_fd and returns the
+   results.  If you just want to test whether the function is supported,
+   use pcap_selectable_fd_valid() instead. */
+int my_pcap_get_selectable_fd(pcap_t *p);
+
 // Returns whether the packet receive time value obtaned from libpcap
 // (and thus by readip_pcap()) should be considered valid.  When
 // invalid (Windows and Amiga), readip_pcap returns the time you called it.
@@ -723,6 +707,7 @@ int setTargetMACIfAvailable(Target *target, struct link_header *linkhdr,
 bool setTargetNextHopMAC(Target *target);
 
 int islocalhost(const struct in_addr * const addr);
+int isipprivate(const struct in_addr * const addr);
 int unblock_socket(int sd);
 
 // Takes a protocol number like IPPROTO_TCP, IPPROTO_UDP, or

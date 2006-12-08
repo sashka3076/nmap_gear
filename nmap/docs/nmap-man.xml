@@ -30,7 +30,12 @@
   </refsynopsisdiv>
   <refsect1 id="man-description">
     <title>Description</title>
-
+    <web>
+    <note><para>This document describes the very latest version of
+    Nmap available from <ulink url="http://insecure.org/nmap/download.html"/> or <ulink url="http://insecure.org/nmap/dist/?C=M&amp;O=D"/>.  Please
+    ensure you are using the latest version before reporting that a
+    feature doesn't work as described.</para></note>
+    </web>
     <para>Nmap (<quote>Network Mapper</quote>) is an open source tool for network
     exploration and security auditing.  It was designed to rapidly
     scan large networks, although it works fine against single
@@ -80,7 +85,7 @@
 <screen format="linespecific">
 # nmap -A -T4 scanme.nmap.org playground
 
-Starting nmap ( http://www.insecure.org/nmap/ )
+Starting nmap ( http://insecure.org/nmap/ )
 Interesting ports on scanme.nmap.org (205.217.153.62):
 (The 1663 ports scanned but not shown below are in state: filtered)
 PORT    STATE  SERVICE VERSION
@@ -116,8 +121,8 @@ Nmap finished: 2 IP addresses (2 hosts up) scanned in 88.392 seconds
 </screen>
 </example>
 
-<para>The newest version of Nmap can be obtained from <ulink url="http://www.insecure.org/nmap/"/>.  The newest version of the man
-page is available from <ulink url="http://www.insecure.org/nmap/man/"/>.</para>
+<para>The newest version of Nmap can be obtained from <ulink url="http://insecure.org/nmap/"/>.  The newest version of the man
+page is available from <ulink url="http://insecure.org/nmap/man/"/>.</para>
 
   </refsect1>
 
@@ -126,13 +131,14 @@ page is available from <ulink url="http://www.insecure.org/nmap/man/"/>.</para>
 
 <para>This options summary is printed when Nmap is run
 with no arguments, and the latest version is always available at
-<ulink url="http://www.insecure.org/nmap/data/nmap.usage.txt"/>.
+<ulink url="http://insecure.org/nmap/data/nmap.usage.txt"/>.
 It helps people remember the most common options, but is no
 substitute for the in-depth documentation in the rest of this
 manual.  Some obscure options aren't even included here.</para>
 
 <para>
-<literallayout format="linespecific" class="normal">Usage: nmap [Scan Type(s)] [Options] {target specification}
+<literallayout format="linespecific" class="normal">Nmap 4.20RC1 ( http://insecure.org )
+Usage: nmap [Scan Type(s)] [Options] {target specification}
 TARGET SPECIFICATION:
   Can pass hostnames, IP addresses, networks, etc.
   Ex: scanme.nmap.org, microsoft.com/24, 192.168.0.1; 10.0.0-255.1-254
@@ -151,6 +157,7 @@ HOST DISCOVERY:
   --system-dns: Use OS's DNS resolver
 SCAN TECHNIQUES:
   -sS/sT/sA/sW/sM: TCP SYN/Connect()/ACK/Window/Maimon scans
+  -sU: UDP Scan
   -sN/sF/sX: TCP Null, FIN, and Xmas scans
   --scanflags &lt;flags&gt;: Customize TCP scan flags
   -sI &lt;zombie host[:probeport]&gt;: Idlescan
@@ -168,7 +175,9 @@ SERVICE/VERSION DETECTION:
   --version-all: Try every single probe (intensity 9)
   --version-trace: Show detailed version scan activity (for debugging)
 OS DETECTION:
-  -O: Enable OS detection
+  -O: Enable OS detection (try 2nd generation w/fallback to 1st)
+  -O2: Only use the new OS detection system (no fallback)
+  -O1: Only use the old (1st generation) OS detection system
   --osscan-limit: Limit OS detection to promising targets
   --osscan-guess: Guess OS more aggressively
 TIMING AND PERFORMANCE:
@@ -189,6 +198,7 @@ FIREWALL/IDS EVASION AND SPOOFING:
   -e &lt;iface&gt;: Use specified interface
   -g/--source-port &lt;portnum&gt;: Use given port number
   --data-length &lt;num&gt;: Append random data to sent packets
+  --ip-options &lt;options&gt;: Send packets with specified ip options
   --ttl &lt;val&gt;: Set IP time-to-live field
   --spoof-mac &lt;mac address/prefix/vendor name&gt;: Spoof your MAC address
   --badsum: Send packets with a bogus TCP/UDP checksum
@@ -198,6 +208,7 @@ OUTPUT:
   -oA &lt;basename&gt;: Output in the three major formats at once
   -v: Increase verbosity level (use twice for more effect)
   -d[level]: Set or increase debugging level (Up to 9 is meaningful)
+  --open: Only show open (or possibly open) ports
   --packet-trace: Show all packets sent and received
   --iflist: Print host interfaces and routes (for debugging)
   --log-errors: Log errors/warnings to the normal-format output file
@@ -212,6 +223,7 @@ MISC:
   --datadir &lt;dirname&gt;: Specify custom Nmap data file location
   --send-eth/--send-ip: Send using raw ethernet frames or IP packets
   --privileged: Assume that the user is fully privileged
+  --unprivileged: Assume the user lacks raw socket privileges
   -V: Print version number
   -h: Print this help summary page.
 EXAMPLES:
@@ -255,7 +267,7 @@ this through octet range addressing.  Rather than specify a normal IP
 address, you can specify a comma separated list of numbers or ranges
 for each octet.  For example, 192.168.0-255.1-254 will skip all
 addresses in the range that end in .0 and or .255.  Ranges need not be
-limited to the final octects: the specifier
+limited to the final octets: the specifier
 0-255.0-255.13.37 will perform an Internet-wide scan for all IP
 addresses ending in 13.37.  This sort of broad sampling can be useful
 for Internet surveys and research.</para>
@@ -433,8 +445,8 @@ you would expect.</para>
           default, Nmap still does reverse-DNS resolution on the hosts
           to learn their names.  It is often surprising how much
           useful information simple hostnames give out.  For example,
-          <literal moreinfo="none">fw.chi.playboy.com</literal> is the firewall for the Chicago office of
-          Playboy Enterprises.  Nmap also reports the total number of
+          <literal moreinfo="none">fw.chi</literal> is the name of one company's Chicago firewall. 
+          Nmap also reports the total number of
           IP addresses at the end.  The list scan is a good sanity
           check to ensure that you have proper IP addresses for your
           targets.  If the hosts sport domain names you do not
@@ -761,10 +773,10 @@ you would expect.</para>
         </term>
         <listitem>
           <indexterm significance="normal"><primary>-n</primary></indexterm>
-          <para>Tells Nmap to 
-          <emphasis>never</emphasis> do reverse DNS
-          resolution on the active IP addresses it finds. Since DNS
-          is often slow, this speeds things up.</para>
+          <para>Tells Nmap to <emphasis>never</emphasis> do reverse
+          DNS resolution on the active IP addresses it finds. Since
+          DNS can be slow even with Nmap's built-in parallel stub
+          resolver, this option can slash scanning times.</para>
         </listitem>
       </varlistentry>
 
@@ -776,8 +788,8 @@ you would expect.</para>
           <indexterm significance="normal"><primary>-R</primary></indexterm>
           <para>Tells Nmap to 
           <emphasis>always</emphasis> do reverse DNS
-          resolution on the target IP addresses. Normally this is
-          only performed when a machine is found to be alive.</para>
+          resolution on the target IP addresses. Normally reverse DNS is
+          only performed against responsive (online) hosts.</para>
         </listitem>
       </varlistentry>
 
@@ -790,12 +802,12 @@ you would expect.</para>
           <para>By default, Nmap resolves IP addresses by sending
           queries directly to the name servers configured on your host
           and then listening for responses.  Many requests (often
-          dozens) are performed in parallel for performance.  Specify
-          this option if you wish to use your system resolver instead
-          (one IP at a time via the getnameinfo() call).  This is
-          slower and rarely useful unless there is a bug in the Nmap
-          DNS code -- please contact us if that is the case.  The
-          system resolver is always used for IPv6 scans.</para>
+          dozens) are performed in parallel to improve performance.
+          Specify this option to use your system resolver instead (one
+          IP at a time via the getnameinfo() call).  This is slower
+          and rarely useful unless you find a bug in the Nmap parallel
+          resolver (please let us know if you do).  The system
+          resolver is always used for IPv6 scans.</para>
         </listitem>
       </varlistentry>
 
@@ -806,16 +818,26 @@ you would expect.</para>
         </term>
         <listitem>
           <indexterm significance="normal"><primary>--dns-servers</primary></indexterm>
-
           <para>By default Nmap will try to determine your DNS servers
           (for rDNS resolution) from your resolv.conf file (UNIX) or
           the registry (Win32).  Alternatively, you may use this
           option to specify alternate servers.  This option is not
           honored if you are using <option>--system-dns</option> or an
-          IPv6 scan. Using multiple DNS servers is often faster and
-          more stealthy than querying just one.  The best performance
-          is often obtained by specifying all of the authoritative
-          servers for the target IP space.</para>
+          IPv6 scan. Using multiple DNS servers is often faster,
+          especially if you choose authoritative servers for your
+          target IP space.  This option can also improve stealth, as
+          your requests can be bounced off just about any recursive
+          DNS server on the internet.</para>
+
+          <para>This option also comes in handy when scanning private
+          networks.  Sometimes only a few name servers provide
+          proper rDNS information, and you may not even know where
+          they are.  You can scan the network for port 53 (perhaps
+          with version detection), then try Nmap list scans
+          (<option>-sL</option>) specifying each name server one at a
+          time with <option>--dns-servers</option> until you find one
+          which works.</para>
+
 
         </listitem>
       </varlistentry>
@@ -1287,7 +1309,7 @@ used.</para>
           specify (which must be up and meet certain criteria). This
           fascinating scan type is too complex to fully describe in this reference
           guide, so I wrote and posted an informal paper with full details at
-          <ulink url="http://www.insecure.org/nmap/idlescan.html"/>.</para>
+          <ulink url="http://insecure.org/nmap/idlescan.html"/>.</para>
 
           <para>Besides being extraordinarily stealthy (due to its
           blind nature), this scan type permits mapping out
@@ -1533,7 +1555,7 @@ way.</para>
     the same way.  Note that the Nmap <option>-A</option> option
     enables version detection among other things.  A paper documenting
     the workings, usage, and customization of version detection is
-    available at <ulink url="http://www.insecure.org/nmap/vscan/"/>.</para>
+    available at <ulink url="http://insecure.org/nmap/vscan/"/>.</para>
 
     <para>When Nmap receives responses from a service but cannot match
     them to its database, it prints out a special fingerprint and
@@ -1718,7 +1740,7 @@ way.</para>
     spoofing attacks.</para>
 
     <para>A paper documenting the workings, usage, and customization
-    of version detection is available in more than a dozen languages at <ulink url="http://www.insecure.org/nmap/nmap-fingerprinting-article.html"/>.</para>
+    of OS detection is available at <ulink url="http://insecure.org/nmap/osdetect/"/>.</para>
 
     <para>OS detection is enabled and controlled with the following options:</para>
 
@@ -1729,9 +1751,53 @@ way.</para>
         </term>
         <listitem>
           <indexterm significance="normal"><primary>-O</primary></indexterm>
+
           <para>Enables OS detection, as discussed above.
           Alternatively, you can use <option>-A</option> to enable
-          both OS detection and version detection.</para>
+          both OS detection and version detection.  2nd generation OS
+          detection is tried first.  If that fails, Nmap will either
+          print out the host fingerprint and ask you to submit it (if
+          you are certain about what the target host is running), or
+          Nmap will fall back to the 1st generation OS detection
+          system in case its larger database has a match.</para>
+
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-O2</option> (2nd Generation OS Detection Only)
+        </term>
+        <listitem>
+          <indexterm significance="normal"><primary>-O2</primary></indexterm>
+
+          <para>Enables 2nd generation OS detection, but never falls
+          back to the old (1st generation) system, even if it fails to
+          find any match.  This saves time and can reduce the number
+          of packets sent to each target.</para>
+
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-O1</option> (1nd Generation OS Detection Only)
+        </term>
+        <listitem>
+          <indexterm significance="normal"><primary>-O1</primary></indexterm>
+
+          <para>Tells Nmap to only use the old OS detection system.
+          If <option>-O2</option> just gives you a fingerprint to
+          submit, but you don't know what OS the target is running,
+          try <option>-O1</option>.  But in that case, <emphasis role="bold">don't submit the fingerprint</emphasis> as you
+          don't know for sure whether <option>-O1</option> guess
+          correctly.  If it was perfect, we wouldn't have bothered to
+          create <option>-O2</option>.</para>
+
+          <para>This option, and all other vestiges of the old OS
+          detection system, will likely be removed in late 2006 or in
+          2007.</para>
+
         </listitem>
       </varlistentry>
 
@@ -1767,6 +1833,30 @@ way.</para>
         </listitem>
       </varlistentry>
 
+      <varlistentry>
+        <term>
+          <option>--max-os-tries</option> (Set the maximum number of OS detection tries against a target)
+        </term>
+        <listitem>
+          <indexterm significance="normal"><primary>--max-os-tries</primary></indexterm>
+
+          <para>When Nmap performs OS detection against a target and
+          fails to find a perfect match, it usually repeats the
+          attempt.  By default, Nmap tries five times if conditions
+          are favorable for OS fingerprint submission, and twice when
+          conditions aren't so good.  Specifying a lower
+          <option>--max-os-tries</option> value (such as 1) speeds
+          Nmap up, though you miss out on retries which could
+          potentially identify the OS.  Alternatively, a high value
+          may be set to allow even more retries when conditions are
+          favorable.  This is rarely done, except to generate better
+          fingerprints for submission and integration into the Nmap OS
+          database.  This option only affects second generation OS
+          detection (<option>-O2</option>, the default) and not the
+          old system (<option>-O1</option>).</para>
+
+        </listitem>
+      </varlistentry>
 
     </variablelist>
   </refsect1>
@@ -1980,7 +2070,7 @@ or software, packet rate limiting, or a restrictive firewall.  The
 slowest few percent of the scanned hosts can eat up a majority of the
 scan time.  Sometimes it is best to cut your losses and skip those
 hosts initially.  Specify 
-<option>--host-timeout</option> with the maximum amoung of time you
+<option>--host-timeout</option> with the maximum amount of time you
 are willing to wait.  I
 often specify <literal moreinfo="none">30m</literal> to ensure that Nmap doesn't waste
 more than half an hour on a single host.  Note that Nmap may be
@@ -2241,37 +2331,38 @@ lists the relevant options and describes what they do.</para>
           (Cloak a scan with decoys)
         </term>
         <listitem>
-          <indexterm significance="normal"><primary>-D</primary></indexterm>
+
+          <indexterm significance="normal"><primary>-D</primary></indexterm> 
           <para>Causes a decoy scan to be performed, which makes it
           appear to the remote host that the host(s) you specify as
-          decoys are scanning the target network too. Thus their
-          IDS might report 5-10 port scans from unique IP
-          addresses, but they won't know which IP was scanning them
-          and which were innocent decoys. While this can be
-          defeated through router path tracing, response-dropping,
-          and other active mechanisms, it is generally an
-          effective technique for hiding your IP
-          address.</para>
+          decoys are scanning the target network too. Thus their IDS
+          might report 5-10 port scans from unique IP addresses, but
+          they won't know which IP was scanning them and which were
+          innocent decoys. While this can be defeated through router
+          path tracing, response-dropping, and other active
+          mechanisms, it is generally an effective technique for
+          hiding your IP address.</para>
 
           <para>Separate each decoy host with commas, and you can
-          optionally use <literal moreinfo="none">ME</literal> as one of the decoys to represent the
-          position for your real IP address. If you put
-          <literal moreinfo="none">ME</literal> in the 6th position or later, some common port scan
-          detectors (such as Solar Designer's excellent scanlogd)
-          are unlikely to show your IP address at all. If you don't
-          use <literal moreinfo="none">ME</literal>, nmap will put you in a random position.</para>
-          <para>Note that the hosts you use as decoys should be up
-          or you might accidentally SYN flood your targets. Also it
-          will be pretty easy to determine which host is scanning
-          if only one is actually up on the network. You might want
-          to use IP addresses instead of names (so the decoy
-          networks don't see you in their nameserver logs).</para>
+          optionally use <literal moreinfo="none">ME</literal> as one of the decoys to
+          represent the position for your real IP address. If you put
+          <literal moreinfo="none">ME</literal> in the 6th position or later, some
+          common port scan detectors (such as Solar Designer's
+          excellent scanlogd) are unlikely to show your IP address at
+          all. If you don't use <literal moreinfo="none">ME</literal>, nmap will put
+          you in a random position.</para> <para>Note that the hosts
+          you use as decoys should be up or you might accidentally SYN
+          flood your targets. Also it will be pretty easy to determine
+          which host is scanning if only one is actually up on the
+          network. You might want to use IP addresses instead of names
+          (so the decoy networks don't see you in their nameserver
+          logs).</para>
 
           <para>Decoys are used both in the initial ping scan (using
           ICMP, SYN, ACK, or whatever) and during the actual port
           scanning phase. Decoys are also used during remote OS
-          detection (<option>-O</option>).  Decoys do not work with version detection
-          or TCP connect scan.</para>
+          detection (<option>-O</option>).  Decoys do not work with
+          version detection or TCP connect scan.</para>
 
           <para>It is worth noting that using too many decoys may
           slow your scan and potentially even make it less
@@ -2298,9 +2389,11 @@ lists the relevant options and describes what they do.</para>
           to make the targets think that <emphasis>someone
           else</emphasis> is scanning them. Imagine a company being
           repeatedly port scanned by a competitor!  The
-          <option>-e</option> option would generally be required for
-          this sort of usage, and <option>-P0</option> would normally
-          be advisable as well.</para>
+          <option>-e</option> option and <option>-P0</option> are
+          generally required for this sort of usage.  Note that you
+          usually won't receive reply packets back (they will be
+          addressed to the IP you are spoofing), so Nmap won't produce
+          useful reports.</para>
 
         </listitem>
       </varlistentry>
@@ -2385,6 +2478,54 @@ support the option completely, as does UDP scan.</para>
           support this. It slows things down a little, but can make a scan slightly less
           conspicuous.</para>
         </listitem>
+      </varlistentry>
+
+      <varlistentry>
+      <term>
+      <option>--ip-options &lt;S|R [route]|L [route]|T|U ... &gt;;</option>
+      <option>--ip-options &lt;hex string&gt;</option>  (Send packets with specified ip options)
+      </term>
+      <listitem>
+      <indexterm significance="normal"><primary>--ip-options</primary></indexterm>
+
+      <para>The <ulink url="http://www.ietf.org/rfc/rfc0791.txt">IP
+      protocol</ulink> offers several options which may be placed in
+      packet headers.  Unlike the ubiquitous TCP options, IP options
+      are rarely seen due to practicality and security concerns.  In
+      fact, many Internet routers block the most dangerous options
+      such as source routing.  Yet options can still be useful in some
+      cases for determining and manipulating the network route to
+      target machines.  For example, you may be able to use the record
+      route option to determine a path to a target even when more
+      traditional traceroute-style approaches fail.  Or if your
+      packets are being dropped by a certain firewall, you may be able
+      to specify a different route with the strict or loose source
+      routing options.</para>
+
+      <para>The most powerful way to specify IP options is to simply
+      pass in values as the argument to
+      <option>--ip-options</option>.  Precede each hex number with
+      <literal moreinfo="none">\x</literal> then the two digits.  You may repeat
+      certain characters by following them with an asterisk and then
+      the number of times you wish them to repeat.  For example,
+      <literal moreinfo="none">\x01\x07\x04\x00*36\x01</literal> is a hex string
+      containing 36 NUL bytes.</para>
+
+      <para>Nmap also offers a shortcut mechanism for specifying
+      options.  Simply pass the letter <literal moreinfo="none">R</literal>,
+      <literal moreinfo="none">T</literal>, or <literal moreinfo="none">U</literal> to request
+      record-route, record-timestamp, or both options together,
+      respectively.  Loose or strict source routing may be specified
+      with an <literal moreinfo="none">L</literal> or <literal moreinfo="none">S</literal> followed by
+      a space and then a space-separated list of IP addresses.</para>
+
+      <para>If you wish to see the options in packets sent and
+      received, specify <option>--packet-trace</option>.  For more
+      information and examples of using IP options with Nmap, see
+      <ulink url="http://seclists.org/nmap-dev/2006/q3/0052.html"/>.
+      </para>
+
+      </listitem>
       </varlistentry>
 
       <varlistentry>
@@ -2561,7 +2702,7 @@ described below.</para>
           programmatic use, it can also help humans interpret Nmap XML
           output.  The DTD defines the legal elements of the format,
           and often enumerates the attributes and values they can take
-          on.  The latest version is always available from <ulink url="http://www.insecure.org/nmap/data/nmap.dtd"/>.</para>
+          on.  The latest version is always available from <ulink url="http://insecure.org/nmap/data/nmap.dtd"/>.</para>
 
           <para>XML offers a stable format that is easily parsed by
           software. Free XML parsers are available for all major
@@ -2744,16 +2885,36 @@ increased.</para>
 
       <varlistentry>
         <term>
-          <option>--iflist</option> (List interfaces and routes)
+          <option>--open</option> (Show only open (or possibly open) ports)
         </term>
         <listitem>
-          <indexterm significance="normal"><primary>--iflist</primary></indexterm>
-          <para>Prints the interface list and system routes as
-          detected by Nmap.  This is useful for debugging routing
-          problems or device mischaracterization (such as
-          Nmap treating a PPP connection as Ethernet).</para>
+
+        <indexterm significance="normal"><primary>--open</primary></indexterm>
+
+<para>Sometimes you only care about ports you can actually connect to
+(<literal moreinfo="none">open</literal> ones), and don't want results cluttered with
+<literal moreinfo="none">closed</literal>, <literal moreinfo="none">filtered</literal>, and
+<literal moreinfo="none">closed|filtered</literal> ports.  Output customization is
+normally done after the scan using tools such as
+<application moreinfo="none">grep</application>, <application moreinfo="none">awk</application>, and
+<application moreinfo="none">Perl</application>, but this feature was added due to
+overwhelming requests.  Specify <option>--open</option> to only see
+<literal moreinfo="none">open</literal>, <literal moreinfo="none">open|filtered</literal>, and
+<literal moreinfo="none">unfiltered</literal> ports.  These three ports are treated just as they normally are, which means that <literal moreinfo="none">open|filtered</literal> and <literal moreinfo="none">unfiltered</literal> may be condensed into counts if there are an overwhelming number of them.
+</para>
+
         </listitem>
       </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>--iflist</option> (List interfaces and routes)
+        </term> <listitem>
+        <indexterm significance="normal"><primary>--iflist</primary></indexterm>
+        <para>Prints the interface list and system routes as detected
+        by Nmap.  This is useful for debugging routing problems or
+        device mischaracterization (such as Nmap treating a PPP
+        connection as Ethernet).</para> </listitem> </varlistentry>
 
       <varlistentry>
         <term>
@@ -2853,7 +3014,7 @@ increased.</para>
           <option>--stylesheet</option>.  You must pass the full
           pathname or URL.  One common invocation is
           <option>--stylesheet
-          http://www.insecure.org/nmap/data/nmap.xsl</option>.  This
+          http://insecure.org/nmap/data/nmap.xsl</option>.  This
           tells a browser to load the latest version of the stylesheet
           from Insecure.Org.  The <option>--webxml</option> option
           does the same thing with less typing and memorization.
@@ -2872,7 +3033,7 @@ increased.</para>
         <listitem>
           <indexterm significance="normal"><primary>--webxml</primary></indexterm>
           <para>This convenience option is simply an alias for
-          <option>--stylesheet http://www.insecure.org/nmap/data/nmap.xsl</option>.</para>
+          <option>--stylesheet http://insecure.org/nmap/data/nmap.xsl</option>.</para>
         </listitem>
       </varlistentry>
 
@@ -3029,6 +3190,36 @@ increased.</para>
           <option>--privileged</option>.</para>
         </listitem>
       </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>--unprivileged</option> (Assume that the user lacks raw socket privileges)
+        </term>
+        <listitem>
+          <indexterm significance="normal"><primary>--unprivileged</primary></indexterm>
+
+          <para>This option is the opposite of
+          <option>--privileged</option>.  It tells Nmap to treat the
+          user as lacking network raw socket and sniffing
+          privileges.  This is useful for testing, debugging, or when the raw network functionality of your operating system is somehow broken.</para>
+
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+	 <term>
+	 <option>--release-memory</option> (Release memory before quitting)
+         </term>
+         <listitem>
+	 <indexterm significance="normal"><primary>--release-memory</primary></indexterm>
+          <para>This option is only useful for memory-leak debugging.
+          It causes Nmap to release allocated memory just before it
+          quits so that actual memory leaks are easier to spot.
+          Normally Nmap skips this as the OS does this anyway upon
+          process termination.</para>
+        </listitem>
+      </varlistentry>
+
 
       <varlistentry>
         <term>
@@ -3216,10 +3407,10 @@ increased.</para>
     <para>Like its author, Nmap isn't perfect.  But you can help make
     it better by sending bug reports or even writing patches.  If Nmap
     doesn't behave the way you expect, first upgrade to the latest
-    version available from <ulink url="http://www.insecure.org/nmap/"/>.  If the problem persists,
+    version available from <ulink url="http://insecure.org/nmap/"/>.  If the problem persists,
     do some research to determine whether it has already been
     discovered and addressed.  Try Googling the error message or
-    browsing the Nmap-dev archives at <ulink url="http://seclists.org/"/>.  Read this full munaual page as
+    browsing the Nmap-dev archives at <ulink url="http://seclists.org/"/>.  Read this full munual page as
     well.  If nothing comes of this, mail a bug report to
     <email>nmap-dev@insecure.org</email>.  Please include everything
     you have learned about the problem, as well as what version of
@@ -3230,7 +3421,7 @@ increased.</para>
 
     <para>Code patches to fix bugs are even better than bug reports.
     Basic instructions for creating patch files with your changes are
-    available at <ulink url="http://www.insecure.org/nmap/data/HACKING"/>.  Patches may
+    available at <ulink url="http://insecure.org/nmap/data/HACKING"/>.  Patches may
     be sent to nmap-dev (recommended) or to Fyodor directly.</para>
   </refsect1>
 
@@ -3238,13 +3429,13 @@ increased.</para>
     <title>Author</title>
     <para>Fyodor 
     <email>fyodor@insecure.org</email>
-    (<ulink url="http://www.insecure.org"/>)
+    (<ulink url="http://insecure.org"/>)
     </para>
 
     <para>Hundreds of people have made valuable contributions to Nmap
     over the years.  These are detailed in the
     <filename moreinfo="none">CHANGELOG</filename> file which is distributed with Nmap
-    and also available from <ulink url="http://www.insecure.org/nmap/changelog.html"/>.</para>
+    and also available from <ulink url="http://insecure.org/nmap/changelog.html"/>.</para>
 
   </refsect1>
 
@@ -3298,7 +3489,7 @@ just meant to clarify our interpretation of derived works with some
 common examples. These restrictions only apply when you actually
 redistribute Nmap. For example, nothing stops you from writing and
 selling a proprietary front-end to Nmap.  Just distribute it by
-itself, and point people to <ulink url="http://www.insecure.org/nmap/"/> to download Nmap.</para>
+itself, and point people to <ulink url="http://insecure.org/nmap/"/> to download Nmap.</para>
 
 <para>We don't consider these to be added restrictions on top of the
 GPL, but just a clarification of how we interpret <quote>derived

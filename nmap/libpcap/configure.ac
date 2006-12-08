@@ -1,4 +1,4 @@
-dnl @(#) $Header$ (LBL)
+dnl @(#) $Header: /tcpdump/master/libpcap/configure.in,v 1.120.2.7 2005/07/07 06:56:03 guy Exp $ (LBL)
 dnl
 dnl Copyright (c) 1994, 1995, 1996, 1997
 dnl	The Regents of the University of California.  All rights reserved.
@@ -6,7 +6,7 @@ dnl
 dnl Process this file with autoconf to produce a configure script.
 dnl
 
-AC_REVISION($Revision: 2867 $)
+AC_REVISION($Revision: 1.120.2.7 $)
 AC_PREREQ(2.50)
 AC_INIT(pcap.c)
 
@@ -231,8 +231,8 @@ then
 	#
 	V_FINDALLDEVS=null
 else
-AC_CHECK_FUNC(getifaddrs,[
-	#
+	AC_CHECK_FUNC(getifaddrs,[
+		#
 		# We have "getifaddrs()"; make sure we have <ifaddrs.h>
 		# as well, just in case some platform is really weird.
 		#
@@ -240,10 +240,10 @@ AC_CHECK_FUNC(getifaddrs,[
 		    #
 		    # We have the header, so we use "getifaddrs()" to
 		    # get the list of interfaces.
-	#
-	V_FINDALLDEVS=getad
-],[
-	#
+		    #
+		    V_FINDALLDEVS=getad
+		],[
+		    #
 		    # We don't have the header - give up.
 		    # XXX - we could also fall back on some other
 		    # mechanism, but, for now, this'll catch this
@@ -258,48 +258,48 @@ AC_CHECK_FUNC(getifaddrs,[
 		#
 		# Well, we don't have "getifaddrs()", so we have to use
 		# some other mechanism; determine what that mechanism is.
-	#
-	# The first thing we use is the type of capture mechanism,
-	# which is somewhat of a proxy for the OS we're using.
-	#
-	case "$V_PCAP" in
-
-	dlpi)
 		#
+		# The first thing we use is the type of capture mechanism,
+		# which is somewhat of a proxy for the OS we're using.
+		#
+		case "$V_PCAP" in
+
+		dlpi)
+			#
 			# This might be Solaris 8 or later, with
 			# SIOCGLIFCONF, or it might be some other OS
 			# or some older version of Solaris, with
 			# just SIOCGIFCONF.
-		#
-		AC_MSG_CHECKING(whether we have SIOCGLIFCONF)
-		AC_CACHE_VAL(ac_cv_lbl_have_siocglifconf,
-		    AC_TRY_COMPILE(
-			[#include <sys/param.h>
-			#include <sys/file.h>
-			#include <sys/ioctl.h>
-			#include <sys/socket.h>
-			#include <sys/sockio.h>],
-			[ioctl(0, SIOCGLIFCONF, (char *)0);],
-			ac_cv_lbl_have_siocglifconf=yes,
-			ac_cv_lbl_have_siocglifconf=no))
-		AC_MSG_RESULT($ac_cv_lbl_have_siocglifconf)
-		if test $ac_cv_lbl_have_siocglifconf = yes ; then
-			V_FINDALLDEVS=glifc
-		else
-			V_FINDALLDEVS=gifc
-		fi
-		;;
+			#
+			AC_MSG_CHECKING(whether we have SIOCGLIFCONF)
+			AC_CACHE_VAL(ac_cv_lbl_have_siocglifconf,
+			    AC_TRY_COMPILE(
+				[#include <sys/param.h>
+				#include <sys/file.h>
+				#include <sys/ioctl.h>
+				#include <sys/socket.h>
+				#include <sys/sockio.h>],
+				[ioctl(0, SIOCGLIFCONF, (char *)0);],
+				ac_cv_lbl_have_siocglifconf=yes,
+				ac_cv_lbl_have_siocglifconf=no))
+			AC_MSG_RESULT($ac_cv_lbl_have_siocglifconf)
+			if test $ac_cv_lbl_have_siocglifconf = yes ; then
+				V_FINDALLDEVS=glifc
+			else
+				V_FINDALLDEVS=gifc
+			fi
+			;;
 
-	*)
-		#
-		# Assume we just have SIOCGIFCONF.
-		# (XXX - on at least later Linux kernels, there's
-		# another mechanism, and we should be using that
-		# instead.)
-		#
-		V_FINDALLDEVS=gifc
-		;;
-	esac])
+		*)
+			#
+			# Assume we just have SIOCGIFCONF.
+			# (XXX - on at least later Linux kernels, there's
+			# another mechanism, and we should be using that
+			# instead.)
+			#
+			V_FINDALLDEVS=gifc
+			;;
+		esac])
 fi
 
 AC_MSG_CHECKING(if --enable-ipv6 option is specified)
@@ -366,7 +366,7 @@ linux)
 
 dag)
 	V_DEFS="$V_DEFS -DDAG_ONLY"
-	;;	
+	;;
 
 septel)
 	V_DEFS="$V_DEFS -DSEPTEL_ONLY"
@@ -465,7 +465,7 @@ if test "$want_dag" != no; then
 
 	if test -z "$dag_lib_dir"; then
 	    dag_lib_dir="$dag_root/lib"
-		fi
+	fi
 	
 	if test -z "$dag_tools_dir"; then
 	    dag_tools_dir="$dag_root/tools"
@@ -524,7 +524,7 @@ if test $ac_cv_lbl_dag_api = yes; then
 	if test $dagopts_obj = no; then
 		AC_MSG_RESULT([no (checked $dag_lib_dir  $dag_tools_dir  $dag_lib_dir/libdag.a)])
 		ac_cv_lbl_dag_api=no
-		else
+	else
 		AC_MSG_RESULT([yes ($dagopts_obj)])
 	fi
 fi
@@ -559,7 +559,7 @@ if test $ac_cv_lbl_dag_api = yes; then
 	V_LIBS="$V_LIBS $dagapi_obj $dagopts_obj $dagreg_obj"
 	if test $V_PCAP != dag ; then
 		 SSRC="pcap-dag.c"
-		fi
+	fi
 
 	# See if we can find a general version string.
 	# Don't need to save and restore LIBS to prevent -ldag being
@@ -580,10 +580,10 @@ if test $ac_cv_lbl_dag_api = yes; then
 	fi
 	AC_MSG_RESULT([$dag_version])
 	AC_DEFINE(HAVE_DAG_API, 1, [define if you have the DAG API])
-	fi
+fi
 
-	if test $ac_cv_lbl_dag_api = no; then
-		if test "$want_dag" = yes; then
+if test $ac_cv_lbl_dag_api = no; then
+	if test "$want_dag" = yes; then
         	# User wanted DAG support but we couldn't find it.
 		AC_MSG_ERROR([DAG API requested, but not found at $dag_root: use --without-dag])
 	fi

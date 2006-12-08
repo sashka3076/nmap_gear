@@ -6,17 +6,17 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2004 Insecure.Com LLC. Nmap       *
- * is also a registered trademark of Insecure.Com LLC.  This program is    *
- * free software; you may redistribute and/or modify it under the          *
- * terms of the GNU General Public License as published by the Free        *
- * Software Foundation; Version 2.  This guarantees your right to use,     *
- * modify, and redistribute this software under certain conditions.  If    *
- * you wish to embed Nmap technology into proprietary software, we may be  *
- * willing to sell alternative licenses (contact sales@insecure.com).      *
- * Many security scanner vendors already license Nmap technology such as  *
- * our remote OS fingerprinting database and code, service/version         *
- * detection system, and port scanning code.                               *
+ * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
  *                                                                         *
  * Note that the GPL places important restrictions on "derived works", yet *
  * it does not provide a detailed definition of that term.  To avoid       *
@@ -39,7 +39,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://www.insecure.org/nmap/ to download Nmap.                         *
+ * http://insecure.org/nmap/ to download Nmap.                             *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -51,10 +51,10 @@
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
  * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to many    *
- * security vendors, and generally include a perpetual license as well as  *
- * providing for priority support and updates as well as helping to fund   *
- * the continued development of Nmap technology.  Please email             *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
  * sales@insecure.com for further information.                             *
  *                                                                         *
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: MACLookup.cc 3200 2006-03-05 23:59:46Z fyodor $ */
+/* $Id: MACLookup.cc 4134 2006-11-06 02:14:35Z fyodor $ */
 
 
 /* Character pool memory allocation */
@@ -128,7 +128,7 @@ static inline int MACTableHash(int prefix, int table_capacity) {
   return prefix % table_capacity;
 }
 
-void mac_prefix_init() {
+static void mac_prefix_init() {
   static int initialized = 0;
   if (initialized) return;
   initialized = 1;
@@ -140,7 +140,7 @@ void mac_prefix_init() {
   int lineno = 0;
   struct MAC_entry *ME;
 
-  MacTable.table_capacity = 9521;
+  MacTable.table_capacity = 19037;
   MacTable.table_members = 0;
   MacTable.table = (struct MAC_entry **) safe_zalloc(MacTable.table_capacity * sizeof(struct MAC_entry *));
 
@@ -153,6 +153,7 @@ void mac_prefix_init() {
   fp = fopen(filename, "r");
   if (!fp) {
     error("Unable to open %s.  Ethernet vendor correlation will not be performed ", filename);
+    return;
   }
 
   while(fgets(line, sizeof(line), fp)) {
@@ -179,6 +180,9 @@ void mac_prefix_init() {
     ME = (struct MAC_entry *) cp_alloc(sizeof(struct MAC_entry));
     ME->prefix = pfx;
     ME->vendor = cp_strdup(p);
+
+    if (MacTable.table_members > MacTable.table_capacity * 0.8)
+      error("WARNING:  nmap-mac-prefixes has grown to more than 80%% of our hash table size.  MacTable.table_capacity should be increased");
 
     // Now insert it into the table
     if (MacTable.table_members >= MacTable.table_capacity)

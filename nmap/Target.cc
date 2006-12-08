@@ -6,17 +6,17 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2004 Insecure.Com LLC. Nmap       *
- * is also a registered trademark of Insecure.Com LLC.  This program is    *
- * free software; you may redistribute and/or modify it under the          *
- * terms of the GNU General Public License as published by the Free        *
- * Software Foundation; Version 2.  This guarantees your right to use,     *
- * modify, and redistribute this software under certain conditions.  If    *
- * you wish to embed Nmap technology into proprietary software, we may be  *
- * willing to sell alternative licenses (contact sales@insecure.com).      *
- * Many security scanner vendors already license Nmap technology such as  *
- * our remote OS fingerprinting database and code, service/version         *
- * detection system, and port scanning code.                               *
+ * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
  *                                                                         *
  * Note that the GPL places important restrictions on "derived works", yet *
  * it does not provide a detailed definition of that term.  To avoid       *
@@ -39,7 +39,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://www.insecure.org/nmap/ to download Nmap.                         *
+ * http://insecure.org/nmap/ to download Nmap.                             *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -51,10 +51,10 @@
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
  * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to many    *
- * security vendors, and generally include a perpetual license as well as  *
- * providing for priority support and updates as well as helping to fund   *
- * the continued development of Nmap technology.  Please email             *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
  * sales@insecure.com for further information.                             *
  *                                                                         *
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: Target.cc 3274 2006-04-22 23:00:09Z fyodor $ */
+/* $Id: Target.cc 3869 2006-08-25 01:47:49Z fyodor $ */
 
 #ifdef WIN32
 #include "nmap_winconfig.h"
@@ -120,6 +120,8 @@ Target::Target() {
 void Target::Initialize() {
   hostname = NULL;
   memset(&seq, 0, sizeof(seq));
+  distance = -1;
+  FPR1 = NULL;
   FPR = NULL;
   osscan_performed = 0;
   wierd_responses = flags = 0;
@@ -161,8 +163,8 @@ void Target::FreeInternal() {
     nameIPBuf = NULL;
   }
 
+  if (FPR1) delete FPR1;
   if (FPR) delete FPR;
-
 }
 
 /*  Creates a "presentation" formatted string out of the IPv4/IPv6 address.

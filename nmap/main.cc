@@ -5,17 +5,17 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2004 Insecure.Com LLC. Nmap       *
- * is also a registered trademark of Insecure.Com LLC.  This program is    *
- * free software; you may redistribute and/or modify it under the          *
- * terms of the GNU General Public License as published by the Free        *
- * Software Foundation; Version 2.  This guarantees your right to use,     *
- * modify, and redistribute this software under certain conditions.  If    *
- * you wish to embed Nmap technology into proprietary software, we may be  *
- * willing to sell alternative licenses (contact sales@insecure.com).      *
- * Many security scanner vendors already license Nmap technology such as  *
- * our remote OS fingerprinting database and code, service/version         *
- * detection system, and port scanning code.                               *
+ * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
  *                                                                         *
  * Note that the GPL places important restrictions on "derived works", yet *
  * it does not provide a detailed definition of that term.  To avoid       *
@@ -38,7 +38,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://www.insecure.org/nmap/ to download Nmap.                         *
+ * http://insecure.org/nmap/ to download Nmap.                             *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -50,10 +50,10 @@
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
  * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to many    *
- * security vendors, and generally include a perpetual license as well as  *
- * providing for priority support and updates as well as helping to fund   *
- * the continued development of Nmap technology.  Please email             *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
  * sales@insecure.com for further information.                             *
  *                                                                         *
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: main.cc 3199 2006-03-05 21:31:04Z fyodor $ */
+/* $Id: main.cc 4123 2006-11-03 05:36:41Z fyodor $ */
 
 #include "nmap.h"
 #include "osscan.h"
@@ -136,9 +136,8 @@ static BOOL OpenLibs(void) {
 
 /* global options */
 extern NmapOps o;  /* option structure */
-extern char **environ;
 
-int main(int argc, char *argv[], char *envp[]) {
+int main(int argc, char *argv[]) {
   /* The "real" main is nmap_main().  This function hijacks control at the
      beginning to do the following:
      1) Check if Nmap called under name listed in INTERACTIVE_NAMES or with
@@ -212,6 +211,11 @@ int main(int argc, char *argv[], char *envp[]) {
     if (snprintf(command, sizeof(command), "nmap %s", cptr) >= (int) sizeof(command)) {
         error("Warning: NMAP_ARGS variable is too long, truncated");
     }
+    /* copy rest of command-line arguments */
+    for (i = 1; i < argc && strlen(command) + strlen(argv[i]) + 1 < sizeof(command); i++) {
+      strcat(command, " ");
+      strcat(command, argv[i]);
+    }
     myargc = arg_parse(command, &myargv);
     if (myargc < 1) {
       fatal("NMAP_ARG variable could not be parsed");
@@ -280,7 +284,8 @@ int main(int argc, char *argv[], char *envp[]) {
       nmap_main(myargc, myargv);
     } else if (*myargv[0] == '!') {
       cptr = strchr(command, '!');
-      system(cptr + 1);
+      int rc = system(cptr + 1);
+      if (rc < 1) printf("system() execution of command failed\n");
     } else if (*myargv[0] == 'd') {
       o.debugging++;
     } else if (strcasecmp(myargv[0], "f") == 0) {
@@ -314,7 +319,7 @@ int main(int argc, char *argv[], char *envp[]) {
 	    } else fatal("Arguments too long.");
 	  }	 
 	}
-	/* First we stick our arguments into envp */
+
 	if (o.debugging) {
 	  error("Adding to environment: %s", nmapargs);
 	}
@@ -384,7 +389,7 @@ int main(int argc, char *argv[], char *envp[]) {
 	}
 
 	/* OK, I think we are finally ready for the big exec() */
-	ret = execve(nmappath, fakeargv, environ);
+	ret = execv(nmappath, fakeargv);
 	if (ret == -1) {
 	  pfatal("Could not exec %s", nmappath);
 	}

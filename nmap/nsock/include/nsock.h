@@ -5,7 +5,7 @@
  *                                                                         *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
- * The nsock parallel socket event library is (C) 1999-2004 Insecure.Com   *
+ * The nsock parallel socket event library is (C) 1999-2006 Insecure.Com   *
  * LLC This library is free software; you may redistribute and/or          *
  * modify it under the terms of the GNU General Public License as          *
  * published by the Free Software Foundation; Version 2.  This guarantees  *
@@ -54,7 +54,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock.h 2866 2005-09-12 05:35:14Z fyodor $ */
+/* $Id: nsock.h 3870 2006-08-25 01:47:53Z fyodor $ */
 
 #ifndef NSOCK_H
 #define NSOCK_H
@@ -399,6 +399,14 @@ nsock_event_id nsock_connect_ssl(nsock_pool nsp, nsock_iod nsiod,
 				 void *userdata, struct sockaddr *ss, 
 				 size_t sslen, unsigned short port,
 				 nsock_ssl_session ssl_session);
+
+/* Request ssl connection over already established TCP connection.
+   nsiod must be socket that is already connected to target
+   using nsock_connect_tcp.
+   All parameters have the same meaning as in 'nsock_connect_ssl' */
+nsock_event_id nsock_reconnect_ssl(nsock_pool nsp, nsock_iod nsiod,
+				   nsock_ev_handler handler, int timeout_msecs,
+                                   void *userdata, nsock_ssl_session ssl_session);
 
 /* Read up to nlines lines (terminated with \n, which of course
    inclues \r\n), or until EOF, or until the timeout, whichever comes

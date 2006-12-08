@@ -7,7 +7,7 @@
  *                                                                         *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
- * The nsock parallel socket event library is (C) 1999-2004 Insecure.Com   *
+ * The nsock parallel socket event library is (C) 1999-2006 Insecure.Com   *
  * LLC This library is free software; you may redistribute and/or          *
  * modify it under the terms of the GNU General Public License as          *
  * published by the Free Software Foundation; Version 2.  This guarantees  *
@@ -56,7 +56,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_pool.c 2396 2004-08-29 09:12:05Z fyodor $ */
+/* $Id: nsock_pool.c 3870 2006-08-25 01:47:53Z fyodor $ */
 
 #include "nsock_internal.h"
 #include "gh_list.h"
@@ -217,6 +217,7 @@ void nsp_delete(nsock_pool ms_pool) {
 	}
 	msevent_delete(nsp, nse);
       }      
+      gh_list_free(event_lists[current_list_idx]);
     }
 
   /* Then I go through and kill the iods */
@@ -231,6 +232,13 @@ void nsp_delete(nsock_pool ms_pool) {
     while((nsi = (msiod *) gh_list_pop(&nsp->free_iods))) {
       free(nsi);
     }
+
+    while((nsi = (msiod *) gh_list_pop(&nsp->evl.free_events))) {
+      free(nsi);
+    }
+    gh_list_free(&nsp->evl.free_events);
+    gh_list_free(&nsp->active_iods);
+    gh_list_free(&nsp->free_iods);
 
     free(nsp);
 }

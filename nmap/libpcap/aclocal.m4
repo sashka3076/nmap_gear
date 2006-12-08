@@ -1,4 +1,4 @@
-dnl @(#) $Header$ (LBL)
+dnl @(#) $Header: /tcpdump/master/libpcap/aclocal.m4,v 1.85.2.1 2005/04/21 03:42:09 guy Exp $ (LBL)
 dnl
 dnl Copyright (c) 1995, 1996, 1997, 1998
 dnl	The Regents of the University of California.  All rights reserved.
@@ -829,7 +829,7 @@ AC_DEFUN(AC_LBL_LIBRARY_NET, [
     # Most operating systems have gethostbyname() in the default searched
     # libraries (i.e. libc):
     # Some OSes (eg. Solaris) place it in libnsl
-	    # Some strange OSes (SINIX) have it in libsocket:
+    # Some strange OSes (SINIX) have it in libsocket:
     AC_SEARCH_LIBS(gethostbyname, nsl socket resolv)
     # Unfortunately libsocket sometimes depends on libnsl and
     # AC_SEARCH_LIBS isn't up to the task of handling dependencies like this.

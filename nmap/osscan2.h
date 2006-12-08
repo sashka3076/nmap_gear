@@ -1,6 +1,8 @@
+
 /***************************************************************************
- * nbase_winunix.h -- Misc. compatability routines that generally try to   *
- * reproduce UNIX-centric concepts on Windows.                             *
+ * osscan2.h -- Header info for 2nd Generation OS detection via TCP/IP     *
+ * fingerprinting.  For more information on how this works in Nmap, see    *
+ * http://insecure.org/osdetect/                                           *
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
@@ -96,107 +98,33 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_winunix.h 3899 2006-08-29 05:42:35Z fyodor $ */
+/* $Id: osscan.h 3636 2006-07-04 23:04:56Z fyodor $ */
 
-#ifndef NBASE_WINUNIX_H
-#define NBASE_WINUNIX_H
+#ifndef OSSCAN2_H
+#define OSSCAN2_H
 
-#define _INC_ERRNO  /* supress errno.h */
-#define _ERRNO_H_ /* Also for errno.h suppresion */
+#include "nmap.h"
+#include "tcpip.h"
+#include "global_structures.h"
+#include "FingerPrintResults.h"
+#include "osscan.h"
 
-/* Supress winsock.h */
-#define _WINSOCKAPI_
-#define WIN32_LEAN_AND_MEAN
+/**********************  PROTOTYPES  ***********************************/
 
-#include <windows.h>
-#include <winsock2.h>
-#include <ws2tcpip.h> /* IPv6 stuff */
-#include <time.h>
-#include <iptypes.h>
-#include <stdlib.h>
-#include <malloc.h>
-#include <io.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <process.h>
-#include <limits.h>
-#include <WINCRYPT.H>
-#include <math.h>
 
-#ifndef HAVE_U_INT8_T
-#define HAVE_U_INT8_T
-typedef unsigned char u_int8_t;
-#endif
+/* This is the primary OS detection function.  If many Targets are
+   passed in (the threshold is based on timing level), they are
+   processed as smaller groups to improve accuracy  */
+void os_scan2(std::vector<Target *> &Targets);
 
-#ifndef HAVE_U_INT16_T
-#define HAVE_U_INT16_T
-typedef unsigned short u_int16_t;
-#endif
+int send_closedudp_probe_2(struct udpprobeinfo &upi, int sd,
+                           struct eth_nfo *eth,  const struct in_addr *victim,
+                           int ttl, u16 sport, u16 dport);
+int send_icmp_echo_probe(int sd, struct eth_nfo *eth, const struct in_addr *victim,
+			 u8 tos, bool df, u8 pcode, unsigned short id, u16 seq, u16 datalen);
 
-#ifndef HAVE_U_INT32_T
-#define HAVE_U_INT32_T
-typedef unsigned long u_int32_t;
-#endif
+int get_initial_ttl_guess(u8 ttl);
+int get_ipid_sequence(int numSamples, int *ipids, int islocalhost);
 
-#ifndef _SSIZE_T_
-typedef unsigned int ssize_t;
-#endif
+#endif /*OSSCAN2_H*/
 
-#define SIOCGIFCONF     0x8912          /* get iface list */
-
-#ifndef GLOBALS
-#define GLOBALS 1
-
-#endif
-
-/* Disables VC++ warning:
-  "integral size mismatch in argument; conversion supplied".  Perhaps
-  I should try to fix this with casts at some point */
-/* #pragma warning(disable: 4761) */
-
-#define munmap(ptr, len) win32_munmap(ptr, len)
-int nmapwin_isroot();
-
-/* Windows error message names */
-#define ECONNABORTED    WSAECONNABORTED
-#define ECONNRESET      WSAECONNRESET
-#define ECONNREFUSED    WSAECONNREFUSED
-#undef  EAGAIN
-#define EAGAIN		WSAEWOULDBLOCK
-#define EHOSTUNREACH	WSAEHOSTUNREACH
-#define ENETDOWN	WSAENETDOWN
-#define ENETUNREACH	WSAENETUNREACH
-#define ENETRESET	WSAENETRESET
-#define ETIMEDOUT	WSAETIMEDOUT
-#define EHOSTDOWN	WSAEHOSTDOWN
-#define EINPROGRESS	WSAEINPROGRESS
-#undef  EINVAL
-#define EINVAL          WSAEINVAL      /* Invalid argument */
-#undef  EPERM
-#define EPERM           WSAEACCES      /* Operation not permitted */
-#undef  EACCES
-#define EACCES          WSAEACCES     /* Operation not permitted */
-#undef  EINTR
-#define EINTR           WSAEINTR      /* Interrupted system call */
-#define ENOBUFS         WSAENOBUFS     /* No buffer space available */
-#undef  ENOENT
-#define ENOENT          WSAENOENT      /* No such file or directory */
-#define EMSGSIZE        WSAEMSGSIZE    /* Message too long */
-#undef  ENOMEM
-#define ENOMEM          WSAENOBUFS
-#undef  EIO
-#define EIO             WSASYSCALLFAILURE
-
-#define close(x) my_close(x)
-/* #define read(x,y,z) recv(x,(char*)(y),z,0) */
-
-#ifdef __cplusplus
-  extern "C" int my_close(int sd);
-#else
-  int my_close(int sd);
-#endif
-
-typedef unsigned short u_short_t;
-
-#endif /* NBASE_WINUNIX_H */

@@ -24,7 +24,7 @@
 
 #ifndef lint
 static const char rcsid[] _U_ =
-    "@(#) $Header$ (LBL)";
+    "@(#) $Header: /tcpdump/master/libpcap/pcap-pf.c,v 1.91.2.2 2005/05/03 18:54:37 guy Exp $ (LBL)";
 #endif
 
 #ifdef HAVE_CONFIG_H
@@ -330,7 +330,7 @@ pcap_open_live(const char *device, int snaplen, int promisc, int to_ms,
 	 */
 	p->fd = pfopen(device, O_RDWR);
 	if (p->fd == -1 && errno == EACCES)
-	p->fd = pfopen(device, O_RDONLY);
+		p->fd = pfopen(device, O_RDONLY);
 	if (p->fd < 0) {
 		snprintf(ebuf, PCAP_ERRBUF_SIZE, "pf open: %s: %s\n\
 your system may not be properly configured; see the packetfilter(4) man page\n",

@@ -31,20 +31,20 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * @(#) $Header$ (LBL)
+ * @(#) $Header: /tcpdump/master/libpcap/pcap.h,v 1.52.2.5 2005/07/07 02:04:36 guy Exp $ (LBL)
  */
 
 #ifndef lib_pcap_h
 #define lib_pcap_h
 
 #if defined(WIN32)
-#include <pcap-stdinc.h>
+  #include <pcap-stdinc.h>
 #elif defined(MSDOS)
   #include <sys/types.h>
   #include <sys/socket.h>  /* u_int, u_char etc. */
 #else /* UN*X */
-#include <sys/types.h>
-#include <sys/time.h>
+  #include <sys/types.h>
+  #include <sys/time.h>
 #endif /* WIN32/MSDOS/UN*X */
 
 #ifndef PCAP_DONT_INCLUDE_PCAP_BPF_H

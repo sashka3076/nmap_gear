@@ -1,5 +1,5 @@
 # Nmap OS Fingerprint List. -*- mode: fundamental; -*-
-# $Id: nmap-os-fingerprints 3408 2006-05-31 23:01:19Z fyodor $ 
+# $Id: nmap-os-fingerprints 4228 2006-12-08 03:01:08Z fyodor $ 
 #
 # Contributions to this database are welcome.  If Nmap obtains a new
 # fingerprint (and test conditions are favorable), it will print out a
@@ -19339,7 +19339,7 @@ T6(DF=N%W=0%ACK=O%Flags=R%Ops=)
 T7(DF=N%W=0%ACK=S%Flags=AR%Ops=)
 PU(DF=N%TOS=0%IPLEN=38%RIPTL=148%RID=E%RIPCK=E%UCK=E%ULEN=134%DAT=E)
 
-Fingerprint SGI IRIX 6.4 - 6.5.3m  # Lamont Granquist (again :)
+Fingerprint SGI IRIX 6.4 - 6.5.3m
 Class SGI | IRIX | 6.X | general purpose
 TSeq(Class=RI|TD%gcd=28|50|78|A0|C8|F0|140%SI=<3E8)
 T1(DF=N%W=C000%ACK=S++%Flags=AS%Ops=MNWNNT)
@@ -21078,7 +21078,7 @@ PU(Resp=N)
 
 # Vega 400 SIP Version: 10.02.07.1
 Fingerprint Vega 50/400
-Class VegaStream | embedded || VoIP gateway
+Class Vegastream | embedded || VoIP gateway
 TSeq(Class=TR%gcd=<6%IPID=I%TS=U)
 T1(DF=N%W=3E80%ACK=S++%Flags=AS%Ops=M)
 T2(Resp=Y%DF=N%W=0%ACK=S%Flags=AR%Ops=)

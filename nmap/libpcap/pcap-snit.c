@@ -25,7 +25,7 @@
 
 #ifndef lint
 static const char rcsid[] _U_ =
-    "@(#) $Header$ (LBL)";
+    "@(#) $Header: /tcpdump/master/libpcap/pcap-snit.c,v 1.72.2.1 2005/05/03 18:54:38 guy Exp $ (LBL)";
 #endif
 
 #ifdef HAVE_CONFIG_H
@@ -301,7 +301,7 @@ pcap_open_live(const char *device, int snaplen, int promisc, int to_ms,
 	 */
 	p->fd = fd = open(dev, O_RDWR);
 	if (fd < 0 && errno == EACCES)
-	p->fd = fd = open(dev, O_RDONLY);
+		p->fd = fd = open(dev, O_RDONLY);
 	if (fd < 0) {
 		snprintf(ebuf, PCAP_ERRBUF_SIZE, "%s: %s", dev,
 		    pcap_strerror(errno));

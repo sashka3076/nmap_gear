@@ -5,21 +5,21 @@
  * completely blind scanning (eg no packets sent to the target from your   *
  * own IP address) and can also be used to penetrate firewalls and scope   *
  * out router ACLs.  This is one of the "advanced" scans meant for         *
- * epxerienced Nmap users.                                                 *
+ * experienced Nmap users.                                                 *
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2004 Insecure.Com LLC. Nmap       *
- * is also a registered trademark of Insecure.Com LLC.  This program is    *
- * free software; you may redistribute and/or modify it under the          *
- * terms of the GNU General Public License as published by the Free        *
- * Software Foundation; Version 2.  This guarantees your right to use,     *
- * modify, and redistribute this software under certain conditions.  If    *
- * you wish to embed Nmap technology into proprietary software, we may be  *
- * willing to sell alternative licenses (contact sales@insecure.com).      *
- * Many security scanner vendors already license Nmap technology such as  *
- * our remote OS fingerprinting database and code, service/version         *
- * detection system, and port scanning code.                               *
+ * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
  *                                                                         *
  * Note that the GPL places important restrictions on "derived works", yet *
  * it does not provide a detailed definition of that term.  To avoid       *
@@ -42,7 +42,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://www.insecure.org/nmap/ to download Nmap.                         *
+ * http://insecure.org/nmap/ to download Nmap.                             *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -54,10 +54,10 @@
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
  * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to many    *
- * security vendors, and generally include a perpetual license as well as  *
- * providing for priority support and updates as well as helping to fund   *
- * the continued development of Nmap technology.  Please email             *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
  * sales@insecure.com for further information.                             *
  *                                                                         *
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
@@ -101,7 +101,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: idle_scan.cc 3354 2006-05-14 05:00:58Z fyodor $ */
+/* $Id: idle_scan.cc 3943 2006-09-05 08:39:32Z fyodor $ */
 
 #include "idle_scan.h"
 #include "scan_engine.h"
@@ -186,12 +186,14 @@ static int ipid_proxy_probe(struct idle_proxy_info *proxy, int *probes_sent,
     gettimeofday(&tv_sent[tries], NULL);
 
     /* Time to send the pr0be!*/
-    send_tcp_raw(proxy->rawsd, proxy->ethptr, proxy->host.v4sourceip(), 
-		 proxy->host.v4hostip(), o.ttl, base_port + tries,
-		 proxy->probe_port,
-		 seq_base + (packet_send_count++ * 500) + 1, ack, 
-		 TH_SYN|TH_ACK, 0, 
-		 (u8 *) "\x02\x04\x05\xb4", 4, NULL, 0);
+    send_tcp_raw(proxy->rawsd, proxy->ethptr,
+    		proxy->host.v4sourceip(), proxy->host.v4hostip(),
+    		o.ttl, false,
+    		o.ipoptions, o.ipoptionslen,
+    		base_port + tries, proxy->probe_port,
+		seq_base + (packet_send_count++ * 500) + 1, ack, 0, TH_SYN|TH_ACK, 0, 0,
+		(u8 *) "\x02\x04\x05\xb4", 4,
+		NULL, 0);
     sent++;
     tries++;
 
@@ -254,8 +256,8 @@ static int ipid_distance(int seqclass , u16 startid, u16 endid) {
   
   if (seqclass == IPID_SEQ_BROKEN_INCR) {
     /* Convert to network byte order */
-    startid = (startid >> 8) + ((startid & 0xFF) << 8);
-    endid = (endid >> 8) + ((endid & 0xFF) << 8);
+    startid = htons(startid);
+    endid = htons(endid);
     return endid - startid;
   }
 
@@ -378,7 +380,7 @@ static void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
     proxy->ethptr = &proxy->eth;
   } else {
     if ((proxy->rawsd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0 )
-      pfatal("socket trobles in %s", __FUNCTION__);
+      pfatal("socket troubles in %s", __FUNCTION__);
     unblock_socket(proxy->rawsd);
     broadcast_socket(proxy->rawsd);
 #ifndef WIN32
@@ -416,11 +418,14 @@ static void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
        a response with the exact request for timing purposes.  So I
        think I'll use TH_SYN, although it is a tough call. */
     /* We can't use decoys 'cause that would screw up the IPIDs */
-    send_tcp_raw(proxy->rawsd, proxy->ethptr, proxy->host.v4sourceip(), 
-		 proxy->host.v4hostip(), o.ttl, 
+    send_tcp_raw(proxy->rawsd, proxy->ethptr,
+    		proxy->host.v4sourceip(), proxy->host.v4hostip(),
+    		o.ttl, false,
+    		o.ipoptions, o.ipoptionslen,
 		 o.magic_port + probes_sent + 1, proxy->probe_port, 
-		 sequence_base + probes_sent + 1, ack, TH_SYN|TH_ACK, 
-		 0, (u8 *) "\x02\x04\x05\xb4", 4, NULL, 0);
+		sequence_base + probes_sent + 1, ack, 0, TH_SYN|TH_ACK, 0, 0,
+		(u8 *) "\x02\x04\x05\xb4",4,
+		NULL, 0);
     gettimeofday(&probe_send_times[probes_sent], NULL);
     probes_sent++;
 
@@ -523,11 +528,14 @@ static void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
   if (first_target) {  
     for (probes_sent = 0; probes_sent < 4; probes_sent++) {  
       if (probes_sent) usleep(50000);
-      send_tcp_raw(proxy->rawsd, proxy->ethptr, first_target, 
-		   proxy->host.v4hostip(), 
-		   o.ttl, o.magic_port, proxy->probe_port, 
-		   sequence_base + probes_sent + 1, 0, TH_SYN|TH_ACK, 
-		   ack, (u8 *) "\x02\x04\x05\xb4", 4, NULL, 0);
+      send_tcp_raw(proxy->rawsd, proxy->ethptr,
+      		first_target, proxy->host.v4hostip(), 
+		o.ttl, false,
+		o.ipoptions, o.ipoptionslen,
+		o.magic_port, proxy->probe_port, 
+		sequence_base + probes_sent + 1, ack, 0, TH_SYN|TH_ACK, 0, 0,
+		(u8 *) "\x02\x04\x05\xb4",
+		4, NULL, 0);
 
     }
 
@@ -680,10 +688,13 @@ static int idlescan_countopen2(struct idle_proxy_info *proxy,
        but doing it the straightforward way (using the same decoys as
        we use in probing the proxy box is risky.  I'll have to think
        about this more. */
-    send_tcp_raw(proxy->rawsd, eth.ethsd? &eth : NULL, proxy->host.v4hostip(), 
-		 target->v4hostip(),
-		 o.ttl, proxy->probe_port, ports[pr0be], seq, 0, TH_SYN, 0,
-		 (u8 *) "\x02\x04\x05\xb4", 4, o.extra_payload, o.extra_payload_length);
+    send_tcp_raw(proxy->rawsd, eth.ethsd? &eth : NULL,
+    		proxy->host.v4hostip(), target->v4hostip(),
+		o.ttl, false,
+		o.ipoptions, o.ipoptionslen,
+		proxy->probe_port, ports[pr0be], seq, 0, 0, TH_SYN, 0, 0,
+		(u8 *) "\x02\x04\x05\xb4", 4,
+		o.extra_payload, o.extra_payload_length);
   }
   gettimeofday(&end, NULL);
 
@@ -965,6 +976,9 @@ void idle_scan(Target *target, u16 *portarray, int numports,
   int portidx = 0; /* Used for splitting the port array into chunks */
   int portsleft;
   time_t starttime;
+  char scanname[32];
+  snprintf(scanname, sizeof(scanname), "Idlescan against %s", target->NameIP());
+  ScanProgressMeter SPM(scanname);
 
   if (numports == 0) return; /* nothing to scan for */
   if (!proxyName) fatal("Idlescan requires a proxy host");
@@ -988,9 +1002,6 @@ void idle_scan(Target *target, u16 *portarray, int numports,
     initialize_idleproxy(&proxy, proxyName, target->v4hostip());
   }
 
-  if (o.debugging || o.verbose) {
-    log_write(LOG_STDOUT, "Initiating Idlescan against %s\n", target->NameIP());
-  }
   starttime = time(NULL);
 
   /* If we don't have timing infoz for the new target, we'll use values 
@@ -1019,11 +1030,9 @@ void idle_scan(Target *target, u16 *portarray, int numports,
   }
 
 
-  if (o.verbose) {
-    long timediff = time(NULL) - starttime;
-    log_write(LOG_STDOUT, "The Idlescan took %ld %s to scan %d ports.\n", 
-	      timediff, (timediff == 1)? "second" : "seconds", numports);
-  }
+  char additional_info[14];
+  snprintf(additional_info, sizeof(additional_info), "%d ports", numports);
+  SPM.endTask(NULL, additional_info);
 
   /* Now we go through the ports which were not determined were scanned
      but not determined to be open, and add them in the "closed" state */

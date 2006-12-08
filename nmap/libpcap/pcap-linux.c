@@ -27,7 +27,7 @@
 
 #ifndef lint
 static const char rcsid[] _U_ =
-    "@(#) $Header$ (LBL)";
+    "@(#) $Header: /tcpdump/master/libpcap/pcap-linux.c,v 1.110.2.6 2005/08/16 04:25:26 guy Exp $ (LBL)";
 #endif
 
 /*
@@ -83,7 +83,7 @@ static const char rcsid[] _U_ =
 #ifdef HAVE_DAG_API
 #include "pcap-dag.h"
 #endif /* HAVE_DAG_API */
-	  
+
 #ifdef HAVE_SEPTEL_API
 #include "pcap-septel.h"
 #endif /* HAVE_SEPTEL_API */
@@ -100,7 +100,6 @@ static const char rcsid[] _U_ =
 #include <netinet/in.h>
 #include <linux/if_ether.h>
 #include <net/if_arp.h>
-#include <assert.h>
 
 /*
  * If PF_PACKET is defined, we can use {SOCK_RAW,SOCK_DGRAM}/PF_PACKET
@@ -256,7 +255,7 @@ pcap_open_live(const char *device, int snaplen, int promisc, int to_ms,
 	}
 #endif /* HAVE_SEPTEL_API */
 
-        /* Allocate a handle for this session. */
+	/* Allocate a handle for this session. */
 
 	handle = malloc(sizeof(*handle));
 	if (handle == NULL) {
@@ -498,32 +497,6 @@ pcap_read_packet(pcap_t *handle, pcap_handler callback, u_char *userdata)
 			return -2;
 		}
 		fromlen = sizeof(from);
-		/* If the user specified a timeout in pcap_open_live(),
-		   we will honor the timeout and return even if no packets
-		   have arrived */
-		if (handle->md.timeout > 0) {
-		  fd_set readfs;
-		  struct timeval tv;
-                  int res;
-		  
-                  FD_ZERO(&readfs);
-                  FD_SET(handle->fd, &readfs);
-                  bzero((void *) &tv, sizeof(tv));
-                  tv.tv_sec = handle->md.timeout / 1000;
-                  tv.tv_usec = (handle->md.timeout % 1000 ) * 1000;
-                  do {
-		    /* since this is in pcap-linux.c, we can assume
-		       Linux select() behavior WRT decrementing tv */
-                    res = select(handle->fd + 1, &readfs, NULL, NULL, &tv);
-		    if (res == 1) break;
-		    if (res == 0) return 0;
-		    assert(res == -1);
-		    if (errno == EINTR) continue;
-		    snprintf(handle->errbuf, sizeof(handle->errbuf), "select: %s", pcap_strerror(errno));
-		    return -1;
-		  } while (1);
-		}
-		
 		packet_len = recvfrom(
 			handle->fd, bp + offset,
 			handle->bufsize - offset, MSG_TRUNC,
@@ -560,7 +533,7 @@ pcap_read_packet(pcap_t *handle, pcap_handler callback, u_char *userdata)
 			if (from.sll_ifindex == handle->md.lo_ifindex)
 				return 0;
 
-	/*
+			/*
 			 * If the user only wants incoming packets, reject it.
 			 */
 			if (handle->direction == PCAP_D_IN)
@@ -571,7 +544,7 @@ pcap_read_packet(pcap_t *handle, pcap_handler callback, u_char *userdata)
 			 * If the user only wants outgoing packets, reject it.
 			 */
 			if (handle->direction == PCAP_D_OUT)
-		return 0;
+				return 0;
 		}
 	}
 #endif
@@ -1212,6 +1185,13 @@ static void map_arphrd_to_dlt(pcap_t *handle, int arptype, int cooked_ok)
 		handle->linktype = DLT_PRISM_HEADER;
 		break;
 
+#ifndef ARPHRD_IEEE80211_RADIOTAP /* new */
+#define ARPHRD_IEEE80211_RADIOTAP 803
+#endif
+	case ARPHRD_IEEE80211_RADIOTAP:
+		handle->linktype = DLT_IEEE802_11_RADIO;
+		break;
+
 	case ARPHRD_PPP:
 		/*
 		 * Some PPP code in the kernel supplies no link-layer
@@ -1469,7 +1449,7 @@ live_open_new(pcap_t *handle, const char *device, int promisc,
 				}
 				/* IrDA capture is not a real "cooked" capture,
 				 * it's IrLAP frames, not IP packets. */
-				if(handle->linktype != DLT_LINUX_IRDA)
+				if (handle->linktype != DLT_LINUX_IRDA)
 					handle->linktype = DLT_LINUX_SLL;
 			}
 

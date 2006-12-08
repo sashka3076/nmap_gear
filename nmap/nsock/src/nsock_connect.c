@@ -4,7 +4,7 @@
  * connections from the nsock parallel socket event library                *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
- * The nsock parallel socket event library is (C) 1999-2004 Insecure.Com   *
+ * The nsock parallel socket event library is (C) 1999-2006 Insecure.Com   *
  * LLC This library is free software; you may redistribute and/or          *
  * modify it under the terms of the GNU General Public License as          *
  * published by the Free Software Foundation; Version 2.  This guarantees  *
@@ -53,7 +53,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_connect.c 3292 2006-04-29 06:20:45Z fyodor $ */
+/* $Id: nsock_connect.c 3870 2006-08-25 01:47:53Z fyodor $ */
 
 #include "nsock.h"
 #include "nsock_internal.h"
@@ -101,6 +101,7 @@ static void nsock_connect_internal(mspool *ms, msevent *nse, int proto,
     assert(sslen <= sizeof(nse->iod->peer));
     memcpy(&nse->iod->peer, ss, sslen);
     nse->iod->peerlen = sslen;
+    nse->iod->lastproto = proto;
 
     if ((res = connect(nse->iod->sd, (struct sockaddr *) ss, sslen)) != -1) {
       nse->event_done = 1;
@@ -206,6 +207,43 @@ nsock_event_id nsock_connect_ssl(nsock_pool nsp, nsock_iod nsiod,
   return nse->id;
 #endif /* HAVE_OPENSSL */
 }
+
+/* Request ssl connection over already established TCP connection.
+   nsiod must be socket that is already connected to target
+   using nsock_connect_tcp.
+   All parameters have the same meaning as in 'nsock_connect_ssl' */
+nsock_event_id nsock_reconnect_ssl(nsock_pool nsp, nsock_iod nsiod,
+				 nsock_ev_handler handler, int timeout_msecs,
+				 void *userdata, nsock_ssl_session ssl_session)
+{
+
+#ifndef HAVE_OPENSSL
+  fatal("nsock_reconnect_ssl called - but nsock was built w/o SSL support.  QUITTING");
+  return (nsock_event_id) 0; /* UNREACHED */
+#else
+  msiod *nsi = (msiod *) nsiod;
+  mspool *ms = (mspool *) nsp;
+  msevent *nse;
+
+  Nsock_SSL_Init();
+
+  nse = msevent_new(ms, NSE_TYPE_CONNECT_SSL, nsi, timeout_msecs, handler, userdata);
+  assert(nse);
+
+  // Set our SSL_SESSION so we can benefit from session-id reuse.
+  nsi_set_ssl_session(nsi, (SSL_SESSION *) ssl_session);
+
+  if (ms->tracelevel > 0)
+    nsock_trace(ms, "SSL/TCP reconnection requested (IOD #%li) EID %li", nsi->id, nse->id);
+
+  /* Do the actual connect() */
+  nse->event_done = 0;
+  nse->status = NSE_STATUS_SUCCESS;
+  nsp_add_event(ms, nse);
+  return nse->id;
+#endif /* HAVE_OPENSSL */
+}
+
 
 /* Request a UDP "connection" to another system (by IP address).  The
    in_addr is normal network byte order, but the port number should be
