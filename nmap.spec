@@ -1,5 +1,5 @@
 Name: nmap
-Version: 4.11
+Version: 4.20
 Release: alt1
 Serial: 20020501
 
@@ -16,12 +16,11 @@ Source2: nmapfe-32.png
 Source3: nmapfe-48.png
 
 Patch1: nmap-4.11-alt-autoheader.patch
-Patch2: nmap-4.01-alt-owl-libpcap.patch
-Patch3: nmap-4.04-alt-libdnet.patch
-Patch4: nmap-4.11-alt-owl-drop-priv.patch
-Patch5: nmap-4.01-alt-nmapfe.desktop.patch
-Patch6: nmap-4.01-alt-dot-dir.patch
-Patch7: nmap-4.02-alt-fileexistsandisreadable.patch
+Patch2: nmap-4.20-alt-owl-drop-priv.patch
+Patch3: nmap-4.01-alt-dot-dir.patch
+Patch4: nmap-4.20-alt-owl-fileexistsandisreadable.patch
+Patch5: nmap-4.04-alt-libdnet.patch
+Patch6: nmap-4.01-alt-nmapfe.desktop.patch
 
 PreReq: shadow-utils
 Requires: chrooted-resolv, libdnet >= 0:1.11-alt4
@@ -54,9 +53,8 @@ This package includes nmapfe, a Gtk+ frontend for nmap.
 %patch4 -p1
 %patch5 -p1
 %patch6 -p1
-%patch7 -p1
 find -type f -name \*.orig -delete -print
-bzip2 -9k CHANGELOG
+bzip2 -9 CHANGELOG
 
 %build
 aclocal
@@ -99,6 +97,9 @@ install -pD -m644 %_sourcedir/nmapfe-48.png %buildroot%_liconsdir/nmapfe.png
 %_liconsdir/*
 
 %changelog
+* Thu Oct 18 2007 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.20-alt1
+- Updated to 4.20.
+
 * Sat Jun 24 2006 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.11-alt1
 - Updated to 4.11.
 
