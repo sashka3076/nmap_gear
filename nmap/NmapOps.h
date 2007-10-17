@@ -5,17 +5,17 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2004 Insecure.Com LLC. Nmap       *
- * is also a registered trademark of Insecure.Com LLC.  This program is    *
- * free software; you may redistribute and/or modify it under the          *
- * terms of the GNU General Public License as published by the Free        *
- * Software Foundation; Version 2.  This guarantees your right to use,     *
- * modify, and redistribute this software under certain conditions.  If    *
- * you wish to embed Nmap technology into proprietary software, we may be  *
- * willing to sell alternative licenses (contact sales@insecure.com).      *
- * Many security scanner vendors already license Nmap technology such as  *
- * our remote OS fingerprinting database and code, service/version         *
- * detection system, and port scanning code.                               *
+ * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
  *                                                                         *
  * Note that the GPL places important restrictions on "derived works", yet *
  * it does not provide a detailed definition of that term.  To avoid       *
@@ -38,7 +38,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://www.insecure.org/nmap/ to download Nmap.                         *
+ * http://insecure.org/nmap/ to download Nmap.                             *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -50,10 +50,10 @@
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
  * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to many    *
- * security vendors, and generally include a perpetual license as well as  *
- * providing for priority support and updates as well as helping to fund   *
- * the continued development of Nmap technology.  Please email             *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
  * sales@insecure.com for further information.                             *
  *                                                                         *
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOps.h 3355 2006-05-15 22:37:31Z fyodor $ */
+/* $Id: NmapOps.h 4068 2006-10-14 01:25:43Z fyodor $ */
 
 class NmapOps {
  public:
@@ -167,6 +167,8 @@ class NmapOps {
   // setPacketTrace(false) has been called
   void setPacketTrace(bool pt) { pTrace = pt;  }
   void setVersionTrace(bool vt) { vTrace = vt;  }
+  bool openOnly() { return open_only; }
+  void setOpenOnly(bool oo) { open_only = oo; }
   int verbose;
   int randomize_hosts;
   int spoofsource; /* -S used */
@@ -174,7 +176,8 @@ class NmapOps {
   int interactivemode;
   int ping_group_sz;
   int generate_random_ips; /* -iR option */
-  FingerPrint **reference_FPs;
+  FingerPrintDB *reference_FPs1; /* Used in the old OS scan system. */
+  FingerPrintDB *reference_FPs; /* Used in the new OS scan system. */
   u16 magic_port;
   unsigned short magic_port_set; /* Was this set by user? */
   int num_ping_synprobes;
@@ -188,6 +191,13 @@ class NmapOps {
   int timing_level; // 0-5, corresponding to Paranoid, Sneaky, Polite, Normal, Aggressive, Insane
   int max_parallelism; // 0 means it has not been set
   int min_parallelism; // 0 means it has not been set
+
+  /* The maximum number of OS detection (gen2) tries we will make
+     without any matches before giving up on a host.  We may well give
+     up after fewer tries anyway, particularly if the target isn't
+     ideal for unknown fingerprint submissions */
+  int maxOSTries() { return max_os_tries; }
+  void setMaxOSTries(int mot);
 
   /* These functions retrieve and set the Round Trip Time timeouts, in
    milliseconds.  The set versions do extra processing to insure sane
@@ -234,6 +244,7 @@ class NmapOps {
   unsigned long host_timeout;
   /* Delay between probes, in milliseconds */
   unsigned int scan_delay;
+  bool open_only;
 
   int scanflags; /* if not -1, this value should dictate the TCP flags
 		    for the core portscaning routine (eg to change a
@@ -280,7 +291,6 @@ class NmapOps {
   int windowscan;
   int xmasscan;
   int noresolve;
-  int force; /* force nmap to continue on even when the outcome seems somewhat certain */
   int append_output; /* Append to any output files rather than overwrite */
   FILE *logfd[LOG_NUM_FILES];
   FILE *nmap_stdout; /* Nmap standard output */
@@ -292,6 +302,13 @@ class NmapOps {
   char *dns_servers;
   bool log_errors;
 
+  /* ip options used in build_*_raw() */
+  u8 *ipoptions;
+  int ipoptionslen;
+  int ipopt_firsthop;	// offset in ipoptions where is first hop for source/strict routing
+  int ipopt_lasthop;	// offset in ipoptions where is space for targets ip for source/strict routing
+
+
   // Statistics Options set in nmap.cc
   int numhosts_scanned;
   int numhosts_up;
@@ -299,7 +316,9 @@ class NmapOps {
   stype current_scantype;
   bool noninteractive;
 
+  bool release_memory;	/* suggest to release memory before quitting. used to find memory leaks. */
  private:
+  int max_os_tries;
   int max_rtt_timeout;
   int min_rtt_timeout;
   int initial_rtt_timeout;

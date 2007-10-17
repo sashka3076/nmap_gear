@@ -6,17 +6,17 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2004 Insecure.Com LLC. Nmap       *
- * is also a registered trademark of Insecure.Com LLC.  This program is    *
- * free software; you may redistribute and/or modify it under the          *
- * terms of the GNU General Public License as published by the Free        *
- * Software Foundation; Version 2.  This guarantees your right to use,     *
- * modify, and redistribute this software under certain conditions.  If    *
- * you wish to embed Nmap technology into proprietary software, we may be  *
- * willing to sell alternative licenses (contact sales@insecure.com).      *
- * Many security scanner vendors already license Nmap technology such as  *
- * our remote OS fingerprinting database and code, service/version         *
- * detection system, and port scanning code.                               *
+ * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
  *                                                                         *
  * Note that the GPL places important restrictions on "derived works", yet *
  * it does not provide a detailed definition of that term.  To avoid       *
@@ -39,7 +39,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://www.insecure.org/nmap/ to download Nmap.                         *
+ * http://insecure.org/nmap/ to download Nmap.                             *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -51,10 +51,10 @@
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
  * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to many    *
- * security vendors, and generally include a perpetual license as well as  *
- * providing for priority support and updates as well as helping to fund   *
- * the continued development of Nmap technology.  Please email             *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
  * sales@insecure.com for further information.                             *
  *                                                                         *
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: tcpip.cc 3516 2006-06-19 04:19:52Z fyodor $ */
+/* $Id: tcpip.cc 4228 2006-12-08 03:01:08Z fyodor $ */
 #ifdef WIN32
 #include "nmap_winconfig.h"
 #endif
@@ -248,7 +248,7 @@ void PacketTrace::traceArp(pdirection pdir, const u8 *frame, u32 len,
 
   if (frame[21] == 1) /* arp REQUEST */ {
     inet_ntop(AF_INET, frame+38, who_has, sizeof(who_has));
-    inet_ntop(AF_INET, frame+28, tell, sizeof(who_has));
+    inet_ntop(AF_INET, frame+28, tell, sizeof(tell));
     snprintf(arpdesc, sizeof(arpdesc), "who-has %s tell %s", who_has, tell);
   } else { /* ARP REPLY */
     inet_ntop(AF_INET, frame+28, who_has, sizeof(who_has));
@@ -262,6 +262,142 @@ void PacketTrace::traceArp(pdirection pdir, const u8 *frame, u32 len,
   return;
 }
 
+/* Get an ASCII information about a tcp option which is pointed by
+   optp, with a length of len. The result is stored in the result
+   buffer. The result may look like "<mss 1452,sackOK,timestamp
+   45848914 0,nop,wscale 7>" */
+static void tcppacketoptinfo(u8 *optp, int len, char *result, int bufsize) {
+  assert(optp);
+  assert(result);
+  char *p, ch;
+  u8 *q;
+  int opcode;
+  u16 tmpshort;
+  u32 tmpword1, tmpword2;
+
+  p = result; *p = '\0';
+  q = optp;
+  ch = '<';
+  
+  while(len > 0 && bufsize > 2) {
+	snprintf(p, bufsize, "%c", ch);
+	bufsize--;
+	p++;
+    opcode=*q++;	
+    if (!opcode) { /* End of List */
+	  
+	  snprintf(p, bufsize, "eol");
+	  bufsize -= strlen(p);
+	  p += strlen(p);
+	  
+      len--;
+	  
+    } else if (opcode == 1) { /* No Op */
+	  
+	  snprintf(p, bufsize, "nop");
+	  bufsize -= strlen(p);
+	  p += strlen(p);
+	  
+      len--;
+	  
+    } else if (opcode == 2) { /* MSS */
+	  
+      if(len<4)
+        break; /* MSS has 4 bytes */
+	  
+      q++;
+      memcpy(&tmpshort, q, 2);
+	  
+	  snprintf(p, bufsize, "mss %u", ntohs(tmpshort));
+	  bufsize -= strlen(p);
+	  p += strlen(p);
+
+      q += 2;
+      len -= 4;
+	  
+    } else if (opcode == 3) { /* Window Scale */
+	  
+      if(len<3)
+        break; /* Window Scale option has 3 bytes */
+	  
+      q++;
+
+	  snprintf(p, bufsize, "wsacle %u", *q);
+	  bufsize -= strlen(p);
+	  p += strlen(p); 
+	  
+      q++;
+      len -= 3;
+	  
+    } else if (opcode == 4) { /* SACK permitted */
+	  
+      if(len<2)
+        break; /* SACK permitted option has 2 bytes */
+	  
+	  snprintf(p, bufsize, "sackOK");
+	  bufsize -= strlen(p);
+	  p += strlen(p); 
+	  
+      q++;
+      len -= 2;
+	  
+    } else if (opcode == 5) { /* SACK */
+	  
+	  int sackoptlen = *q;
+	  if(len < sackoptlen)
+		break;
+	  
+	  q++;
+	  
+	  if((sackoptlen-2) % 8 != 0) {
+		snprintf(p, bufsize, "malformed sack");
+		bufsize -= strlen(p);
+		p += strlen(p); 
+	  } else {
+		snprintf(p, bufsize, "sack %d ", (sackoptlen-2)/8);
+		bufsize -= strlen(p);
+		p += strlen(p);
+		for(int i = 0; i < sackoptlen - 2; i += 8) {
+		  memcpy(&tmpword1, q + i, 4);
+		  memcpy(&tmpword2, q + i + 4, 4);
+		  snprintf(p, bufsize, "{%u:%u}", tmpword1, tmpword2);
+		  bufsize -= strlen(p);
+		  p += strlen(p);
+		}
+	  }
+
+	  q += sackoptlen-2;
+	  len -= sackoptlen;
+	  
+	} else if (opcode == 8) { /* Timestamp */
+
+      if(len<10)
+        break; /* Timestamp option has 10 bytes */
+
+      q++;
+      memcpy(&tmpword1, q, 4);
+      memcpy(&tmpword2, q+4, 4);
+
+	  snprintf(p, bufsize, "timestamp %u %u", ntohl(tmpword1), ntohl(tmpword2));
+	  bufsize -= strlen(p);
+	  p += strlen(p);
+
+	  q += 8;
+	  len -= 10;
+	  
+    }
+
+	ch = ',';
+  }
+
+  if(len > 0) {
+	*result = '\0';
+	return;
+  }
+
+  snprintf(p, bufsize, ">");
+}
+
 /* Returns a buffer of ASCII information about a packet that may look
    like "TCP 127.0.0.1:50923 > 127.0.0.1:3 S ttl=61 id=39516 iplen=40
    seq=625950769" or "ICMP PING (0/1) ttl=61 id=39516 iplen=40".
@@ -269,17 +405,16 @@ void PacketTrace::traceArp(pdirection pdir, const u8 *frame, u32 len,
    within (say) printf().  And certainly don't try to free() it!  The
    returned buffer is NUL-terminated */
 static const char *ippackethdrinfo(const u8 *packet, u32 len) {
-  static char protoinfo[256];
+  static char protoinfo[512];
   struct ip *ip = (struct ip *) packet;
   struct tcphdr *tcp;
   udphdr_bsd *udp;
-  char ipinfo[64];
+  char ipinfo[512];
   char srchost[INET6_ADDRSTRLEN], dsthost[INET6_ADDRSTRLEN];
   char *p;
   struct in_addr saddr, daddr;
   int frag_off = 0, more_fragments = 0;
   char fragnfo[64] = "";
-  char tflags[10];
   if (ip->ip_v != 4)
     return "BOGUS!  IP Version in packet is not 4";
 
@@ -299,16 +434,22 @@ static const char *ippackethdrinfo(const u8 *packet, u32 len) {
   }
   
 
-  snprintf(ipinfo, sizeof(ipinfo), "ttl=%d id=%d iplen=%d%s", 
-	   ip->ip_ttl, ntohs(ip->ip_id), ntohs(ip->ip_len), fragnfo);
+  snprintf(ipinfo, sizeof(ipinfo), "ttl=%d id=%d iplen=%d%s %s%s%s", 
+	  ip->ip_ttl, ntohs(ip->ip_id), ntohs(ip->ip_len), fragnfo,
+	  ip->ip_hl==5?"":"ipopts={",
+	  ip->ip_hl==5?"":print_ip_options((u8*)ip + sizeof(struct ip), MIN((ip->ip_hl-5)*4,len-sizeof(struct ip))),
+	  ip->ip_hl==5?"":"}");
 
   if (ip->ip_p == IPPROTO_TCP) {
+	char tflags[10];
     char tcpinfo[64] = "";
     char buf[32];
+	char tcpoptinfo[256] = "";
+	
     tcp = (struct tcphdr *)  (packet + ip->ip_hl * 4);
     if (frag_off > 8 || len < (u32) ip->ip_hl * 4 + 8) 
       snprintf(protoinfo, sizeof(protoinfo), "TCP %s:?? > %s:?? ?? %s (incomplete)", srchost, dsthost, ipinfo);
-    else if (frag_off == 8 && len >= (u32) ip->ip_hl * 4 + 8) {// we can get TCP flags and ACKn
+    else if (frag_off == 8) {// at least we can get TCP flags and ACKn
       tcp = (struct tcphdr *)((u8 *) tcp - frag_off); // ugly?
       p = tflags;
       /* These are basically in tcpdump order */
@@ -326,19 +467,27 @@ static const char *ippackethdrinfo(const u8 *packet, u32 len) {
       if (tcp->th_flags & TH_CWR) *p++ = 'C'; /* rfc 2481/3168 */
       *p++ = '\0';
 
-      snprintf(protoinfo, sizeof(protoinfo), "TCP %s:?? > %s:?? %s %s %s",
-	       srchost, dsthost, tflags, ipinfo, tcpinfo);
-    } else if (len < (u32) ip->ip_hl * 4 + 16) { // we can get ports an seq
+	  if((u32) tcp->th_off * 4 > sizeof(struct tcphdr)) {
+		// tcp options
+		if(len < (u32) ip->ip_hl * 4 + (u32) tcp->th_off * 4 - frag_off) {
+		  snprintf(tcpoptinfo, sizeof(tcpoptinfo), "option incomplete");
+		  
+		} else {
+		  tcppacketoptinfo((u8*) tcp + sizeof(struct tcphdr),
+					 tcp->th_off*4 - sizeof(struct tcphdr),
+					 tcpoptinfo, sizeof(tcpoptinfo));
+		}
+	  }
+
+      snprintf(protoinfo, sizeof(protoinfo), "TCP %s:?? > %s:?? %s %s %s %s",
+			   srchost, dsthost, tflags, ipinfo, tcpinfo, tcpoptinfo);
+    } else if (len < (u32) ip->ip_hl * 4 + 16) { // we can get ports and seq
       snprintf(tcpinfo, sizeof(tcpinfo), "seq=%lu (incomplete)", (unsigned long) ntohl(tcp->th_seq));
       snprintf(protoinfo, sizeof(protoinfo), "TCP %s:%d > %s:%d ?? %s %s",
 	       srchost, ntohs(tcp->th_sport), dsthost, ntohs(tcp->th_dport), ipinfo, tcpinfo);
-    } else if (len < (u32) ip->ip_hl * 4 + 16 && !frag_off) { // we can't get TCP flags
-      snprintf(protoinfo, sizeof(protoinfo), "TCP %s:%d > %s:%d ?? %s %s (incomplete)",
-	       srchost, ntohs(tcp->th_sport), dsthost, ntohs(tcp->th_dport),
-	       ipinfo, tcpinfo);
-    } else { // at least first 16 bytes of TCP header are there (everything we need)
+    } else { // at least first 16 bytes of TCP header are there
 
-      snprintf(tcpinfo, sizeof(tcpinfo), "seq=%lu win=%hi", 
+      snprintf(tcpinfo, sizeof(tcpinfo), "seq=%lu win=%hu", 
 	       (unsigned long) ntohl(tcp->th_seq),
 	       ntohs(tcp->th_win));
       p = tflags;
@@ -351,16 +500,28 @@ static const char *ippackethdrinfo(const u8 *packet, u32 len) {
 	*p++ = 'A';
 	snprintf(buf, sizeof(buf), " ack=%lu", 
 		 (unsigned long) ntohl(tcp->th_ack));
-	strncat(tcpinfo, buf, sizeof(tcpinfo));
+	strncat(tcpinfo, buf, sizeof(tcpinfo) - strlen(tcpinfo) - 1);
       }
       if (tcp->th_flags & TH_URG) *p++ = 'U';
       if (tcp->th_flags & TH_ECE) *p++ = 'E'; /* rfc 2481/3168 */
       if (tcp->th_flags & TH_CWR) *p++ = 'C'; /* rfc 2481/3168 */
       *p++ = '\0';
 
-      snprintf(protoinfo, sizeof(protoinfo), "TCP %s:%d > %s:%d %s %s %s",
+	  if((u32) tcp->th_off * 4 > sizeof(struct tcphdr)) {
+		// tcp options
+		if(len < (u32) ip->ip_hl * 4 + (u32) tcp->th_off * 4) {
+		  snprintf(tcpoptinfo, sizeof(tcpoptinfo), "option incomplete");
+		  
+		} else {
+		  tcppacketoptinfo((u8*) tcp + sizeof(struct tcphdr),
+					 tcp->th_off*4 - sizeof(struct tcphdr),
+					 tcpoptinfo, sizeof(tcpoptinfo));
+		}
+	  }
+
+      snprintf(protoinfo, sizeof(protoinfo), "TCP %s:%d > %s:%d %s %s %s %s",
 	       srchost, ntohs(tcp->th_sport), dsthost, ntohs(tcp->th_dport),
-	       tflags, ipinfo, tcpinfo);
+			   tflags, ipinfo, tcpinfo, tcpoptinfo);
     }
   } else if (ip->ip_p == IPPROTO_UDP && frag_off) {
       snprintf(protoinfo, sizeof(protoinfo), "UDP %s:?? > %s:?? fragment %s (incomplete)", srchost, dsthost, ipinfo);
@@ -556,7 +717,7 @@ void PacketTrace::traceConnect(u8 proto, const struct sockaddr *sock,
     assert(sin->sin_family == AF_INET6);
     if (inet_ntop(sin->sin_family, (char *) &sin6->sin6_addr, targetipstr, 
 		  sizeof(targetipstr)) == NULL)
-      fatal("Failed to convert target IPv4 address to presentation format!?!");
+      fatal("Failed to convert target IPv6 address to presentation format!?!");
     targetport = ntohs(sin6->sin6_port);
 #else
     assert(0);
@@ -627,7 +788,7 @@ int resolve(char *hostname, struct sockaddr_storage *ss, size_t *sslen,
 
 int islocalhost(const struct in_addr * const addr) {
 char dev[128];
-  /* If it is 0.0.0.0 or starts with 127.0.0.1 then it is 
+  /* If it is 0.0.0.0 or starts with 127 then it is 
      probably localhost */
   if ((addr->s_addr & htonl(0xFF000000)) == htonl(0x7F000000))
     return 1;
@@ -642,6 +803,31 @@ char dev[128];
 
   /* OK, so to a first approximation, this addy is probably not
      localhost */
+  return 0;
+}
+
+int isipprivate(const struct in_addr * const addr) {
+  char *ipc;
+  unsigned char i1, i2;
+  
+  if(!addr) return 0;
+  
+  ipc = (char *) &(addr->s_addr);
+  i1 = ipc[0];
+  i2 = ipc[1];
+
+  /* 10.0.0.0/8 */
+  if (i1 == 10)
+	return 1;
+
+  /* 172.16.0.0/12 */
+  if (i1 == 172 && i2 >= 16 && i2 <= 31)
+    return 1;
+
+  /* 192.168.0.0/16 */
+  if (i1 == 192 && i2 == 168)
+	return 1;
+
   return 0;
 }
 
@@ -718,6 +904,7 @@ naming system.  So the conversion is done here */
 fatal("Call to pcap_open_live(%s, %d, %d, %d) failed three times. Reported error: %s\nThere are several possible reasons for this, depending on your operating system:\n"
           "LINUX: If you are getting Socket type not supported, try modprobe af_packet or recompile your kernel with SOCK_PACKET enabled.\n"
           "*BSD:  If you are getting device not configured, you need to recompile your kernel with Berkeley Packet Filter support.  If you are getting No such file or directory, try creating the device (eg cd /dev; MAKEDEV <device>; or use mknod).\n"
+          "*WINDOWS:  Nmap only supports ethernet interfaces on Windows for most operations because Microsoft disabled raw sockets as of Windows XP SP2.  Depending on the reason for this error, it is possible that the --unprivileged command-line argument will help.\n"
           "SOLARIS:  If you are trying to scan localhost and getting '/dev/lo0: No such file or directory', complain to Sun.  I don't think Solaris can support advanced localhost scans.  You can probably use \"-P0 -sT localhost\" though.\n\n", pcapdev, snaplen, promisc, to_ms, err0r);
       } else {
 	error("pcap_open_live(%s, %d, %d, %d) FAILED. Reported error: %s.  Will wait %d seconds then retry.", pcapdev, snaplen, promisc, to_ms, err0r, (int) pow(5.0, failed));	
@@ -829,18 +1016,69 @@ void eth_close_cached() {
   return;
 }
 
+// fill ip header. no error check.
+// This function is also changing what's needed from host to network order.
+static inline int fill_ip_raw(
+	struct ip *ip, int packetlen, u8* ipopt, int ipoptlen,
+	int ip_tos, int ip_id, int ip_off, int ip_ttl, int ip_p,
+	const struct in_addr *ip_src, const struct in_addr *ip_dst)
+{
+  ip->ip_v   = 4;
+  ip->ip_hl  = 5 + (ipoptlen/4);
+  ip->ip_tos = ip_tos;
+  ip->ip_len = htons(packetlen);
+  ip->ip_id  = htons(ip_id);
+  ip->ip_off = htons(ip_off);
+  ip->ip_ttl = ip_ttl;
+  ip->ip_p   = ip_p;
+  ip->ip_src.s_addr = ip_src->s_addr;
+  ip->ip_dst.s_addr = ip_dst->s_addr;
+
+  if (ipoptlen)
+    memcpy((u8*)ip + sizeof(struct ip), ipopt, ipoptlen);
+    
+  // ip options source routing hack:
+  if(ipoptlen && o.ipopt_firsthop && o.ipopt_lasthop) {
+    u8* ipo = (u8*)ip + sizeof(struct ip);
+    struct in_addr *newdst = (struct in_addr *) &ipo[o.ipopt_firsthop];
+    struct in_addr *olddst = (struct in_addr *) &ipo[o.ipopt_lasthop];
+    // our destination is somewhere else :)
+    ip->ip_dst.s_addr = newdst->s_addr;
+    
+    // and last hop should be destination
+    olddst->s_addr    = ip_dst->s_addr;
+  }
+   
+
+  #if HAVE_IP_IP_SUM
+  ip->ip_sum = 0;
+  ip->ip_sum = in_cksum((unsigned short *)ip, sizeof(struct ip) + ipoptlen);
+  #endif
+  return(sizeof(struct ip) + ipoptlen);
+}
+
+
+
 int send_tcp_raw_decoys( int sd, struct eth_nfo *eth, 
-			 const struct in_addr *victim, int ttl,
-			 u16 sport, u16 dport, u32 seq, u32 ack, u8 flags,
-			 u16 window, u8 *options, int optlen, char *data,
-			 u16 datalen) 
+			 const struct in_addr *victim,
+			 int ttl, bool df,
+			 u8* ipopt, int ipoptlen,
+			 u16 sport, u16 dport,
+			 u32 seq, u32 ack, u8 reserved, u8 flags, u16 window, u16 urp,
+			 u8 *options, int optlen,
+			 char *data, u16 datalen) 
 {
   int decoy;
 
   for(decoy = 0; decoy < o.numdecoys; decoy++) 
-    if (send_tcp_raw(sd, eth, &o.decoys[decoy], victim, ttl, sport, dport, 
-		     seq, ack, flags, window, options, optlen, data, 
-		     datalen) == -1)
+    if (send_tcp_raw(sd, eth,
+    		&o.decoys[decoy], victim,
+    		ttl, df,
+    		ipopt, ipoptlen,
+    		sport, dport, 
+		seq, ack, reserved, flags, window, urp,
+		options, optlen,
+		data, datalen) == -1)
       return -1;
 
   return 0;
@@ -852,11 +1090,13 @@ int send_tcp_raw_decoys( int sd, struct eth_nfo *eth,
    actually sent by this function.  Caller must delete the buffer when
    finished with the packet.  The packet length is returned in
    packetlen, which must be a valid int pointer. */
-u8 *build_tcp_raw(const struct in_addr *source, 
-		  const struct in_addr *victim, int ttl, 
-		  u16 ipid, u16 sport, u16 dport, u32 seq, u32 ack, u8 flags,
-		  u16 window, u8 *options, int optlen, char *data, 
-		  u16 datalen, u32 *packetlen) {
+u8 *build_tcp_raw(const struct in_addr *source, const struct in_addr *victim,
+                  int ttl, u16 ipid, u8 tos, bool df,
+		  u8 *ipopt, int ipoptlen, 
+		  u16 sport, u16 dport,
+		  u32 seq, u32 ack, u8 reserved, u8 flags, u16 window, u16 urp,
+		  u8 *tcpopt, int tcpoptlen,
+		  char *data, u16 datalen, u32 *outpacketlen) {
 
 struct pseudo_header { 
   /*for computing TCP checksum, see TCP/IP Illustrated p. 145 */
@@ -866,18 +1106,22 @@ struct pseudo_header {
   u8 protocol;
   u16 length;
 };
-u8 *packet = (u8 *) safe_malloc(sizeof(struct ip) + sizeof(struct tcphdr) + optlen + datalen);
+int packetlen = sizeof(struct ip) + ipoptlen + 
+	sizeof(struct tcphdr) + tcpoptlen + datalen;
+u8 *packet = (u8 *) safe_malloc(packetlen);
 struct ip *ip = (struct ip *) packet;
-struct tcphdr *tcp = (struct tcphdr *) (packet + sizeof(struct ip));
-struct pseudo_header *pseudo =  (struct pseudo_header *) (packet + sizeof(struct ip) - sizeof(struct pseudo_header)); 
+struct tcphdr *tcp = (struct tcphdr *) ((u8*)ip + sizeof(struct ip) + ipoptlen);
+struct pseudo_header *pseudo = 
+	(struct pseudo_header *) ((u8*)tcp - sizeof(struct pseudo_header));
 static int myttl = 0;
 
 assert(victim);
 assert(source);
+assert(ipoptlen%4==0);
 
-if (optlen % 4) {
-  fatal("build_tcp_raw() called with an option length argument of %d which is illegal because it is not divisible by 4", optlen);
-}
+if (tcpoptlen % 4)
+  fatal("build_tcp_raw() called with an option length argument of %d which is illegal because it is not divisible by 4. Just add \\0 padding to the end.", tcpoptlen);
+
 
 /* Time to live */
 if (ttl == -1) {
@@ -886,19 +1130,19 @@ if (ttl == -1) {
   myttl = ttl;
 }
 
-memset((char *) packet, 0, sizeof(struct ip) + sizeof(struct tcphdr));
-
 pseudo->s_addy = source->s_addr;
 pseudo->d_addr = victim->s_addr;
+pseudo->zer0	= 0;
 pseudo->protocol = IPPROTO_TCP;
-pseudo->length = htons(sizeof(struct tcphdr) + optlen + datalen);
+pseudo->length	= htons(sizeof(struct tcphdr) + tcpoptlen + datalen);
 
+/* Fill tcp header */
+memset(tcp, 0, sizeof(struct tcphdr));
 tcp->th_sport = htons(sport);
 tcp->th_dport = htons(dport);
 if (seq) {
   tcp->th_seq = htonl(seq);
-}
-else if (flags & TH_SYN) {
+} else if (flags & TH_SYN) {
   get_random_bytes(&(tcp->th_seq), 4);
 }
 
@@ -907,68 +1151,63 @@ if (ack)
 /*else if (flags & TH_ACK)
   tcp->th_ack = rand() + rand();*/
 
-tcp->th_off = 5 + (optlen /4) /*words*/;
+if (reserved)
+  tcp->th_x2 = reserved & 0x0F;
+tcp->th_off = 5 + (tcpoptlen /4) /*words*/;
 tcp->th_flags = flags;
 
 if (window)
   tcp->th_win = htons(window);
 else tcp->th_win = htons(1024 * (myttl % 4 + 1)); /* Who cares */
 
- /* We should probably copy the data over too */
- if (data && datalen)
-   memcpy(packet + sizeof(struct ip) + sizeof(struct tcphdr) + optlen, data, datalen);
- /* And the options */
- if (optlen) {
-   memcpy(packet + sizeof(struct ip) + sizeof(struct tcphdr), options, optlen);
- }
+/* Urgend pointer */
+if (urp)
+  tcp->th_urp = htons(urp);
+
+/* And the options */
+if (tcpoptlen)
+  memcpy((u8*)tcp + sizeof(struct tcphdr), tcpopt, tcpoptlen);
+/* We should probably copy the data over too */
+if (data && datalen)
+  memcpy((u8*)tcp + sizeof(struct tcphdr) + tcpoptlen, data, datalen);
 
 #if STUPID_SOLARIS_CHECKSUM_BUG
- tcp->th_sum = sizeof(struct tcphdr) + optlen + datalen; 
+tcp->th_sum = sizeof(struct tcphdr) + tcpoptlen + datalen; 
 #else
 tcp->th_sum = in_cksum((unsigned short *)pseudo, sizeof(struct tcphdr) + 
-		       optlen + sizeof(struct pseudo_header) + datalen);
+		       tcpoptlen + sizeof(struct pseudo_header) + datalen);
 #endif
 
 if ( o.badsum )
   --tcp->th_sum;
 
-/* Now for the ip header */
-memset(packet, 0, sizeof(struct ip)); 
-ip->ip_v = 4;
-ip->ip_hl = 5;
-ip->ip_len = htons(sizeof(struct ip) + sizeof(struct tcphdr) + optlen + datalen);
-get_random_bytes(&(ip->ip_id), 2);
-ip->ip_ttl = myttl;
-ip->ip_p = IPPROTO_TCP;
-ip->ip_id = ipid;
-ip->ip_src.s_addr = source->s_addr;
-#ifdef WIN32
-// I'm not sure why this is --Fyodor
-if (source->s_addr == victim->s_addr) ip->ip_src.s_addr++;
-#endif
+  fill_ip_raw(ip, packetlen, ipopt, ipoptlen,
+  	tos, ipid, df?IP_DF:0, myttl, IPPROTO_TCP,
+  	source, victim);
 
-ip->ip_dst.s_addr= victim->s_addr;
-#if HAVE_IP_IP_SUM
-ip->ip_sum = in_cksum((unsigned short *)ip, sizeof(struct ip));
-#endif
-
- *packetlen = ntohs(ip->ip_len);
+  *outpacketlen = packetlen;
  return packet;
-
 }
 
 /* You need to call sethdrinclude(sd) on the sending sd before calling this */
-int send_tcp_raw( int sd, struct eth_nfo *eth, const struct in_addr *source, 
-		  const struct in_addr *victim, int ttl, 
-		  u16 sport, u16 dport, u32 seq, u32 ack, u8 flags,
-		  u16 window, u8 *options, int optlen, char *data, 
-		  u16 datalen) 
+int send_tcp_raw( int sd, struct eth_nfo *eth,
+		  const struct in_addr *source, const struct in_addr *victim,
+		  int ttl, bool df,
+		  u8* ipops, int ipoptlen,
+		  u16 sport, u16 dport,
+		  u32 seq, u32 ack, u8 reserved, u8 flags,u16 window, u16 urp,
+		  u8 *options, int optlen,
+		  char *data, u16 datalen) 
 {
   unsigned int packetlen;
   int res = -1;
 
-  u8 *packet = build_tcp_raw(source, victim, ttl, get_random_u16(), sport, 
-			     dport, seq, ack, flags, window, options, optlen, 
+  u8 *packet = build_tcp_raw(source, victim,
+  			     ttl, get_random_u16(), IP_TOS_DEFAULT, df,
+  			     ipops, ipoptlen,
+  			     sport, dport,
+  			     seq, ack, reserved, flags, window, urp,
+  			     options, optlen, 
 			     data, datalen, &packetlen);
   if (!packet) return -1;
   res = send_ip_packet(sd, eth, packet, packetlen);
@@ -1029,14 +1268,23 @@ struct sockaddr_in *sin = (struct sockaddr_in *) to;
 int res;
 int retries = 0;
 int sleeptime = 0;
+static int numerrors = 0;
 
 do {
   if ((res = sendto(sd, (const char *) packet, len, flags, to, tolen)) == -1) {
     int err = socket_errno();
 
-    error("sendto in %s: sendto(%d, packet, %d, 0, %s, %d) => %s",
-	  functionname, sd, len, inet_ntoa(sin->sin_addr), tolen,
-	  strerror(err));
+    numerrors++;
+    if (o.debugging > 1 || numerrors <= 10) {
+      error("sendto in %s: sendto(%d, packet, %d, 0, %s, %d) => %s",
+	    functionname, sd, len, inet_ntoa(sin->sin_addr), tolen,
+	    strerror(err));
+      error("Offending packet: %s", ippackethdrinfo(packet, len));
+      if (numerrors == 10) {
+	error("Omitting future Sendto error messages now that %d have been shown.  Use -d2 if you really want to see them.", numerrors);
+      }
+    }
+
 #if WIN32
 	return -1;
 #else
@@ -1132,10 +1380,13 @@ int send_ip_packet(int sd, struct eth_nfo *eth, u8 *packet, unsigned int packetl
    packet contents, and then returns that buffer.  The packet is not
    actually sent by this function.  Caller must delete the buffer when
    finished with the packet.  The packet length is returned in
-   packetlen, which must be a valid int pointer. */
+   packetlen, which must be a valid int pointer.  The id/seq will be converted
+   to network byte order (if it differs from HBO) */
 u8 *build_icmp_raw(const struct in_addr *source, const struct in_addr *victim, 
-		   int ttl, u16 ipid, u16 seq, unsigned short id, u8 ptype, 
-		   u8 pcode, char *data, u16 datalen, u32 *packetlen) {
+		   int ttl, u16 ipid, u8 tos, bool df,
+		   u8 *ipopt, int ipoptlen,
+		   u16 seq, unsigned short id, u8 ptype, u8 pcode,
+		   char *data, u16 datalen, u32 *packetlen) {
 
 struct ppkt {
   u8 type;
@@ -1153,7 +1404,7 @@ char *ping = (char *) &pingpkt;
  pingpkt.type = ptype;
  pingpkt.code = pcode;
 
- if (ptype == 8 && pcode == 0) /* echo request */ {
+ if (ptype == 8) /* echo request */ {
    icmplen = 8;
  } else if (ptype == 13 && pcode == 0) /* ICMP timestamp req */ {
    icmplen = 20;
@@ -1173,17 +1424,20 @@ char *ping = (char *) &pingpkt;
  }
 /* Fill out the ping packet */
 
-pingpkt.code = 0;
-pingpkt.id = id;
-pingpkt.seq = seq;
+ pingpkt.id = htons(id);
+ pingpkt.seq = htons(seq);
 pingpkt.checksum = 0;
 pingpkt.checksum = in_cksum((unsigned short *)ping, icmplen);
 
 if ( o.badsum )
   --pingpkt.checksum;
 
-return build_ip_raw(source, victim, o.ttl, IPPROTO_ICMP, get_random_u16(),
-		    ping, icmplen, packetlen);
+return build_ip_raw(source, victim,
+		    IPPROTO_ICMP,
+		    o.ttl, get_random_u16(), tos, df,
+		    ipopt, ipoptlen,
+		    ping, icmplen,
+		    packetlen);
 }
 
 
@@ -1294,14 +1548,17 @@ if (ip->ip_p== IPPROTO_UDP) {
 }
 
 int send_udp_raw_decoys( int sd, struct eth_nfo *eth, 
-			 const struct in_addr *victim, int ttl, 
-			 u16 sport, u16 dport, u16 ipid, char *data, 
-			 u16 datalen) {
+			 const struct in_addr *victim,
+			 int ttl, u16 ipid,
+			 u8* ipops, int ipoptlen,
+			 u16 sport, u16 dport,
+			 char *data, u16 datalen) {
   int decoy;
   
   for(decoy = 0; decoy < o.numdecoys; decoy++) 
-    if (send_udp_raw(sd, eth, &o.decoys[decoy], victim, ttl, sport, dport, ipid,
-		     data, datalen) == -1)
+    if (send_udp_raw(sd, eth, &o.decoys[decoy], victim,
+    		     ttl, ipid, ipops, ipoptlen,
+    		     sport, dport, data, datalen) == -1)
       return -1;
 
   return 0;
@@ -1315,30 +1572,30 @@ int send_udp_raw_decoys( int sd, struct eth_nfo *eth,
    finished with the packet.  The packet length is returned in
    packetlen, which must be a valid int pointer. */
 u8 *build_udp_raw(struct in_addr *source, const struct in_addr *victim,
- 		  int ttl, u16 sport, u16 dport, u16 ipid, char *data, 
-		  u16 datalen, u32 *packetlen) 
+                  int ttl, u16 ipid, u8 tos, bool df,
+		  u8 *ipopt, int ipoptlen, 
+ 		  u16 sport, u16 dport,
+ 		  char *data, u16 datalen, u32 *outpacketlen) 
 {
-  unsigned char *packet = (unsigned char *) safe_malloc(sizeof(struct ip) + sizeof(udphdr_bsd) + datalen);
+  int packetlen = sizeof(struct ip) + ipoptlen + sizeof(udphdr_bsd) + datalen;
+  u8 *packet = (u8 *) safe_malloc(packetlen);
   struct ip *ip = (struct ip *) packet;
-  udphdr_bsd *udp = (udphdr_bsd *) (packet + sizeof(struct ip));
+  udphdr_bsd *udp = (udphdr_bsd *) ((u8*)ip + sizeof(struct ip) + ipoptlen);
   static int myttl = 0;
   
   struct pseudo_udp_hdr {
     struct in_addr source;
     struct in_addr dest;        
-    u8 zero;
+    u8 zer0;
     u8 proto;        
     u16 length;
-  } *pseudo = (struct pseudo_udp_hdr *) ((char *)udp - 12) ;
+  } *pseudo = (struct pseudo_udp_hdr *) ((u8 *)udp - sizeof(struct pseudo_udp_hdr));
 
-  *packetlen = 0;
 
   /* check that required fields are there and not too silly */
-  if ( !victim) {
-    fprintf(stderr, "build_udp_raw: One or more of your parameters suck!\n");
-    free(packet);
-    return NULL;
-  }
+  assert(victim);
+  assert(source);
+  assert(ipoptlen%4==0);
   
   /* Time to live */
   if (ttl == -1) {
@@ -1347,19 +1604,19 @@ u8 *build_udp_raw(struct in_addr *source, const struct in_addr *victim,
     myttl = ttl;
   }
   
-  memset((char *) packet, 0, sizeof(struct ip) + sizeof(udphdr_bsd));
-  
   udp->uh_sport = htons(sport);
   udp->uh_dport = htons(dport);
-  udp->uh_ulen = htons(8 + datalen);
+  udp->uh_sum   = 0;
+  udp->uh_ulen  = htons(sizeof(udphdr_bsd) + datalen);
   
   /* We should probably copy the data over too */
   if (data)
-    memcpy(packet + sizeof(struct ip) + sizeof(udphdr_bsd), data, datalen);
+    memcpy((u8*)udp + sizeof(udphdr_bsd), data, datalen);
   
   /* Now the pseudo header for checksuming */
   pseudo->source.s_addr = source->s_addr;
   pseudo->dest.s_addr = victim->s_addr;
+  pseudo->zer0  = 0;
   pseudo->proto = IPPROTO_UDP;
   pseudo->length = htons(sizeof(udphdr_bsd) + datalen);
   
@@ -1373,39 +1630,28 @@ u8 *build_udp_raw(struct in_addr *source, const struct in_addr *victim,
   if ( o.badsum )
     --udp->uh_sum;
   
-  /* Goodbye, pseudo header! */
-  memset(pseudo, 0, sizeof(*pseudo));
+  fill_ip_raw(ip, packetlen, ipopt, ipoptlen,
+	tos, ipid, df?IP_DF:0, myttl, IPPROTO_UDP,
+	source, victim);
   
-  /* Now for the ip header */
-  ip->ip_v = 4;
-  ip->ip_hl = 5;
-  ip->ip_len = htons(sizeof(struct ip) + sizeof(udphdr_bsd) + datalen);
-  ip->ip_id = htons(ipid);
-  ip->ip_ttl = myttl;
-  ip->ip_p = IPPROTO_UDP;
-  ip->ip_src.s_addr = source->s_addr;
-#ifdef WIN32
-  // I'm not exactly sure why this is needed --Fyodor
-  if(source->s_addr == victim->s_addr) ip->ip_src.s_addr;
-#endif
-  ip->ip_dst.s_addr= victim->s_addr;
-#if HAVE_IP_IP_SUM
-  ip->ip_sum = in_cksum((unsigned short *)ip, sizeof(struct ip));
-#endif
-  
-  *packetlen = ntohs(ip->ip_len);
+  *outpacketlen = packetlen;
   return packet;
 }
 
-int send_udp_raw( int sd, struct eth_nfo *eth, struct in_addr *source, 
-		  const struct in_addr *victim,
- 		  int ttl, u16 sport, u16 dport, u16 ipid, char *data, 
-		  u16 datalen) 
+int send_udp_raw( int sd, struct eth_nfo *eth,
+		  struct in_addr *source, const struct in_addr *victim,
+ 		  int ttl, u16 ipid,
+ 		  u8* ipopt, int ipoptlen,
+ 		  u16 sport, u16 dport,
+ 		  char *data, u16 datalen) 
 {
   unsigned int packetlen;
   int res = -1;
-  u8 *packet = build_udp_raw(source, victim, ttl, sport, dport, ipid, data, 
-			     datalen, &packetlen);
+  u8 *packet = build_udp_raw(source, victim,
+  			     ttl, ipid, IP_TOS_DEFAULT, false,
+  			     ipopt, ipoptlen,
+  			     sport, dport,
+  			     data, datalen, &packetlen);
   if (!packet) return -1;
   res = send_ip_packet(sd, eth, packet, packetlen);
 
@@ -1420,20 +1666,21 @@ int send_udp_raw( int sd, struct eth_nfo *eth, struct in_addr *source,
    finished with the packet.  The packet length is returned in
    packetlen, which must be a valid int pointer. */
 u8 *build_ip_raw(const struct in_addr *source, const struct in_addr *victim, 
-		 int ttl, u8 proto, u16 ipid, char *data, u16 datalen, 
-		 u32 *packetlen) 
+		 u8 proto,
+		 int ttl, u16 ipid, u8 tos, bool df,
+		 u8 *ipopt, int ipoptlen,
+		 char *data, u16 datalen, 
+		 u32 *outpacketlen) 
 {
-
-unsigned char *packet = (unsigned char *) safe_malloc(sizeof(struct ip) + datalen);
+int packetlen = sizeof(struct ip) + ipoptlen + datalen;
+u8 *packet = (u8 *) safe_malloc(packetlen);
 struct ip *ip = (struct ip *) packet;
 static int myttl = 0;
 
 /* check that required fields are there and not too silly */
-if ( !victim) {
-  fprintf(stderr, "send_ip_raw: One or more of your parameters suck!\n");
-  free(packet);
-  return NULL;
-}
+assert(source);
+assert(victim);
+assert(ipoptlen%4==0);
 
 /* Time to live */
 if (ttl == -1) {
@@ -1442,45 +1689,34 @@ if (ttl == -1) {
 	        myttl = ttl;
 }
 
-memset((char *) packet, 0, sizeof(struct ip));
-
-/* Now for the ip header */
-
-ip->ip_v = 4;
-ip->ip_hl = 5;
-ip->ip_len = htons(sizeof(struct ip) + datalen);
-ip->ip_id = htons(ipid);
-ip->ip_ttl = myttl;
-ip->ip_p = proto;
-ip->ip_src.s_addr = source->s_addr;
-// #ifdef WIN32
-// TODO: Should this be removed? I'm not sure why this is here -- Fyodor
-// if(source->s_addr == victim->s_addr) ip->ip_src.s_addr++;
-// #endif
-ip->ip_dst.s_addr = victim->s_addr;
-#if HAVE_IP_IP_SUM
-ip->ip_sum = in_cksum((unsigned short *)ip, sizeof(struct ip));
-#endif
+  fill_ip_raw(ip, packetlen, ipopt, ipoptlen,
+	tos, ipid, df?IP_DF:0, myttl, proto,
+	source, victim);
 
  /* We should probably copy the data over too */
  if (data)
-   memcpy(packet + sizeof(struct ip), data, datalen);
+    memcpy((u8*)ip + sizeof(struct ip) + ipoptlen, data, datalen);
 
- *packetlen = ntohs(ip->ip_len);
+  *outpacketlen = packetlen;
  return packet;
 }
 
 
 /* You need to call sethdrinclude(sd) on the sending sd before calling this */
-int send_ip_raw( int sd, struct eth_nfo *eth, struct in_addr *source, 
-		 const struct in_addr *victim, int ttl, u8 proto, 
+int send_ip_raw( int sd, struct eth_nfo *eth,
+		 struct in_addr *source, const struct in_addr *victim,
+		 u8 proto, int ttl,
+		 u8* ipopt, int ipoptlen,		 
 		 char *data, u16 datalen) 
 {
   unsigned int packetlen;
   int res = -1;
 
-  u8 *packet = build_ip_raw(source, victim, ttl, proto, get_random_u16(), 
-			    data, datalen, &packetlen);
+  u8 *packet = build_ip_raw(source, victim,
+    			    proto,
+  			    ttl, get_random_u16(), IP_TOS_DEFAULT, false,
+  			    ipopt, ipoptlen,
+  			    data, datalen, &packetlen);
   if (!packet) return -1;
 
   res = send_ip_packet(sd, eth, packet, packetlen);
@@ -1524,11 +1760,13 @@ unsigned int offset = 0;
 struct pcap_pkthdr head;
 char *p;
 int datalink;
+int pcap_descriptor=-1; // -1 means we CANNOT select()
 int timedout = 0;
 struct timeval tv_start, tv_end;
 static char *alignedbuf = NULL;
 static unsigned int alignedbufsz=0;
 static int warning = 0;
+
 if (linknfo) { memset(linknfo, 0, sizeof(*linknfo)); }
 
 if (!pd) fatal("NULL packet device passed to readip_pcap");
@@ -1614,6 +1852,11 @@ if (!pd) fatal("NULL packet device passed to readip_pcap");
  if (to_usec > 0) {
    gettimeofday(&tv_start, NULL);
  }
+
+ pcap_descriptor = -1;
+ if (pcap_selectable_fd_valid())  
+   pcap_descriptor = my_pcap_get_selectable_fd(pd);
+
  do {
 #ifdef WIN32
    gettimeofday(&tv_end, NULL);
@@ -1622,7 +1865,32 @@ if (!pd) fatal("NULL packet device passed to readip_pcap");
    PacketSetReadTimeout(pd->adapter, to_left);
 #endif
 
-   p = (char *) pcap_next(pd, &head);
+   p = NULL;
+   if (pcap_descriptor != -1) {
+     fd_set rfds;
+     struct timeval sel_tv;
+     int rv=0;
+
+     FD_ZERO(&rfds);
+     FD_SET(pcap_descriptor, &rfds);
+
+     sel_tv.tv_sec = to_usec/1000000;
+     sel_tv.tv_usec = to_usec%1000000;
+
+     rv = select(pcap_descriptor+1, &rfds, NULL, NULL, to_usec ? &sel_tv : NULL);
+
+     if (rv == -1) {
+       fatal("Your system does not support select()ing on pcap devices (%s). PLEASE REPORT THIS ALONG WITH DETAILED SYSTEM INFORMATION TO THE nmap-dev MAILING LIST!", strerror(errno));
+     } else if (rv == 0) {
+       timedout = 1;
+     } else {
+       p = (char *) pcap_next(pd, &head);
+     }
+   } else {
+     // THIS CALL CAN BLOCK INAPPROPRIATLEY! (ie, will block until it sees another
+     // packet - to_usec notwithstanding) Use the select() code if possible.
+     p = (char *) pcap_next(pd, &head);
+   }
 
    if (p) {
      if (head.caplen <= offset) {
@@ -1688,6 +1956,30 @@ if (timedout) {
 
  return alignedbuf;
 }
+
+// Returns whether the system supports pcap_get_selectable_fd() properly
+bool pcap_selectable_fd_valid() {
+#if defined(WIN32) || defined(MACOSX)
+  return false;
+#endif
+  return true;
+}
+
+/* Call this instead of pcap_get_selectable_fd directly (or your code
+   won't compile on Windows).  On systems which don't seem to support
+   the pcap_get_selectable_fd() function properly, returns -1,
+   otherwise simply calls pcap_selectable_fd and returns the
+   results.  If you just want to test whether the function is supported,
+   use pcap_selectable_fd_valid() instead. */
+int my_pcap_get_selectable_fd(pcap_t *p) {
+#if defined(WIN32) || defined(MACOSX)
+  return -1;
+#else
+  assert(pcap_selectable_fd_valid());
+  return pcap_get_selectable_fd(p);
+#endif
+}
+
  
 // Returns whether the packet receive time value obtained from libpcap
 // (and thus by readip_pcap()) should be considered valid.  When
@@ -1772,6 +2064,7 @@ int read_arp_reply_pcap(pcap_t *pd, u8 *sendermac, struct in_addr *senderIP,
   int timedout = 0;
   int badcounter = 0;
   struct timeval tv_start, tv_end;
+  int pcap_descriptor = -1;
 
   if (!pd) fatal("NULL packet device passed to readarp_reply_pcap");
 
@@ -1806,7 +2099,36 @@ int read_arp_reply_pcap(pcap_t *pd, u8 *sendermac, struct in_addr *senderIP,
     }
 #endif
 
-    p = (u8 *) pcap_next(pd, &head);
+   pcap_descriptor = -1;
+   if (pcap_selectable_fd_valid())  
+     pcap_descriptor = my_pcap_get_selectable_fd(pd);
+    
+   p = NULL;
+   if (pcap_descriptor != -1) {
+     fd_set rfds;
+     struct timeval sel_tv;
+     int rv=0;
+
+     FD_ZERO(&rfds);
+     FD_SET(pcap_descriptor, &rfds);
+
+     sel_tv.tv_sec = to_usec/1000000;
+     sel_tv.tv_usec = to_usec%1000000;
+
+     rv = select(pcap_descriptor+1, &rfds, NULL, NULL, to_usec ? &sel_tv : NULL);
+
+     if (rv == -1) {
+       fatal("Your system does not support select()ing on pcap devices (%s). PLEASE REPORT THIS ALONG WITH DETAILED SYSTEM INFORMATION TO THE nmap-dev MAILING LIST!", strerror(errno));
+     } else if (rv == 0) {
+       timedout = 1;
+     } else {
+       p = (u8 *) pcap_next(pd, &head);
+     }
+   } else {
+     // THIS CALL CAN BLOCK INAPPROPRIATLEY! (ie, will block until it sees another
+     // packet - to_usec notwithstanding) Use the select() code if possible.
+     p = (u8 *) pcap_next(pd, &head);
+   }
 
     if (p && head.caplen >= 42) { /* >= because Ethernet padding makes 60 */
       /* frame type 0x0806 (arp), hw type eth (0x0001), prot ip (0x0800),
@@ -2085,6 +2407,7 @@ void set_pcap_filter(const char *device,
     fatal("Error compiling our pcap filter: %s\n", pcap_geterr(pd));
   if (pcap_setfilter(pd, &fcode) < 0 )
     fatal("Failed to set the pcap filter: %s\n", pcap_geterr(pd));
+  pcap_freecode(&fcode);
 }
 
 /* The 'dev' passed in must be at least 32 bytes long */
@@ -2476,13 +2799,15 @@ struct sys_route *getsysroutes(int *howmany) {
   struct sockaddr_in *sin;
   struct interface_info *ii;
 
+  if (!howmany) fatal("NULL howmany ptr passed to getsysroutes()");
+
   if (!routes) {
     routes = (struct sys_route *) safe_zalloc(route_capacity * sizeof(struct sys_route));
     ifaces = getinterfaces(&numifaces);
     /* First let us try Linux-style /proc/net/route */
     routefp = fopen("/proc/net/route", "r");
     if (routefp) {
-      fgets(buf, sizeof(buf), routefp); /* Kill the first line (column headers) */
+      (void) fgets(buf, sizeof(buf), routefp); /* Kill the first line (column headers) */
       while(fgets(buf,sizeof(buf), routefp)) {
 	p = strtok(buf, " \t\n");
 	if (!p) {
@@ -2593,7 +2918,7 @@ struct sys_route *getsysroutes(int *howmany) {
       qsort(routes, numroutes, sizeof(routes[0]), nmaskcmp);
     }
   }
-  if (!howmany) fatal("NULL howmany ptr passed to getsysroutes()");
+
   *howmany = numroutes;
   return routes;
 }
@@ -2894,84 +3219,3 @@ if (echots) *echots = 0;
 return 0;
 }
 
-IPProbe::IPProbe() {
-  packetbuflen = 0;
-  packetbuf = NULL;
-  Reset();
-}
-
-void IPProbe::Reset() {
-  if (packetbuf)
-    free(packetbuf);
-  packetbuflen = 0;
-  packetbuf = NULL;
-  ipv4 = NULL;
-  icmp = NULL;
-  tcp = NULL;
-  udp = NULL;
-}
-
-IPProbe::~IPProbe() {
-  if (packetbuf) {
-    free(packetbuf);
-    packetbuf = NULL;
-    packetbuflen = 0;
-  }
-  Reset();
-}
-
-int IPProbe::storePacket(u8 *ippacket, u32 len) {
-  assert(packetbuf == NULL);
-  af = AF_INET;
-  packetbuf = (u8 *) safe_malloc(len);
-  memcpy(packetbuf, ippacket, len);
-  packetbuflen = len;
-  ipv4 = (struct ip *) packetbuf;
-  assert(ipv4->ip_v == 4);
-  assert(len >= 20);
-  assert(len == (u32) ntohs(ipv4->ip_len));
-  if (ipv4->ip_p == IPPROTO_TCP) {
-    if (len >= (unsigned) ipv4->ip_hl * 4 + 20)
-      tcp = (struct tcphdr *) ((u8 *) ipv4 + ipv4->ip_hl * 4);
-  } else if (ipv4->ip_p == IPPROTO_ICMP) {
-    if (len >= (unsigned) ipv4->ip_hl * 4 + 8)
-      icmp = (struct icmp *) ((u8 *) ipv4 + ipv4->ip_hl * 4);
-  } else if (ipv4->ip_p == IPPROTO_UDP) {
-    if (len >= (unsigned) ipv4->ip_hl * 4 + 8)
-      udp = (udphdr_bsd *) ((u8 *) ipv4 + ipv4->ip_hl * 4);
-  }
-  return 0;
-}
-
-ArpProbe::ArpProbe() {
-  packetbuflen = 0;
-  packetbuf = NULL;
-  Reset();
-}
-
-void ArpProbe::Reset() {
-  if (packetbuf)
-    free(packetbuf);
-  packetbuflen = 0;
-  packetbuf = NULL;
-  ipquery = NULL;
-}
-
-ArpProbe::~ArpProbe() {
-  if (packetbuf) {
-    free(packetbuf);
-    packetbuf = NULL;
-    packetbuflen = 0;
-  }
-  Reset();
-}
-
-int ArpProbe::storePacket(u8 *arppacket, u32 len) {
-  assert(packetbuf == NULL);
-  assert(len == 42);
-  packetbuf = (u8 *) safe_malloc(len);
-  memcpy(packetbuf, arppacket, len);
-  packetbuflen = len;
-  ipquery = (struct in_addr *) ((u8 *)arppacket + 38);
-  return 0;
-}

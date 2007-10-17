@@ -6,17 +6,17 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2004 Insecure.Com LLC. Nmap       *
- * is also a registered trademark of Insecure.Com LLC.  This program is    *
- * free software; you may redistribute and/or modify it under the          *
- * terms of the GNU General Public License as published by the Free        *
- * Software Foundation; Version 2.  This guarantees your right to use,     *
- * modify, and redistribute this software under certain conditions.  If    *
- * you wish to embed Nmap technology into proprietary software, we may be  *
- * willing to sell alternative licenses (contact sales@insecure.com).      *
- * Many security scanner vendors already license Nmap technology such as  *
- * our remote OS fingerprinting database and code, service/version         *
- * detection system, and port scanning code.                               *
+ * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
  *                                                                         *
  * Note that the GPL places important restrictions on "derived works", yet *
  * it does not provide a detailed definition of that term.  To avoid       *
@@ -39,7 +39,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://www.insecure.org/nmap/ to download Nmap.                         *
+ * http://insecure.org/nmap/ to download Nmap.                             *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -51,10 +51,10 @@
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
  * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to many    *
- * security vendors, and generally include a perpetual license as well as  *
- * providing for priority support and updates as well as helping to fund   *
- * the continued development of Nmap technology.  Please email             *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
  * sales@insecure.com for further information.                             *
  *                                                                         *
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
@@ -98,16 +98,18 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.cc 3367 2006-05-16 22:09:58Z fyodor $ */
+/* $Id: nmap.cc 4069 2006-10-14 06:02:43Z fyodor $ */
 
 #include "nmap.h"
 #include "osscan.h"
+#include "osscan2.h"
 #include "scan_engine.h"
 #include "idle_scan.h"
 #include "timing.h"
 #include "NmapOps.h"
 #include "MACLookup.h"
 #include "nmap_tty.h"
+#include "nmap_dns.h"
 #ifdef WIN32
 #include "winfix.h"
 #endif
@@ -146,9 +148,6 @@ static int parse_scanflags(char *arg) {
     if (strcasestr(arg, "URG")) {
       flagval |= TH_URG;
     } 
-    if (strcasestr(arg, "SYN")) {
-      flagval |= TH_SYN;
-    }
   }
   return flagval;
 }
@@ -157,35 +156,29 @@ static int parse_scanflags(char *arg) {
 static int parse_bounce_argument(struct ftpinfo *ftp, char *url) {
   char *p = url,*q, *s;
 
-  if ((q = strrchr(url, '@'))) { /*we have username and/or pass */
-    *(q++) = '\0';
-    if ((s = strchr(q, ':')))
-      { /* has portno */
-	*(s++) = '\0';
-	strncpy(ftp->server_name, q, MAXHOSTNAMELEN);
-	ftp->port = atoi(s);
-      }
-    else  strncpy(ftp->server_name, q, MAXHOSTNAMELEN);
+  if ((q = strrchr(url, '@'))) { /* we have user and/or pass */
+    *q++ = '\0';
 
-    if ((s = strchr(p, ':'))) { /* User AND pass given */
-      *(s++) = '\0';
-      strncpy(ftp->user, p, 63);
+    if ((s = strchr(p, ':'))) { /* we have user AND pass */
+      *s++ = '\0';
       strncpy(ftp->pass, s, 255);
-    }
-    else { /* Username ONLY given */
+    } else { /* we ONLY have user */
       log_write(LOG_STDOUT, "Assuming %s is a username, and using the default password: %s\n",
-	      p, ftp->pass);
-      strncpy(ftp->user, p, 63);
+		p, ftp->pass);
     }
+
+    strncpy(ftp->user, p, 63);
+  } else {
+    q = url;
   }
-  else /* no username or password given */ 
-    if ((s = strchr(url, ':'))) { /* portno is given */
-      *(s++) = '\0';
-      strncpy(ftp->server_name, url, MAXHOSTNAMELEN);
-      ftp->port = atoi(s);
-    }
-    else  /* default case, no username, password, or portnumber */
-      strncpy(ftp->server_name, url, MAXHOSTNAMELEN);
+
+  /* q points to beginning of server name */
+  if ((s = strchr(q, ':'))) { /* we have portno */
+    *s++ = '\0';
+    ftp->port = atoi(s);
+  }
+
+  strncpy(ftp->server_name, q, MAXHOSTNAMELEN);
 
   ftp->user[63] = ftp->pass[255] = ftp->server_name[MAXHOSTNAMELEN] = 0;
 
@@ -214,6 +207,7 @@ printf("%s %s ( %s )\n"
        "  --system-dns: Use OS's DNS resolver\n"
        "SCAN TECHNIQUES:\n"
        "  -sS/sT/sA/sW/sM: TCP SYN/Connect()/ACK/Window/Maimon scans\n"
+       "  -sU: UDP Scan\n"
        "  -sN/sF/sX: TCP Null, FIN, and Xmas scans\n"
        "  --scanflags <flags>: Customize TCP scan flags\n"
        "  -sI <zombie host[:probeport]>: Idlescan\n"
@@ -231,7 +225,9 @@ printf("%s %s ( %s )\n"
        "  --version-all: Try every single probe (intensity 9)\n"
        "  --version-trace: Show detailed version scan activity (for debugging)\n"
        "OS DETECTION:\n"
-       "  -O: Enable OS detection\n"
+       "  -O: Enable OS detection (try 2nd generation w/fallback to 1st)\n"
+       "  -O2: Only use the new OS detection system (no fallback)\n"
+       "  -O1: Only use the old (1st generation) OS detection system\n"
        "  --osscan-limit: Limit OS detection to promising targets\n"
        "  --osscan-guess: Guess OS more aggressively\n"
        "TIMING AND PERFORMANCE:\n"
@@ -252,6 +248,7 @@ printf("%s %s ( %s )\n"
        "  -e <iface>: Use specified interface\n"
        "  -g/--source-port <portnum>: Use given port number\n"
        "  --data-length <num>: Append random data to sent packets\n"
+       "  --ip-options <options>: Send packets with specified ip options\n"
        "  --ttl <val>: Set IP time-to-live field\n"
        "  --spoof-mac <mac address/prefix/vendor name>: Spoof your MAC address\n"
        "  --badsum: Send packets with a bogus TCP/UDP checksum\n"
@@ -261,6 +258,7 @@ printf("%s %s ( %s )\n"
        "  -oA <basename>: Output in the three major formats at once\n"
        "  -v: Increase verbosity level (use twice for more effect)\n"
        "  -d[level]: Set or increase debugging level (Up to 9 is meaningful)\n"
+       "  --open: Only show open (or possibly open) ports\n"
        "  --packet-trace: Show all packets sent and received\n"
        "  --iflist: Print host interfaces and routes (for debugging)\n"
        "  --log-errors: Log errors/warnings to the normal-format output file\n"
@@ -275,6 +273,7 @@ printf("%s %s ( %s )\n"
        "  --datadir <dirname>: Specify custom Nmap data file location\n"
        "  --send-eth/--send-ip: Send using raw ethernet frames or IP packets\n"
        "  --privileged: Assume that the user is fully privileged\n"
+       "  --unprivileged: Assume the user lacks raw socket privileges\n"
        "  -V: Print version number\n"
        "  -h: Print this help summary page.\n"
        "EXAMPLES:\n"
@@ -431,7 +430,6 @@ int nmap_main(int argc, char *argv[]) {
   int i, arg;
   long l;
   unsigned int targetno;
-  size_t j, argvlen;
   FILE *inputfd = NULL, *excludefd = NULL;
   char *host_spec = NULL, *exclude_spec = NULL;
   short fastscan=0, randomize=1;
@@ -488,12 +486,15 @@ int nmap_main(int argc, char *argv[]) {
       {"debug", optional_argument, 0, 'd'},
       {"help", no_argument, 0, 'h'},
       {"iflist", no_argument, 0, 0},
+      {"release_memory", no_argument, 0, 0},
+      {"release-memory", no_argument, 0, 0},
+      {"max_os_tries", required_argument, 0, 0},
+      {"max-os-tries", required_argument, 0, 0},
       {"max_parallelism", required_argument, 0, 'M'},
       {"max-parallelism", required_argument, 0, 'M'},
       {"min_parallelism", required_argument, 0, 0},
       {"min-parallelism", required_argument, 0, 0},
       {"timing", required_argument, 0, 'T'},
-      {"timing", no_argument, 0, 0},
       {"max_rtt_timeout", required_argument, 0, 0},
       {"max-rtt-timeout", required_argument, 0, 0},
       {"min_rtt_timeout", required_argument, 0, 0},
@@ -506,6 +507,7 @@ int nmap_main(int argc, char *argv[]) {
       {"max-hostgroup", required_argument, 0, 0},
       {"min_hostgroup", required_argument, 0, 0},
       {"min-hostgroup", required_argument, 0, 0},
+      {"open", no_argument, 0, 0},
       {"scanflags", required_argument, 0, 0},
       {"defeat_rst_ratelimit", no_argument, 0, 0},
       {"defeat-rst-ratelimit", no_argument, 0, 0},
@@ -524,7 +526,7 @@ int nmap_main(int argc, char *argv[]) {
       {"oS", required_argument, 0, 0},
       {"oH", required_argument, 0, 0},  
       {"oX", required_argument, 0, 0},  
-      {"iL", required_argument, 0, 0},  
+      {"iL", required_argument, 0, 'i'},  
       {"iR", required_argument, 0, 0},
       {"sI", required_argument, 0, 0},  
       {"source_port", required_argument, 0, 'g'},
@@ -554,6 +556,7 @@ int nmap_main(int argc, char *argv[]) {
       {"vv", no_argument, 0, 0},
       {"ff", no_argument, 0, 0},
       {"privileged", no_argument, 0, 0},
+      {"unprivileged", no_argument, 0, 0},
       {"mtu", required_argument, 0, 0},
       {"append_output", no_argument, 0, 0},
       {"append-output", no_argument, 0, 0},
@@ -576,6 +579,8 @@ int nmap_main(int argc, char *argv[]) {
       {"log-errors", no_argument, 0, 0},
       {"dns_servers", required_argument, 0, 0},
       {"dns-servers", required_argument, 0, 0},
+      {"ip_options", required_argument, 0, 0},
+      {"ip-options", required_argument, 0, 0},
       {0, 0, 0, 0}
     };
 
@@ -594,10 +599,15 @@ int nmap_main(int argc, char *argv[]) {
 
   /* OK, lets parse these args! */
   optind = 1; /* so it can be called multiple times */
-  while((arg = getopt_long_only(argc,fakeargv,"6Ab:D:d::e:Ffg:hIi:M:m:nOo:P:p:qRrS:s:T:Vv", long_options, &option_index)) != EOF) {
+  while((arg = getopt_long_only(argc,fakeargv,"6Ab:D:d::e:Ffg:hIi:M:m:nO::o:P:p:qRrS:s:T:Vv", long_options, &option_index)) != EOF) {
     switch(arg) {
     case 0:
-      if (optcmp(long_options[option_index].name, "max-rtt-timeout") == 0) {
+      if (optcmp(long_options[option_index].name, "max-os-tries") == 0) {
+	l = tval2msecs(optarg);
+	if (l < 1 || l > 50) 
+	  fatal("Bogus --max-os-tries argument specified, must be between 1 and 50 (inclusive)");
+	o.setMaxOSTries(l);
+      } else if (optcmp(long_options[option_index].name, "max-rtt-timeout") == 0) {
 	l = tval2msecs(optarg);
 	if (l < 5) fatal("Bogus --max-rtt-timeout argument specified, must be at least 5");
         if (l < 20) {
@@ -616,6 +626,8 @@ int nmap_main(int argc, char *argv[]) {
 	if (l <= 0) fatal("Bogus --initial-rtt-timeout argument specified.  Must be positive");
         pre_init_rtt_timeout = l;
       } else if (strcmp(long_options[option_index].name, "excludefile") == 0) {
+	if (exclude_spec)
+	  fatal("--excludefile and --exclude options are mutually exclusive.");
         excludefd = fopen(optarg, "r");
         if (!excludefd) {
           fatal("Failed to open exclude file %s for reading", optarg);
@@ -630,6 +642,8 @@ int nmap_main(int argc, char *argv[]) {
 	o.setMinHostGroupSz(atoi(optarg));
 	if (atoi(optarg) > 100)
 	  error("Warning: You specified a highly aggressive --min-hostgroup.");
+      } else if (optcmp(long_options[option_index].name, "open") == 0) {
+	o.setOpenOnly(true);
       } else if (strcmp(long_options[option_index].name, "scanflags") == 0) {
 	o.scanflags = parse_scanflags(optarg);
 	if (o.scanflags < 0) {
@@ -637,6 +651,8 @@ int nmap_main(int argc, char *argv[]) {
 	}
       } else if (strcmp(long_options[option_index].name, "iflist") == 0 ) {
 	iflist = true;
+      } else if (strcmp(long_options[option_index].name, "release-memory") == 0 ) {
+	o.release_memory = true;
       } else if (optcmp(long_options[option_index].name, "min-parallelism") == 0 ) {
 	o.min_parallelism = atoi(optarg); 
 	if (o.min_parallelism < 1) fatal("Argument to --min-parallelism must be at least 1!");
@@ -685,9 +701,9 @@ int nmap_main(int argc, char *argv[]) {
 	if (l < 0) fatal("--max-scan-delay cannot be negative.");
 	pre_max_scan_delay = l;
       } else if (optcmp(long_options[option_index].name, "max-retries") == 0) {
-        int pre_max_retries = atoi(optarg);
+        pre_max_retries = atoi(optarg);
         if (pre_max_retries < 0)
-          fatal("max-retransmissions must be positive");
+          fatal("max-retries must be positive");
       } else if (optcmp(long_options[option_index].name, "randomize-hosts") == 0
 		 || strcmp(long_options[option_index].name, "rH") == 0) {
 	o.randomize_hosts = 1;
@@ -750,19 +766,6 @@ int nmap_main(int argc, char *argv[]) {
 	exit(0);
       } else if (strcmp(long_options[option_index].name, "badsum") == 0) {
 	o.badsum = 1;
-      }
-      else if (strcmp(long_options[option_index].name, "iL") == 0) {
-	if (inputfd) {
-	  fatal("Only one input filename allowed");
-	}
-	if (!strcmp(optarg, "-")) {
-	  inputfd = stdin;
-	} else {    
-	  inputfd = fopen(optarg, "r");
-	  if (!inputfd) {
-	    fatal("Failed to open input file %s for reading", optarg);
-	  }  
-	}
       } else if (strcmp(long_options[option_index].name, "iR") == 0) {
 	o.generate_random_ips = 1;
 	o.max_ips_to_scan = strtoul(optarg, &endptr, 10);
@@ -779,10 +782,19 @@ int nmap_main(int argc, char *argv[]) {
 	o.fragscan += 16; 
       } else if (strcmp(long_options[option_index].name, "privileged") == 0) {
 	o.isr00t = 1;
+      } else if (strcmp(long_options[option_index].name, "unprivileged") == 0) {
+	o.isr00t = 0;
       } else if (strcmp(long_options[option_index].name, "mtu") == 0) {
         o.fragscan = atoi(optarg);
         if (o.fragscan <= 0 || o.fragscan % 8 != 0)
             fatal("Data payload MTU must be >0 and multiple of 8");
+      } else if (strcmp(long_options[option_index].name, "ip-options") == 0){
+        o.ipoptions    = (u8*) safe_malloc(4*10+1);
+        o.ipoptionslen = parse_ip_options(optarg, o.ipoptions, 4*10+1, &o.ipopt_firsthop, &o.ipopt_lasthop);
+        if(o.ipoptionslen > 4*10)
+          fatal("Ip options can't be more than 40 bytes long");
+        if(o.ipoptionslen %4 != 0)
+          fatal("Ip options must be multiple of 4 (read length is %i bytes)", o.ipoptionslen);
       } else {
 	fatal("Unknown long option (%s) given@#!$#$", long_options[option_index].name);
       }
@@ -797,7 +809,7 @@ int nmap_main(int argc, char *argv[]) {
     case 'A':
       o.servicescan = true;
       if (o.isr00t)
-	o.osscan++; 
+		o.osscan = OS_SCAN_DEFAULT;
       break;
     case 'b': 
       o.bouncescan++;
@@ -837,7 +849,7 @@ int nmap_main(int argc, char *argv[]) {
       }
       break;
     case 'e': 
-      strncpy(o.device, optarg,63); o.device[63] = '\0'; break;
+      Strncpy(o.device, optarg, sizeof(o.device)); break;
     case 'F': fastscan++; break;
     case 'f': o.fragscan += 8; break;
     case 'g': 
@@ -876,7 +888,15 @@ int nmap_main(int argc, char *argv[]) {
       break;
     case 'n': o.noresolve++; break;
     case 'O': 
-      o.osscan++; 
+      if (!optarg)
+		o.osscan = OS_SCAN_DEFAULT;
+      else if (*optarg == '1')
+		o.osscan = OS_SCAN_SYS_1_ONLY;
+	  else if (*optarg == '2')
+		o.osscan = OS_SCAN_SYS_2_ONLY;
+      else {
+	fatal("Use -O for new osscan engine, -O1 for old osscan engine.");
+      }
       break;
     case 'o':
       normalfilename = optarg;
@@ -1064,6 +1084,8 @@ int nmap_main(int argc, char *argv[]) {
     if (o.scan_delay > o.maxTCPScanDelay()) o.setMaxTCPScanDelay(o.scan_delay);
     if (o.scan_delay > o.maxUDPScanDelay()) o.setMaxUDPScanDelay(o.scan_delay);
     o.max_parallelism = 1;
+    if(pre_max_parallelism != -1)
+      fatal("You can't use --max-parallelism with --scan-delay.");
   }
   if (pre_max_scan_delay != -1) {
     o.setMaxTCPScanDelay(pre_max_scan_delay);
@@ -1076,10 +1098,22 @@ int nmap_main(int argc, char *argv[]) {
   if (pre_host_timeout != -1) o.host_timeout = pre_host_timeout;
 
 
-  if (o.osscan)
-    o.reference_FPs = parse_fingerprint_reference_file();
+  if (o.osscan == OS_SCAN_SYS_1_ONLY)
+    o.reference_FPs1 = parse_fingerprint_reference_file("nmap-os-fingerprints");
+  else if (o.osscan == OS_SCAN_DEFAULT || o.osscan == OS_SCAN_SYS_2_ONLY)
+    o.reference_FPs = parse_fingerprint_reference_file("nmap-os-db");
 
   o.ValidateOptions();
+
+  // print ip options
+  if((o.debugging || o.packetTrace()) && o.ipoptionslen){
+    char buf[256]; // 256 > 5*40
+    bintohexstr(buf, sizeof(buf), (char*)o.ipoptions, o.ipoptionslen);
+    if(o.ipoptionslen>=8)	// at least one ip address
+    log_write(LOG_STDOUT, "Binary ip options to be send:\n%s", buf);
+    log_write(LOG_STDOUT, "Parsed ip options to be send:\n%s\n", 
+    	print_ip_options(o.ipoptions, o.ipoptionslen));
+  }
 
   /* Open the log files, now that we know whether the user wants them appended
      or overwritten */
@@ -1111,8 +1145,8 @@ int nmap_main(int argc, char *argv[]) {
     }
   }
 
-  if ((o.pingscan || o.listscan) && fastscan) {
-    fatal("The fast scan (-F) is incompatible with ping scan");
+  if ((o.pingscan || o.listscan) && (portlist || fastscan)) {
+    fatal("You cannot use -F (fast scan) or -p (explicit port selection) with PING scan or LIST scan");
   }
 
   if (portlist) {
@@ -1129,10 +1163,6 @@ int nmap_main(int argc, char *argv[]) {
     ports = getfastprots();
   } else if (fastscan) {
     ports = getfastports(o.TCPScan(), o.UDPScan());
-  }
-
-  if ((o.pingscan || o.listscan) && ports) {
-    fatal("You cannot use -F (fast scan) or -p (explicit port selection) with PING scan or LIST scan");
   }
 
 #ifdef WIN32
@@ -1300,16 +1330,13 @@ int nmap_main(int argc, char *argv[]) {
 
   /* more fakeargv junk, BTW malloc'ing extra space in argv[0] doesn't work */
   if (quashargv) {
-    argvlen = strlen(argv[0]);
-    if (argvlen < strlen(FAKE_ARGV))
+    size_t fakeargvlen = strlen(FAKE_ARGV), argvlen = strlen(argv[0]);
+    if (argvlen < fakeargvlen)
       fatal("If you want me to fake your argv, you need to call the program with a longer name.  Try the full pathname, or rename it fyodorssuperdedouperportscanner");
-    strncpy(argv[0], FAKE_ARGV, strlen(FAKE_ARGV));
-    for(j = strlen(FAKE_ARGV); j < argvlen; j++) argv[0][j] = '\0';
-    for(i=1; i < argc; i++) {
-      argvlen = strlen(argv[i]);
-      for(j=0; j <= argvlen; j++)
-	argv[i][j] = '\0';
-    }
+    strncpy(argv[0], FAKE_ARGV, fakeargvlen);
+    memset(&argv[0][fakeargvlen], '\0', strlen(&argv[0][fakeargvlen]));
+    for(i=1; i < argc; i++)
+      memset(argv[i], '\0', strlen(argv[i]));
   }
 
 #if defined(HAVE_SIGNAL) && defined(SIGPIPE)
@@ -1329,7 +1356,7 @@ int nmap_main(int argc, char *argv[]) {
     printf("--------------- Timing report ---------------\n");
     printf("  hostgroups: min %d, max %d\n", o.minHostGroupSz(), o.maxHostGroupSz());
     printf("  rtt-timeouts: init %d, min %d, max %d\n", o.initialRttTimeout(), o.minRttTimeout(), o.maxRttTimeout());
-    printf("  scan-delay: TCP %d, UDP %d\n", o.maxTCPScanDelay(), o.maxUDPScanDelay());
+    printf("  msx-scan-delay: TCP %d, UDP %d\n", o.maxTCPScanDelay(), o.maxUDPScanDelay());
     printf("  parallelism: min %d, max %d\n", o.min_parallelism, o.max_parallelism);
     printf("  max-retries: %d, host-timeout: %ld\n", o.getMaxRetransmissions(), o.host_timeout);
     printf("---------------------------------------------\n");
@@ -1548,6 +1575,9 @@ int nmap_main(int argc, char *argv[]) {
       service_scan(Targets);
     }
 
+    if (o.osscan == OS_SCAN_DEFAULT || o.osscan == OS_SCAN_SYS_2_ONLY)
+	  os_scan2(Targets);
+
     for(targetno = 0; targetno < Targets.size(); targetno++) {
       currenths = Targets[targetno];
     
@@ -1558,7 +1588,7 @@ int nmap_main(int argc, char *argv[]) {
       if (o.servicescan || o.rpcscan)  pos_scan(currenths, NULL, 0, RPC_SCAN);
 
       // Should be host parallelized.  Though rarely takes a huge amt. of time.
-      if (o.osscan) {
+      if (o.osscan == OS_SCAN_SYS_1_ONLY) {
 	os_scan(currenths);
       }
 
@@ -1608,23 +1638,35 @@ int nmap_main(int argc, char *argv[]) {
 
   printfinaloutput();
 
-  if (ports) {
-    free(ports->tcp_ports);
-    free(ports->udp_ports);
-    free(ports->prots);
-    free(ports);
-  }
+  free_scan_lists(ports);
 
   eth_close_cached();
 
-  /* Free fake argv */
-  for(i=0; i < argc; i++)
-    free(fakeargv[i]);
-  free(fakeargv);
+  if(o.release_memory || o.interactivemode) {
+    /* Free fake argv */
+    for(i=0; i < argc; i++)
+      free(fakeargv[i]);
+    free(fakeargv);
 
+    nmap_free_mem();
+  }
   return 0;
 }      
       
+// Free some global memory allocations.
+// This is used for detecting memory leaks.
+void nmap_free_mem() {
+  PortList::freePortMap();
+  cp_free();
+  free_dns_servers();
+  free_etchosts();
+  if(o.reference_FPs){
+    free_fingerprint_file(o.reference_FPs);
+    o.reference_FPs = NULL;
+  }
+  AllProbes::service_scan_free();
+  
+}
 
 /* Reads in a (normal or machine format) Nmap log file and gathers enough
    state to allow Nmap to continue where it left off.  The important things
@@ -1674,7 +1716,7 @@ int gather_logfile_resumption_state(char *fname, int *myargc, char ***myargv) {
   nmap_arg_buffer[21 + q-p] = '\0';
 
   if (strstr(nmap_arg_buffer, "--randomize-hosts") != NULL) {
-    error("WARNING:  You are attempting to resume a scan which used --randomize-hosts.  Some hosts in the last randomized batch make be missed and others may be repeated once");
+    error("WARNING:  You are attempting to resume a scan which used --randomize-hosts.  Some hosts in the last randomized batch may be missed and others may be repeated once");
   }
 
   *myargc = arg_parse(nmap_arg_buffer, myargv);
@@ -1909,6 +1951,14 @@ struct scan_lists *getpts(char *origexpr) {
   return ports;
 }
 
+void free_scan_lists(struct scan_lists *ports) {
+  if (ports) {
+    free(ports->tcp_ports);
+    free(ports->udp_ports);
+    free(ports->prots);
+    free(ports);
+  }
+}
 
 void printinteractiveusage() {
   printf(
@@ -1932,18 +1982,32 @@ n -sS -O -v example.com/24\n\
 f --spoof \"/usr/local/bin/pico -z hello.c\" -sS -oN e.log example.com/24\n\n");
 }
 
+char *seqreport1(struct seq_info *seq) {
+  static char report[512];
+
+  snprintf(report, sizeof(report), "TCP Sequence Prediction: Difficulty=%d (%s)\n", seq->index, seqidx2difficultystr1(seq->index));
+  return report;
+}
+
+/* Convert a TCP sequence prediction difficulty index like 1264386
+   into a difficulty string like "Worthy Challenge */
+const char *seqidx2difficultystr1(unsigned long idx) {
+  return  (idx < 10)? "Trivial joke" : (idx < 80)? "Easy" : (idx < 3000)? "Medium" : (idx < 5000)? "Formidable" : (idx < 100000)? "Worthy challenge" : "Good luck!";
+}
+
 char *seqreport(struct seq_info *seq) {
   static char report[512];
 
-  snprintf(report, sizeof(report), "TCP Sequence Prediction: Class=%s\n                         Difficulty=%d (%s)\n", seqclass2ascii(seq->seqclass), seq->index, seqidx2difficultystr(seq->index));
+  snprintf(report, sizeof(report), "TCP Sequence Prediction: Difficulty=%d (%s)\n", seq->index, seqidx2difficultystr(seq->index));
   return report;
 }
 
 /* Convert a TCP sequence prediction difficulty index like 1264386
    into a difficulty string like "Worthy Challenge */
 const char *seqidx2difficultystr(unsigned long idx) {
-  return  (idx < 10)? "Trivial joke" : (idx < 80)? "Easy" : (idx < 3000)? "Medium" : (idx < 5000)? "Formidable" : (idx < 100000)? "Worthy challenge" : "Good luck!";
+  return  (idx < 3)? "Trivial joke" : (idx < 6)? "Easy" : (idx < 11)? "Medium" : (idx < 12)? "Formidable" : (idx < 16)? "Worthy challenge" : "Good luck!";
 }
+
 
 char *seqclass2ascii(int seqclass) {
   switch(seqclass) {
@@ -2198,19 +2262,23 @@ void sigdie(int signo) {
   exit(1);
 }
 
-#ifndef S_IRUSR
-#define S_IRUSR 00400
+#ifdef WIN32
+#define STAT_READABLE(st) st.st_mode & S_IREAD
+#else
+#define STAT_READABLE(st) st.st_mode & S_IRUSR
 #endif
 
-/* Returns true (nonzero) if the file pathname given exists and is
-   readable by the executing process.  Returns zero if it is not */
+/* Returns true (nonzero) if the file pathname given exists, is not
+ * a directory and is readable by the executing process.  Returns
+ * zero if it is not
+ */
 static int fileexistsandisreadable(char *pathname) {
   struct stat st;
 
   if (stat(pathname, &st) == -1)
     return 0;
 
-  if (!(st.st_mode & S_IFDIR) && (st.st_mode & S_IRUSR))
+  if (!S_ISDIR(st.st_mode) && STAT_READABLE(st))
     return 1;
 
   return 0;

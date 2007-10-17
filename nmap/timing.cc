@@ -7,17 +7,17 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2004 Insecure.Com LLC. Nmap       *
- * is also a registered trademark of Insecure.Com LLC.  This program is    *
- * free software; you may redistribute and/or modify it under the          *
- * terms of the GNU General Public License as published by the Free        *
- * Software Foundation; Version 2.  This guarantees your right to use,     *
- * modify, and redistribute this software under certain conditions.  If    *
- * you wish to embed Nmap technology into proprietary software, we may be  *
- * willing to sell alternative licenses (contact sales@insecure.com).      *
- * Many security scanner vendors already license Nmap technology such as  *
- * our remote OS fingerprinting database and code, service/version         *
- * detection system, and port scanning code.                               *
+ * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
  *                                                                         *
  * Note that the GPL places important restrictions on "derived works", yet *
  * it does not provide a detailed definition of that term.  To avoid       *
@@ -40,7 +40,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://www.insecure.org/nmap/ to download Nmap.                         *
+ * http://insecure.org/nmap/ to download Nmap.                             *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -52,10 +52,10 @@
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
  * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to many    *
- * security vendors, and generally include a perpetual license as well as  *
- * providing for priority support and updates as well as helping to fund   *
- * the continued development of Nmap technology.  Please email             *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
  * sales@insecure.com for further information.                             *
  *                                                                         *
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
@@ -99,7 +99,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: timing.cc 3044 2006-01-12 04:47:03Z fyodor $ */
+/* $Id: timing.cc 3869 2006-08-25 01:47:49Z fyodor $ */
 
 #include "timing.h"
 #include "NmapOps.h"
@@ -243,6 +243,7 @@ ScanProgressMeter::ScanProgressMeter(char *stypestr) {
   last_print_test = begin;
   memset(&last_print, 0, sizeof(last_print));
   memset(&last_est, 0, sizeof(last_print));
+  beginOrEndTask(&begin, NULL, true);
 }
 
 ScanProgressMeter::~ScanProgressMeter() {
@@ -378,14 +379,61 @@ bool ScanProgressMeter::printStats(double perc_done,
     assert(ltime);
 
     sec_left = time_left_ms / 1000;
-    log_write(LOG_STDOUT, "%s Timing: About %.2f%% done; ETC: %02d:%02d (%li:%02li:%02li remaining)\n", 
-	      scantypestr, perc_done * 100, ltime->tm_hour, ltime->tm_min, sec_left / 3600, 
-	      (sec_left % 3600) / 60, sec_left % 60);
-    log_flush(LOG_STDOUT);
+
+    // If we're less than 1% done we probably don't have enough
+    // data for decent timing estimates. Also with perc_done == 0
+    // these elements will be nonsensical.
+    if (perc_done < 0.01) {
+      log_write(LOG_STDOUT, "%s Timing: About %.2f%% done\n", 
+                scantypestr, perc_done * 100);
+      log_flush(LOG_STDOUT);
+    } else {
+      log_write(LOG_STDOUT, "%s Timing: About %.2f%% done; ETC: %02d:%02d (%li:%02li:%02li remaining)\n", 
+                scantypestr, perc_done * 100, ltime->tm_hour, ltime->tm_min, sec_left / 3600, 
+                (sec_left % 3600) / 60, sec_left % 60);
+      log_write(LOG_XML, "<taskprogress task=\"%s\" time=\"%lu\" percent=\"%.2f\" remaining=\"%li\" etc=\"%lu\" />\n",
+		scantypestr, (unsigned long) now->tv_sec,
+		perc_done * 100, sec_left, (unsigned long) last_est.tv_sec);
+      log_flush(LOG_STDOUT|LOG_XML);
+    }
     return true;
 }
 
+/* Indicates that the task is beginning or ending, and that a message should
+   be generated if appropriate.  Returns whether a message was printed.
+   now may be NULL, if the caller doesn't have the current time handy.
+   additional_info may be NULL if no additional information is necessary. */
+bool ScanProgressMeter::beginOrEndTask(const struct timeval *now, const char *additional_info, bool beginning) {
+  struct timeval tvtmp;
+  struct tm *tm;
+  time_t tv_sec;
 
+  if (!o.verbose) {
+    return false;
+  }
 
+  if (!now) {
+    gettimeofday(&tvtmp, NULL);
+    now = (const struct timeval *) &tvtmp;
+  }
 
-
+  tv_sec = now->tv_sec;
+  tm = localtime(&tv_sec);
+  if (beginning) {
+    log_write(LOG_STDOUT, "Initiating %s at %02d:%02d", scantypestr, tm->tm_hour, tm->tm_min);
+    if (additional_info) {
+      log_write(LOG_STDOUT, " (%s)", additional_info);
+    }
+    log_write(LOG_STDOUT, "\n");
+    log_write(LOG_XML, "<taskbegin task=\"%s\" time=\"%lu\" />\n", scantypestr, (unsigned long) now->tv_sec);
+  } else {
+    log_write(LOG_STDOUT, "Completed %s at %02d:%02d, %.2fs elapsed", scantypestr, tm->tm_hour, tm->tm_min, TIMEVAL_MSEC_SUBTRACT(*now, begin) / 1000.0);
+    if (additional_info) {
+      log_write(LOG_STDOUT, " (%s)", additional_info);
+    }
+    log_write(LOG_STDOUT, "\n");
+    log_write(LOG_XML, "<taskend task=\"%s\" time=\"%lu\" />\n", scantypestr, (unsigned long) now->tv_sec);
+  }
+  log_flush(LOG_STDOUT|LOG_XML);
+  return true;
+}

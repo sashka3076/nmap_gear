@@ -374,7 +374,7 @@
     The process stopped at <xsl:value-of select="$end" />.
 	<xsl:choose>
         <xsl:when test="debugging/@level = '0'">Debuging was disabled, </xsl:when>
-        <xsl:otherwise>Debugging was enabeld, </xsl:otherwise>
+        <xsl:otherwise>Debugging was enabled, </xsl:otherwise>
     </xsl:choose>
     the verbosity level was <xsl:value-of select="verbose/@level" />.
 
@@ -601,6 +601,16 @@
 <ul>
 <li>uptime: <xsl:value-of select="@seconds" /> sec</li>
 <li>last reboot: <xsl:value-of select="@lastboot" /></li>
+</ul>
+</xsl:template>
+<!-- ............................................................ -->
+
+<!-- distance -->
+<!-- ............................................................ -->
+<xsl:template match="distance">
+<xsl:if test="@value != ''"><h3>network distance</h3></xsl:if>
+<ul>
+	<li>distance: <xsl:value-of select="@value" /> hops</li>
 </ul>
 </xsl:template>
 <!-- ............................................................ -->

@@ -32,7 +32,10 @@ $(TARGET): $(DEPS) $(OBJS)
 	$(RANLIB) $@
 
 clean:
-	rm -f $(OBJS) $(TARGET) config.cache config.log
+	rm -f $(OBJS) $(TARGET) 
+
+distclean: clean
+	rm -f Makefile config.cache config.log config.status nbase_config.h
 
 depend:
 	$(MAKEDEPEND) $(INCLS) -s "# DO NOT DELETE" -- $(DEFS) -- $(SRCS)

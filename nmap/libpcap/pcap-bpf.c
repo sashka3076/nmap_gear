@@ -20,7 +20,7 @@
  */
 #ifndef lint
 static const char rcsid[] _U_ =
-    "@(#) $Header$ (LBL)";
+    "@(#) $Header: /tcpdump/master/libpcap/pcap-bpf.c,v 1.86.2.8 2005/07/10 10:55:31 guy Exp $ (LBL)";
 #endif
 
 #ifdef HAVE_CONFIG_H
@@ -557,7 +557,7 @@ bpf_open(pcap_t *p, char *errbuf)
 		 */
 		fd = open(device, O_RDWR);
 		if (fd == -1 && errno == EACCES)
-		fd = open(device, O_RDONLY);
+			fd = open(device, O_RDONLY);
 	} while (fd < 0 && errno == EBUSY);
 
 	/*
@@ -1007,7 +1007,7 @@ pcap_open_live(const char *device, int snaplen, int promisc, int to_ms,
 		if (strcmp(osinfo.sysname, "FreeBSD") == 0) {
 			if (strncmp(osinfo.release, "4.3-", 4) == 0 ||
 			     strncmp(osinfo.release, "4.4-", 4) == 0)
-			p->selectable_fd = -1;
+				p->selectable_fd = -1;
 		}
 	}
 

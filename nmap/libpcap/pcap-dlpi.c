@@ -70,7 +70,7 @@
 
 #ifndef lint
 static const char rcsid[] _U_ =
-    "@(#) $Header$ (LBL)";
+    "@(#) $Header: /tcpdump/master/libpcap/pcap-dlpi.c,v 1.108.2.6 2005/08/13 23:15:58 guy Exp $ (LBL)";
 #endif
 
 #ifdef HAVE_CONFIG_H
@@ -622,7 +622,7 @@ pcap_open_live(const char *device, int snaplen, int promisc, int to_ms,
 #endif
 	if (infop->dl_provider_style == DL_STYLE2) {
 		if (dl_doattach(p->fd, ppa, ebuf) < 0)
-		goto bad;
+			goto bad;
 #ifdef DL_HP_RAWDLS
 		if (p->send_fd >= 0) {
 			if (dl_doattach(p->send_fd, ppa, ebuf) < 0)
@@ -1029,8 +1029,13 @@ dl_dohpuxbind(int fd, char *ebuf)
 		/*
 		 * For any error other than a UNIX EBUSY, give up.
 		 */
-		if (uerror != EBUSY)
+		if (uerror != EBUSY) {
+			/*
+			 * dlbindack() has already filled in ebuf for
+			 * this error.
+			 */
 			return (-1);
+		}
 
 		/*
 		 * For EBUSY, try the next SAP value; that means that
@@ -1040,9 +1045,14 @@ dl_dohpuxbind(int fd, char *ebuf)
 		 */
 		*ebuf = '\0';
 		hpsap++;
-		if (hpsap > 100)
+		if (hpsap > 100) {
+			strlcpy(ebuf,
+			    "All SAPs from 22 through 100 are in use",
+			    PCAP_ERRBUF_SIZE);
 			return (-1);
+		}
 	}
+	return (0);
 }
 #endif
 
@@ -1116,6 +1126,13 @@ recv_ack(int fd, int size, const char *what, char *bufp, char *ebuf, int *uerror
 	struct	strbuf	ctl;
 	int	flags;
 
+	/*
+	 * Clear out "*uerror", so it's only set for DL_ERROR_ACK/DL_SYSERR,
+	 * making that the only place where EBUSY is treated specially.
+	 */
+	if (uerror != NULL)
+		*uerror = 0;
+
 	ctl.maxlen = MAXDLBUF;
 	ctl.len = 0;
 	ctl.buf = bufp;
@@ -1151,8 +1168,6 @@ recv_ack(int fd, int size, const char *what, char *bufp, char *ebuf, int *uerror
 			break;
 
 		default:
-			if (uerror != NULL)
-				*uerror = 0;
 			snprintf(ebuf, PCAP_ERRBUF_SIZE, "recv_ack: %s: %s",
 			    what, dlstrerror(dlp->error_ack.dl_errno));
 			break;
@@ -1160,8 +1175,6 @@ recv_ack(int fd, int size, const char *what, char *bufp, char *ebuf, int *uerror
 		return (-1);
 
 	default:
-		if (uerror != NULL)
-			*uerror = 0;
 		snprintf(ebuf, PCAP_ERRBUF_SIZE,
 		    "recv_ack: %s: Unexpected primitive ack %s",
 		    what, dlprim(dlp->dl_primitive));
@@ -1169,8 +1182,6 @@ recv_ack(int fd, int size, const char *what, char *bufp, char *ebuf, int *uerror
 	}
 
 	if (ctl.len < size) {
-		if (uerror != NULL)
-			*uerror = 0;
 		snprintf(ebuf, PCAP_ERRBUF_SIZE,
 		    "recv_ack: %s: Ack too small (%d < %d)",
 		    what, ctl.len, size);
@@ -1735,20 +1746,20 @@ get_dlpi_ppa(register int fd, register const char *device, register int unit,
 			ip = (dl_hp_ppa_info_t *)((u_char *)ipstart + ip->dl_next_offset);
 		}
 	}
-        if (i == ap->dl_count) {
-                snprintf(ebuf, PCAP_ERRBUF_SIZE,
+	if (i == ap->dl_count) {
+		snprintf(ebuf, PCAP_ERRBUF_SIZE,
 		    "can't find /dev/dlpi PPA for %s%d", device, unit);
 		return (-1);
-        }
-        if (ip->dl_hdw_state == HDW_DEAD) {
-                snprintf(ebuf, PCAP_ERRBUF_SIZE,
+	}
+	if (ip->dl_hdw_state == HDW_DEAD) {
+		snprintf(ebuf, PCAP_ERRBUF_SIZE,
 		    "%s%d: hardware state: DOWN\n", device, unit);
 		free(ppa_data_buf);
 		return (-1);
-        }
-        ppa = ip->dl_ppa;
-        free(ppa_data_buf);
-        return (ppa);
+	}
+	ppa = ip->dl_ppa;
+	free(ppa_data_buf);
+	return (ppa);
 }
 #endif
 

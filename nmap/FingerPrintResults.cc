@@ -1,21 +1,21 @@
 
 /***************************************************************************
- * FingerPrintResults -- The FingerPrintResults class the results of OS    *
+ * FingerPrintResults.cc -- The FingerPrintResults class the results of OS *
  * fingerprint matching against a certain host.                            *
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2004 Insecure.Com LLC. Nmap       *
- * is also a registered trademark of Insecure.Com LLC.  This program is    *
- * free software; you may redistribute and/or modify it under the          *
- * terms of the GNU General Public License as published by the Free        *
- * Software Foundation; Version 2.  This guarantees your right to use,     *
- * modify, and redistribute this software under certain conditions.  If    *
- * you wish to embed Nmap technology into proprietary software, we may be  *
- * willing to sell alternative licenses (contact sales@insecure.com).      *
- * Many security scanner vendors already license Nmap technology such as  *
- * our remote OS fingerprinting database and code, service/version         *
- * detection system, and port scanning code.                               *
+ * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
  *                                                                         *
  * Note that the GPL places important restrictions on "derived works", yet *
  * it does not provide a detailed definition of that term.  To avoid       *
@@ -38,7 +38,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://www.insecure.org/nmap/ to download Nmap.                         *
+ * http://insecure.org/nmap/ to download Nmap.                             *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -50,10 +50,10 @@
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
  * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to many    *
- * security vendors, and generally include a perpetual license as well as  *
- * providing for priority support and updates as well as helping to fund   *
- * the continued development of Nmap technology.  Please email             *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
  * sales@insecure.com for further information.                             *
  *                                                                         *
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: FingerPrintResults.cc 2396 2004-08-29 09:12:05Z fyodor $ */
+/* $Id: FingerPrintResults.cc 4228 2006-12-08 03:01:08Z fyodor $ */
 
 #include "FingerPrintResults.h"
 #include "osscan.h"
@@ -110,8 +110,13 @@ FingerPrintResults::FingerPrintResults() {
   overall_results = OSSCAN_NOMATCHES;
   memset(accuracy, 0, sizeof(accuracy));
   isClassified = false;
-  osscan_opentcpport = osscan_closedtcpport = -1;
-  memset(FPs, 0, sizeof(FPs));
+  osscan_opentcpport = osscan_closedtcpport = osscan_closedudpport = -1;
+  distance = -1;
+  distance_guess = -1;
+  /* We keep FPs holding at least 10 records because Gen1 OS detection
+     doesn't support maxOSTries() */
+  FPs = (FingerPrint **) safe_zalloc(MAX(o.maxOSTries(), 10) * sizeof(FingerPrint *));
+  maxTimingRatio = 0;
   numFPs = goodFP = 0;
 }
 
@@ -124,7 +129,7 @@ FingerPrintResults::~FingerPrintResults() {
     FPs[i] = NULL;
   }
   numFPs = 0;
-
+  free(FPs);
 }
 
 const struct OS_Classification_Results *FingerPrintResults::getOSClassification() {
@@ -132,17 +137,50 @@ const struct OS_Classification_Results *FingerPrintResults::getOSClassification(
   return &OSR;
 }
 
-  /* Are the attributes of this fingerprint good enough to warrant submission to the official DB? */
-bool FingerPrintResults::fingerprintSuitableForSubmission() {
-  // TODO:  There are many more tests I could (and should) add.  Maybe related to
-  // UDP test, TTL, etc.
-  if (o.scan_delay > 500) // This can screw up the sequence timing
-    return false;
+/* If the fingerprint is of potentially poor quality, we don't want to
+   print it and ask the user to submit it.  In that case, the reason
+   for skipping the FP is returned as a static string.  If the FP is
+   great and should be printed, NULL is returned. */
+const char *FingerPrintResults::OmitSubmissionFP() {
+  static char reason[128];
 
-  if (osscan_opentcpport < 0 || osscan_closedtcpport < 0 ) // then results won't be complete
-    return false;
+  if (o.scan_delay > 500) { // This can screw up the sequence timing
+    snprintf(reason, sizeof(reason), "Scan delay (%d) is greater than 500", o.scan_delay);
+    return reason;
+  }
 
-  return true;
+  if (o.timing_level > 4)
+    return "Timing level 5 (Insane) used";
+
+  if (osscan_opentcpport <= 0)
+    return "Missing an open TCP port so results incomplete";
+
+  if (osscan_closedtcpport <= 0)
+    return "Missing a closed TCP port so results incomplete";
+
+  // I'm not sure this is really necessary, but maybe.  Large routes
+  // can cause asymetric routing which leads to wrong TTL information.
+  // They can cause variable timing too.
+  if (distance > 10) {
+    snprintf(reason, sizeof(reason), "Host distance (%d network hops) is greater than ten", distance);
+    return reason;
+  }
+
+  if (maxTimingRatio > 1.4) {
+    snprintf(reason, sizeof(reason), "maxTimingRatio (%e) is greater than 1.4", maxTimingRatio);
+    return reason;
+  }
+
+  if (osscan_closedudpport < 0 && !o.udpscan) {
+    /* If we didn't get a U1 response, that might be just
+       because we didn't search for an open port rather than
+       because this OS doesn't respond to that sort of probe.
+       So we don't print FP if U1 response is lacking AND no UDP
+       scan was performed. */
+    return "Didn't receive UDP response. Please try again with -sSU";
+  }
+
+  return NULL;
 }
 
 

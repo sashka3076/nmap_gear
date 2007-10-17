@@ -5,17 +5,17 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2004 Insecure.Com LLC. Nmap       *
- * is also a registered trademark of Insecure.Com LLC.  This program is    *
- * free software; you may redistribute and/or modify it under the          *
- * terms of the GNU General Public License as published by the Free        *
- * Software Foundation; Version 2.  This guarantees your right to use,     *
- * modify, and redistribute this software under certain conditions.  If    *
- * you wish to embed Nmap technology into proprietary software, we may be  *
- * willing to sell alternative licenses (contact sales@insecure.com).      *
- * Many security scanner vendors already license Nmap technology such as  *
- * our remote OS fingerprinting database and code, service/version         *
- * detection system, and port scanning code.                               *
+ * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
  *                                                                         *
  * Note that the GPL places important restrictions on "derived works", yet *
  * it does not provide a detailed definition of that term.  To avoid       *
@@ -38,7 +38,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://www.insecure.org/nmap/ to download Nmap.                         *
+ * http://insecure.org/nmap/ to download Nmap.                             *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -50,10 +50,10 @@
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
  * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to many    *
- * security vendors, and generally include a perpetual license as well as  *
- * providing for priority support and updates as well as helping to fund   *
- * the continued development of Nmap technology.  Please email             *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
  * sales@insecure.com for further information.                             *
  *                                                                         *
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: portlist.cc 3355 2006-05-15 22:37:31Z fyodor $ */
+/* $Id: portlist.cc 4068 2006-10-14 01:25:43Z fyodor $ */
 
 
 #include "portlist.h"
@@ -264,6 +264,23 @@ int Port::getServiceDeductions(struct serviceDeductions *sd) {
 // one is available and the user should submit it.  tunnel must be
 // SERVICE_TUNNEL_NULL (normal) or SERVICE_TUNNEL_SSL (means ssl was
 // detected and we tried to tunnel through it ).
+
+char* Port::cstringSanityCheck(const char* string, int len) {
+	char* result;
+  int slen;
+
+  if(!string)
+	  return NULL;
+
+  slen = strlen(string);
+  if (slen > len) slen = len;
+  result = (char *) safe_malloc(slen + 1);
+  memcpy(result, string, slen);
+  result[slen] = '\0';
+  replacenonprintable(result, slen, '.'); 
+  return result;
+}
+
 void Port::setServiceProbeResults(enum serviceprobestate sres, 
 				  const char *sname,	
 				  enum service_tunnel_type tunnel, 
@@ -272,91 +289,17 @@ void Port::setServiceProbeResults(enum serviceprobestate sres,
 				  const char *ostype, const char *devicetype,
 				  const char *fingerprint) {
 
-  int slen;
   serviceprobe_results = sres;
-  unsigned char *p;
   serviceprobe_tunnel = tunnel;
   if (sname) serviceprobe_service = strdup(sname);
   if (fingerprint) serviceprobe_fp = strdup(fingerprint);
 
-  if (product) {
-    slen = strlen(product);
-    if (slen > 64) slen = 64;
-    serviceprobe_product = (char *) safe_malloc(slen + 1);
-    memcpy(serviceprobe_product, product, slen);
-    serviceprobe_product[slen] = '\0';
-    p = (unsigned char *) serviceprobe_product;
-    while(*p) {
-      if (!isprint((int)*p)) *p = '.';
-      p++;
-    }
-  }
-
-  if (version) {
-    slen = strlen(version);
-    if (slen > 64) slen = 64;
-    serviceprobe_version = (char *) safe_malloc(slen + 1);
-    memcpy(serviceprobe_version, version, slen);
-    serviceprobe_version[slen] = '\0';
-    p = (unsigned char *) serviceprobe_version;
-    while(*p) {
-      if (!isprint((int)*p)) *p = '.';
-      p++;
-    }
-  }
-
-  if (extrainfo) {
-    slen = strlen(extrainfo);
-    if (slen > 128) slen = 128;
-    serviceprobe_extrainfo = (char *) safe_malloc(slen + 1);
-    memcpy(serviceprobe_extrainfo, extrainfo, slen);
-    serviceprobe_extrainfo[slen] = '\0';
-    p = (unsigned char *) serviceprobe_extrainfo;
-    while(*p) {
-      if (!isprint((int)*p)) *p = '.';
-      p++;
-    }
-  }
-
-  if (hostname) {
-    slen = strlen(hostname);
-    if (slen > 64) slen = 64;
-    serviceprobe_hostname = (char *) safe_malloc(slen + 1);
-    memcpy(serviceprobe_hostname, hostname, slen);
-    serviceprobe_hostname[slen] = '\0';
-    p = (unsigned char *) serviceprobe_hostname;
-    while(*p) {
-      if (!isprint((int)*p)) *p = '.';
-      p++;
-    }
-  }
-
-  if (ostype) {
-    slen = strlen(ostype);
-    if (slen > 64) slen = 64;
-    serviceprobe_ostype = (char *) safe_malloc(slen + 1);
-    memcpy(serviceprobe_ostype, ostype, slen);
-    serviceprobe_ostype[slen] = '\0';
-    p = (unsigned char *) serviceprobe_ostype;
-    while(*p) {
-      if (!isprint((int)*p)) *p = '.';
-      p++;
-    }
-  }
-  
-  if (devicetype) {
-    slen = strlen(devicetype);
-    if (slen > 64) slen = 64;
-    serviceprobe_devicetype = (char *) safe_malloc(slen + 1);
-    memcpy(serviceprobe_devicetype, devicetype, slen);
-    serviceprobe_devicetype[slen] = '\0';
-    p = (unsigned char *) serviceprobe_devicetype;
-    while(*p) {
-      if (!isprint((int)*p)) *p = '.';
-      p++;
-    }
-  }
-
+	serviceprobe_product = cstringSanityCheck(product, 64);
+	serviceprobe_version = cstringSanityCheck(version, 64);
+	serviceprobe_extrainfo = cstringSanityCheck(extrainfo, 128);
+	serviceprobe_hostname = cstringSanityCheck(hostname, 64);
+	serviceprobe_ostype = cstringSanityCheck(ostype, 64);
+	serviceprobe_devicetype = cstringSanityCheck(devicetype, 64);
 }
 
 /* Sets the results of an RPC scan.  if rpc_status is not
@@ -633,6 +576,17 @@ void PortList::setPortEntry(u16 portno, u8 protocol, Port *port) {
   port_list[proto][mapped_pno] = port;
 }
 
+/* Just free memory used by PortList::port_map[]. Should be done somewhere 
+ * before closing nmap. */
+void PortList::freePortMap(){
+  int proto;
+  for(proto=0; proto < PORTLIST_PROTO_MAX; proto++)
+    if(port_map[proto]){
+      free(port_map[proto]);
+      port_map[proto] = NULL;
+  }
+}
+  
 
 u16 *PortList::port_map[PORTLIST_PROTO_MAX];
 int PortList::port_list_count[PORTLIST_PROTO_MAX];
@@ -724,10 +678,16 @@ bool PortList::isIgnoredState(int state) {
       state == PORT_FRESH)
     return false; /* Cannot be ignored */
 
+  /* If openonly, we always ignore states that don't at least have open
+     as a possibility. */
+  if (o.openOnly() && state != PORT_OPENFILTERED && state != PORT_UNFILTERED 
+      && getStateCounts(state) > 0)
+    return true;
+
   int max_per_state = 25; // Ignore states with more ports than this
   /* We will show more ports when verbosity is requested */
   if (o.verbose || o.debugging)
-    max_per_state *= (o.verbose + 50 * o.debugging);
+    max_per_state *= (o.verbose + 20 * o.debugging);
   
   if (getStateCounts(state) > max_per_state)
     return true;

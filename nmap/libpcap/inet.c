@@ -34,7 +34,7 @@
 
 #ifndef lint
 static const char rcsid[] _U_ =
-    "@(#) $Header$ (LBL)";
+    "@(#) $Header: /tcpdump/master/libpcap/inet.c,v 1.66.2.1 2005/06/20 21:30:17 guy Exp $ (LBL)";
 #endif
 
 #ifdef HAVE_CONFIG_H
@@ -622,7 +622,7 @@ pcap_lookupdev(errbuf)
 		static char AdaptersName[8192];
 		
 		if (PacketGetAdapterNames(AdaptersName,&NameLength) )
-		return (AdaptersName);
+			return (AdaptersName);
 		else
 			return NULL;
 	} else {

@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * @(#) $Header$ (LBL)
+ * @(#) $Header: /tcpdump/master/libpcap/pcap-int.h,v 1.68.2.6 2005/07/07 06:56:04 guy Exp $ (LBL)
  */
 
 #ifndef pcap_int_h
@@ -100,7 +100,7 @@ struct pcap_md {
 	u_int	dag_mem_top;	/* DAG card current memory top offset */
 #endif /* HAVE_DAG_STREAMS_API */
 	int	dag_fcs_bits;	/* Number of checksum bits from link layer */
-	int dag_offset_flags; /* Flags to pass to dag_offset(). */
+	int	dag_offset_flags; /* Flags to pass to dag_offset(). */
 	int	dag_stream;	/* DAG stream number */
 	int	dag_timeout;	/* timeout specified to pcap_open_live.
 				 * Same as in linux above, introduce

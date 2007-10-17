@@ -4,17 +4,17 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2004 Insecure.Com LLC. Nmap       *
- * is also a registered trademark of Insecure.Com LLC.  This program is    *
- * free software; you may redistribute and/or modify it under the          *
- * terms of the GNU General Public License as published by the Free        *
- * Software Foundation; Version 2.  This guarantees your right to use,     *
- * modify, and redistribute this software under certain conditions.  If    *
- * you wish to embed Nmap technology into proprietary software, we may be  *
- * willing to sell alternative licenses (contact sales@insecure.com).      *
- * Many security scanner vendors already license Nmap technology such as  *
- * our remote OS fingerprinting database and code, service/version         *
- * detection system, and port scanning code.                               *
+ * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
  *                                                                         *
  * Note that the GPL places important restrictions on "derived works", yet *
  * it does not provide a detailed definition of that term.  To avoid       *
@@ -37,7 +37,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://www.insecure.org/nmap/ to download Nmap.                         *
+ * http://insecure.org/nmap/ to download Nmap.                             *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -49,10 +49,10 @@
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
  * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to many    *
- * security vendors, and generally include a perpetual license as well as  *
- * providing for priority support and updates as well as helping to fund   *
- * the continued development of Nmap technology.  Please email             *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
  * sales@insecure.com for further information.                             *
  *                                                                         *
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
@@ -291,7 +291,7 @@ static ScanProgressMeter *SPM;
 
 //------------------- Prototypes and macros ---------------------
 
-void put_dns_packet_on_wire(request *req);
+static void put_dns_packet_on_wire(request *req);
 
 #define ACTION_FINISHED 0
 #define ACTION_CNAME_LIST 1
@@ -391,7 +391,7 @@ static void write_evt_handler(nsock_pool nsp, nsock_event evt, void *req_v) {
 // Takes a DNS request structure and actually puts it on the wire
 // (calls nsock_write()). Does various other tasks like recording
 // the time for the timeout.
-void put_dns_packet_on_wire(request *req) {
+static void put_dns_packet_on_wire(request *req) {
   char packet[512];
   int plen=0;
   u32 ip;
@@ -569,9 +569,9 @@ static u32 parse_inaddr_arpa(unsigned char *buf, int maxlen) {
   u32 ip=0;
   int i, j;
 
-  for (i=0; i<=3; i++) {
-    if (maxlen <= 0) return 0;
+  if (maxlen <= 0) return 0;
 
+  for (i=0; i<=3; i++) {
     if (buf[0] < 1 || buf[0] > 3) return 0;
 
     maxlen -= buf[0] + 1;
@@ -593,7 +593,7 @@ static u32 parse_inaddr_arpa(unsigned char *buf, int maxlen) {
 // Turns a DNS packet encoded name (see the RFC) and turns it into
 // a normal decimal separated hostname.
 // ASSUMES NAME LENGTH/VALIDITY HAS ALREADY BEEN VERIFIED
-int encoded_name_to_normal(unsigned char *buf, char *output, int outputsize){
+static int encoded_name_to_normal(unsigned char *buf, char *output, int outputsize){
   while (buf[0]) {
     if (buf[0] >= outputsize-1) return -1;
     memcpy(output, buf+1, buf[0]);
@@ -674,9 +674,10 @@ static void read_evt_handler(nsock_pool nsp, nsock_event evt, void *nothing) {
   // 0xFA == 11111010 (we're not concerned with AA or RD bits)
   if ((buf[2] & 0xFA) != 0x80) return;
 
-  // Check that Recursion is available, the zero field is all zeros
-  // and there is no error condition:
-  if (buf[3] != 0x80) {
+  // Check that the zero field is all zeros and there is no error condition.
+  // We don't care if recursion is available or not since we might be querying
+  // an authoritative DNS server.
+  if (buf[3] != 0x80 && buf[3] != 0) {
     if ((buf[3] & 0xF) == 2) errcode = 2;
     else if ((buf[3] & 0xF) == 3) errcode = 3;
     else return;
@@ -816,9 +817,24 @@ static void add_dns_server(char *ipaddrs) {
 
 }
 
+void free_dns_servers() {
+  std::list<dns_server *>::iterator servI;
+  dns_server *tpserv;
+
+  for(servI = servs.begin(); servI != servs.end();servI++){
+    tpserv = *servI;
+    if(tpserv){
+      if(tpserv->hostname)
+        free(tpserv->hostname);
+      delete tpserv;
+    }
+  }
+  servs.clear();
+}
+
 
 // Creates a new nsi for each DNS server
-void connect_dns_servers() {
+static void connect_dns_servers() {
   std::list<dns_server *>::iterator serverI;
   dns_server *s;
 
@@ -969,6 +985,23 @@ static void parse_etchosts(char *fname) {
   fclose(fp);
 }
 
+void free_etchosts() {
+  host_elem *he;
+  std::list<host_elem *>::iterator hi;
+  int i;
+
+  for(i=0; i < HASH_TABLE_SIZE; i++){
+    for(hi = etchosts[i].begin(); hi != etchosts[i].end(); hi++) {
+      he = *hi;
+      if(he) {
+        free(he->name);
+        delete he;
+      }
+    }
+    etchosts[i].clear();
+  }
+}
+
 
 static char *lookup_etchosts(u32 ip) {
   std::list<host_elem *>::iterator hostI;
@@ -1026,6 +1059,7 @@ static void nmap_mass_rdns_core(Target **targets, int num_targets) {
   char *tpname;
   int i;
   bool lasttrace = false;
+  char spmobuf[1024];
 
   if (o.mass_dns == false) {
     Target *currenths;
@@ -1039,8 +1073,9 @@ static void nmap_mass_rdns_core(Target **targets, int num_targets) {
       if (((currenths->flags & HOST_UP) || o.resolve_all) && !o.noresolve) stat_actual++;
     }
 
-    SPM = new ScanProgressMeter("System DNS resolution");
-    
+    snprintf(spmobuf, sizeof(spmobuf), "System DNS resolution of %d host%s.", num_targets, num_targets-1 ? "s" : "");
+    SPM = new ScanProgressMeter(spmobuf);
+
     for(i=0, hostI = targets; hostI < targets+num_targets; hostI++, i++) {
       currenths = *hostI;
 	
@@ -1058,6 +1093,7 @@ static void nmap_mass_rdns_core(Target **targets, int num_targets) {
       }
     }
 
+    SPM->endTask(NULL, NULL);
     delete SPM;
 
     return;
@@ -1118,7 +1154,8 @@ static void nmap_mass_rdns_core(Target **targets, int num_targets) {
 
   read_timeout_index = MIN(sizeof(read_timeouts)/sizeof(read_timeouts[0]), servs.size()) - 1;
 
-  SPM = new ScanProgressMeter("System DNS resolution");
+  snprintf(spmobuf, sizeof(spmobuf), "Parallel DNS resolution of %d host%s.", num_targets, num_targets-1 ? "s" : "");
+  SPM = new ScanProgressMeter(spmobuf);
 
   while (total_reqs > 0) {
     timeout = deal_with_timedout_reads();
@@ -1137,6 +1174,7 @@ static void nmap_mass_rdns_core(Target **targets, int num_targets) {
     nsock_loop(dnspool, timeout);
   }
 
+  SPM->endTask(NULL, NULL);
   delete SPM;
 
   close_dns_servers();
@@ -1146,33 +1184,37 @@ static void nmap_mass_rdns_core(Target **targets, int num_targets) {
   if (cname_reqs.size() && o.debugging)
     log_write(LOG_STDOUT, "Performing system-dns for %d domain names that use CNAMEs\n", (int) cname_reqs.size());
 
-  SPM = new ScanProgressMeter("System CNAME DNS resolution");
+  if (cname_reqs.size()) {
+    snprintf(spmobuf, sizeof(spmobuf), "System CNAME DNS resolution of %u host%s.", (unsigned) cname_reqs.size(), cname_reqs.size()-1 ? "s" : "");
+    SPM = new ScanProgressMeter(spmobuf);
 
-  for(i=0, reqI = cname_reqs.begin(); reqI != cname_reqs.end(); reqI++, i++) {
-    struct sockaddr_storage ss;
-    size_t sslen;
-    char hostname[MAXHOSTNAMELEN + 1] = "";
+    for(i=0, reqI = cname_reqs.begin(); reqI != cname_reqs.end(); reqI++, i++) {
+      struct sockaddr_storage ss;
+      size_t sslen;
+      char hostname[MAXHOSTNAMELEN + 1] = "";
 
-    if (keyWasPressed())
-      SPM->printStats((double) i / cname_reqs.size(), NULL);
+      if (keyWasPressed())
+        SPM->printStats((double) i / cname_reqs.size(), NULL);
 
-    tpreq = *reqI;
+      tpreq = *reqI;
 
-    if (tpreq->targ->TargetSockAddr(&ss, &sslen) != 0)
-      fatal("Failed to get target socket address.");
+      if (tpreq->targ->TargetSockAddr(&ss, &sslen) != 0)
+        fatal("Failed to get target socket address.");
 
-    if (getnameinfo((struct sockaddr *)&ss, sslen, hostname,
-                    sizeof(hostname), NULL, 0, NI_NAMEREQD) == 0) {
-      stat_ok++;
-      stat_cname++;
-      tpreq->targ->setHostName(hostname);
+      if (getnameinfo((struct sockaddr *)&ss, sslen, hostname,
+                      sizeof(hostname), NULL, 0, NI_NAMEREQD) == 0) {
+        stat_ok++;
+        stat_cname++;
+        tpreq->targ->setHostName(hostname);
+      }
+
+      delete tpreq;
+
     }
 
-    delete tpreq;
-
+    SPM->endTask(NULL, NULL);
+    delete SPM;
   }
-
-  delete SPM;
 
   cname_reqs.clear();
 
@@ -1195,7 +1237,7 @@ void nmap_mass_rdns(Target **targets, int num_targets) {
   gettimeofday(&now, NULL);
 
   if (stat_actual > 0) {
-    if (o.debugging) {
+    if (o.debugging || o.verbose >= 3) {
       if (o.mass_dns) {
 	// #:  Number of DNS servers used
 	// OK: Number of fully reverse resolved queries
@@ -1211,8 +1253,6 @@ void nmap_mass_rdns(Target **targets, int num_targets) {
 		  stat_actual, TIMEVAL_MSEC_SUBTRACT(now, starttv) / 1000.0,
 		  stat_ok, stat_actual - stat_ok);
       }
-    } else if (o.verbose) {
-      log_write(LOG_STDOUT, "DNS resolution of %d IPs took %.2fs.\n", stat_actual, TIMEVAL_MSEC_SUBTRACT(now, starttv) / 1000.0);
     }
   }
 

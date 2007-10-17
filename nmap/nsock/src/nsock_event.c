@@ -7,7 +7,7 @@
  *                                                                         *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
- * The nsock parallel socket event library is (C) 1999-2004 Insecure.Com   *
+ * The nsock parallel socket event library is (C) 1999-2006 Insecure.Com   *
  * LLC This library is free software; you may redistribute and/or          *
  * modify it under the terms of the GNU General Public License as          *
  * published by the Free Software Foundation; Version 2.  This guarantees  *
@@ -56,7 +56,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_event.c 3292 2006-04-29 06:20:45Z fyodor $ */
+/* $Id: nsock_event.c 3870 2006-08-25 01:47:53Z fyodor $ */
 
 #include "nsock_internal.h"
 #include "gh_list.h"
@@ -252,7 +252,7 @@ nsock_event_id get_new_event_id(mspool *ms, enum nse_type type) {
   unsigned long serial = ms->next_event_serial++;
   unsigned long max_serial_allowed;
   int shiftbits;
-  assert(type <= 3);
+  assert(type <= 4);
  
   shiftbits = sizeof(nsock_event_id) * 8 - TYPE_CODE_NUM_BITS;
   max_serial_allowed = ( 1 << shiftbits ) - 1;

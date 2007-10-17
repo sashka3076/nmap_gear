@@ -5,17 +5,17 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2004 Insecure.Com LLC. Nmap       *
- * is also a registered trademark of Insecure.Com LLC.  This program is    *
- * free software; you may redistribute and/or modify it under the          *
- * terms of the GNU General Public License as published by the Free        *
- * Software Foundation; Version 2.  This guarantees your right to use,     *
- * modify, and redistribute this software under certain conditions.  If    *
- * you wish to embed Nmap technology into proprietary software, we may be  *
- * willing to sell alternative licenses (contact sales@insecure.com).      *
- * Many security scanner vendors already license Nmap technology such as  *
- * our remote OS fingerprinting database and code, service/version         *
- * detection system, and port scanning code.                               *
+ * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
  *                                                                         *
  * Note that the GPL places important restrictions on "derived works", yet *
  * it does not provide a detailed definition of that term.  To avoid       *
@@ -38,7 +38,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://www.insecure.org/nmap/ to download Nmap.                         *
+ * http://insecure.org/nmap/ to download Nmap.                             *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -50,10 +50,10 @@
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
  * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to many    *
- * security vendors, and generally include a perpetual license as well as  *
- * providing for priority support and updates as well as helping to fund   *
- * the continued development of Nmap technology.  Please email             *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
  * sales@insecure.com for further information.                             *
  *                                                                         *
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmapfe.c 3057 2006-01-21 00:41:19Z fyodor $ */
+/* $Id: nmapfe.c 4006 2006-09-26 07:49:08Z fyodor $ */
 
 
 /* Original Author: Zach
@@ -145,7 +145,7 @@ static void Colourize_callback  (GtkAction *action, GtkRadioAction *current);
 
 void scanType_cb                (GtkComboBox *widget, gpointer data);
 
-GtkWidget *main_win;
+static GtkWidget *main_win;
 
 static GtkActionEntry menu_entries[] = {
     { "FileMenu",   NULL, "_File" }, /* File menu */
@@ -231,15 +231,6 @@ static gchar *protportEntries[] = {
     "All",
     "Most Important [fast]",
     "Range Given Below",
-    NULL
-};
-
-static gchar *verboseEntries[] = {
-    "Quiet",
-    "Verbose",
-    "Very Verbose",
-    "Debug",
-    "Verbose Debug",
     NULL
 };
 
@@ -428,21 +419,19 @@ GtkAdjustment *adjust;
   /* initialize our options */
   opt.viewValue = 1;
   opt.appendLog = FALSE;
-  opt.uid = 0;
   opt.scanValue = SYN_SCAN;
   opt.throttleValue = NORMAL_THROTTLE;
   opt.resolveValue = DEFAULT_RESOLVE;
   opt.protportValue = DEFAULT_PROTPORT;
-  opt.verboseValue = QUIET_VERBOSE;
   opt.outputFormatValue = NORMAL_OUTPUT;
 
 #ifdef WIN32
-  opt.uid = 0;
+  opt.isr00t = 1;
   /* for nmap version */
 #include "nmap_winconfig.h"
 #define VERSION NMAP_VERSION
 #else
-  opt.uid = getuid();
+  opt.isr00t = !geteuid();
 #endif
 
 /* main (toplevel) window */
@@ -552,11 +541,11 @@ GtkAdjustment *adjust;
       GtkCellRenderer *renderer;
       GtkTreeModel    *model;
       model = create_dropdown_store (scanentries, 
-              (opt.uid == 0) ? TRUE : FALSE);
+              opt.isr00t ? TRUE : FALSE);
       opt.scanType = gtk_combo_box_new_with_model (model);
       g_object_unref (model);
 
-      opt.scanValue = (opt.uid == 0) ? SYN_SCAN : CONNECT_SCAN;
+      opt.scanValue = opt.isr00t ? SYN_SCAN : CONNECT_SCAN;
 
       gtk_table_attach_defaults (GTK_TABLE(table), opt.scanType, 0, 4, 0, 1);
       gtk_widget_show (opt.scanType);
@@ -658,7 +647,7 @@ GtkAdjustment *adjust;
   opt.OSInfo = gtk_check_button_new_with_label("OS Detection");
   g_signal_connect(GTK_OBJECT(opt.OSInfo), "released",
 		     GTK_SIGNAL_FUNC(display_nmap_command_cb), NULL);
-  if (opt.uid == 0)
+  if (opt.isr00t)
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(opt.OSInfo), TRUE);
   else
     gtk_widget_set_sensitive(GTK_WIDGET(opt.OSInfo), FALSE);
@@ -710,7 +699,7 @@ GtkAdjustment *adjust;
   g_signal_connect(GTK_OBJECT(opt.icmpechoPing), "released",
 		     GTK_SIGNAL_FUNC(pingButton_toggled_cb), opt.icmpechoPing);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.icmpechoPing, 0, 1, 0, 1);
-  if (opt.uid == 0)
+  if (opt.isr00t)
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(opt.icmpechoPing), TRUE);
   else
     gtk_widget_set_sensitive(GTK_WIDGET(opt.icmpechoPing), FALSE);
@@ -720,7 +709,7 @@ GtkAdjustment *adjust;
   opt.icmptimePing = gtk_check_button_new_with_label("ICMP Timestamp");
   g_signal_connect(GTK_OBJECT(opt.icmptimePing), "released",
 		     GTK_SIGNAL_FUNC(pingButton_toggled_cb), opt.icmptimePing);
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(opt.icmptimePing), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.icmptimePing, 0, 1, 1, 2);
   gtk_widget_show(opt.icmptimePing);
@@ -729,7 +718,7 @@ GtkAdjustment *adjust;
   opt.icmpmaskPing = gtk_check_button_new_with_label("ICMP Netmask");
   g_signal_connect(GTK_OBJECT(opt.icmpmaskPing), "released",
 		     GTK_SIGNAL_FUNC(pingButton_toggled_cb), opt.icmpmaskPing);
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(opt.icmpmaskPing), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.icmpmaskPing, 0, 1, 2, 3);
   gtk_widget_show(opt.icmpmaskPing);
@@ -758,13 +747,13 @@ GtkAdjustment *adjust;
   opt.synPing = gtk_check_button_new_with_label("TCP SYN Ping");
   g_signal_connect(GTK_OBJECT(opt.synPing), "released",
 		     GTK_SIGNAL_FUNC(pingButton_toggled_cb), opt.synPing);
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(opt.synPing), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.synPing, 1, 2, 1, 2);
   gtk_widget_show(opt.synPing);
 
   opt.synPingLabel = gtk_label_new("Port(s):");
-  if ((opt.uid != 0) || (! GTK_TOGGLE_BUTTON(opt.synPing)->active))
+  if ((!opt.isr00t) || (! GTK_TOGGLE_BUTTON(opt.synPing)->active))
     gtk_widget_set_sensitive(GTK_WIDGET(opt.synPingLabel), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.synPingLabel, 2, 3, 1, 2);
   gtk_widget_show(opt.synPingLabel);
@@ -774,7 +763,7 @@ GtkAdjustment *adjust;
   /*gtk_object_set(GTK_OBJECT(opt.synPingPorts), "width", 100, NULL);*/
   g_signal_connect(GTK_OBJECT(opt.synPingPorts), "changed",
 		     GTK_SIGNAL_FUNC(display_nmap_command_cb), NULL);
-  if ((opt.uid != 0)  || (! GTK_TOGGLE_BUTTON(opt.synPing)->active))
+  if ((!opt.isr00t)  || (! GTK_TOGGLE_BUTTON(opt.synPing)->active))
     gtk_widget_set_sensitive(GTK_WIDGET(opt.synPingPorts), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.synPingPorts, 3, 4, 1, 2);
   gtk_widget_show(opt.synPingPorts);
@@ -783,13 +772,13 @@ GtkAdjustment *adjust;
   opt.udpPing = gtk_check_button_new_with_label("UDP Ping");
   g_signal_connect(GTK_OBJECT(opt.udpPing), "released",
 		     GTK_SIGNAL_FUNC(pingButton_toggled_cb), opt.udpPing);
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(opt.udpPing), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.udpPing, 1, 2, 2, 3);
   gtk_widget_show(opt.udpPing);
 
   opt.udpPingLabel = gtk_label_new("Port(s):");
-  if ((opt.uid != 0) || (! GTK_TOGGLE_BUTTON(opt.udpPing)->active))
+  if ((!opt.isr00t) || (! GTK_TOGGLE_BUTTON(opt.udpPing)->active))
     gtk_widget_set_sensitive(GTK_WIDGET(opt.udpPingLabel), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.udpPingLabel, 2, 3, 2, 3);
   gtk_widget_show(opt.udpPingLabel);
@@ -799,7 +788,7 @@ GtkAdjustment *adjust;
   /*gtk_object_set(GTK_OBJECT(opt.udpPingPorts), "width", 100, NULL);*/
   g_signal_connect(GTK_OBJECT(opt.udpPingPorts), "changed",
 		     GTK_SIGNAL_FUNC(display_nmap_command_cb), NULL);
-  if ((opt.uid != 0) || (! GTK_TOGGLE_BUTTON(opt.udpPing)->active))
+  if ((!opt.isr00t) || (! GTK_TOGGLE_BUTTON(opt.udpPing)->active))
     gtk_widget_set_sensitive(GTK_WIDGET(opt.udpPingPorts), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.udpPingPorts, 3, 4, 2, 3);
   gtk_widget_show(opt.udpPingPorts);
@@ -846,7 +835,7 @@ GtkAdjustment *adjust;
 
 
   opt.ipv4Ttl = gtk_check_button_new_with_label("IPv4 TTL");
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(opt.ipv4Ttl), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.ipv4Ttl, 0, 1, 2, 3);
   gtk_widget_show(opt.ipv4Ttl);
@@ -859,14 +848,14 @@ GtkAdjustment *adjust;
   /*  gtk_object_set(GTK_OBJECT(opt.ipv4TtlValue), "width", 55, NULL);*/
   g_signal_connect(GTK_OBJECT(opt.ipv4TtlValue), "changed",
 		     GTK_SIGNAL_FUNC(display_nmap_command_cb), NULL);
-  if ((opt.uid != 0) || (! GTK_TOGGLE_BUTTON(opt.ipv4Ttl)->active))
+  if ((!opt.isr00t) || (! GTK_TOGGLE_BUTTON(opt.ipv4Ttl)->active))
     gtk_widget_set_sensitive(GTK_WIDGET(opt.ipv4TtlValue), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.ipv4TtlValue, 1, 2, 2, 3);
   gtk_widget_show(opt.ipv4TtlValue);
 
 
   opt.minPar = gtk_check_button_new_with_label("Min. Parallel");
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(opt.minPar), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.minPar, 0, 1, 3, 4);
   gtk_widget_show(opt.minPar);
@@ -879,14 +868,14 @@ GtkAdjustment *adjust;
 		     GTK_SIGNAL_FUNC(toggle_button_set_sensitive_cb), opt.minParSocks);
   g_signal_connect(GTK_OBJECT(opt.minParSocks), "changed",
 		     GTK_SIGNAL_FUNC(display_nmap_command_cb), NULL);
-  if ((opt.uid != 0) || (! GTK_TOGGLE_BUTTON(opt.minPar)->active))
+  if ((!opt.isr00t) || (! GTK_TOGGLE_BUTTON(opt.minPar)->active))
     gtk_widget_set_sensitive(GTK_WIDGET(opt.minParSocks), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.minParSocks, 1, 2, 3, 4);
   gtk_widget_show(opt.minParSocks);
 
 
   opt.maxPar = gtk_check_button_new_with_label("Max. Parallel");
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(opt.maxPar), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.maxPar, 0, 1, 4, 5);
   gtk_widget_show(opt.maxPar);
@@ -899,14 +888,14 @@ GtkAdjustment *adjust;
 		     GTK_SIGNAL_FUNC(toggle_button_set_sensitive_cb), opt.maxParSocks);
   g_signal_connect(GTK_OBJECT(opt.maxParSocks), "changed",
 		     GTK_SIGNAL_FUNC(display_nmap_command_cb), NULL);
-  if ((opt.uid != 0) || (! GTK_TOGGLE_BUTTON(opt.maxPar)->active))
+  if ((!opt.isr00t) || (! GTK_TOGGLE_BUTTON(opt.maxPar)->active))
     gtk_widget_set_sensitive(GTK_WIDGET(opt.maxParSocks), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.maxParSocks, 1, 2, 4, 5);
   gtk_widget_show(opt.maxParSocks);
 
 
   opt.startRtt = gtk_check_button_new_with_label("Initial RTT");
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(opt.startRtt), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.startRtt, 2, 3, 0, 1);
   gtk_widget_show(opt.startRtt);
@@ -919,20 +908,20 @@ GtkAdjustment *adjust;
 		     GTK_SIGNAL_FUNC(toggle_button_set_sensitive_cb), opt.startRttTime);
   g_signal_connect(GTK_OBJECT(opt.startRttTime), "changed",
 		     GTK_SIGNAL_FUNC(display_nmap_command_cb), NULL);
-  if ((opt.uid != 0) || (! GTK_TOGGLE_BUTTON(opt.startRtt)->active))
+  if ((!opt.isr00t) || (! GTK_TOGGLE_BUTTON(opt.startRtt)->active))
     gtk_widget_set_sensitive(GTK_WIDGET(opt.startRttTime), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.startRttTime, 3, 4, 0, 1);
   gtk_widget_show(opt.startRttTime);
 
   label = gtk_label_new("ms");
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(label), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), label, 4, 5, 0, 1);
   gtk_widget_show(label);
 
 
   opt.minRtt = gtk_check_button_new_with_label("Min. RTT");
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(opt.minRtt), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.minRtt, 2, 3, 1, 2);
   gtk_widget_show(opt.minRtt);
@@ -945,20 +934,20 @@ GtkAdjustment *adjust;
 		     GTK_SIGNAL_FUNC(toggle_button_set_sensitive_cb), opt.minRttTime);
   g_signal_connect(GTK_OBJECT(opt.minRttTime), "changed",
 		     GTK_SIGNAL_FUNC(display_nmap_command_cb), NULL);
-  if ((opt.uid != 0) || (! GTK_TOGGLE_BUTTON(opt.minRtt)->active))
+  if ((!opt.isr00t) || (! GTK_TOGGLE_BUTTON(opt.minRtt)->active))
     gtk_widget_set_sensitive(GTK_WIDGET(opt.minRttTime), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.minRttTime, 3, 4, 1, 2);
   gtk_widget_show(opt.minRttTime);
 
   label = gtk_label_new("ms");
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(label), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), label, 4, 5, 1, 2);
   gtk_widget_show(label);
 
 
   opt.maxRtt = gtk_check_button_new_with_label("Max. RTT");
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(opt.maxRtt), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.maxRtt, 2, 3, 2, 3);
   gtk_widget_show(opt.maxRtt);
@@ -971,20 +960,20 @@ GtkAdjustment *adjust;
 		     GTK_SIGNAL_FUNC(toggle_button_set_sensitive_cb), opt.maxRttTime);
   g_signal_connect(GTK_OBJECT(opt.maxRttTime), "changed",
 		     GTK_SIGNAL_FUNC(display_nmap_command_cb), NULL);
-  if ((opt.uid != 0) || (! GTK_TOGGLE_BUTTON(opt.maxRtt)->active))
+  if ((!opt.isr00t) || (! GTK_TOGGLE_BUTTON(opt.maxRtt)->active))
     gtk_widget_set_sensitive(GTK_WIDGET(opt.maxRttTime), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.maxRttTime, 3, 4, 2, 3);
   gtk_widget_show(opt.maxRttTime);
 
   label = gtk_label_new("ms");
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(label), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), label, 4, 5, 2, 3);
   gtk_widget_show(label);
 
 
   opt.hostTimeout = gtk_check_button_new_with_label("Host Timeout");
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(opt.hostTimeout), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.hostTimeout, 2, 3, 3, 4);
   gtk_widget_show(opt.hostTimeout);
@@ -997,20 +986,20 @@ GtkAdjustment *adjust;
 		     GTK_SIGNAL_FUNC(toggle_button_set_sensitive_cb), opt.hostTimeoutTime);
   g_signal_connect(GTK_OBJECT(opt.hostTimeoutTime), "changed",
 		     GTK_SIGNAL_FUNC(display_nmap_command_cb), NULL);
-  if ((opt.uid != 0) || (! GTK_TOGGLE_BUTTON(opt.hostTimeout)->active))
+  if ((!opt.isr00t) || (! GTK_TOGGLE_BUTTON(opt.hostTimeout)->active))
     gtk_widget_set_sensitive(GTK_WIDGET(opt.hostTimeoutTime), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.hostTimeoutTime, 3, 4, 3, 4);
   gtk_widget_show(opt.hostTimeoutTime);
 
   label = gtk_label_new("ms");
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(label), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), label, 4, 5, 3, 4);
   gtk_widget_show(label);
 
 
   opt.scanDelay = gtk_check_button_new_with_label("Scan Delay");
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(opt.scanDelay), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.scanDelay, 2, 3, 4, 5);
   gtk_widget_show(opt.scanDelay);
@@ -1023,13 +1012,13 @@ GtkAdjustment *adjust;
 		     GTK_SIGNAL_FUNC(toggle_button_set_sensitive_cb), opt.scanDelayTime);
   g_signal_connect(GTK_OBJECT(opt.scanDelayTime), "changed",
 		     GTK_SIGNAL_FUNC(display_nmap_command_cb), NULL);
-  if ((opt.uid != 0) || (! GTK_TOGGLE_BUTTON(opt.scanDelay)->active))
+  if ((!opt.isr00t) || (! GTK_TOGGLE_BUTTON(opt.scanDelay)->active))
     gtk_widget_set_sensitive(GTK_WIDGET(opt.scanDelayTime), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.scanDelayTime, 3, 4, 4, 5);
   gtk_widget_show(opt.scanDelayTime);
 
   label = gtk_label_new("ms");
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(label), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), label, 4, 5, 4, 5);
   gtk_widget_show(label);
@@ -1213,29 +1202,48 @@ GtkAdjustment *adjust;
     gtk_widget_show_all(frame);
   }
 
-  /* Verbosity frame */
-  {
-    gint i;
+  /* Verbosity & Debugging frame */
+  frame = gtk_frame_new("Verbosity & Debugging Levels");
+  gtk_table_attach_defaults(GTK_TABLE(nbpage), frame, 0, 1, 1, 2);
 
-    frame = gtk_frame_new("Verbosity");
-    gtk_table_attach_defaults(GTK_TABLE(nbpage), frame, 0, 1, 1, 2);
+  table = gtk_table_new(2, 2, FALSE);
+  gtk_container_set_border_width(GTK_CONTAINER(table), 5);
+  gtk_container_add(GTK_CONTAINER(frame), table);
 
-    vbox = gtk_vbox_new(FALSE, 5);
-    gtk_container_set_border_width(GTK_CONTAINER(vbox), 5);
-    gtk_container_add(GTK_CONTAINER(frame), vbox);
+  opt.verbose = gtk_check_button_new_with_label("Verbosity");
+  gtk_table_attach_defaults(GTK_TABLE(table), opt.verbose, 0, 1, 0, 1);
+  gtk_widget_show(opt.verbose);
 
-    opt.verboseType = gtk_combo_box_new_text();
+  adjust = (GtkAdjustment *) gtk_adjustment_new(1.0, 1.0, 2.0, 1.0, 10.0, 10.0);
+  opt.verboseValue = gtk_spin_button_new(adjust, 1.0, 0);
+  gtk_spin_button_set_numeric(GTK_SPIN_BUTTON(opt.verboseValue), TRUE);
+  g_signal_connect(GTK_OBJECT(opt.verbose), "released",
+		   GTK_SIGNAL_FUNC(toggle_button_set_sensitive_cb), opt.verboseValue);
+  g_signal_connect(GTK_OBJECT(opt.verboseValue), "changed",
+		   GTK_SIGNAL_FUNC(display_nmap_command_cb), NULL);
+  if (!GTK_TOGGLE_BUTTON(opt.verbose)->active)
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.verboseValue), FALSE);
+  gtk_table_attach_defaults(GTK_TABLE(table), opt.verboseValue, 1, 2, 0, 1);
+  gtk_widget_show(opt.verboseValue);
 
-    for (i = 0; verboseEntries[i]; i++) {
-      gtk_combo_box_append_text(GTK_COMBO_BOX(opt.verboseType), verboseEntries[i]);
-    }
+  opt.debug = gtk_check_button_new_with_label("Debugging");
+  gtk_table_attach_defaults(GTK_TABLE(table), opt.debug, 0, 1, 1, 2);
+  gtk_widget_show(opt.debug);
 
-    g_signal_connect(G_OBJECT(opt.verboseType), "changed",
-            G_CALLBACK (verboseType_cb), NULL);
+  adjust = (GtkAdjustment *) gtk_adjustment_new(1.0, 1.0, 9.0, 1.0, 10.0, 10.0);
+  opt.debugValue = gtk_spin_button_new(adjust, 1.0, 0);
+  gtk_spin_button_set_numeric(GTK_SPIN_BUTTON(opt.debugValue), TRUE);
+  g_signal_connect(GTK_OBJECT(opt.debug), "released",
+		   GTK_SIGNAL_FUNC(toggle_button_set_sensitive_cb), opt.debugValue);
+  g_signal_connect(GTK_OBJECT(opt.debugValue), "changed",
+		   GTK_SIGNAL_FUNC(display_nmap_command_cb), NULL);
+  if (!GTK_TOGGLE_BUTTON(opt.debug)->active)
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.debugValue), FALSE);
+  gtk_table_attach_defaults(GTK_TABLE(table), opt.debugValue, 1, 2, 1, 2);
+  gtk_widget_show(opt.debugValue);
 
-    gtk_box_pack_start(GTK_BOX(vbox), opt.verboseType, TRUE, FALSE, 0);
-    gtk_widget_show_all (frame);
-  }
+  gtk_widget_show(table);
+  gtk_widget_show(frame);
 
 
   frame = gtk_frame_new("Source");
@@ -1249,7 +1257,7 @@ GtkAdjustment *adjust;
   opt.useSourceDevice = gtk_check_button_new_with_label("Device");
   g_signal_connect(GTK_OBJECT(opt.useSourceDevice), "toggled",
 			GTK_SIGNAL_FUNC(validate_option_change), NULL);
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(opt.useSourceDevice), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.useSourceDevice, 0, 1, 0, 1);
   gtk_widget_show(opt.useSourceDevice);
@@ -1270,7 +1278,7 @@ GtkAdjustment *adjust;
   opt.useSourcePort = gtk_check_button_new_with_label("Port");
   g_signal_connect(GTK_OBJECT(opt.useSourcePort), "released",
 			GTK_SIGNAL_FUNC(validate_option_change), NULL);
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(opt.useSourcePort), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.useSourcePort, 0, 1, 1, 2);
   gtk_widget_show(opt.useSourcePort);
@@ -1291,7 +1299,7 @@ GtkAdjustment *adjust;
   opt.useSourceIP = gtk_check_button_new_with_label("IP");
   g_signal_connect(GTK_OBJECT(opt.useSourceIP), "released",
 			GTK_SIGNAL_FUNC(validate_option_change), NULL);
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(opt.useSourceIP), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.useSourceIP, 0, 1, 2, 3);
   gtk_widget_show(opt.useSourceIP);
@@ -1312,7 +1320,7 @@ GtkAdjustment *adjust;
   opt.useDecoy = gtk_check_button_new_with_label("Decoy");
   g_signal_connect(GTK_OBJECT(opt.useDecoy), "released",
 			GTK_SIGNAL_FUNC(validate_option_change), NULL);
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(opt.useDecoy), FALSE);
   gtk_table_attach_defaults(GTK_TABLE(table), opt.useDecoy, 0, 1, 3, 4);
   gtk_widget_show(opt.useDecoy);
@@ -1344,7 +1352,7 @@ GtkAdjustment *adjust;
   opt.useFragments = gtk_check_button_new_with_label("Fragmentation");
   g_signal_connect(GTK_OBJECT(opt.useFragments), "released",
 			GTK_SIGNAL_FUNC(validate_option_change), NULL);
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(opt.useFragments), FALSE);
   gtk_box_pack_start(GTK_BOX(vbox), opt.useFragments, FALSE, TRUE, 0);
   gtk_widget_show(opt.useFragments);
@@ -1353,7 +1361,7 @@ GtkAdjustment *adjust;
   opt.useIPv6 = gtk_check_button_new_with_label("IPv6");
   g_signal_connect(GTK_OBJECT(opt.useIPv6), "released",
 			GTK_SIGNAL_FUNC(validate_option_change), NULL);
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(opt.useIPv6), FALSE);
   gtk_box_pack_start(GTK_BOX(vbox), opt.useIPv6, FALSE, TRUE, 0);
   gtk_widget_show(opt.useIPv6);
@@ -1362,10 +1370,16 @@ GtkAdjustment *adjust;
   opt.useOrderedPorts = gtk_check_button_new_with_label("Ordered Ports");
   g_signal_connect(GTK_OBJECT(opt.useOrderedPorts), "released",
 			GTK_SIGNAL_FUNC(validate_option_change), NULL);
-  if (opt.uid != 0)
+  if (!opt.isr00t)
     gtk_widget_set_sensitive(GTK_WIDGET(opt.useOrderedPorts), FALSE);
   gtk_box_pack_start(GTK_BOX(vbox), opt.useOrderedPorts, FALSE, TRUE, 0);
   gtk_widget_show(opt.useOrderedPorts);
+
+  opt.randomizeHosts = gtk_check_button_new_with_label("Randomize Host Order");
+  g_signal_connect(GTK_OBJECT(opt.randomizeHosts), "released",
+			GTK_SIGNAL_FUNC(validate_option_change), NULL);
+  gtk_box_pack_start(GTK_BOX(vbox), opt.randomizeHosts, FALSE, TRUE, 0);
+  gtk_widget_show(opt.randomizeHosts);
 
   gtk_widget_show(vbox);
   gtk_widget_show(frame);
@@ -1455,7 +1469,6 @@ GtkAdjustment *adjust;
   gtk_combo_box_set_active(GTK_COMBO_BOX (opt.outputFormatType), opt.outputFormatValue);
   /* Fifth Notebook - Options */
   gtk_combo_box_set_active(GTK_COMBO_BOX (opt.resolveType), opt.resolveValue);
-  gtk_combo_box_set_active(GTK_COMBO_BOX (opt.verboseType), opt.verboseValue);
 
   display_nmap_command();
 

@@ -1,9 +1,5 @@
-NOTE: This has been upgraded to pcap 0.9.3 since the instructions
-below were written.  That upgrade was done by applying a diff
-between pcap 0.8.3 and 0.9.3 to the Nmap libpcap dir.
-
 Nmap currently includes a modified version of the tcpdump.org release
-of libpcap version 0.8.3 (released March 30, 2004).  My
+of libpcap version 0.9.4 (released October 2, 2005).  My
 (fyodor@insecure.org) modifications are as follows:
 
 o Included this file, renamed directory from libpcap-0.8.3 to
@@ -12,20 +8,18 @@ o Included this file, renamed directory from libpcap-0.8.3 to
 o Renamed configure.in to configure.ac, which is the name now
   recommended by the autoconf project.
 
-o Removed the .cvsignore file, all 'CVS' directories, the 'packaging' directory, and the install-sh script.
+o Removed the .cvsignore file, all 'CVS' directories, the 'packaging'
+  directory, (pcap spec file conflicts w/Nmap spec file when I
+  rpmbuild from tarball) and the install-sh script.
 
-o Rewrote Win32 version of eth_open() as the previous verson didn't
-  work on any of my Windows machines.
-  
+o Updated config.sub and config.guess (in the distribution file they
+  are just symlinks to the corresponding files in the nmap dir
+
+o Removed the Win32 and msdos directories as Nmap doesn't use them
+
 o Added the gcc debugging flag (-g) to aclocal.m4 if gcc is being used:
---- libpcap-0.8.3/aclocal.m4    2003-11-16 01:45:51.000000000 -0800
-+++ libpcap/aclocal.m4 2004-07-31 22:34:47.000000000 -0700
-@@ -1,4 +1,4 @@
--dnl @(#) $Header$ (LBL)
-+dnl @(#) $Header$ (LBL)
- dnl
- dnl Copyright (c) 1995, 1996, 1997, 1998
- dnl    The Regents of the University of California.  All rights reserved.
+--- libpcap-0.9.4/aclocal.m4    2005-04-20 20:42:09.000000000 -0700
++++ libpcap/aclocal.m4  2006-08-16 15:27:46.000000000 -0700
 @@ -76,7 +76,7 @@
      if test "$GCC" = yes ; then
             if test "$SHLICC2" = yes ; then
@@ -45,81 +39,19 @@ o Added the gcc debugging flag (-g) to aclocal.m4 if gcc is being used:
             fi
      else
 
-o The config.sub and config.guess have been upgraded (in the distribution
-  file they are just symlinks to the corresponding files in the nmap dir
-
-o Changed pcap-linux.c by adding a select() call guarding recvfrom()
-  to insure that it returns after the timeout period specified in
-  pcap_open_live() rather than blocking forever.
---- libpcap-0.8.3/pcap-linux.c  2003-11-21 02:20:46.000000000 -0800
-+++ libpcap/pcap-linux.c       2004-07-31 22:34:47.000000000 -0700
-@@ -27,7 +27,7 @@
- 
- #ifndef lint
- static const char rcsid[] _U_ =
--    "@(#) $Header$ (LBL)";
-+    "@(#) $Header$ (LBL)";
- #endif
- 
- /*
-@@ -96,6 +96,7 @@
- #include <netinet/in.h>
- #include <linux/if_ether.h>
- #include <net/if_arp.h>
-+#include <assert.h>
- 
- /*
-  * If PF_PACKET is defined, we can use {SOCK_RAW,SOCK_DGRAM}/PF_PACKET
-@@ -483,6 +484,32 @@
-                        return -2;
-                }
-                fromlen = sizeof(from);
-+               /* If the user specified a timeout in pcap_open_live(),
-+                  we will honor the timeout and return even if no packets
-+                  have arrived */
-+               if (handle->md.timeout > 0) {
-+                 fd_set readfs;
-+                 struct timeval tv;
-+                  int res;
-+                 
-+                  FD_ZERO(&readfs);
-+                  FD_SET(handle->fd, &readfs);
-+                  bzero((void *) &tv, sizeof(tv));
-+                  tv.tv_sec = handle->md.timeout / 1000;
-+                  tv.tv_usec = (handle->md.timeout % 1000 ) * 1000;
-+                  do {
-+                   /* since this is in pcap-linux.c, we can assume
-+                      Linux select() behavior WRT decrementing tv */
-+                    res = select(handle->fd + 1, &readfs, NULL, NULL, &tv);
-+                   if (res == 1) break;
-+                   if (res == 0) return 0;
-+                   assert(res == -1);
-+                   if (errno == EINTR) continue;
-+                   snprintf(handle->errbuf, sizeof(handle->errbuf), "select: %s", pcap_strerror(errno));
-+                   return -1;
-+                 } while (1);
-+               }
-+
-                packet_len = recvfrom(
-                        handle->fd, bp + offset,
-                        handle->bufsize - offset, MSG_TRUNC,
+o Used to change pcap-linux.c by adding a select() call guarding
+  recvfrom() to insure that it returns after the timeout period
+  specified in pcap_open_live() rather than blocking forever.  But now
+  we use the new get_selectable_fd() API instead (thanks to Doug Hoyte
+  for the patch).
 
 o Eliminated Lex/Yacc requirement (I now ship the generated .c files).
   This involved:
 
    o Changes to Makefile.in
---- libpcap-0.8.3/Makefile.in   2003-12-14 17:42:23.000000000 -0800
-+++ libpcap/Makefile.in        2004-07-31 22:34:47.000000000 -0700
-@@ -17,7 +17,7 @@
- #  WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
- #  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
- #
--# @(#) $Header$ (LBL)
-+# @(#) $Header$ (LBL)
- 
- #
- # Various configurable paths (remember to edit Makefile.in, not Makefile)
-@@ -60,8 +60,8 @@
+--- libpcap-0.9.4/Makefile.in   2003-12-14 17:35:03.000000000 -0800
++++ libpcap/Makefile.in 2006-08-16 15:32:39.000000000 -0700
+@@ -61,8 +61,8 @@
  # used by the generated parser.  This allows programs to use lex/yacc
  # and link against libpcap.  If you don't have flex or bison, get them.
  #
@@ -127,40 +59,25 @@ o Eliminated Lex/Yacc requirement (I now ship the generated .c files).
 -YACC = @V_YACC@
 +LEX = flex
 +YACC = yacc
- 
+
  # Explicitly define compilation rule since SunOS 4's make doesn't like gcc.
  # Also, gcc does not remove the .o before forking 'as', which can be a
-@@ -94,7 +94,7 @@
+@@ -95,7 +95,7 @@
  TAGFILES = \
         $(SRC) $(HDR) $(TAGHDR)
- 
+
 -CLEANFILES = $(OBJ) libpcap.a $(GENSRC) $(GENHDR) lex.yy.c
 +CLEANFILES = $(OBJ) libpcap.a version.c lex.yy.c
- 
+
  all: libpcap.a
  
   o Ripped LEX/YACC detection code from configure.in:
---- libpcap-0.8.3/configure.in  2004-03-28 13:43:34.000000000 -0800
-+++ libpcap/configure.ac       2004-07-31 22:34:47.000000000 -0700
-@@ -1,4 +1,4 @@
--dnl @(#) $Header$ (LBL)
-+dnl @(#) $Header$ (LBL)
- dnl
- dnl Copyright (c) 1994, 1995, 1996, 1997
- dnl    The Regents of the University of California.  All rights reserved.
-@@ -6,7 +6,7 @@
- dnl Process this file with autoconf to produce a configure script.
- dnl
- 
--AC_REVISION($Revision: 2867 $)
-+AC_REVISION($Revision: 2867 $)
- AC_PREREQ(2.50)
- AC_INIT(pcap.c)
- 
-@@ -341,25 +341,6 @@
-        AC_MSG_ERROR(Specifying the capture type as 'dag' requires the DAG API to be present; use --with-dag=DIR)
+--- libpcap-0.9.4/configure.in  2005-07-06 23:56:03.000000000 -0700
++++ libpcap/configure.ac        2006-08-16 15:35:31.000000000 -0700
+@@ -677,25 +677,6 @@
+        AC_MSG_ERROR(Specifying the capture type as 'septel' requires the Septel API to be present; use --with-septel=DIR)
  fi
- 
+
 -
 -AC_LBL_LEX_AND_YACC(V_LEX, V_YACC, pcap_)
 -if test "$V_LEX" = lex ; then
@@ -180,10 +97,10 @@ o Eliminated Lex/Yacc requirement (I now ship the generated .c files).
 -       fi
 -fi
 -
+ DYEXT="so"
  case "$host_os" in
- 
- aix*)
-@@ -420,11 +401,9 @@
+
+@@ -773,11 +754,9 @@
  AC_SUBST(V_DEFS)
  AC_SUBST(V_INCLS)
  AC_SUBST(V_LIBS)
@@ -193,14 +110,12 @@ o Eliminated Lex/Yacc requirement (I now ship the generated .c files).
  AC_SUBST(V_RANLIB)
 -AC_SUBST(V_YACC)
  AC_SUBST(SSRC)
- 
- AC_PROG_INSTALL
+ AC_SUBST(DYEXT)
 
 o An OpenBSD portability fix to make loopback work:
-diff -w -u -r1.1 pcap-bpf.h
---- pcap-bpf.h  1 Aug 2004 05:34:47 -0000       1.1
-+++ pcap-bpf.h  29 Jan 2005 20:32:24 -0000
-@@ -235,12 +235,14 @@
+--- libpcap-0.9.4/pcap-bpf.h    2005-08-13 15:29:47.000000000 -0700
++++ libpcap/pcap-bpf.h  2006-08-16 15:36:42.000000000 -0700
+@@ -246,12 +246,14 @@
   * OpenBSD DLT_LOOP, for loopback devices; it's like DLT_NULL, except
   * that the AF_ type in the link-layer header is in network byte order.
   *
@@ -216,22 +131,21 @@ diff -w -u -r1.1 pcap-bpf.h
 +#else
  #define DLT_LOOP       108
 +#endif
- 
+
  /*
   * Encapsulated packets for IPsec; DLT_ENC is 13 in OpenBSD, but that's
 
+o The following patch removes some code that apparently causes libpcap
+  on Solaris to wait for 64K chunks before returning in some cases,
+  regardless of the timeout values.  Problem report and patch came
+  from Ben Harris (bjh21(a)cam.ac.uk)
 
-The following patch removes some code that apparently causes libpcap on
-Solaris to wait for 64K chunks before returning in some cases, regardless of
-the timeout values.  Problem report and patch came from 
-Ben Harris (bjh21(a)cam.ac.uk)
-
---- pcap-dlpi.c 1 Aug 2004 05:34:47 -0000       1.4
-+++ pcap-dlpi.c 1 Feb 2005 20:29:29 -0000
-@@ -675,16 +675,6 @@
+--- libpcap-0.9.4/pcap-dlpi.c   2005-08-13 16:15:58.000000000 -0700
++++ libpcap/pcap-dlpi.c 2006-08-16 15:38:26.000000000 -0700
+@@ -895,16 +895,6 @@
                 }
         }
- 
+
 -       /*
 -       ** Set the chunk length.
 -       */
@@ -243,19 +157,18 @@ Ben Harris (bjh21(a)cam.ac.uk)
 -               goto bad;
 -       }
  #endif
- 
-        /*
 
-o Removed packaging/pcap.spec because it conflicted with the Nmap spec file when building RPMs from the tarball.
+        /*
 
 o Changed the configure.ac to enable -fno-strict-aliasing when GCC 4+
 is in use.  Here is that patch:
---- configure.ac        (revision 2864)
-+++ configure.ac        (working copy)
-@@ -741,6 +741,39 @@
- 
+
+--- libpcap-0.9.4/configure.in  2005-07-06 23:56:03.000000000 -0700
++++ libpcap/configure.ac        2006-08-16 15:40:51.000000000 -0700
+@@ -760,6 +741,39 @@
+
  AC_LBL_UNALIGNED_ACCESS
- 
+
 +pcap_gcc_major_version=0
 +AC_MSG_CHECKING([whether the compiler is gcc 4 or greater])
 +if test x"$GCC" = xno; then
@@ -292,3 +205,6 @@ is in use.  Here is that patch:
  #
  # Makefile.in includes rules to generate version.h, so we assume
  # that it will be generated if autoconf is used.
+
+o Ran autoconf to regenerate configure (I ship those with the Nmap
+  tarball rather than generating them at build time).

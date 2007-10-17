@@ -4,6 +4,7 @@
 	Version="8.00"
 	Name="nsock"
 	ProjectGUID="{F8D6D1E3-D4EA-402C-98AA-168E5309BAF4}"
+        RootNamespace="nsock"
 	Keyword="Win32Proj"
 	>
 	<Platforms>
@@ -106,6 +107,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
+                               AdditionalOptions="/D &quot;_CRT_SECURE_NO_DEPRECATE&quot;"
 				AdditionalIncludeDirectories="..\nbase\;include"
 				PreprocessorDefinitions="WIN32;NDEBUG;_LIB"
 				ExceptionHandling="0"

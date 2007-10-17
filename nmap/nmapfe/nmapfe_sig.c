@@ -4,17 +4,17 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2004 Insecure.Com LLC. Nmap       *
- * is also a registered trademark of Insecure.Com LLC.  This program is    *
- * free software; you may redistribute and/or modify it under the          *
- * terms of the GNU General Public License as published by the Free        *
- * Software Foundation; Version 2.  This guarantees your right to use,     *
- * modify, and redistribute this software under certain conditions.  If    *
- * you wish to embed Nmap technology into proprietary software, we may be  *
- * willing to sell alternative licenses (contact sales@insecure.com).      *
- * Many security scanner vendors already license Nmap technology such as  *
- * our remote OS fingerprinting database and code, service/version         *
- * detection system, and port scanning code.                               *
+ * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
  *                                                                         *
  * Note that the GPL places important restrictions on "derived works", yet *
  * it does not provide a detailed definition of that term.  To avoid       *
@@ -37,7 +37,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://www.insecure.org/nmap/ to download Nmap.                         *
+ * http://insecure.org/nmap/ to download Nmap.                             *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -49,10 +49,10 @@
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
  * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to many    *
- * security vendors, and generally include a perpetual license as well as  *
- * providing for priority support and updates as well as helping to fund   *
- * the continued development of Nmap technology.  Please email             *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
  * sales@insecure.com for further information.                             *
  *                                                                         *
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
@@ -96,7 +96,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmapfe_sig.c 3437 2006-06-10 21:23:27Z fyodor $ */
+/* $Id: nmapfe_sig.c 4123 2006-11-03 05:36:41Z fyodor $ */
 
 
 /* Original Author: Zach
@@ -167,7 +167,6 @@ HANDLE pipes[2]; /* 0 == read; 1 == write */
 int pipes[2] = {-1,-1};
 #endif
 int verb = 0;
-extern char **environ;
 
 
 
@@ -183,9 +182,9 @@ main (int   argc,
 
 #ifndef WIN32
     signal(SIGPIPE, SIG_IGN);
-    opt.uid = getuid();
+    opt.isr00t = !geteuid();
 #else
-    opt.uid = 0; /* With Windows (in general), every user is a Super User! */
+    opt.isr00t = 1; /* With Windows (in general), every user is a Super User! */
 #endif
 
     main_win = create_main_win();
@@ -193,7 +192,7 @@ main (int   argc,
 
     gtk_text_buffer_get_end_iter (opt.buffer, &iter);
     gtk_text_buffer_insert_with_tags_by_name (opt.buffer, &iter, 
-            (opt.uid == 0)
+            (opt.isr00t)
             ? "You are root - All options granted."
             : "You are *NOT* root - Some options aren't available.", -1, 
             "normal", NULL);
@@ -202,203 +201,42 @@ main (int   argc,
     return 0;
 }
 
-void scanButton_toggled_cb(GtkButton *button, void *ignored)
+// tokensz is the total size of token in characters
+static char *next_token(char *buf, char *token, int tokensz)
 {
-  if(GTK_TOGGLE_BUTTON(button)->active) {
-  char *command = build_command();
+  if ((buf != NULL) && (token != NULL)) {
+  int count = (strchr("\t ", *buf) != NULL)
+              ? strspn(buf, "\t ")
+              : strcspn(buf, "\t ");
 
-  if(!(opt.appendLog))
-          gtk_text_buffer_set_text (GTK_TEXT_BUFFER(opt.buffer), "\0", -1);
+    if (count > 0) {
+      char *bol = buf;
+    char *eol;
 
-    nmap_pid = execute(command);
-}
-  else {
-    if (stop_scan()) {
-    static char string[256];
+      count = MIN(count, tokensz - 1);
+      eol = buf+count;
 
-      strcpy(string, "CANCELLED!\n\n");
-      print_line(GTK_TEXT_BUFFER(opt.buffer), string);
-}
-}
-}
+      /* copy token  */
+      memcpy(token, buf, count);
+      token[count] = '\0';
 
+      /* remove token from str */
+      while (*eol != '\0')
+        *bol++ = *eol++;
+      *bol = '\0';
 
-void 
-saveLog (char *filename)
-{
-    GtkTextIter start, end;
-    if (filename && *filename) {
-        FILE *file;
-        if ((file = fopen(filename, "w"))) {
-	  gchar *text;
-            gtk_text_buffer_get_start_iter(opt.buffer, &start);
-            gtk_text_buffer_get_end_iter(opt.buffer, &end);
-            text = gtk_text_buffer_get_text(opt.buffer,
-                    &start, &end, FALSE);
-
-            fputs(text, file);
-            fclose(file);
-            free(text);
-        }
+      return(token);
     }
-}
-
-
-void openLog(char *filename)
-{
-  if (filename && *filename) {
-  FILE *file;
-     
-  if (!opt.appendLog) 
-          gtk_text_buffer_set_text (GTK_TEXT_BUFFER(opt.buffer), "\0", -1);
-	
-    if((file = fopen(filename, "r"))) {
-    char buf[BUFSIZ+1];
-
-      while(fgets(buf, BUFSIZ, file) != NULL) {
-        print_line(GTK_TEXT_BUFFER(opt.buffer), buf);
-      }
-
-      fclose(file);
-    }
+    return(buf);
   }
+  return(NULL);
 }
 
 
-void okButton_clicked_cb(GtkWidget *window, GtkButton *button)
+static char *build_command()
 {
-const char *selected = gtk_file_selection_get_filename(GTK_FILE_SELECTION(window));
-void (*action)() = (void (*)())g_object_get_data(G_OBJECT(window), "NmapFE_action");
-GtkEntry *entry = g_object_get_data(G_OBJECT(window), "NmapFE_entry");
-char *filename = g_object_get_data(G_OBJECT(window), "NmapFE_filename");
-
-  if (filename && selected) {
-    strncpy(filename, selected, FILENAME_MAX);
-    filename[FILENAME_MAX-1] = '\0';
-    if (action)
-      (*action)(filename);
-    if (entry)
-      gtk_entry_set_text(GTK_ENTRY(entry), filename);
-  }
-}
-
-
-/* The idea of execute() is to create an Nmap process running in the background with its stdout
-    connected to a pipe we can poll many times per second to collect any new output.  Admittedly 
-	there are much more elegant ways to do this, but this is how it works now.  The functions
-	return the process ID of nmap.  This process is
-	different enough between windows & UNIX that I have two functions for doing it: */
-int execute_unix(char *command)
-{
-#ifdef WIN32
-  fatal("The execute_unix function should not be called from Windows!");
-  return -1;
-#else
-
-  /* Many thanks to Fyodor for helping with the piping */
-  if (pipe(pipes) == -1) {
-    perror("poopy pipe error");
-    exit(1);
-  }
-
-  if (!(pid = fork())) {
-    char **argv;
-    int argc;
-
-    argc = arg_parse(command, &argv);
-		
-    if (argc <= 0)
-      exit(1);
-    dup2(pipes[1], 1);
-    dup2(pipes[1], 2);
-    fcntl(pipes[0], F_SETFL, O_NDELAY);
-    if (execvp("nmap", argv) == -1) {
-      fprintf(stderr, "Nmap execution failed.  errno=%d (%s)\n", errno, strerror(errno));
-      exit(1);
-    }
-    /*exit(127);*/
-  }
-  if (pid == -1) {
-    fprintf(stderr, "fork() failed.  errno=%d (%s)", errno, strerror(errno));
-    pid = 0;
-    close(pipes[0]);
-    pipes[0] = -1;
-  }
-  close(pipes[1]);
-  pipes[1] = -1;
-
-  return(pid);
-
-#endif
-}
-
-
-/* Parts cribbed from _Win32 System Programming Second Edition_ pp 304 */
-int execute_win(char *command)
-{
-#ifndef WIN32
-  fatal("The execute_win function should ONLY be called from Windows!");
-  return -1;
-#else
-
-/* For pipes[] array:  0 == READ; 1 == WRITE */
-
-/* To ensure pipe handles are inheritable */
-SECURITY_ATTRIBUTES PipeSA = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
-PROCESS_INFORMATION Nmap_Proc;
-STARTUPINFO Nmap_Start;
-
-  GetStartupInfo(&Nmap_Start);
-
-  /* Create our pipe for reading Nmap output */
-  if (!CreatePipe(&pipes[0], &pipes[1], &PipeSA, 8196))
-    pfatal("execute_win: Failed to create pipes!");
-
-  /* Insure that stdout/stderr for Nmap will go to our pipe */
-  Nmap_Start.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-  Nmap_Start.hStdError = pipes[1];
-  Nmap_Start.hStdOutput = pipes[1];
-  Nmap_Start.dwFlags = STARTF_USESTDHANDLES;
-
-  /* Start up Nmap! */
-  if (!CreateProcess ( NULL, command, NULL, NULL, TRUE, 0, NULL, NULL, &Nmap_Start, &Nmap_Proc))
-    pfatal("execute_win: Failed to start Nmap process with command '%s'", command);
-
-  /* I don't care about the thread handle or the write pipe anymore */
-  CloseHandle(Nmap_Proc.hThread);
-   CloseHandle(pipes[1]);
-
-  /* I'm gonna squirrel away the Nmap process handle in a global variable.
-     All this nonsense needs to be redone */
-   NmapHandle = Nmap_Proc.hProcess;
-
-  return Nmap_Proc.dwProcessId;
-
-#endif
-}
-
-int execute(char *command)
-{
-#ifdef WIN32
-int pid = execute_win(command);
-#else
-int pid = execute_unix(command);
-#endif /* WIN32 */
-
-/* timer for calling our read function to poll for new data 8 times per second */
- g_timeout_add(125, read_data, NULL);
-
-  return(pid);
-}
-
-
-
-
-char *build_command()
-{
-int size = 2560; /* this should be long enough ;-) */
 static char *command = NULL;
-static int command_size = 0;
+int command_size = 2560;
 
   /* Find how much to malloc() */
   // size = strlen(gtk_entry_get_text(GTK_ENTRY(opt.range_text))) +
@@ -410,8 +248,8 @@ static int command_size = 0;
   //   2560;
   /* We get 60 from the chars required for each option */
 
-  if (size > command_size)
-    command = realloc(command, size);
+  if (!command)
+    command = safe_malloc(command_size);
 
   strcpy(command, "nmap ");
  
@@ -577,6 +415,28 @@ static int command_size = 0;
   else if (opt.resolveValue == NEVER_RESOLVE)
     strcat(command, "-n ");		
 
+  if (GTK_TOGGLE_BUTTON(opt.verbose)->active) {
+  int val = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(opt.verboseValue));
+
+    if (val == 1)
+      strcat(command, "-v ");
+    else if (val == 2)
+      strcat(command, "-vv ");
+  }
+
+  if (GTK_TOGGLE_BUTTON(opt.debug)->active) {
+  int val = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(opt.debugValue));
+
+    if (val > 0) {
+      strcat(command, "-d");
+
+      if (val > 1)
+        sprintf(command+strlen(command), "%d", val);
+
+      strcat(command, " ");
+    }
+  }
+
   if (GTK_WIDGET_SENSITIVE(opt.useDecoy) &&
       GTK_TOGGLE_BUTTON(opt.useDecoy)->active) {
   const char *val = gtk_entry_get_text(GTK_ENTRY(opt.Decoy));
@@ -633,6 +493,10 @@ static int command_size = 0;
       GTK_TOGGLE_BUTTON(opt.useOrderedPorts)->active)
     strcat(command, "-r ");
 
+  if (GTK_WIDGET_SENSITIVE(opt.randomizeHosts) &&
+      GTK_TOGGLE_BUTTON(opt.randomizeHosts)->active)
+    strcat(command, "--randomize-hosts ");
+
   if (GTK_WIDGET_SENSITIVE(opt.useInputFile) &&
       GTK_TOGGLE_BUTTON(opt.useInputFile)->active) {
   const char *val = gtk_entry_get_text(GTK_ENTRY(opt.inputFilename));
@@ -667,366 +531,12 @@ static int command_size = 0;
     }
   }
  
-  if (opt.verboseValue == V1_VERBOSE)
-    strcat(command, "-v ");
-  else if (opt.verboseValue == V2_VERBOSE)
-    strcat(command, "-vv ");
-  else if (opt.verboseValue == D1_VERBOSE)
-    strcat(command, "-d ");
-  else if (opt.verboseValue == D2_VERBOSE)
-    strcat(command, "-d2 ");
-
   strcat(command, gtk_entry_get_text(GTK_ENTRY(opt.targetHost)));
 
   return(command);
 }
 
-void display_nmap_command()
-{
-char *command = build_command();
-
-  gtk_entry_set_text(GTK_ENTRY(opt.commandEntry), command);
-}
-
-
-void display_nmap_command_cb(GtkWidget *target_option, void *ignored)
-{
-  display_nmap_command();
-}
-
-
-void browseButton_pressed_cb(GtkWidget *widget, GtkWidget *text)
-{
-static char filename[FILENAME_MAX+1] = "";
-const char *name = gtk_entry_get_text(GTK_ENTRY(text));
-
-  if (name && *name) {
-    strncpy(filename, name, FILENAME_MAX);
-    filename[FILENAME_MAX] = '\0';
-  }
-
-  gtk_widget_show(create_fileSelection("Select File", filename, NULL, GTK_ENTRY(text)));
-}
-
-void scanType_cb 
-(GtkComboBox *w, gpointer data)
-{	
-    Entry *user = data;
-    gint i = 0, j, k;
-
-    j = gtk_combo_box_get_active(w);
-
-    if (opt.uid == 0) {
-        k = j;
-    } else {
-        for (k = 0; user[k].scantype; k++) {
-            if (user[k].rootonly != TRUE) {
-                if (i == j) {
-                    break;
-                }
-                i++;
-            }
-        }
-    }
-    opt.scanValue = user[k].scantype;
-
-    if ((opt.scanValue == PING_SCAN) || (opt.scanValue == LIST_SCAN)) {
-      // gtk_widget_set_sensitive(GTK_WIDGET(opt.protportFrame), FALSE);
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.protportType), FALSE);
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.protportLabel), FALSE);
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.protportRange), FALSE);
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.OSInfo), FALSE);
-    } else {
-      // gtk_widget_set_sensitive(GTK_WIDGET(opt.protportFrame), TRUE);
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.protportType), TRUE);
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.protportLabel),
-                               (opt.protportValue == GIVEN_PROTPORT));
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.protportRange),
-                               (opt.protportValue == GIVEN_PROTPORT));
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.OSInfo), TRUE);
-    }
-
-    if ((opt.scanValue == PING_SCAN) || 
-            (opt.scanValue == LIST_SCAN) || (opt.scanValue == PROT_SCAN)) {
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.RPCInfo), FALSE);
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.VersionInfo), FALSE);
-    } else {
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.RPCInfo), TRUE);
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.VersionInfo), TRUE);
-    }
-
-    if ((opt.scanValue == CONNECT_SCAN) || (opt.scanValue == BOUNCE_SCAN)) {
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.useDecoy), FALSE);
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.Decoy), FALSE);
-    } else if (opt.uid == 0) {
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.useDecoy), TRUE);
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.Decoy), TRUE);
-    }
-
-    if ((opt.scanValue != ACK_SCAN) && 
-            (opt.scanValue != MAIMON_SCAN) && (opt.scanValue != FIN_SCAN) &&
-            (opt.scanValue != SYN_SCAN) && (opt.scanValue != NULL_SCAN) && 
-            (opt.scanValue != XMAS_SCAN) && (opt.scanValue != WIN_SCAN))
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.useFragments), FALSE);
-    else if (opt.uid == 0)
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.useFragments), TRUE);
-
-    if ((opt.scanValue == BOUNCE_SCAN) || (opt.scanValue == IDLE_SCAN)) {
-      gtk_label_set_text(GTK_LABEL(opt.scanRelayLabel), 
-                         (opt.scanValue == BOUNCE_SCAN) ? "Bounce Host:" : "Zombie Host:");
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.scanRelayLabel), TRUE);
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.scanRelay), TRUE);
-      gtk_widget_grab_focus(GTK_WIDGET(opt.scanRelay));
-    } else {
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.scanRelayLabel), FALSE);
-      gtk_label_set_text(GTK_LABEL(opt.scanRelayLabel), "Relay Host:");
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.scanRelay), FALSE);
-    }
-
-    g_object_set(G_OBJECT(opt.protportFrame), "label",
-                   (opt.scanValue == PROT_SCAN) ? "Scanned Protocols" : "Scanned Ports", NULL);
-
-  display_nmap_command();
-}
-
-
-void pingButton_toggled_cb(GtkWidget *ping_button, void *ignored)
-{
-gboolean status = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(ping_button));
-
-  if (ping_button == opt.dontPing) {
-  gboolean localstatus = (GTK_TOGGLE_BUTTON(opt.tcpPing)->active) && (!status);
-
-    gtk_widget_set_sensitive(GTK_WIDGET(opt.tcpPing), !status);
-    gtk_widget_set_sensitive(GTK_WIDGET(opt.tcpPingLabel), localstatus);
-    gtk_widget_set_sensitive(GTK_WIDGET(opt.tcpPingPorts), localstatus);
-    if (opt.uid == 0) {
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.icmpechoPing), !status);
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.icmpmaskPing), !status);
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.icmptimePing), !status);
-
-      localstatus = (GTK_TOGGLE_BUTTON(opt.synPing)->active) && (!status);
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.synPing), !status);
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.synPingLabel), localstatus);
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.synPingPorts), localstatus);
-
-      localstatus = (GTK_TOGGLE_BUTTON(opt.udpPing)->active) && (!status);
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.udpPing), !status);
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.udpPingLabel), localstatus);
-      gtk_widget_set_sensitive(GTK_WIDGET(opt.udpPingPorts), localstatus);
-    }
-  }
-  else if (ping_button == opt.tcpPing) {
-    gtk_widget_set_sensitive(GTK_WIDGET(opt.tcpPingLabel), status);
-    gtk_widget_set_sensitive(GTK_WIDGET(opt.tcpPingPorts), status);
-  }
-  else if ((ping_button == opt.synPing) && (opt.uid == 0)) {
-    gtk_widget_set_sensitive(GTK_WIDGET(opt.synPingLabel), status);
-    gtk_widget_set_sensitive(GTK_WIDGET(opt.synPingPorts), status);
-  }
-  else if ((ping_button == opt.udpPing) && (opt.uid == 0)) {
-    gtk_widget_set_sensitive(GTK_WIDGET(opt.udpPingLabel), status);
-    gtk_widget_set_sensitive(GTK_WIDGET(opt.udpPingPorts), status);
-  }
-  
-  display_nmap_command();
-}
-
-
-void throttleType_cb (GtkComboBox *w, gpointer data)
-{	
-    opt.throttleValue = gtk_combo_box_get_active(w);
-    display_nmap_command();
-}
-
-
-void resolveType_cb (GtkComboBox *w, gpointer data)
-{
-    opt.resolveValue = gtk_combo_box_get_active(w);
-    display_nmap_command();
-}
-
-
-void protportType_cb(GtkComboBox *w, gpointer d)
-{
-    opt.protportValue = gtk_combo_box_get_active(w);
-
-    gtk_widget_set_sensitive(GTK_WIDGET(opt.protportLabel), 
-            (opt.protportValue == GIVEN_PROTPORT));
-    gtk_widget_set_sensitive(GTK_WIDGET(opt.protportRange), 
-            (opt.protportValue == GIVEN_PROTPORT));
-    if (opt.protportValue == GIVEN_PROTPORT)
-      gtk_widget_grab_focus(GTK_WIDGET(opt.protportRange));
-
-    display_nmap_command();
-}
-
-
-/* callback for factory generated menu items: set variable to action */
-void verboseType_cb(GtkComboBox *w, gpointer d)
-{
-  opt.verboseValue = gtk_combo_box_get_active(w);
-  display_nmap_command();
-}
-
-
-/* callback for factory generated menu items: set variable to action */
-void outputFormatType_cb(GtkComboBox *w, gpointer d)
-{
-  opt.outputFormatValue = gtk_combo_box_get_active(w);
-  display_nmap_command();
-}
-
-
-/* callback for toggle buttons: control other objects seneistivity */
-void toggle_button_set_sensitive_cb(GtkWidget *master, GtkWidget *slave)
-{
-  if ((master != NULL) && (slave != NULL) && GTK_IS_TOGGLE_BUTTON(master))
-    gtk_widget_set_sensitive(GTK_WIDGET(slave), GTK_TOGGLE_BUTTON(master)->active);
-
-  display_nmap_command();
-}
-
-
-void validate_file_change(GtkWidget *button, void *ignored)
-{	
-gboolean status = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(button));
-
-  if (button == opt.useInputFile) {
-    gtk_widget_set_sensitive(GTK_WIDGET(opt.targetHost), !status);
-    gtk_widget_set_sensitive(GTK_WIDGET(opt.inputFilename), status);
-    gtk_widget_set_sensitive(GTK_WIDGET(opt.inputBrowse), status);
-  } else if (button == opt.useOutputFile) {
-    gtk_widget_set_sensitive(GTK_WIDGET(opt.outputFilename), status);
-    gtk_widget_set_sensitive(GTK_WIDGET(opt.outputBrowse), status);
-    gtk_widget_set_sensitive(GTK_WIDGET(opt.outputFormatLabel), status);
-    gtk_widget_set_sensitive(GTK_WIDGET(opt.outputFormatType), status);
-    gtk_widget_set_sensitive(GTK_WIDGET(opt.outputAppend), status);
-  }
-
-  display_nmap_command();
-}
-
-
-void validate_option_change(GtkWidget *target_option, void *ignored)
-{	
-gboolean status = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(target_option));
-
-  if ((target_option == opt.useInputFile) && (status))
-    gtk_entry_set_text(GTK_ENTRY(opt.targetHost), "");
-
-  display_nmap_command();
-}
-
-
-/* The read_from_pipe functions (UNIX & Win versions) do a non-blocking read from the pipe
-   given into the buffer given up to a maximum read length of bufsz.  The number of bytes 
-   read is returned.  -1 is returned in the case of heinous error.  Returned buffer is NOT
-   NUL terminated */
-#ifdef WIN32
-
-static int read_from_pipe(HANDLE pipe, char *buf, int bufsz)
-{
-int ret;
-int count = 0;
-
-/* First lets check if anything is ready for us.
-   Note: I don't know if this technique even works! */
-  ret = WaitForSingleObject(pipe, 0);
-  if ( ret == WAIT_OBJECT_0 ) {
-    /* Apparently the pipe is available for reading -- Read up to # of bytes in buffer */
-    if (!ReadFile(pipe, buf, bufsz, &count, NULL)) {
-      if (GetLastError() != ERROR_BROKEN_PIPE)
-	pfatal("ReadFile on Nmap process pipe failed!");
-    }
-  }
-  return count;
-}
-
-#else
-
-/* NOTE:  pipefd must be in O_NONBLOCK mode ( via fcntl ) */
-static int read_from_pipe(int pipefd, char *buf, int bufsz)
-{
-int count;
-
-  if (pipefd == -1) return -1;
-  count = read(pipefd, buf, bufsz);
-  if (count == -1 && errno != EINTR && errno != EAGAIN) {
-    pfatal("Failed to read from nmap process pipe");
-  }
-  return count;
-}
-
-#endif /* read_from_pipe Win32/UNIX selector */
-
-
-/* split buf into first line and remainder by
-   copying the first line into line and stripping it from str;
-   return the first line from str or NULL if str contains no full line.
-   bufsz is the number of chars in buf.
- */
-char *next_line(char *buf, int bufsz, char *line)
-{
-  if ((buf != NULL) && (line != NULL)) {
-  char *eol = strchr(buf, '\n');
-
-    if (eol != NULL) {
-      char *bol = buf;
-    int linelen = MIN(bufsz - 1, eol - buf + 1); // we can't exceed buffer size
-
-      /* copy line including \n to line */
-      memcpy(line, buf, linelen);
-      line[linelen] = '\0';
-
-      eol = buf + linelen;
-
-      /* remove line from str */
-      while (*eol != '\0')
-	*bol++ = *eol++;
-      *bol = '\0';
-      
-      return(line);
-    }
-    return(buf);
-  }
-  return(NULL);
-}
-
-
-// tokensz is the total size of token in characters
-char *next_token(char *buf, char *token, int tokensz)
-{
-  if ((buf != NULL) && (token != NULL)) {
-  int count = (strchr("\t ", *buf) != NULL)
-              ? strspn(buf, "\t ")
-              : strcspn(buf, "\t ");
-
-    if (count > 0) {
-      char *bol = buf;
-    char *eol;
-
-      count = MIN(count, tokensz - 1);
-      eol = buf+count;
-
-      /* copy token  */
-      memcpy(token, buf, count);
-      token[count] = '\0';
-
-      /* remove token from str */
-      while (*eol != '\0')
-        *bol++ = *eol++;
-      *bol = '\0';
-
-      return(token);
-    }
-    return(buf);
-  }
-  return(NULL);
-}
-
-
-void 
+static void 
 print_line (GtkTextBuffer *buffer, 
             char          *line)
 {
@@ -1111,8 +621,161 @@ print_line (GtkTextBuffer *buffer,
   }
 }
 
+void scanButton_toggled_cb(GtkButton *button, void *ignored)
+{
+  if(GTK_TOGGLE_BUTTON(button)->active) {
+  char *command = build_command();
 
-gint read_data(gpointer data)
+  if(!(opt.appendLog))
+          gtk_text_buffer_set_text (GTK_TEXT_BUFFER(opt.buffer), "\0", -1);
+
+    nmap_pid = execute(command);
+}
+  else {
+    if (stop_scan()) {
+    static char string[256];
+
+      strcpy(string, "CANCELLED!\n\n");
+      print_line(GTK_TEXT_BUFFER(opt.buffer), string);
+}
+}
+}
+
+
+void 
+saveLog (char *filename)
+{
+    GtkTextIter start, end;
+    if (filename && *filename) {
+        FILE *file;
+        if ((file = fopen(filename, "w"))) {
+	  gchar *text;
+            gtk_text_buffer_get_start_iter(opt.buffer, &start);
+            gtk_text_buffer_get_end_iter(opt.buffer, &end);
+            text = gtk_text_buffer_get_text(opt.buffer,
+                    &start, &end, FALSE);
+
+            fputs(text, file);
+            fclose(file);
+            free(text);
+        }
+    }
+}
+
+
+void openLog(char *filename)
+{
+  if (filename && *filename) {
+  FILE *file;
+     
+  if (!opt.appendLog) 
+          gtk_text_buffer_set_text (GTK_TEXT_BUFFER(opt.buffer), "\0", -1);
+	
+    if((file = fopen(filename, "r"))) {
+    char buf[BUFSIZ+1];
+
+      while(fgets(buf, BUFSIZ, file) != NULL) {
+        print_line(GTK_TEXT_BUFFER(opt.buffer), buf);
+      }
+
+      fclose(file);
+    }
+  }
+}
+
+
+void okButton_clicked_cb(GtkWidget *window, GtkButton *button)
+{
+const char *selected = gtk_file_selection_get_filename(GTK_FILE_SELECTION(window));
+void (*action)() = (void (*)())g_object_get_data(G_OBJECT(window), "NmapFE_action");
+GtkEntry *entry = g_object_get_data(G_OBJECT(window), "NmapFE_entry");
+char *filename = g_object_get_data(G_OBJECT(window), "NmapFE_filename");
+
+  if (filename && selected) {
+    strncpy(filename, selected, FILENAME_MAX);
+    filename[FILENAME_MAX-1] = '\0';
+    if (action)
+      (*action)(filename);
+    if (entry)
+      gtk_entry_set_text(GTK_ENTRY(entry), filename);
+  }
+}
+
+/* split buf into first line and remainder by
+   copying the first line into line and stripping it from str;
+   return the first line from str or NULL if str contains no full line.
+   bufsz is the number of chars in buf.
+ */
+static char *next_line(char *buf, int bufsz, char *line)
+{
+  if ((buf != NULL) && (line != NULL)) {
+  char *eol = strchr(buf, '\n');
+
+    if (eol != NULL) {
+      char *bol = buf;
+    int linelen = MIN(bufsz - 1, eol - buf + 1); // we can't exceed buffer size
+
+      /* copy line including \n to line */
+      memcpy(line, buf, linelen);
+      line[linelen] = '\0';
+
+      eol = buf + linelen;
+
+      /* remove line from str */
+      while (*eol != '\0')
+	*bol++ = *eol++;
+      *bol = '\0';
+      
+      return(line);
+    }
+    return(buf);
+  }
+  return(NULL);
+}
+
+/* The read_from_pipe functions (UNIX & Win versions) do a non-blocking read from the pipe
+   given into the buffer given up to a maximum read length of bufsz.  The number of bytes 
+   read is returned.  -1 is returned in the case of heinous error.  Returned buffer is NOT
+   NUL terminated */
+#ifdef WIN32
+
+static int read_from_pipe(HANDLE pipe, char *buf, int bufsz)
+{
+int ret;
+int count = 0;
+
+/* First lets check if anything is ready for us.
+   Note: I don't know if this technique even works! */
+  ret = WaitForSingleObject(pipe, 0);
+  if ( ret == WAIT_OBJECT_0 ) {
+    /* Apparently the pipe is available for reading -- Read up to # of bytes in buffer */
+    if (!ReadFile(pipe, buf, bufsz, &count, NULL)) {
+      if (GetLastError() != ERROR_BROKEN_PIPE)
+	pfatal("ReadFile on Nmap process pipe failed!");
+    }
+  }
+  return count;
+}
+
+#else
+
+/* NOTE:  pipefd must be in O_NONBLOCK mode ( via fcntl ) */
+static int read_from_pipe(int pipefd, char *buf, int bufsz)
+{
+int count;
+
+  if (pipefd == -1) return -1;
+  count = read(pipefd, buf, bufsz);
+  if (count == -1 && errno != EINTR && errno != EAGAIN) {
+    pfatal("Failed to read from nmap process pipe");
+  }
+  return count;
+}
+
+#endif /* read_from_pipe Win32/UNIX selector */
+
+
+static gint read_data(gpointer data)
 {
   static char buf[BUFSIZ+1] = "";
   static int buflen = 0;
@@ -1191,6 +854,343 @@ int count;
 #endif /* waitpid unix/windoze selector */
 
   return(1);	
+}
+
+
+/* The idea of execute() is to create an Nmap process running in the background with its stdout
+    connected to a pipe we can poll many times per second to collect any new output.  Admittedly 
+	there are much more elegant ways to do this, but this is how it works now.  The functions
+	return the process ID of nmap.  This process is
+	different enough between windows & UNIX that I have two functions for doing it: */
+static int execute_unix(char *command)
+{
+#ifdef WIN32
+  fatal("The execute_unix function should not be called from Windows!");
+  return -1;
+#else
+
+  /* Many thanks to Fyodor for helping with the piping */
+  if (pipe(pipes) == -1) {
+    perror("poopy pipe error");
+    exit(1);
+  }
+
+  if (!(pid = fork())) {
+    char **argv;
+    int argc;
+
+    argc = arg_parse(command, &argv);
+		
+    if (argc <= 0)
+      exit(1);
+    dup2(pipes[1], 1);
+    dup2(pipes[1], 2);
+    fcntl(pipes[0], F_SETFL, O_NDELAY);
+    if (execvp("nmap", argv) == -1) {
+      fprintf(stderr, "Nmap execution failed.  errno=%d (%s)\n", errno, strerror(errno));
+      exit(1);
+    }
+    /*exit(127);*/
+  }
+  if (pid == -1) {
+    fprintf(stderr, "fork() failed.  errno=%d (%s)", errno, strerror(errno));
+    pid = 0;
+    close(pipes[0]);
+    pipes[0] = -1;
+  }
+  close(pipes[1]);
+  pipes[1] = -1;
+
+  return(pid);
+
+#endif
+}
+
+
+#ifdef WIN32
+/* Parts cribbed from _Win32 System Programming Second Edition_ pp 304 */
+static int execute_win(char *command)
+{
+
+/* For pipes[] array:  0 == READ; 1 == WRITE */
+
+/* To ensure pipe handles are inheritable */
+SECURITY_ATTRIBUTES PipeSA = { sizeof(SECURITY_ATTRIBUTES), NULL, TRUE };
+PROCESS_INFORMATION Nmap_Proc;
+STARTUPINFO Nmap_Start;
+
+  GetStartupInfo(&Nmap_Start);
+
+  /* Create our pipe for reading Nmap output */
+  if (!CreatePipe(&pipes[0], &pipes[1], &PipeSA, 8196))
+    pfatal("execute_win: Failed to create pipes!");
+
+  /* Insure that stdout/stderr for Nmap will go to our pipe */
+  Nmap_Start.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+  Nmap_Start.hStdError = pipes[1];
+  Nmap_Start.hStdOutput = pipes[1];
+  Nmap_Start.dwFlags = STARTF_USESTDHANDLES;
+
+  /* Start up Nmap! */
+  if (!CreateProcess ( NULL, command, NULL, NULL, TRUE, 0, NULL, NULL, &Nmap_Start, &Nmap_Proc))
+    pfatal("execute_win: Failed to start Nmap process with command '%s'", command);
+
+  /* I don't care about the thread handle or the write pipe anymore */
+  CloseHandle(Nmap_Proc.hThread);
+   CloseHandle(pipes[1]);
+
+  /* I'm gonna squirrel away the Nmap process handle in a global variable.
+     All this nonsense needs to be redone */
+   NmapHandle = Nmap_Proc.hProcess;
+
+  return Nmap_Proc.dwProcessId;
+
+
+}
+#endif /* WIN32 */
+
+int execute(char *command)
+{
+#ifdef WIN32
+int pid = execute_win(command);
+#else
+int pid = execute_unix(command);
+#endif /* WIN32 */
+
+/* timer for calling our read function to poll for new data 8 times per second */
+ g_timeout_add(125, read_data, NULL);
+
+  return(pid);
+}
+
+
+void display_nmap_command()
+{
+char *command = build_command();
+
+  gtk_entry_set_text(GTK_ENTRY(opt.commandEntry), command);
+}
+
+
+void display_nmap_command_cb(GtkWidget *target_option, void *ignored)
+{
+  display_nmap_command();
+}
+
+
+void browseButton_pressed_cb(GtkWidget *widget, GtkWidget *text)
+{
+static char filename[FILENAME_MAX+1] = "";
+const char *name = gtk_entry_get_text(GTK_ENTRY(text));
+
+  if (name && *name) {
+    strncpy(filename, name, FILENAME_MAX);
+    filename[FILENAME_MAX] = '\0';
+  }
+
+  gtk_widget_show(create_fileSelection("Select File", filename, NULL, GTK_ENTRY(text)));
+}
+
+void scanType_cb 
+(GtkComboBox *w, gpointer data)
+{	
+    Entry *user = data;
+    gint i = 0, j, k;
+
+    j = gtk_combo_box_get_active(w);
+
+    if (opt.isr00t) {
+        k = j;
+    } else {
+        for (k = 0; user[k].scantype; k++) {
+            if (user[k].rootonly != TRUE) {
+                if (i == j) {
+                    break;
+                }
+                i++;
+            }
+        }
+    }
+    opt.scanValue = user[k].scantype;
+
+    if ((opt.scanValue == PING_SCAN) || (opt.scanValue == LIST_SCAN)) {
+      // gtk_widget_set_sensitive(GTK_WIDGET(opt.protportFrame), FALSE);
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.protportType), FALSE);
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.protportLabel), FALSE);
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.protportRange), FALSE);
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.OSInfo), FALSE);
+    } else {
+      // gtk_widget_set_sensitive(GTK_WIDGET(opt.protportFrame), TRUE);
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.protportType), TRUE);
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.protportLabel),
+                               (opt.protportValue == GIVEN_PROTPORT));
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.protportRange),
+                               (opt.protportValue == GIVEN_PROTPORT));
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.OSInfo), TRUE);
+    }
+
+    if ((opt.scanValue == PING_SCAN) || 
+            (opt.scanValue == LIST_SCAN) || (opt.scanValue == PROT_SCAN)) {
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.RPCInfo), FALSE);
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.VersionInfo), FALSE);
+    } else {
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.RPCInfo), TRUE);
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.VersionInfo), TRUE);
+    }
+
+    if ((opt.scanValue == CONNECT_SCAN) || (opt.scanValue == BOUNCE_SCAN)) {
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.useDecoy), FALSE);
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.Decoy), FALSE);
+    } else if (opt.isr00t) {
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.useDecoy), TRUE);
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.Decoy), TRUE);
+    }
+
+    if ((opt.scanValue != ACK_SCAN) && 
+            (opt.scanValue != MAIMON_SCAN) && (opt.scanValue != FIN_SCAN) &&
+            (opt.scanValue != SYN_SCAN) && (opt.scanValue != NULL_SCAN) && 
+            (opt.scanValue != XMAS_SCAN) && (opt.scanValue != WIN_SCAN))
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.useFragments), FALSE);
+    else if (opt.isr00t)
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.useFragments), TRUE);
+
+    if ((opt.scanValue == BOUNCE_SCAN) || (opt.scanValue == IDLE_SCAN)) {
+      gtk_label_set_text(GTK_LABEL(opt.scanRelayLabel), 
+                         (opt.scanValue == BOUNCE_SCAN) ? "Bounce Host:" : "Zombie Host:");
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.scanRelayLabel), TRUE);
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.scanRelay), TRUE);
+      gtk_widget_grab_focus(GTK_WIDGET(opt.scanRelay));
+    } else {
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.scanRelayLabel), FALSE);
+      gtk_label_set_text(GTK_LABEL(opt.scanRelayLabel), "Relay Host:");
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.scanRelay), FALSE);
+    }
+
+    g_object_set(G_OBJECT(opt.protportFrame), "label",
+                   (opt.scanValue == PROT_SCAN) ? "Scanned Protocols" : "Scanned Ports", NULL);
+
+  display_nmap_command();
+}
+
+
+void pingButton_toggled_cb(GtkWidget *ping_button, void *ignored)
+{
+gboolean status = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(ping_button));
+
+  if (ping_button == opt.dontPing) {
+  gboolean localstatus = (GTK_TOGGLE_BUTTON(opt.tcpPing)->active) && (!status);
+
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.tcpPing), !status);
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.tcpPingLabel), localstatus);
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.tcpPingPorts), localstatus);
+    if (opt.isr00t) {
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.icmpechoPing), !status);
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.icmpmaskPing), !status);
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.icmptimePing), !status);
+
+      localstatus = (GTK_TOGGLE_BUTTON(opt.synPing)->active) && (!status);
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.synPing), !status);
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.synPingLabel), localstatus);
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.synPingPorts), localstatus);
+
+      localstatus = (GTK_TOGGLE_BUTTON(opt.udpPing)->active) && (!status);
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.udpPing), !status);
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.udpPingLabel), localstatus);
+      gtk_widget_set_sensitive(GTK_WIDGET(opt.udpPingPorts), localstatus);
+    }
+  }
+  else if (ping_button == opt.tcpPing) {
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.tcpPingLabel), status);
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.tcpPingPorts), status);
+  }
+  else if ((ping_button == opt.synPing) && (opt.isr00t)) {
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.synPingLabel), status);
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.synPingPorts), status);
+  }
+  else if ((ping_button == opt.udpPing) && (opt.isr00t)) {
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.udpPingLabel), status);
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.udpPingPorts), status);
+  }
+  
+  display_nmap_command();
+}
+
+
+void throttleType_cb (GtkComboBox *w, gpointer data)
+{	
+    opt.throttleValue = gtk_combo_box_get_active(w);
+    display_nmap_command();
+}
+
+
+void resolveType_cb (GtkComboBox *w, gpointer data)
+{
+    opt.resolveValue = gtk_combo_box_get_active(w);
+    display_nmap_command();
+}
+
+
+void protportType_cb(GtkComboBox *w, gpointer d)
+{
+    opt.protportValue = gtk_combo_box_get_active(w);
+
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.protportLabel), 
+            (opt.protportValue == GIVEN_PROTPORT));
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.protportRange), 
+            (opt.protportValue == GIVEN_PROTPORT));
+    if (opt.protportValue == GIVEN_PROTPORT)
+      gtk_widget_grab_focus(GTK_WIDGET(opt.protportRange));
+
+    display_nmap_command();
+}
+
+
+/* callback for factory generated menu items: set variable to action */
+void outputFormatType_cb(GtkComboBox *w, gpointer d)
+{
+  opt.outputFormatValue = gtk_combo_box_get_active(w);
+  display_nmap_command();
+}
+
+
+/* callback for toggle buttons: control other objects seneistivity */
+void toggle_button_set_sensitive_cb(GtkWidget *master, GtkWidget *slave)
+{
+  if ((master != NULL) && (slave != NULL) && GTK_IS_TOGGLE_BUTTON(master))
+    gtk_widget_set_sensitive(GTK_WIDGET(slave), GTK_TOGGLE_BUTTON(master)->active);
+
+  display_nmap_command();
+}
+
+
+void validate_file_change(GtkWidget *button, void *ignored)
+{	
+gboolean status = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(button));
+
+  if (button == opt.useInputFile) {
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.targetHost), !status);
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.inputFilename), status);
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.inputBrowse), status);
+  } else if (button == opt.useOutputFile) {
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.outputFilename), status);
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.outputBrowse), status);
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.outputFormatLabel), status);
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.outputFormatType), status);
+    gtk_widget_set_sensitive(GTK_WIDGET(opt.outputAppend), status);
+  }
+
+  display_nmap_command();
+}
+
+
+void validate_option_change(GtkWidget *target_option, void *ignored)
+{	
+gboolean status = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(target_option));
+
+  if ((target_option == opt.useInputFile) && (status))
+    gtk_entry_set_text(GTK_ENTRY(opt.targetHost), "");
+
+  display_nmap_command();
 }
 
 gboolean stop_scan()

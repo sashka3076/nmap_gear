@@ -2,7 +2,7 @@ dnl # -*- mode: fundamental; -*-
 dnl # Autoconf configuration file for Nbase
 dnl #
 dnl # Process this file with autoconf to produce a configure script.
-dnl # $Id: configure.ac 3232 2006-03-26 06:44:57Z fyodor $
+dnl # $Id: configure.ac 3590 2006-06-26 07:58:37Z fyodor $
 
 # Require autoconf 2.13
 AC_PREREQ(2.13)

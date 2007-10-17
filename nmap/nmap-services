@@ -1,7 +1,7 @@
 # Well known service port numbers -*- mode: fundamental; -*-
 # From the Nmap security scanner ( http://www.insecure.org/nmap/ )
 #
-# $Id: nmap-services 3515 2006-06-19 04:01:16Z fyodor $
+# $Id: nmap-services 4219 2006-12-03 00:34:19Z fyodor $
 # For a HUGE list of services (including these and others), 
 # see http://www.graffiti.com/services
 tcpmux            1/tcp      # TCP Port Service Multiplexer [rfc-1078]
@@ -1198,6 +1198,7 @@ hotline           1234/tcp   #
 nessus            1241/tcp   # Nessus or remote message server
 hermes            1248/tcp   # 
 hermes            1248/udp   # 
+ssserver          1270/tcp   # Sun StorEdge Configuration Service
 waste             1337/tcp   # Nullsoft WASTE encrypted P2P app
 alta-ana-lm       1346/tcp   # Alta Analytics License Manager
 alta-ana-lm       1346/udp   # Alta Analytics License Manager
@@ -1843,6 +1844,8 @@ ppp               3000/tcp   # User-level ppp daemon, or chili!soft asp
 nessusd           3001/tcp   # Nessus Security Scanner (www.nessus.org) Daemon or chili!soft asp
 deslogin          3005/tcp   # encrypted symmetric telnet/login
 deslogind         3006/tcp   # 
+slnp              3025/tcp   # SLNP (Simple Library Network Protocol) by Sisis Informationssysteme GmbH
+slnp              3045/tcp   # SLNP (Simple Library Network Protocol) by Sisis Informationssysteme GmbH
 cfs               3049/tcp   # cryptographic file system (nfs) (proposed)
 cfs               3049/udp   # cryptographic file system (nfs)
 PowerChute        3052/tcp
@@ -1858,11 +1861,15 @@ ccmail            3264/udp   # cc:mail/lotus
 globalcatLDAP     3268/tcp   # Global Catalog LDAP
 globalcatLDAPssl  3269/tcp   # Global Catalog LDAP over ssl
 meetingmaker      3292/tcp   # Meeting maker time management software
+saprouter         3299/tcp   # SAProuter
 mysql             3306/tcp   # mySQL
 dec-notes         3333/tcp   # DEC Notes
 dec-notes         3333/udp   # DEC Notes
 msdtc             3372/tcp   # MS distributed transaction coordinator
 ms-term-serv      3389/tcp   # Microsoft Remote Display Protocol
+saposs            3397/tcp   # SAP Oss
+sapcomm           3398/tcp   # SAPcomm
+sapeps            3399/tcp   # SAP EPS
 squid-snmp        3401/udp   # Squid proxy SNMP port
 bmap              3421/tcp   # Bull Apprise portmapper
 bmap              3421/udp   # Bull Apprise portmapper
@@ -1969,7 +1976,8 @@ hacl-local        5304/udp   #
 hacl-test         5305/tcp   # 
 hacl-test         5305/udp   # 
 cfengine          5308/tcp   # 
-cfengine          5308/udp   # 
+cfengine          5308/udp   #
+zeroconf          5353/udp   # Mac OS X Bonjour/Zeroconf port 
 pcduo-old         5400/tcp   # RemCon PC-Duo - old port
 pcduo             5405/tcp   # RemCon PC-Duo - new port
 omid              5428/udp   # OpenMosix Info Dissemination
@@ -2117,6 +2125,7 @@ http-alt          8000/tcp   # A common alternative http port
 ajp12             8007/tcp   # Apache JServ Protocol 1.x
 ajp13             8009/tcp   # Apache JServ Protocol 1.3
 ftp-proxy         8021/tcp   # Common FTP proxy port
+slnp              8076/tcp   # SLNP (Simple Library Network Protocol) by Sisis Informationssysteme GmbH
 http-proxy        8080/tcp   # Common HTTP proxy/second web server port
 blackice-icecap   8081/tcp   # ICECap user console
 blackice-alerts   8082/tcp   # BlackIce Alerts sent to this port
@@ -2125,6 +2134,13 @@ sun-answerbook    8888/tcp   # Sun Answerbook HTTP server.  Or gnump3d streaming
 seosload          8892/tcp   # From the new Computer Associates eTrust ACX
 zeus-admin        9090/tcp   # Zeus admin server
 jetdirect         9100/tcp   # HP JetDirect card
+jetdirect         9101/tcp   # HP JetDirect card
+jetdirect         9102/tcp   # HP JetDirect card
+jetdirect         9103/tcp   # HP JetDirect card
+jetdirect         9104/tcp   # HP JetDirect card
+jetdirect         9105/tcp   # HP JetDirect card
+jetdirect         9106/tcp   # HP JetDirect card
+jetdirect         9107/tcp   # HP JetDirect card
 DragonIDSConsole  9111/tcp   # Dragon IDS Console 
 ms-sql2000        9152/tcp   #
 man               9535/tcp   # 
@@ -2163,6 +2179,8 @@ VeritasNetbackup  13721/tcp  # bpdbm         server
 VeritasNetbackup  13722/tcp  # bpjava-msvc   client
 VeritasNetbackup  13782/tcp  # bpcd          client
 VeritasNetbackup  13783/tcp  # vopied        client
+bo2k              14141/tcp  # Back Orifice 2K BoPeep mouse/keyboard input
+bo2k              15151/tcp  # Back Orifice 2K BoPeep video output
 swgps             15126/tcp  # Nortel Java S/WGPS Global Payment Solutions for US credit card authorizations
 overnet           16444/tcp  # Overnet file sharing
 overnet           16444/udp  # Overnet file sharing

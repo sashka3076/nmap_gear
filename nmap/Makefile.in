@@ -1,6 +1,6 @@
-export NMAP_VERSION = 4.11
+export NMAP_VERSION = 4.20
 NMAP_NAME= Nmap
-NMAP_URL= http://www.insecure.org/nmap/
+NMAP_URL= http://insecure.org
 NMAP_PLATFORM=@host@
 prefix = @prefix@
 exec_prefix = @exec_prefix@
@@ -16,6 +16,7 @@ export NSOCKDIR=@NSOCKDIR@
 CC = @CC@
 CXX = @CXX@
 CCOPT = 
+DBGFLAGS = 
 LIBPCAPDIR = @libpcapdir@
 LIBPCREDIR = @LIBPCREDIR@
 export LIBDNETDIR = @LIBDNETDIR@
@@ -23,12 +24,12 @@ DEFS = @DEFS@ -DNMAP_VERSION=\"$(NMAP_VERSION)\" -DNMAP_NAME=\"$(NMAP_NAME)\" -D
 # For mtrace debugging -- see MTRACE define in main.cc for instructions
 # Should only be enabled during debugging and not in any real release.
 # DEFS += -DMTRACE=1
-CXXFLAGS = @CXXFLAGS@ $(CCOPT) $(DEFS)
+CXXFLAGS = @CXXFLAGS@ $(DBGFLAGS) $(CCOPT) $(DEFS)
 CPPFLAGS = @CPPFLAGS@
 # CFLAGS = $(CXXFLAGS)
 # CFLAGS = $(DEFS) $(INCLS)
 STATIC =
-LDFLAGS = @LDFLAGS@ $(STATIC)
+LDFLAGS = @LDFLAGS@ $(DBGFLAGS) $(STATIC)
 LIBS =  @LIBNBASE_LIBS@ @LIBNSOCK_LIBS@ @LIBPCRE_LIBS@ @LIBPCAP_LIBS@ @OPENSSL_LIBS@ @LIBDNET_LIBS@ @LIBS@
 # LIBS =  -lefence @LIBS@
 # LIBS =  -lrmalloc @LIBS@
@@ -36,6 +37,7 @@ SHTOOL = ./shtool
 INSTALL = $(SHTOOL) install 
 MAKEDEPEND = @MAKEDEPEND@
 export RPMTDIR=$(HOME)/rpm
+
 
 # DESTDIR is used by some package maintainers to install Nmap under
 # its usual directory structure into a different tree.  See the 
@@ -46,11 +48,11 @@ TARGET = nmap
 TARGETNMAPFE=@TARGETNMAPFE@
 INSTALLNMAPFE=@INSTALLNMAPFE@
 
-export SRCS = main.cc nmap.cc targets.cc tcpip.cc nmap_error.cc utils.cc idle_scan.cc osscan.cc output.cc scan_engine.cc timing.cc charpool.cc services.cc protocols.cc nmap_rpc.cc portlist.cc NmapOps.cc TargetGroup.cc Target.cc FingerPrintResults.cc service_scan.cc NmapOutputTable.cc MACLookup.cc nmap_tty.cc nmap_dns.cc @COMPAT_SRCS@
+export SRCS = main.cc nmap.cc targets.cc tcpip.cc nmap_error.cc utils.cc idle_scan.cc osscan.cc osscan2.cc output.cc scan_engine.cc timing.cc charpool.cc services.cc protocols.cc nmap_rpc.cc portlist.cc NmapOps.cc TargetGroup.cc Target.cc FingerPrintResults.cc service_scan.cc NmapOutputTable.cc MACLookup.cc nmap_tty.cc nmap_dns.cc @COMPAT_SRCS@
 
-export HDRS = charpool.h FingerPrintResults.h global_structures.h idle_scan.h MACLookup.h nmap_amigaos.h nmap_dns.h nmap_error.h nmap.h NmapOps.h NmapOutputTable.h nmap_rpc.h nmap_tty.h nmap_winconfig.h osscan.h output.h portlist.h protocols.h scan_engine.h service_scan.h services.h TargetGroup.h Target.h targets.h tcpip.h timing.h utils.h
+export HDRS = charpool.h FingerPrintResults.h global_structures.h idle_scan.h MACLookup.h nmap_amigaos.h nmap_dns.h nmap_error.h nmap.h NmapOps.h NmapOutputTable.h nmap_rpc.h nmap_tty.h nmap_winconfig.h osscan.h osscan2.h output.h portlist.h protocols.h scan_engine.h service_scan.h services.h TargetGroup.h Target.h targets.h tcpip.h timing.h utils.h
 
-OBJS = main.o nmap.o targets.o tcpip.o nmap_error.o utils.o idle_scan.o osscan.o output.o scan_engine.o timing.o charpool.o services.o protocols.o nmap_rpc.o portlist.o NmapOps.o TargetGroup.o Target.o FingerPrintResults.o service_scan.o NmapOutputTable.o MACLookup.o nmap_tty.o nmap_dns.o @COMPAT_OBJS@
+OBJS = main.o nmap.o targets.o tcpip.o nmap_error.o utils.o idle_scan.o osscan.o osscan2.o output.o scan_engine.o timing.o charpool.o services.o protocols.o nmap_rpc.o portlist.o NmapOps.o TargetGroup.o Target.o FingerPrintResults.o service_scan.o NmapOutputTable.o MACLookup.o nmap_tty.o nmap_dns.o @COMPAT_OBJS@
 
 # %.o : %.cc -- nope this is a GNU extension
 .cc.o:
@@ -99,13 +101,16 @@ nmapfe/nmapfe:
 static:
 	$(MAKE) STATIC=-static
 
+debug:
+	$(MAKE) DBGFLAGS="-O0 -g -pg -ftest-coverage -fprofile-arcs"
+
 # Make the Nmap tarball
 distro:
-	cd scripts && $(MAKE) distro
+	cd dev && $(MAKE) distro
 
 # Update the web site
 web:
-	cd scripts && $(MAKE) web
+	cd dev && $(MAKE) web
 
 clean: @PCAP_CLEAN@ @PCRE_CLEAN@ @DNET_CLEAN@ nmapfe_clean nsock_clean nbase_clean my_clean
 
@@ -132,11 +137,17 @@ dnet_dist_clean:
 	-cd $(LIBDNETDIR) && $(MAKE) distclean
 nmapfe_dist_clean:
 	-cd nmapfe && $(MAKE) distclean
+nbase_dist_clean:
+	-cd $(NBASEDIR) && $(MAKE) distclean
+nsock_dist_clean:
+	-cd $(NSOCKDIR)/src && $(MAKE) distclean
+debugclean:
+	rm -f *.gcov *.gcda *.gcno gmon.out
 
-distclean: my_clean my_distclean @PCAP_DIST_CLEAN@ @PCRE_DIST_CLEAN@ @DNET_DIST_CLEAN@ nmapfe_dist_clean
+distclean: my_clean my_distclean @PCAP_DIST_CLEAN@ @PCRE_DIST_CLEAN@ @DNET_DIST_CLEAN@ nmapfe_dist_clean nbase_dist_clean nsock_dist_clean
 
 my_distclean:
-	rm -f Makefile Makefile.bak config.h stamp-h stamp-h.in \
+	rm -f Makefile Makefile.bak makefile.dep config.h stamp-h stamp-h.in \
 	         config.cache config.log config.status
 
 install-nmap: $(TARGET)
@@ -148,6 +159,7 @@ install-nmap: $(TARGET)
 	$(INSTALL) -c -m 644 nmap-services $(DESTDIR)$(nmapdatadir)/
 	$(INSTALL) -c -m 644 nmap-rpc $(DESTDIR)$(nmapdatadir)/
 	$(INSTALL) -c -m 644 nmap-os-fingerprints $(DESTDIR)$(nmapdatadir)/
+	$(INSTALL) -c -m 644 nmap-os-db $(DESTDIR)$(nmapdatadir)/
 	$(INSTALL) -c -m 644 nmap-service-probes $(DESTDIR)$(nmapdatadir)/
 	$(INSTALL) -c -m 644 nmap-protocols $(DESTDIR)$(nmapdatadir)/
 	$(INSTALL) -c -m 644 nmap-mac-prefixes $(DESTDIR)$(nmapdatadir)/

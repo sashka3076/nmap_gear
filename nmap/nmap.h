@@ -6,17 +6,17 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2004 Insecure.Com LLC. Nmap       *
- * is also a registered trademark of Insecure.Com LLC.  This program is    *
- * free software; you may redistribute and/or modify it under the          *
- * terms of the GNU General Public License as published by the Free        *
- * Software Foundation; Version 2.  This guarantees your right to use,     *
- * modify, and redistribute this software under certain conditions.  If    *
- * you wish to embed Nmap technology into proprietary software, we may be  *
- * willing to sell alternative licenses (contact sales@insecure.com).      *
- * Many security scanner vendors already license Nmap technology such as  *
- * our remote OS fingerprinting database and code, service/version         *
- * detection system, and port scanning code.                               *
+ * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
  *                                                                         *
  * Note that the GPL places important restrictions on "derived works", yet *
  * it does not provide a detailed definition of that term.  To avoid       *
@@ -39,7 +39,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://www.insecure.org/nmap/ to download Nmap.                         *
+ * http://insecure.org/nmap/ to download Nmap.                             *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -51,10 +51,10 @@
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
  * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to many    *
- * security vendors, and generally include a perpetual license as well as  *
- * providing for priority support and updates as well as helping to fund   *
- * the continued development of Nmap technology.  Please email             *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
  * sales@insecure.com for further information.                             *
  *                                                                         *
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.h 3363 2006-05-16 21:46:41Z fyodor $ */
+/* $Id: nmap.h 4018 2006-09-30 21:08:04Z fyodor $ */
 
 #ifndef NMAP_H
 #define NMAP_H
@@ -272,15 +272,6 @@ void *realloc();
 /* How many hosts do we ping in parallel to see if they are up? Note that this is
    divided by the num probes per host */
 #define LOOKAHEAD 30
-/* If reads of a UDP port keep returning EAGAIN (errno 13), do we want to 
-   count the port as valid? */
-#define RISKY_UDP_SCAN 0
-/* How many syn packets do we send to TCP sequence a host? */
-#define NUM_SEQ_SAMPLES 6
- /* This ideally should be a port that isn't in use for any protocol on our machine or on the target */ 
-#define MAGIC_PORT 49724
-/* How many udp sends without a ICMP port unreachable error does it take before we consider the port open? */
-#define UDP_MAX_PORT_RETRIES 4
  /*How many seconds before we give up on a host being alive? */
 
 #define FAKE_ARGV "pine" /* What ps and w should show if you use -q */
@@ -329,7 +320,6 @@ void *realloc();
 #endif
 
 #define INITIAL_RTT_TIMEOUT 1000 /* Allow 1 second initially for packet responses */
-#define HOST_TIMEOUT    0 /* By default allow unlimited time to scan each host */
 
 #ifndef MAX_RETRANSMISSIONS
 #define MAX_RETRANSMISSIONS 10    /* 11 probes to port at maximum */
@@ -366,6 +356,19 @@ void *realloc();
 #define PINGTYPE_ARP 1024
 
 #define DEFAULT_PING_TYPES PINGTYPE_TCP|PINGTYPE_TCP_USE_ACK|PINGTYPE_ICMP_PING
+
+/* OS scan */
+#define OS_SCAN_DEFAULT 9
+#define OS_SCAN_SYS_1_ONLY 1
+#define OS_SCAN_SYS_2_ONLY 2
+
+/* How many syn packets do we send to TCP sequence a host? */
+#define NUM_SEQ_SAMPLES 6
+
+/* The max length of each line of the subject fingerprint when
+   wrapped. */
+#define FP_RESULT_WRAP_LINE_LEN 74
+
 /* TCP/IP ISN sequence prediction classes */
 #define SEQ_UNKNOWN 0
 #define SEQ_64K 1
@@ -381,7 +384,8 @@ void *realloc();
 #define TS_SEQ_2HZ 2
 #define TS_SEQ_100HZ 3
 #define TS_SEQ_1000HZ 4
-#define TS_SEQ_UNSUPPORTED 5 /* System didn't send back a timestamp */
+#define TS_SEQ_OTHER_NUM 5
+#define TS_SEQ_UNSUPPORTED 6 /* System didn't send back a timestamp */
 
 #define IPID_SEQ_UNKNOWN 0
 #define IPID_SEQ_INCR 1  /* simple increment by one each time */
@@ -392,6 +396,7 @@ void *realloc();
 #define IPID_SEQ_RD 4 /* Appears to select IPID using a "random" distributions (meaning it can go up or down) */
 #define IPID_SEQ_CONSTANT 5 /* Contains 1 or more sequential duplicates */
 #define IPID_SEQ_ZERO 6 /* Every packet that comes back has an IP.ID of 0 (eg Linux 2.4 does this) */
+
 #ifndef MAXHOSTNAMELEN
 #define MAXHOSTNAMELEN 64
 #endif
@@ -425,27 +430,19 @@ void *realloc();
 /* print Interactive usage information */
 void printinteractiveusage();
 
-int check_ident_port(struct in_addr target);
-
 int ftp_anon_connect(struct ftpinfo *ftp);
 
 /* port manipulators */
-void getprobepts(char *expr);
 struct scan_lists *getpts(char *expr); /* someone stole the name getports()! */
-int getidentinfoz(struct in_addr target, u16 localport, u16 remoteport,
-		  char *owner, int ownersz);
+void free_scan_lists(struct scan_lists *ports);
 
 /* socket manipulation functions */
 void init_socket(int sd);
 
-/* RAW packet building/dissasembling stuff */
-int isup(struct in_addr target);
-int listen_icmp(int icmpsock, unsigned short outports[],
-		unsigned short numtries[], int *num_out,
-		struct in_addr target, PortList *ports);
-
 /* Renamed main so that interactive mode could preprocess when neccessary */
 int nmap_main(int argc, char *argv[]);
+
+void nmap_free_mem();
 
 /* general helper functions */
 int parse_targets(struct targets *targets, char *h);
@@ -454,6 +451,7 @@ char *scantype2str(stype scantype);
 void sigdie(int signo);
 void reaper(int signo);
 char *seqreport(struct seq_info *seq);
+char *seqreport1(struct seq_info *seq);
 char *seqclass2ascii(int clas);
 char *ipidclass2ascii(int seqclass);
 char *tsseqclass2ascii(int seqclass);
@@ -461,6 +459,7 @@ char *tsseqclass2ascii(int seqclass);
 /* Convert a TCP sequence prediction difficulty index like 1264386
    into a difficulty string like "Worthy Challenge */
 const char *seqidx2difficultystr(unsigned long idx);
+const char *seqidx2difficultystr1(unsigned long idx);
 int nmap_fetchfile(char *filename_returned, int bufferlen, char *file);
 int gather_logfile_resumption_state(char *fname, int *myargc, char ***myargv);
 

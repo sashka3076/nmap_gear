@@ -32,7 +32,7 @@
 
 #ifndef lint
 static const char rcsid[] _U_ =
-    "@(#) $Header$ (LBL)";
+    "@(#) $Header: /tcpdump/master/libpcap/pcap-win32.c,v 1.25.2.3 2005/07/10 17:52:54 risso Exp $ (LBL)";
 #endif
 
 #include <pcap-int.h>
@@ -513,31 +513,31 @@ pcap_open_live(const char *device, int snaplen, int promisc, int to_ms,
 	/* 
 	 * Traditional Adapter 
 	 */
-
+		
 		p->buffer = (u_char *)malloc(PcapBufSize);
 		if (p->buffer == NULL) 
-	{
+		{
 			snprintf(ebuf, PCAP_ERRBUF_SIZE, "malloc: %s", pcap_strerror(errno));
-		goto bad;
-	}
-
-	PacketInitPacket(p->Packet,(BYTE*)p->buffer,p->bufsize);
-
+			goto bad;
+		}
+		
+		PacketInitPacket(p->Packet,(BYTE*)p->buffer,p->bufsize);
+		
 		p->snapshot = snaplen;
 		
-	/* allocate the standard buffer in the driver */
-	if(PacketSetBuff( p->adapter, SIZE_BUF)==FALSE)
-	{
-		snprintf(ebuf, PCAP_ERRBUF_SIZE,"driver error: not enough memory to allocate the kernel buffer\n");
-		goto bad;
-	}
-
-	/* tell the driver to copy the buffer only if it contains at least 16K */
-	if(PacketSetMinToCopy(p->adapter,16000)==FALSE)
-	{
-		snprintf(ebuf, PCAP_ERRBUF_SIZE,"Error calling PacketSetMinToCopy: %s\n", pcap_win32strerror());
-		goto bad;
-	}
+		/* allocate the standard buffer in the driver */
+		if(PacketSetBuff( p->adapter, SIZE_BUF)==FALSE)
+		{
+			snprintf(ebuf, PCAP_ERRBUF_SIZE,"driver error: not enough memory to allocate the kernel buffer\n");
+			goto bad;
+		}
+		
+		/* tell the driver to copy the buffer only if it contains at least 16K */
+		if(PacketSetMinToCopy(p->adapter,16000)==FALSE)
+		{
+			snprintf(ebuf, PCAP_ERRBUF_SIZE,"Error calling PacketSetMinToCopy: %s\n", pcap_win32strerror());
+			goto bad;
+		}
 	}
 	else
 #ifdef HAVE_DAG_API
@@ -587,9 +587,9 @@ pcap_open_live(const char *device, int snaplen, int promisc, int to_ms,
 #else
 	goto bad;
 #endif /* HAVE_DAG_API */
-
+	
 	PacketSetReadTimeout(p->adapter, to_ms);
-
+	
 #ifdef HAVE_DAG_API
 	if(p->adapter->Flags & INFO_FLAG_DAG_CARD)
 	{

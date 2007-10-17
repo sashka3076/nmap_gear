@@ -5,17 +5,17 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2004 Insecure.Com LLC. Nmap       *
- * is also a registered trademark of Insecure.Com LLC.  This program is    *
- * free software; you may redistribute and/or modify it under the          *
- * terms of the GNU General Public License as published by the Free        *
- * Software Foundation; Version 2.  This guarantees your right to use,     *
- * modify, and redistribute this software under certain conditions.  If    *
- * you wish to embed Nmap technology into proprietary software, we may be  *
- * willing to sell alternative licenses (contact sales@insecure.com).      *
- * Many security scanner vendors already license Nmap technology such as  *
- * our remote OS fingerprinting database and code, service/version         *
- * detection system, and port scanning code.                               *
+ * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
  *                                                                         *
  * Note that the GPL places important restrictions on "derived works", yet *
  * it does not provide a detailed definition of that term.  To avoid       *
@@ -38,7 +38,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://www.insecure.org/nmap/ to download Nmap.                         *
+ * http://insecure.org/nmap/ to download Nmap.                             *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -50,10 +50,10 @@
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
  * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to many    *
- * security vendors, and generally include a perpetual license as well as  *
- * providing for priority support and updates as well as helping to fund   *
- * the continued development of Nmap technology.  Please email             *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
  * sales@insecure.com for further information.                             *
  *                                                                         *
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOps.cc 3355 2006-05-15 22:37:31Z fyodor $ */
+/* $Id: NmapOps.cc 4068 2006-10-14 01:25:43Z fyodor $ */
 #include "nmap.h"
 #include "nbase.h"
 #include "NmapOps.h"
@@ -194,6 +194,7 @@ void NmapOps::Initialize() {
   interactivemode = 0;
   ping_group_sz = PING_GROUP_SZ;
   generate_random_ips = 0;
+  reference_FPs1 = NULL;
   reference_FPs = NULL;
   magic_port = 33000 + (get_random_uint() % 31000);
   magic_port_set = 0;
@@ -201,6 +202,7 @@ void NmapOps::Initialize() {
   timing_level = 3;
   max_parallelism = 0;
   min_parallelism = 0;
+  max_os_tries = 5;
   max_rtt_timeout = MAX_RTT_TIMEOUT;
   min_rtt_timeout = MIN_RTT_TIMEOUT;
   initial_rtt_timeout = INITIAL_RTT_TIMEOUT;
@@ -213,6 +215,7 @@ void NmapOps::Initialize() {
   extra_payload_length = 0;
   extra_payload = NULL;
   scan_delay = 0;
+  open_only = false;
   scanflags = -1;
   defeat_rst_ratelimit = 0;
   resume_ip.s_addr = 0;
@@ -228,7 +231,7 @@ void NmapOps::Initialize() {
   listscan = pingscan = allowall = ackscan = bouncescan = connectscan = 0;
   rpcscan = nullscan = xmasscan = fragscan = synscan = windowscan = 0;
   maimonscan = idlescan = finscan = udpscan = ipprotscan = noresolve = 0;
-  force = append_output = 0;
+  append_output = 0;
   memset(logfd, 0, sizeof(FILE *) * LOG_NUM_FILES);
   ttl = -1;
   badsum = 0;
@@ -251,6 +254,12 @@ void NmapOps::Initialize() {
   dns_servers = NULL;
   noninteractive = false;
   current_scantype = STYPE_UNKNOWN;
+  ipoptions = NULL;
+  ipoptionslen = 0;
+  ipopt_firsthop = 0;
+  ipopt_lasthop  = 0;  
+  release_memory = false;
+
 }
 
 bool NmapOps::TCPScan() {
@@ -430,7 +439,7 @@ void NmapOps::ValidateOptions() {
   }
 
   if (max_parallelism && min_parallelism && (min_parallelism > max_parallelism)) {
-    fatal("--min-parallelism must be less than or equal to --max-parallelism");
+    fatal("--min-parallelism=%i must be less than or equal to --max-parallelism=%i",min_parallelism,max_parallelism);
   }
   
   if (af() == AF_INET6 && (numdecoys|osscan|bouncescan|fragscan|ackscan|finscan|idlescan|ipprotscan|maimonscan|nullscan|rpcscan|synscan|udpscan|windowscan|xmasscan)) {
@@ -443,8 +452,20 @@ void NmapOps::ValidateOptions() {
   if (min_parallelism > max_parallelism)
     max_parallelism = min_parallelism;
 
+  if(o.ipoptionslen && ! o.isr00t)
+    fatal("To use ip options you must be root.");
+
+  if(o.ipoptions && o.osscan)
+    error("WARNING: Ip options are NOT used while OS scanning!");
+    
 }
-  
+
+void NmapOps::setMaxOSTries(int mot) {
+  if (mot <= 0) 
+    fatal("NmapOps::setMaxOSTries(): value must be at least 1");
+  max_os_tries = mot; 
+}
+
 void NmapOps::setMaxRttTimeout(int rtt) 
 { 
   if (rtt <= 0) fatal("NmapOps::setMaxRttTimeout(): maximum round trip time must be greater than 0");

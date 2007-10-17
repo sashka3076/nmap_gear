@@ -32,7 +32,7 @@
 
 #ifndef lint
 static const char rcsid[] _U_ =
-    "@(#) $Header$ (LBL)";
+    "@(#) $Header: /tcpdump/master/libpcap/fad-win32.c,v 1.11.2.1 2005/09/01 22:07:41 risso Exp $ (LBL)";
 #endif
 
 #ifdef HAVE_CONFIG_H
@@ -224,12 +224,22 @@ pcap_findalldevs(pcap_if_t **alldevsp, char *errbuf)
 	ULONG NameLength;
 	char *name;
 	
-	PacketGetAdapterNames(NULL, &NameLength);
+	if(!PacketGetAdapterNames(NULL, &NameLength) && NameLength == 0)
+	{
+		/*
+		 * If PacketGetAdapterNames *and* sets the lenght of the buffer to zero, 
+		 * it means there was an error.
+		 */
+		snprintf(errbuf, PCAP_ERRBUF_SIZE, "PacketGetAdapterNames failed: %s", pcap_win32strerror());
+		*alldevsp = NULL;
+		return -1;
+	}
 
 	if (NameLength > 0)
 		AdaptersName = (char*) malloc(NameLength);
 	else
 	{
+		snprintf(errbuf, PCAP_ERRBUF_SIZE, "no adapters found.");
 		*alldevsp = NULL;
 		return 0;
 	}
@@ -276,13 +286,13 @@ pcap_findalldevs(pcap_if_t **alldevsp, char *errbuf)
 	 */
 	name = &AdaptersName[0];
 	while (*name != '\0') {
-	/*
-	 * Add an entry for this interface.
-	 */
+		/*
+		 * Add an entry for this interface.
+		 */
 		if (pcap_add_if_win32(&devlist, name, desc, errbuf) == -1) {
 			/*
-			* Failure.
-			*/
+			 * Failure.
+			 */
 			ret = -1;
 			break;
 		}
@@ -291,10 +301,10 @@ pcap_findalldevs(pcap_if_t **alldevsp, char *errbuf)
 	}
 	
 	if (ret == -1) {
-	/*
-	 * We had an error; free the list we've been constructing.
-	 */
-	if (devlist != NULL) {
+		/*
+		 * We had an error; free the list we've been constructing.
+		 */
+		if (devlist != NULL) {
 			pcap_freealldevs(devlist);
 			devlist = NULL;
 		}

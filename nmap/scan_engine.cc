@@ -6,17 +6,17 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2004 Insecure.Com LLC. Nmap       *
- * is also a registered trademark of Insecure.Com LLC.  This program is    *
- * free software; you may redistribute and/or modify it under the          *
- * terms of the GNU General Public License as published by the Free        *
- * Software Foundation; Version 2.  This guarantees your right to use,     *
- * modify, and redistribute this software under certain conditions.  If    *
- * you wish to embed Nmap technology into proprietary software, we may be  *
- * willing to sell alternative licenses (contact sales@insecure.com).      *
- * Many security scanner vendors already license Nmap technology such as  *
- * our remote OS fingerprinting database and code, service/version         *
- * detection system, and port scanning code.                               *
+ * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
  *                                                                         *
  * Note that the GPL places important restrictions on "derived works", yet *
  * it does not provide a detailed definition of that term.  To avoid       *
@@ -39,7 +39,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://www.insecure.org/nmap/ to download Nmap.                         *
+ * http://insecure.org/nmap/ to download Nmap.                             *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -51,10 +51,10 @@
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
  * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to many    *
- * security vendors, and generally include a perpetual license as well as  *
- * providing for priority support and updates as well as helping to fund   *
- * the continued development of Nmap technology.  Please email             *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
  * sales@insecure.com for further information.                             *
  *                                                                         *
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: scan_engine.cc 3437 2006-06-10 21:23:27Z fyodor $ */
+/* $Id: scan_engine.cc 4198 2006-11-19 09:35:26Z fyodor $ */
 
 #ifdef WIN32
 #include "nmap_winconfig.h"
@@ -661,8 +661,6 @@ UltraProbe::~UltraProbe() {
 
 void UltraProbe::setARP(u8 *arppkt, u32 arplen) {
   type = UP_ARP;
-  /*  probes.AP = new ArpProbe;
-      probes.AP->storePacket(arppkt, arplen); */
   mypspec.type = PS_ARP;
   return;
 }
@@ -2136,9 +2134,12 @@ static UltraProbe *sendIPScanProbe(UltraScanInfo *USI, HostScanStats *hss,
     }
 
     for(decoy = 0; decoy < o.numdecoys; decoy++) {
-      packet = build_tcp_raw(&o.decoys[decoy], hss->target->v4hostip(), o.ttl, 
-			     ipid, sport, pspec->pd.tcp.dport, seq, ack, 
-			     pspec->pd.tcp.flags, 0, tcpops, tcpopslen,
+      packet = build_tcp_raw(&o.decoys[decoy], hss->target->v4hostip(),
+      			     o.ttl, ipid, IP_TOS_DEFAULT, false,
+      			     o.ipoptions, o.ipoptionslen,
+      			     sport, pspec->pd.tcp.dport,
+      			     seq, ack, 0, pspec->pd.tcp.flags, 0, 0,
+      			     tcpops, tcpopslen,
 			     o.extra_payload, o.extra_payload_length, 
 			     &packetlen);
       if (decoy == o.decoyturn) {
@@ -2150,8 +2151,10 @@ static UltraProbe *sendIPScanProbe(UltraScanInfo *USI, HostScanStats *hss,
     }
   } else if (USI->udp_scan) {
     for(decoy = 0; decoy < o.numdecoys; decoy++) {
-      packet = build_udp_raw(&o.decoys[decoy], hss->target->v4hostip(), o.ttl, 
-			     sport, pspec->pd.udp.dport, ipid, 
+      packet = build_udp_raw(&o.decoys[decoy], hss->target->v4hostip(),
+			     o.ttl, ipid, IP_TOS_DEFAULT, false,
+			     o.ipoptions, o.ipoptionslen,
+			     sport, pspec->pd.udp.dport,
 			     o.extra_payload, o.extra_payload_length, 
 			     &packetlen);
       if (decoy == o.decoyturn) {
@@ -2166,27 +2169,37 @@ static UltraProbe *sendIPScanProbe(UltraScanInfo *USI, HostScanStats *hss,
       switch(pspec->proto) {
 
       case IPPROTO_TCP:
-	packet = build_tcp_raw(&o.decoys[decoy], hss->target->v4hostip(), o.ttl, 
-			       ipid, sport, o.magic_port, get_random_u32(), 
-			       get_random_u32(), TH_ACK, 0, NULL,
-			       0, o.extra_payload, o.extra_payload_length, 
+	packet = build_tcp_raw(&o.decoys[decoy], hss->target->v4hostip(),
+			       o.ttl, ipid, IP_TOS_DEFAULT, false,
+			       o.ipoptions, o.ipoptionslen,
+			       sport, o.magic_port,
+			       get_random_u32(), get_random_u32(), 0, TH_ACK, 0, 0,
+			       NULL,0,
+			       o.extra_payload, o.extra_payload_length, 
 			       &packetlen);
 	break;
       case IPPROTO_ICMP:
-	packet = build_icmp_raw(&o.decoys[decoy], hss->target->v4hostip(), o.ttl,
-				ipid, 0, 0, 8, 0, o.extra_payload,
-				o.extra_payload_length, &packetlen);
+	packet = build_icmp_raw(&o.decoys[decoy], hss->target->v4hostip(),
+				o.ttl, ipid, IP_TOS_DEFAULT, false,
+				o.ipoptions, o.ipoptionslen,
+				0, 0, 8, 0,
+				o.extra_payload, o.extra_payload_length,
+				&packetlen);
 	break;
       case IPPROTO_UDP:
-	packet = build_udp_raw(&o.decoys[decoy], hss->target->v4hostip(), o.ttl, 
-			       sport, o.magic_port, ipid, 
+	packet = build_udp_raw(&o.decoys[decoy], hss->target->v4hostip(),
+			       o.ttl, ipid, IP_TOS_DEFAULT, false,
+			       o.ipoptions, o.ipoptionslen,
+			       sport, o.magic_port,
 			       o.extra_payload, o.extra_payload_length, 
 			       &packetlen);
 
 	break;
       default:
-	packet = build_ip_raw(&o.decoys[decoy], hss->target->v4hostip(), o.ttl, 
-			      pspec->proto, ipid, 
+	packet = build_ip_raw(&o.decoys[decoy], hss->target->v4hostip(),
+			      pspec->proto,
+			      o.ttl, ipid, IP_TOS_DEFAULT, false,
+			      o.ipoptions, o.ipoptionslen,
 			      o.extra_payload, o.extra_payload_length, 
 			      &packetlen);
 	break;
@@ -2769,6 +2782,8 @@ static bool get_arp_result(UltraScanInfo *USI, struct timeval *stime) {
 }
 
 
+
+
 /* Tries to get one *good* (finishes a probe) pcap response by the
    (absolute) time given in stime.  Even if stime is now, try an
    ultra-quick pcap read just in case.  Returns true if a "good" result
@@ -3194,7 +3209,7 @@ static void begin_sniffer(UltraScanInfo *USI, vector<Target *> &Targets) {
   }
   filterlen = 0;
 
-  USI->pd = my_pcap_open_live(Targets[0]->deviceName(), 100,  (o.spoofsource)? 1 : 0, 2);
+  USI->pd = my_pcap_open_live(Targets[0]->deviceName(), 100,  (o.spoofsource)? 1 : 0, pcap_selectable_fd_valid()? 200 : 2);
 
   if (USI->tcp_scan || USI->udp_scan) {
     if (doIndividual)
@@ -3360,7 +3375,6 @@ static void startTimeOutClocks(vector<Target *> &Targets) {
 void ultra_scan(vector<Target *> &Targets, struct scan_lists *ports, 
 		stype scantype) {
   UltraScanInfo *USI = NULL;
-  time_t starttime;
   o.current_scantype = scantype;
 
   if (Targets.size() == 0) {
@@ -3379,14 +3393,11 @@ void ultra_scan(vector<Target *> &Targets, struct scan_lists *ports,
 
   if (o.verbose) {
     char targetstr[128];
-    struct tm *tm;
     bool plural = (Targets.size() != 1);
     if (!plural) {
       (*(Targets.begin()))->NameIP(targetstr, sizeof(targetstr));
     } else snprintf(targetstr, sizeof(targetstr), "%d hosts", (int) Targets.size());
-    starttime = USI->now.tv_sec;
-    tm = localtime(&starttime);
-    log_write(LOG_STDOUT, "Initiating %s against %s [%d port%s%s] at %02d:%02d\n", scantype2str(scantype), targetstr, USI->gstats->numprobes, (USI->gstats->numprobes != 1)? "s" : "", plural? "/host" : "", tm->tm_hour, tm->tm_min);
+    log_write(LOG_STDOUT, "Scanning %s [%d port%s%s]\n", targetstr, USI->gstats->numprobes, (USI->gstats->numprobes != 1)? "s" : "", plural? "/host" : "");
   }
 
   begin_sniffer(USI, Targets);
@@ -3435,17 +3446,15 @@ void ultra_scan(vector<Target *> &Targets, struct scan_lists *ports,
   }
 
   if (o.verbose) {
+    char additional_info[128];
     if (USI->gstats->num_hosts_timedout == 0)
-      log_write(LOG_STDOUT, "The %s took %.2fs to scan %lu total %s.\n",
-		scantype2str(scantype), 
-		TIMEVAL_MSEC_SUBTRACT(USI->now, USI->SPM->begin) / 1000.0, 
+      snprintf(additional_info, sizeof(additional_info), "%lu total %s",
 		(unsigned long) USI->gstats->numprobes * Targets.size(), 
 		(scantype == PING_SCAN_ARP)? "hosts" : "ports");
-    else log_write(LOG_STDOUT, "Finished %s in %.2fs, but %d %s timed out.\n", 
-		   scantype2str(scantype), 
-		   TIMEVAL_MSEC_SUBTRACT(USI->now, USI->SPM->begin) / 1000.0,
+    else snprintf(additional_info, sizeof(additional_info), "%d %s timed out",
 		   USI->gstats->num_hosts_timedout, 
 		   (USI->gstats->num_hosts_timedout == 1)? "host" : "hosts");
+    USI->SPM->endTask(NULL, additional_info);
   }
   delete USI;
   USI = NULL;
@@ -3631,7 +3640,6 @@ void pos_scan(Target *target, u16 *portarray, int numports, stype scantype) {
   struct scanstats ss;
   int senddelay = 0;
   int rpcportsscanned = 0;
-  bool printedinitialmsg = false;
   int tries = 0;
   time_t starttime;
   struct timeval starttm;
@@ -3640,10 +3648,11 @@ void pos_scan(Target *target, u16 *portarray, int numports, stype scantype) {
   struct timeval now;
   struct connectsockinfo csi;
   struct rpcscaninfo rsi;
-  char hostname[1200];
   unsigned long j;
   struct serviceDeductions sd;
   bool doingOpenFiltered = false;
+
+  ScanProgressMeter *SPM = NULL;
 
   if (target->timedOut(NULL))
     return;
@@ -3761,11 +3770,10 @@ void pos_scan(Target *target, u16 *portarray, int numports, stype scantype) {
 
     // This initial message is way down here because we don't want to print it if
     // no RPC ports need scanning.
-    if (o.verbose && !printedinitialmsg) {
-      struct tm *tm = localtime(&starttime);
-      assert(tm);
-      log_write(LOG_STDOUT, "Initiating %s against %s at %02d:%02d\n", scantype2str(scantype), target->NameIP(hostname, sizeof(hostname)), tm->tm_hour, tm->tm_min);
-      printedinitialmsg = true;
+    if (!SPM) {
+      char scanname[32];
+      snprintf(scanname, sizeof(scanname), "%s against %s", scantype2str(scantype), target->NameIP());
+      SPM = new ScanProgressMeter(scanname);
     }
     
     while(pil.testinglist != NULL)  /* While we have live queries or more ports to scan */
@@ -3921,13 +3929,18 @@ void pos_scan(Target *target, u16 *portarray, int numports, stype scantype) {
   }
 
   numports = rpcportsscanned;
-  if (o.verbose && numports > 0) {
-    gettimeofday(&now, NULL);
-    log_write(LOG_STDOUT, "The %s took %.2fs to scan %d ports on %s.\n", scantype2str(scantype), TIMEVAL_MSEC_SUBTRACT(now, starttm) / 1000.0, numports, target->NameIP());
+  if (SPM && o.verbose && (numports > 0)) {
+    char scannedportsstr[14];
+    snprintf(scannedportsstr, sizeof(scannedportsstr), "%d %s", numports, (numports > 1)? "ports" : "port");
+    SPM->endTask(NULL, scannedportsstr);
   }
  posscan_timedout:
   target->stopTimeOutClock(NULL);
   free(scan);
   close_rpc_query_sockets();
+  if (SPM) {
+    delete SPM;
+    SPM = NULL;
+  }
   return;
 }

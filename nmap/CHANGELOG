@@ -1,4 +1,293 @@
-# Nmap Changelog ($Id: CHANGELOG 3575 2006-06-24 04:13:43Z fyodor $); -*-text-*-
+# Nmap Changelog ($Id: CHANGELOG 4229 2006-12-08 03:02:09Z fyodor $); -*-text-*-
+4.20
+
+o Integrated the latest OS fingerprint submissions.  The 2nd
+  generation DB size has grown to 231 fingerprints.  Please keep them
+  coming!  New fingerprints include Mac OS X Server 10.5 pre-release,
+  NetBSD 4.99.4, Windows NT, and much more.
+
+o Fixed a segmentation fault in the new OS detection system
+  which was reported by Craig Humphrey and Sebastian Garcia.
+
+o Fixed a TCP sequence prediction difficulty indicator bug. The index
+  is supposed to go from 0 ("trivial joke") to about 260 (OpenBSD).
+  But some systems generated ISNs so insecurely, that Nmap went
+  berserk and reported a negative difficulty index.  This generally
+  only affects some printers, crappy consumer devices, and Microsoft
+  Windows (old versions).  Thanks to Sebastian Garcia for helping me
+  track down the problem.
+
+4.20RC2
+
+o Integrated all of your OS detection submissions since RC1.  The DB
+  has increased 13% to 214 fingerprints.  Please keep them coming!
+  New fingerprints include versions of z/OS, OpenBSD, Linux, AIX,
+  FreeBSD, Cisco CatOS, IPSO firewall, and a slew of printers and
+  misc. devices.  We also got our first Windows 95 fingerprint,
+  submitted anonymously of course :).
+
+o Fixed (I hope) the "getinterfaces: intf_loop() failed" error which
+  was seen on Windows Vista.  The problem was apparently in
+  intf-win32.c of libcnet (need to define MIB_IF_TYPE_MAX to
+  MAX_IF_TYPE rather than 32).  Thanks to Dan Griffin
+  (dan(a)jwsecure.com) for tracking this down!
+
+o Applied a couple minor bug fixes for IP options
+  support and packet tracing.  Thanks to Michal Luczaj
+  (regenrecht(a)o2.pl) for reporting them.
+
+o Incorporated SLNP (Simple Library Network Protocol) version
+  detection support.  Thanks to Tibor Csogor (tibi(a)tiborius.net) for
+  the patch.
+
+4.20RC1
+
+o Fixed (I hope) a bug related to Pcap capture on Mac OS X.  Thanks to
+  Christophe Thil for reporting the problem and to Kurt Grutzmacher
+  and Diman Todorov for helping to track it down.
+
+o Integrated all of your OS detection submissions since ALPHA11.  The
+  DB has increased 27% to 189 signatures.  Notable additions include
+  the Apple Airport Express, Windows Vista RC1, OpenBSD 4.0, a Sony
+  TiVo device, and tons of broadband routers, printers, switches, and
+  Linux kernels.  Keep those submissions coming!
+
+o Upgraded the included LibPCRE from version 6.4 to 6.7.  Thanks to
+  Jochen Voss (voss(a)seehuhn.de) for the suggestion (he found some bugs
+  in 6.4)
+
+4.20ALPHA11
+
+o Integrated all of your OS detection submissions, bringing the
+  database up to 149 fingerprints.  This is an increase of 28% from
+  ALPHA10.  Notable additions include FreeBSD 6.1, a bunch of HP
+  LaserJet printers, and HP-UX 11.11.  We also got a bunch of more
+  obscure submissions like Minix 3.1.2a and "Ember InSight Adapter for
+  programming EM2XX-family embedded devices".  Who doesn't have a few
+  of those laying around?  I'm hoping that all the obscure submissions
+  mean that more of the mainstream systems are being detected out of
+  the box!  Please keep those submissions (obscure or otherwise)
+  coming!
+
+4.20ALPHA10
+
+o Integrated tons of new OS fingerprints.  The DB now contains 116
+  fingerprints, which is up 63% since the previous version.  Please keep
+  the submissions coming!
+
+4.20ALPHA9
+
+o Integrated the newly submitted OS fingerprints. The DB now contains
+  71 fingerprints, up 27% from 56 in ALPHA8.  Please keep them coming!
+  We still only have 4.2% as many fingerprints as the gen1 database.
+
+o Added the --open option, which causes Nmap to show only open ports.
+  Ports in the states "open|closed" and "unfiltered" might be open, so
+  those are shown unless the host has an overwhelming number of them.
+
+o Nmap gen2 OS detection used to always do 2 retries if it fails to
+  find a match.  Now it normally does just 1 retry, but does 4 retries
+  if conditions are good enough to warrant fingerprint submission.
+  This should speed things up on average.  A new --max-os-tries option
+  lets you specify a higher lower maximum number of tries.
+
+o Added --unprivileged option, which is the opposite of --privileged.
+  It tells Nmap to treat the user as lacking network raw socket and
+  sniffing privileges.  This is useful for testing, debugging, or when
+  the raw network functionality of your operating system is somehow
+  broken.
+
+o Fixed a confusing error message which occured when you specified a
+  ping scan or list scan, but also specified -p (which is only used for
+  port scans).  Thanks to Thomas Buchanan for the patch.
+
+o Applied some small cleanup patches from Kris Katterjohn
+
+4.20ALPHA8
+
+o Integrated the newly submitted OS fingerprints.  The DB now contains
+  56, up 33% from 42 in ALPHA7.  Please keep them coming!  We still only
+  have 3.33% as many signatures as the gen1 database.
+
+o Nmap 2nd generation OS detection now has a more sophisticated
+  mechanism for guessing a target OS when there is no exact match in the
+  database (see http://insecure.org/nmap/osdetect/osdetect-guess.html )
+
+o Rewrote mswin32/nmap.rc to remove cruft and hopefully reduce some
+  MFC-related compilation problems we've seen.  Thanks to KX
+  (kxmail(a)gmail.com) for doing this.
+
+o NmapFE now uses a spin button for verbosity and debugging options so
+  that you can specify whatever verbosity (-v) or debugging (-d) level
+  you desire.  The --randomize-hosts option was also added to NmapFE.
+  Thanks to Kris Katterjohn for the patches.
+
+o A dozen or so small patches to Nmap and NmapFE by Kris Katterjohn.
+
+o Removed libpcap/Win32 and libpcap/msdos as Nmap doesn't use them.
+  This reduces the Nmap tar.bz2 by about 50K.  Thanks to Kris Katterjohn
+  for the suggestion.
+
+4.20ALPHA7
+
+o Did a bunch of Nmap 2nd generation fingerprint integration work.
+  Thanks to everyone who sent some in, though we still need a lot more.
+  Also thanks to Zhao for a bunch of help with the integration tools.
+  4.20ALPHA6 had 12 fingerprints, this new version has 42.  The old DB
+  (still included) has 1,684.
+
+o Updated nmap-mac-prefixes to reflect the latest OUI DB from the IEEE
+  (http://standards.ieee.org/regauth/oui/oui.txt) as of September 6, 2006.
+  Also added the unregistered PearPC virtual NIC prefix, as suggested
+  by Robert Millan (rmh(a)aybabtu.com).
+
+o Applied some small internal cleanup patches by Kris Katterjohn.
+
+4.20ALPHA6
+
+o Fixed a bug in 2nd generation OS detection which would (usually) prevent
+  fingerprints from being printed when systems don't respond to the 1st
+  ICMP echo probe (the one with bogus code value of 9).  Thanks to
+  Brandon Enright for reporting and helping me debug the problem.
+
+o Fixed some problematic Nmap version detection signatures which could
+  cause warning messages. Thanks to Brandon Enright for the initial patch.
+
+4.20ALPHA5
+
+o Worked with Zhao to improve the new OS detection system with
+  better algorithms, probe changes, and bug fixes.  We're
+  now ready to start growing the new database!  If Nmap gives you
+  fingerprints, please submit them at the given URL.  The DB is still
+  extremely small.  The new system is extensively documented at
+  http://insecure.org/nmap/osdetect/ .
+
+o Nmap now supports IP options with the new --ip-options flag.  You
+  can specify any options in hex, or use "R" (record route), "T"
+  (record timestamp), "U") (record route & timestamp), "S [route]"
+  (strict source route), or "L [route]" (loose source route).  Specify
+  --packet-trace to display IP options of responses.  For further
+  information and examples, see http://insecure.org/nmap/man/ and
+  http://seclists.org/nmap-dev/2006/q3/0052.html .  Thanks to Marek
+  Majkowski for writing and sending the patch.
+
+o Integrated all 2nd quarter service detection fingerprint
+  submissions.  Please keep them coming!  We now have 3,671 signatures
+  representing 415 protocols.   Thanks to version detection czar Doug
+  Hoyte for doing this.
+
+o Nmap now uses the (relatively) new libpcap pcap_get_selectable_fd
+  API on systems which support it.  This means that we no longer need
+  to hack the included Pcap to better support Linux.  So Nmap will now
+  link with an existing system libpcap by default on that platform if
+  one is detected.  Thanks to Doug Hoyte for the patch.
+
+o Updated the included libpcap from 0.9.3 to 0.9.4.  The changes I
+  made are in libpcap/NMAP_MODIFICATIONS .  By default, Nmap will now
+  use the included libpcap unless version 0.9.4 or greater is already
+  installed on the system.
+
+o Applied some nsock bugfixes from Diman Todorov.  These don't affect
+  the current version of Nmap, but are important for his Nmap
+  Scripting Engine, which I hope to integrate into mainline Nmap in
+  September.
+
+o Fixed a bug which would occasionally cause Nmap to crash with the
+  message "log_vwrite: write buffer not large enough".  I thought I
+  conquered it in a previous release -- thanks to Doug Hoyte for finding a
+  corner case which proved me wrong.
+
+o Fixed a bug in the rDNS system which prevented us from querying
+  certain authoritative DNS servers which have recursion explicitly
+  disabled.  Thanks to Doug Hoyte for the patch.
+
+o --packet-trace now reports TCP options (thanks to Zhao Lei for the
+  patch).  Thanks to the --ip-options addition also found in this
+  release, IP options are printed too.
+
+o Cleaned up Nmap DNS reporting to be a little more useful and
+  concise.  Thanks to Doug Hoyte for the patch.
+
+o Applied a bunch of small internal cleanup patches by Kris Katterjohn
+  (kjak(a)ispwest.com).
+
+o Fixed the 'distclean' make target to be more comprehensive.  Thanks
+  to Thomas Buchanan (Thomas.Buchanan(a)thecompassgrp.net) for the
+  patch.
+
+Nmap 4.20ALPHA4
+
+o Nmap now provides progress statistics in the XML output in verbose
+  mode.  Here are some examples of the format (etc is "estimated time
+  until completion) and times are in UNIX time_t (seconds since 1970)
+  format. Angle braces have been replaced by square braces:
+  [taskbegin task="SYN Stealth Scan" time="1151384685" /]
+  [taskprogress task="SYN Stealth Scan" time="1151384715"
+                percent="13.85" remaining="187" etc="1151384902" /]
+  [taskend task="SYN Stealth Scan" time="1151384776" /]
+  [taskbegin task="Service scan" time="1151384776" /]
+  [taskend task="Service scan" time="1151384788" /]
+  Thanks to Adam Vartanian (flooey(a)gmail.com) for the patch.
+
+o Updated the Windows installer to give an option checkbox for
+  performing the Nmap performance registry changes.  The default is to
+  do so.  Thanks to Adam Vartanian (flooey(a)gmail.com) for the patch.
+
+o Applied several code cleanup patches from Marek Majkowski.
+
+o Added --release-memory option, which causes Nmap to release all
+  accessible memory buffers before quitting (rather than let the OS do
+  it).  This is only useful for debugging memory leaks.
+
+o Fixed a bug related to bogus completion time estimates when you
+  request an estimate (through runtime interaction) right when Nmap is
+  starting.a subsystem (such as a port scan or version detection).
+  Thanks to Diman Todorov for reporting the problem and Doug Hoyte for
+  writing a fix.
+
+o Nmap no longer gets random numbers from OpenSSL when it is available
+  because that turned out to be slower than Nmap's other methods
+  (e.g. /dev/urandom on Linux, /dev/arandom on OpenBSD, etc.).  Thanks
+  to Marek Majkowski for reporting the problem.
+
+o Updated the Windows binary distributions (self-installer and .zip)
+  to include the new 2nd generation OS detection DB (nmap-os-db).
+  Thanks to Sina Bahram for reporting the problem.
+
+o Fixed the --max-retries option, which wasn't being honored.  Thanks
+  to Jon Passki (jon.passki(a)hursk.com) for the patch.
+
+Nmap 4.20ALPHA3
+
+o Added back Win32 support thanks to a patch by kx
+
+o Fixed the English translation of TCP sequence difficulty reported by
+  Brandon Enright, and also removed fingerprint printing for 1st
+  generation fingerprints (I don't really want to deal with those
+  anymore).  Thanks to Zhao Lei for writing this patch.
+
+o Fix a problem which caused OS detection to be done in some cases
+  even if the user didn't request it.  Thanks to Diman Todorov for the
+  fix.
+
+Nmap 4.20ALPHA2
+
+o Included nmap-os-db (the new OS detection DB) within the release.
+  Oops!  Thanks to Brandon Enright (bmenrigh(a)ucsd.edu) for catching
+  this problem with 4.20ALPHA1.
+
+o Added a fix for the crash in the new OS detection which would come
+  with the message "Probe doesn't exist! Probe type: 1. Probe subid: 1"
+
+Nmap 4.20ALPHA1
+
+o Integrated initial 2nd generation OS detection patch!  The system is
+  documented at http://insecure.org/nmap/osdetect/ .  Thanks to Zhao Lei
+  for helping with the coding and design.
+
+o portlist.cc was refactored to remove some code duplication.  Thanks
+  to Diman Todorov for the patch.
+
 Nmap 4.11
 
 o Added a dozens of more detailed SSH version detection signatures, thanks

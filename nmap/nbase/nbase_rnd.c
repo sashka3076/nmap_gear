@@ -6,17 +6,17 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2004 Insecure.Com LLC. Nmap       *
- * is also a registered trademark of Insecure.Com LLC.  This program is    *
- * free software; you may redistribute and/or modify it under the          *
- * terms of the GNU General Public License as published by the Free        *
- * Software Foundation; Version 2.  This guarantees your right to use,     *
- * modify, and redistribute this software under certain conditions.  If    *
- * you wish to embed Nmap technology into proprietary software, we may be  *
- * willing to sell alternative licenses (contact sales@insecure.com).      *
- * Many security scanner vendors already license Nmap technology such as  *
- * our remote OS fingerprinting database and code, service/version         *
- * detection system, and port scanning code.                               *
+ * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
  *                                                                         *
  * Note that the GPL places important restrictions on "derived works", yet *
  * it does not provide a detailed definition of that term.  To avoid       *
@@ -39,7 +39,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://www.insecure.org/nmap/ to download Nmap.                         *
+ * http://insecure.org/nmap/ to download Nmap.                             *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -51,10 +51,10 @@
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
  * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to many    *
- * security vendors, and generally include a perpetual license as well as  *
- * providing for priority support and updates as well as helping to fund   *
- * the continued development of Nmap technology.  Please email             *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
  * sales@insecure.com for further information.                             *
  *                                                                         *
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_rnd.c 3232 2006-03-26 06:44:57Z fyodor $ */
+/* $Id: nbase_rnd.c 3899 2006-08-29 05:42:35Z fyodor $ */
 
 #include "nbase.h"
 #include <string.h>
@@ -107,19 +107,11 @@
 #include <sys/time.h>
 #endif
 
-#if HAVE_OPENSSL
-#include <openssl/rand.h>
-#endif
-
 int get_random_bytes(void *buf, int numbytes) {
   static char bytebuf[2048];
   static char badrandomwarning = 0;
   static int bytesleft = 0;
-#if HAVE_OPENSSL
-  static int prng_seeded = 0;
-#else
   int tmp;
-#endif
   int res;
   struct timeval tv;
   FILE *fp = NULL;
@@ -128,22 +120,6 @@ int get_random_bytes(void *buf, int numbytes) {
   
   if (numbytes < 0 || numbytes > 0xFFFF) return -1;
   
-#if HAVE_OPENSSL
- /* If we have OpenSSL, then let's use it's internal PRNG for random
-    numbers, rather than opening /dev/urandom and friends.  The PRNG,
-    once seeded, should never empty. */
-  if ( prng_seeded ) {
-    if ( RAND_bytes((unsigned char*) buf, numbytes) ) {
-      return(0);
-    } else if ( RAND_pseudo_bytes( (unsigned char*) buf, numbytes ) ) {
-      return(0);
-    } else {
-      prng_seeded=0;
-      return get_random_bytes(buf, numbytes);
-    }
-  }
-#endif
-
   if (bytesleft == 0) {
     fp = fopen("/dev/arandom", "r");
     if (!fp) fp = fopen("/dev/urandom", "r");
@@ -176,19 +152,6 @@ int get_random_bytes(void *buf, int numbytes) {
     } else fclose(fp);
   }
   
-#if HAVE_OPENSSL
-  /* If we have OpenSSL, use these bytes to seed the PRNG.  If it's satisfied
-     (RAND_status) then set prng_seeded and re-run ourselves to actually fill
-     the buffer with random data. */
-  RAND_seed( bytebuf, sizeof(bytebuf) );
-  if ( RAND_status() ) {
-    prng_seeded=1;
-  } else {
-    prng_seeded=0;
-  }
-  return get_random_bytes((char *)buf, numbytes);
-#else
-  /* We're not OpenSSL, do things the 'old fashioned way' */
   if (numbytes <= bytesleft) { /* we can cover it */
     memcpy(buf, bytebuf + (sizeof(bytebuf) - bytesleft), numbytes);
     bytesleft -= numbytes;
@@ -200,7 +163,6 @@ int get_random_bytes(void *buf, int numbytes) {
   tmp = bytesleft;
   bytesleft = 0;
   return get_random_bytes((char *)buf + tmp, numbytes - tmp);
-#endif
 }
 
 int get_random_int() {

@@ -22,7 +22,7 @@
  */
 #ifndef lint
 static const char rcsid[] _U_ =
-    "@(#) $Header$ (LBL)";
+    "@(#) $Header: /tcpdump/master/libpcap/optimize.c,v 1.85 2005/04/04 08:42:18 guy Exp $ (LBL)";
 #endif
 
 #ifdef HAVE_CONFIG_H
@@ -488,7 +488,7 @@ compute_local_ud(b)
 				if (!ATOMELEM(def, X_ATOM))
 					use |= ATOMMASK(X_ATOM);
 				if (!ATOMELEM(def, A_ATOM))
-		use |= ATOMMASK(A_ATOM);
+					use |= ATOMMASK(A_ATOM);
 			}
 			else if (atom < N_ATOMS) {
 				if (!ATOMELEM(def, atom))
@@ -833,7 +833,7 @@ opt_peep(b)
 	 * operation, we can sometime optimize it away.
 	 */
 	if (b->s.code == (BPF_JMP|BPF_JEQ|BPF_K) &&
-		    !ATOMELEM(b->out_use, A_ATOM)) {
+	    !ATOMELEM(b->out_use, A_ATOM)) {
 	    	/*
 	    	 * We can optimize away certain subtractions of the
 	    	 * X register.
@@ -879,21 +879,21 @@ opt_peep(b)
 			b->s.k += last->s.k;
 			done = 0;
 		}
-	/*
+		/*
 		 * And, similarly, a constant AND can be simplified
 		 * if we're testing against 0, i.e.:
 		 *
-	 * and #k	nop
-	 * jeq #0  ->	jset #k
-	 */
+		 * and #k	nop
+		 * jeq #0  ->	jset #k
+		 */
 		else if (last->s.code == (BPF_ALU|BPF_AND|BPF_K) &&
 		    b->s.k == 0) {
-		b->s.k = last->s.k;
-		b->s.code = BPF_JMP|BPF_K|BPF_JSET;
-		last->s.code = NOP;
-		done = 0;
-		opt_not(b);
-	}
+			b->s.k = last->s.k;
+			b->s.code = BPF_JMP|BPF_K|BPF_JSET;
+			last->s.code = NOP;
+			done = 0;
+			opt_not(b);
+		}
 	}
 	/*
 	 * jset #0        ->   never
