@@ -1,6 +1,6 @@
 Name: nmap
 Version: 4.20
-Release: alt1
+Release: alt2
 Serial: 20020501
 
 Summary: Network exploration tool and security scanner
@@ -21,6 +21,7 @@ Patch3: nmap-4.01-alt-dot-dir.patch
 Patch4: nmap-4.20-alt-owl-fileexistsandisreadable.patch
 Patch5: nmap-4.04-alt-libdnet.patch
 Patch6: nmap-4.01-alt-nmapfe.desktop.patch
+Patch7: nmap-4.20-owl-osscan.patch
 
 PreReq: shadow-utils
 Requires: chrooted-resolv, libdnet >= 0:1.11-alt4
@@ -53,6 +54,7 @@ This package includes nmapfe, a Gtk+ frontend for nmap.
 %patch4 -p1
 %patch5 -p1
 %patch6 -p1
+%patch7 -p1
 find -type f -name \*.orig -delete -print
 bzip2 -9 CHANGELOG
 
@@ -97,6 +99,9 @@ install -pD -m644 %_sourcedir/nmapfe-48.png %buildroot%_liconsdir/nmapfe.png
 %_liconsdir/*
 
 %changelog
+* Fri Oct 19 2007 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.20-alt2
+- Use 1st generation OS detection system by default.
+
 * Thu Oct 18 2007 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.20-alt1
 - Updated to 4.20.
 
