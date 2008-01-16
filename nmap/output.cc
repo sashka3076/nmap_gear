@@ -9,7 +9,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -101,7 +101,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: output.cc 6056 2007-10-28 00:05:03Z kris $ */
+/* $Id: output.cc 6633 2007-12-22 06:32:03Z fyodor $ */
 
 #include "output.h"
 #include "osscan.h"
@@ -466,25 +466,29 @@ void printportoutput(Target *currenths, PortList *plist) {
   }
 
   if (numignoredports == plist->numports) {
-    log_write(LOG_PLAIN,
-              "%s %d scanned %s on %s %s ",
-	      (numignoredports == 1)? "The" : "All", numignoredports,
-	      (numignoredports == 1)? "port" : "ports", 
-	      currenths->NameIP(hostname, sizeof(hostname)), 
-	      (numignoredports == 1)? "is" : "are");
-    if (plist->numIgnoredStates() == 1) {
-      log_write(LOG_PLAIN, statenum2str(plist->nextIgnoredState(PORT_UNKNOWN)));
+    if (numignoredports == 0) {
+      log_write(LOG_PLAIN, "0 ports scanned on %s\n", currenths->NameIP(hostname, sizeof(hostname)));
     } else {
-      prevstate = PORT_UNKNOWN;
-      while ((istate = plist->nextIgnoredState(prevstate)) != PORT_UNKNOWN) {
-	if (prevstate != PORT_UNKNOWN) log_write(LOG_PLAIN, " or ");
-	log_write(LOG_PLAIN, "%s (%d)", statenum2str(istate), plist->getStateCounts(istate));
-	prevstate = istate;
+      log_write(LOG_PLAIN,
+		"%s %d scanned %s on %s %s ",
+		(numignoredports == 1)? "The" : "All", numignoredports,
+		(numignoredports == 1)? "port" : "ports", 
+		currenths->NameIP(hostname, sizeof(hostname)), 
+		(numignoredports == 1)? "is" : "are");
+      if (plist->numIgnoredStates() == 1) {
+	log_write(LOG_PLAIN, statenum2str(plist->nextIgnoredState(PORT_UNKNOWN)));
+      } else {
+	prevstate = PORT_UNKNOWN;
+	while ((istate = plist->nextIgnoredState(prevstate)) != PORT_UNKNOWN) {
+	  if (prevstate != PORT_UNKNOWN) log_write(LOG_PLAIN, " or ");
+	  log_write(LOG_PLAIN, "%s (%d)", statenum2str(istate), plist->getStateCounts(istate));
+	  prevstate = istate;
+	}
       }
+      if(o.reason) 
+		  print_state_summary(plist, STATE_REASON_EMPTY);
+      log_write(LOG_PLAIN, "\n");
     }
-    if(o.reason) 
-		print_state_summary(plist, STATE_REASON_EMPTY);
-    log_write(LOG_PLAIN, "\n");
 
     log_write(LOG_MACHINE,"Host: %s (%s)\tStatus: Up", 
 	      currenths->targetipstr(), currenths->HostName());
@@ -828,6 +832,71 @@ char* xml_convert (const char* str) {
   *p = 0;
   temp = (char *) safe_realloc(temp,strlen(temp)+1);
   return temp;
+}
+
+char *logfilename(const char *str, struct tm *tm)
+{
+	char *ret, *end, *p;
+	char tbuf[10];
+	int retlen = strlen(str) * 6 + 1;
+
+	ret = (char *) safe_malloc(retlen);
+	end = ret + retlen;
+
+	for (p = ret; *str; str++) {
+		if (*str == '%') {
+			str++;
+
+			if (!*str)
+				break;
+
+			switch (*str) {
+			case 'H':
+				strftime(tbuf, sizeof tbuf, "%H", tm);
+				break;
+			case 'M':
+				strftime(tbuf, sizeof tbuf, "%M", tm);
+				break;
+			case 'S':
+				strftime(tbuf, sizeof tbuf, "%S", tm);
+				break;
+			case 'T':
+				strftime(tbuf, sizeof tbuf, "%H%M%S", tm);
+				break;
+			case 'R':
+				strftime(tbuf, sizeof tbuf, "%H%M", tm);
+				break;
+			case 'm':
+				strftime(tbuf, sizeof tbuf, "%m", tm);
+				break;
+			case 'd': 
+				strftime(tbuf, sizeof tbuf, "%d", tm);
+				break;
+			case 'y': 
+				strftime(tbuf, sizeof tbuf, "%y", tm);
+				break;
+			case 'Y': 
+				strftime(tbuf, sizeof tbuf, "%Y", tm);
+				break;
+			case 'D': 
+				strftime(tbuf, sizeof tbuf, "%m%d%y", tm);
+				break;
+			default:
+				*p++ = *str;
+				continue;
+			}
+
+			assert(end - p > 1);
+			Strncpy(p, tbuf, end - p - 1);
+			p += strlen(tbuf);
+		} else {
+			*p++ = *str;
+		}
+	}
+
+	*p = 0;
+
+	return (char *) safe_realloc(ret, strlen(ret) + 1);
 }
 
 /* This is the workhorse of the logging functions.  Usually it is
@@ -1559,11 +1628,12 @@ void printosscanoutput(Target *currenths) {
   } else { assert(0); }
   
   if (o.debugging || o.verbose) {
-    log_write(LOG_XML,"<osfingerprint fingerprint=\"\n%s\" />\n", 
-	      mergeFPs(FPR->FPs, FPR->numFPs, false,
-		       currenths->v4hostip(), distance, currenths->MACAddress(),
-		       FPR->osscan_opentcpport, FPR->osscan_closedtcpport, FPR->osscan_closedudpport,
-		       false));
+    char *xml_osfp = xml_convert(mergeFPs(FPR->FPs, FPR->numFPs, false,
+				 currenths->v4hostip(), distance, currenths->MACAddress(),
+				 FPR->osscan_opentcpport, FPR->osscan_closedtcpport, FPR->osscan_closedudpport,
+				 false));
+    log_write(LOG_XML,"<osfingerprint fingerprint=\"\n%s\" />\n", xml_osfp);
+    free(xml_osfp);
   }
   
   log_write(LOG_XML, "</os>\n");

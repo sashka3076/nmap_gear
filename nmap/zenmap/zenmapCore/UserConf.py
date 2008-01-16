@@ -331,7 +331,7 @@ options_content = '''<?xml version="1.0"?>
           need_root="1"/>
           
   <option name="Ping after Scan"
-          option="-P0"
+          option="-PN"
           hint="Don't ping hosts before scanning"
           arguments=""
           need_root="0"/>

@@ -77,16 +77,16 @@ if PLATFORM == 'linux2' or PLATFORM == 'linux1':
                                                    HOME, CURRENT_DIR]))
 elif PLATFORM == 'win32':
     PROGRAM_FILES = os.environ.get("PROGRAMFILES", "\\")
-    UMIT_DIR = os.path.join(PROGRAM_FILES, APP_NAME)
-    PIXMAPS_DIR = os.path.join(UMIT_DIR, 'share', 'pixmaps')
+    APP_DIR = os.path.join(PROGRAM_FILES, APP_NAME)
+    PIXMAPS_DIR = os.path.join(APP_DIR, 'share', 'pixmaps')
     
     base_paths.update(dict(\
-        basic_search_sequence = [UMIT_DIR, PROGRAM_FILES, HOME, CURRENT_DIR],
-        config_search_sequence = [UMIT_DIR, PROGRAM_FILES, HOME, CURRENT_DIR],
+        basic_search_sequence = [APP_DIR, PROGRAM_FILES, HOME, CURRENT_DIR],
+        config_search_sequence = [APP_DIR, PROGRAM_FILES, HOME, CURRENT_DIR],
         pixmaps_search_sequence = [PIXMAPS_DIR, PROGRAM_FILES,
                                    os.path.join(CURRENT_DIR, 'share', 'pixmaps'),
                                    HOME],
-        i18n_search_sequence = [UMIT_DIR, PROGRAM_FILES,
+        i18n_search_sequence = [APP_DIR, PROGRAM_FILES,
                                 os.path.join(CURRENT_DIR, 'share', 'locale'), HOME],))
 
 elif PLATFORM == 'darwin':

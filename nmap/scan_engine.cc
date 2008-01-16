@@ -6,7 +6,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: scan_engine.cc 6450 2007-12-08 03:57:28Z kris $ */
+/* $Id: scan_engine.cc 6633 2007-12-22 06:32:03Z fyodor $ */
 
 #ifdef WIN32
 #include "nmap_winconfig.h"
@@ -2581,7 +2581,7 @@ static UltraProbe *sendArpScanProbe(UltraScanInfo *USI, HostScanStats *hss,
   hss->lastprobe_sent = probe->sent = USI->now;
   if ((rc = eth_send(USI->ethsd, frame, sizeof(frame))) != sizeof(frame)) {
     int err = socket_errno();
-    error("WARNING:  eth_send of ARP packet returned %i rather than expected %d (errno=%i: %s)\n", rc, (int) sizeof(frame), err, strerror(err));
+    error("WARNING:  eth_send of ARP packet returned %i rather than expected %d (errno=%i: %s)", rc, (int) sizeof(frame), err, strerror(err));
   }
   PacketTrace::traceArp(PacketTrace::SENT, (u8 *) frame, sizeof(frame), &USI->now);
   probe->tryno = tryno;
@@ -3584,7 +3584,7 @@ static bool get_pcap_result(UltraScanInfo *USI, struct timeval *stime) {
 	    } else newstate = PORT_CLOSED;
 	  } else {
 	    if (o.debugging)
-	      error("Received scan response with unexpected TCP flags: %d\n", tcp->th_flags);
+	      error("Received scan response with unexpected TCP flags: %d", tcp->th_flags);
 	    break;
 	  }
 	}
@@ -3611,7 +3611,7 @@ static bool get_pcap_result(UltraScanInfo *USI, struct timeval *stime) {
 	 8 xtra bytes */
       if (bytes < requiredbytes) {
 	if (o.debugging) 
-	  error("Received short ICMP packet (%d bytes)\n", bytes);
+	  error("Received short ICMP packet (%d bytes)", bytes);
 	continue;
       }
       
@@ -3970,7 +3970,7 @@ static int get_ping_pcap_result(UltraScanInfo *USI, struct timeval *stime) {
       else if (ping->type == 3 || ping->type == 4 || ping->type == 11 || o.debugging) {
         if (bytes < ip->ip_hl * 4 + 28U) {
           if (o.debugging)
-            error("ICMP type %d code %d packet is only %d bytes\n", ping->type, ping->code, bytes);
+            error("ICMP type %d code %d packet is only %d bytes", ping->type, ping->code, bytes);
           continue;
         }
 
@@ -3979,7 +3979,7 @@ static int get_ping_pcap_result(UltraScanInfo *USI, struct timeval *stime) {
 	/* IPProto Scan (generally) sends bare IP headers, so no extra payload */
         if (bytes < ip->ip_hl * 4 + 8U + ip2->ip_hl * 4 + 8U && !USI->ptech.rawprotoscan) {
           if (o.debugging)
-            error("ICMP (embedded) type %d code %d packet is only %d bytes\n", ping->type, ping->code, bytes);
+            error("ICMP (embedded) type %d code %d packet is only %d bytes", ping->type, ping->code, bytes);
           continue;
         }
 
@@ -4063,7 +4063,7 @@ static int get_ping_pcap_result(UltraScanInfo *USI, struct timeval *stime) {
             goodseq = tcp_trynum_pingseq_decode(USI, tcp, &trynum, &pingseq);
             if (!goodseq) {
               if (o.debugging)
-                error("Bogus trynum or sequence number in ICMP error message\n");
+                error("Bogus trynum or sequence number in ICMP error message");
               continue;
             }
 
@@ -4203,7 +4203,7 @@ static int get_ping_pcap_result(UltraScanInfo *USI, struct timeval *stime) {
         continue;
       }
       if (bytes < 4 * ip->ip_hl + 16U) {
-          error("TCP packet is only %d bytes, we can't get enough information from it\n", bytes);
+          error("TCP packet is only %d bytes, we can't get enough information from it", bytes);
           continue;
       }
       struct tcp_hdr *tcp = (struct tcp_hdr *) (((u8 *) ip) + 4 * ip->ip_hl);

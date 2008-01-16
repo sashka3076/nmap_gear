@@ -5,7 +5,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: utils.cc 6236 2007-11-15 22:42:17Z kris $ */
+/* $Id: utils.cc 6633 2007-12-22 06:32:03Z fyodor $ */
 
 #include "nmap.h"
 #include "utils.h"
@@ -974,7 +974,7 @@ char *mmapfile(char *fname, int *length, int openflags)
   }
  else {
   oflags = GENERIC_READ | GENERIC_WRITE;
-  mflags = PAGE_READONLY | PAGE_READWRITE;
+  mflags = PAGE_READWRITE;
  }
 
  fd = CreateFile (

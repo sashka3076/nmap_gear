@@ -9,7 +9,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -101,7 +101,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: idle_scan.cc 6119 2007-11-03 01:31:02Z david $ */
+/* $Id: idle_scan.cc 6633 2007-12-22 06:32:03Z fyodor $ */
 
 #include "idle_scan.h"
 #include "timing.h"
@@ -855,7 +855,7 @@ static int idle_treescan(struct idle_proxy_info *proxy, Target *target,
 
   if (o.debugging > 1) {  
     error("%s: Called against %s with %d ports, starting with %hu. expectedopen: %d", __func__, target->targetipstr(), numports, ports[0], expectedopen);
-    error("IDLE SCAN TIMING: grpsz: %.3f delay: %d srtt: %d rttvar: %d\n",
+    error("IDLE SCAN TIMING: grpsz: %.3f delay: %d srtt: %d rttvar: %d",
 	  proxy->current_groupsz, proxy->senddelay, target->to.srtt,
 	  target->to.rttvar);
   }

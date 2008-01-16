@@ -4,7 +4,7 @@
  *                                                                         *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
- * The nsock parallel socket event library is (C) 1999-2006 Insecure.Com   *
+ * The nsock parallel socket event library is (C) 1999-2008 Insecure.Com   *
  * LLC This library is free software; you may redistribute and/or          *
  * modify it under the terms of the GNU General Public License as          *
  * published by the Free Software Foundation; Version 2.  This guarantees  *
@@ -53,7 +53,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_core.c 6171 2007-11-08 17:19:58Z david $ */
+/* $Id: nsock_core.c 6635 2007-12-22 06:32:18Z fyodor $ */
 
 #include "nsock_internal.h"
 #include "gh_list.h"
@@ -713,8 +713,6 @@ static int pcap_read_on_nonselect(mspool *nsp)
 	int rc;
 	int ret = 0;
 	
-	if (nsp->tracelevel > 3)
-		nsock_trace(nsp, "PCAP read_on_nonselect");
 	
 	for(current = GH_LIST_FIRST_ELEM(event_list);
 		current != NULL; current = next) {
@@ -727,8 +725,6 @@ static int pcap_read_on_nonselect(mspool *nsp)
 	        }
 		next = GH_LIST_ELEM_NEXT(current);
 	}
-	if (nsp->tracelevel > 3)
-		nsock_trace(nsp, "PCAP END read_on_nonselect");
 
 	return(ret);
 }

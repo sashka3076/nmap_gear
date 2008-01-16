@@ -83,7 +83,7 @@ Function .onInit
     return
 
   run_uninstaller:
-    ExecWait '"$0\Uninstall.exe"'
+    ExecWait '"$0\Uninstall.exe" _?=$INSTDIR'
 
 FunctionEnd
 
@@ -107,13 +107,12 @@ Section "" ;No components page, name is not important
   File wpcap.dll
 
   ; Check windows version
-  ReadRegStr $R0 HKLM "SOFTWARE\Microsoft\Windows NT\CurrentVersion" VersionNumber
-  StrCmp $R0 '6.0'vista_files no_vista_files
+  ReadRegStr $R0 HKLM "SOFTWARE\Microsoft\Windows NT\CurrentVersion" CurrentVersion
+  StrCmp $R0 '6.0' vista_files
 
-  no_vista_files:
-    File Packet.dll
-    File WanPacket.dll
-    Goto install
+  File Packet.dll
+  File WanPacket.dll
+  Goto install
 
   vista_files:
     File vista\Packet.dll

@@ -6,7 +6,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: service_scan.cc 6241 2007-11-16 00:48:44Z kris $ */
+/* $Id: service_scan.cc 6633 2007-12-22 06:32:03Z fyodor $ */
 
 
 #include "service_scan.h"
@@ -2083,7 +2083,7 @@ static void servicescan_write_handler(nsock_pool nsp, nsock_event nse, void *myd
 
   if (status == NSE_STATUS_ERROR) {
 	err = nse_errorcode(nse);
-	error("Got nsock WRITE error #%d (%s)\n", err, strerror(err));
+	error("Got nsock WRITE error #%d (%s)", err, strerror(err));
   }
 
   // Uh-oh.  Some sort of write failure ... maybe the connection closed
@@ -2131,7 +2131,7 @@ static void servicescan_read_handler(nsock_pool nsp, nsock_event nse, void *myda
       // WOO HOO!!!!!!  MATCHED!  But might be soft
       if (MD->isSoft && svc->probe_matched) {
 	if (strcmp(svc->probe_matched, MD->serviceName) != 0)
-	  error("WARNING:  service %s:%hi had allready soft-matched %s, but now soft-matched %s; ignoring second value\n", svc->target->NameIP(), svc->portno, svc->probe_matched, MD->serviceName);
+	  error("WARNING:  service %s:%hi had allready soft-matched %s, but now soft-matched %s; ignoring second value", svc->target->NameIP(), svc->portno, svc->probe_matched, MD->serviceName);
 	// No error if its the same - that happens frequently.  For
 	// example, if we read more data for the same probe response
 	// it will probably still match.

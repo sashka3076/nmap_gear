@@ -4,7 +4,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -96,7 +96,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: portlist.cc 5538 2007-08-14 06:46:54Z kris $ */
+/* $Id: portlist.cc 6633 2007-12-22 06:32:03Z fyodor $ */
 
 
 #include "portlist.h"
@@ -426,7 +426,7 @@ int PortList::addPort(u16 portno, u8 protocol, char *owner, int state) {
     /* We must discount our statistics from the old values.  Also warn
        if a complete duplicate */
     if (o.debugging && current->state == state && (!owner || !*owner)) {
-      error("Duplicate port (%hu/%s)\n", portno, proto2ascii(protocol));
+      error("Duplicate port (%hu/%s)", portno, proto2ascii(protocol));
     } 
     state_counts_proto[proto][current->state]--;
   } else {

@@ -9,7 +9,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -101,7 +101,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: output.h 5450 2007-08-11 05:11:47Z fyodor $ */
+/* $Id: output.h 6633 2007-12-22 06:32:03Z fyodor $ */
 
 #ifndef OUTPUT_H
 #define OUTPUT_H
@@ -137,6 +137,8 @@ void printportoutput(Target *currenths, PortList *plist);
    separate call ( print_MAC_XML_Info ) because it needs to be printed
    in a certain place to conform to DTD. */
 void printmacinfo(Target *currenths);
+
+char *logfilename(const char *str, struct tm *tm);
 
 /* Write some information (printf style args) to the given log stream(s).
    Remember to watch out for format string bugs. */

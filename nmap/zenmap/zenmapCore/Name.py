@@ -23,7 +23,7 @@
 
 APP_NAME = "zenmap"
 APP_DISPLAY_NAME = "Zenmap"
-APP_WEB_SITE = "http://insecure.org/nmap"
+APP_WEB_SITE = "http://insecure.org/nmap/zenmap"
 APP_DOWNLOAD_SITE = "http://insecure.org/nmap/download.html"
 APP_COPYRIGHT = "Copyright 2007 Insecure.Com LLC"
 

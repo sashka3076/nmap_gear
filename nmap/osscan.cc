@@ -6,7 +6,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: osscan.cc 6238 2007-11-15 23:36:18Z kris $ */
+/* $Id: osscan.cc 6633 2007-12-22 06:32:03Z fyodor $ */
 
 #include "osscan.h"
 #include "timing.h"
@@ -248,7 +248,7 @@ static int AVal_match(struct AVal *reference, struct AVal *fprint, struct AVal *
 		*q1 = '\0'; number = strtol(p, NULL, 16);
 		number1 = strtol(q1 + 1, NULL, 16);
 		if(number1 < number && o.debugging) {
-		  error("Range error in reference aval: %s=%s\n", current_ref->attribute, current_ref->value);
+		  error("Range error in reference aval: %s=%s", current_ref->attribute, current_ref->value);
       }
 		val = strtol(current_fp->value, &endptr, 16);
 		if (val < number || val > number1 || *endptr) { if (andexp)  { testfailed=1; break; } }

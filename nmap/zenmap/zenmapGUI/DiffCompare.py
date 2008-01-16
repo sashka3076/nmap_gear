@@ -35,7 +35,7 @@ from zenmapCore.Name import APP_DISPLAY_NAME, NMAP_DISPLAY_NAME
 from zenmapCore.Diff import Diff
 from zenmapCore.UmitConf import UmitConf, DiffColors
 from zenmapCore.NmapParser import NmapParser, HostInfo
-from zenmapCore.Paths import check_access
+from zenmapCore.Paths import check_access, Path
 from zenmapCore.UmitLogging import log
 from zenmapCore.I18N import _
 

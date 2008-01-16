@@ -5,7 +5,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: services.cc 6088 2007-10-30 04:40:10Z david $ */
+/* $Id: services.cc 6633 2007-12-22 06:32:03Z fyodor $ */
 
 #include "services.h"
 #include "NmapOps.h"
@@ -140,7 +140,7 @@ static int nmap_services_init() {
 	else
 		len = GetWindowsDirectory(filename, 480);	//	be safe
 	if(!len)
-		error("Get%sDirectory failed (%d) @#!#@\n",
+		error("Get%sDirectory failed (%d) @#!#@",
 		 wnt ? "System" : "Windows", GetLastError());
 	else
 	{

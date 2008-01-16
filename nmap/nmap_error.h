@@ -4,7 +4,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -96,7 +96,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap_error.h 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: nmap_error.h 6633 2007-12-22 06:32:03Z fyodor $ */
 
 #ifndef NMAP_ERROR_H
 #define NMAP_ERROR_H

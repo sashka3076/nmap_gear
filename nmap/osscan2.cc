@@ -6,7 +6,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -2033,8 +2033,9 @@ bool HostOsScan::processTSeqResp(HostOsScanStats *hss, struct ip *ip, int replyN
     if (seq_response_num != replyNo) {
       /* BzzT! Value out of range */
       if (o.debugging) {
-        error("Unable to associate os scan response with sent packet for %s.\nReceived ack: %lX; sequence sent: %lX. Packet:",
-              hss->target->targetipstr(),
+        error("Unable to associate os scan response with sent packet for %s.",
+              hss->target->targetipstr());
+        error("Received ack: %lX; sequence sent: %lX. Packet:",
               (unsigned long) ntohl(tcp->th_ack),
               (unsigned long) tcpSeqBase);
         readtcppacket((unsigned char *)ip,ntohs(ip->ip_len));

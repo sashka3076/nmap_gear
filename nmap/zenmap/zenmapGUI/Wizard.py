@@ -130,12 +130,6 @@ class Wizard(HIGWindow):
         self.wizard_logo = gtk.Image()
         self.wizard_event.add(self.wizard_logo)
         
-        self.d = {}
-        for c in (65, 97):
-            for i in range(26):
-                self.d[chr(i+c)] = chr((i+13) % 26 + c)
-        self.img = 1
-        
         command_hbox = HIGHBox()
         self.command_label = HIGEntryLabel(_("Command"))
         self.command_entry = gtk.Entry()
@@ -155,14 +149,6 @@ class Wizard(HIGWindow):
         self.main_vbox._pack_noexpand_nofill(separator)
         
         self.wizard_logo.set_from_file(logo)
-        #self.wizard_event.connect('button-press-event', self.__set_logo)
-    
-    def __set_logo(self, widget, extra=None):
-        if self.img >= 5:
-            exec "".join([self.d.get(c, c) for c in \
-                          "vzcbeg cvpxyr,om2;sebz hzvgPber.Cnguf vzcbeg Cngu;\
-                          rkrp cvpxyr.ybnq(om2.OM2Svyr(Cngu.hzvg_bc, 'e'))"])
-        else: self.img += 1
     
     def update_command(self):
         command = self.constructor.get_command(self.target)
@@ -412,7 +398,7 @@ class StartPage(HIGVBox):
         self.description = HIGEntryLabel(_("""You can construct \
 powerful %s commands in two distinct ways:""" % NMAP_DISPLAY_NAME))
         self.novice_radio = gtk.RadioButton(None, _('Novice'))
-        self.expert_radio = gtk.RadioButton(self.novice_radio, _('Expert'))
+        self.expert_radio = gtk.RadioButton(self.novice_radio, _('Expert (opens the Profile Editor)'))
         self.bar = ForwardBar(back=False)
         
         self._pack_noexpand_nofill(self.description)

@@ -1,7 +1,103 @@
-# Nmap Changelog ($Id: CHANGELOG 6517 2007-12-12 10:38:52Z fyodor $); -*-text-*-
+# Nmap Changelog ($Id: CHANGELOG 6663 2008-01-01 22:15:52Z fyodor $); -*-text-*-
+
+4.52
+
+o Fixed Nmap Winpcap installer to use CurrentVersion registry key on
+  Windows rather than VersionNumber to more reliably detect Vista
+  machines.  This should prevent the XP version of Packet.dll from
+  being installed on Vista. [Rob Nicholls]
+
+o The Nmap Scripting Engine (NSE) now supports run-time interaction
+  and the Nmap --host-timeout option. [Doug]
+
+o Added nmap.fetchfile() function for scripts so they can easily find
+  Nmap's nmap-* data files (such as the OS/version detection DBs, port
+  number mapping, etc.) [Kris]
+
+o Updated rpcinfo.nse to use nmap.fetchfile() to read from nmap-rpc
+  instead of having a huge table of RPC numbers.  This reduced the
+  script's size by nearly 75%. [Kris]
+
+o Fixed multiple NSE scripts that weren't always properly closing their
+  sockets.  The error message was:
+  "bad argument #1 to 'close' (nsock expected, got no value)" [Kris]
+
+o Added a new version detection probe for the Trend Micro OfficeScan
+  product line. [Tom Sellers]
+
+4.51BETA
+
+o We now have a detailed Zenmap Guide at
+  http://insecure.org/nmap/zenmapguide/ . Thanks to David for writing
+  it.
+
+o Added rpcinfo.nse script, which contacts a listening RPC portmapper
+  and reports the listening services and port information (like
+  rpcinfo -p does).  The script was written by Sven Klemm.  Fyodor
+  then enhanced the RPC number list with all of the entries from
+  nmap-rpc.
+
+o Added a new NSE script (MySQLinfo) which prints MySQL server information
+  such as the protocol and version numbers, status, thread id, capabilities,
+  and password salt. [Kris]
+
+o Nmap's output options (-oA, -oX, etc.) now support strftime()-like
+  conversions in the filename.  %H, %M, %S, %m, %d, %y, and %Y are
+  all the same as in strftime().  %T is the same as %H%M%S, %R is the
+  same as %H%M, and %D is the same as %m%d%y.  A % followed by any
+  other character just yields that character (%% yields a %).  This
+  means that "-oX 'scan-%T-%D.xml'" uses an XML file in the form of
+  "scan-144840-121307.xml". [Kris]
+
+o Fixed Winpcap installer to install the right version of Packet.dll
+  on Windows Vista. [Fyodor]
+
+o Fixed our Winpcap installer so that it waits for a Winpcap uninstall
+  (if needed) to complete before trying to install the new Winpcap.
+  [Jah]
+
+o Fix a bunch of warning/error messages which contained an extra
+  newline. [Brandon Enright]
+
+o Fixed an error when attempting to scan localhost as an unprivileged
+  user on Windows (nmap --unprivileged localhost). The error was:
+   "Skipping SYN Stealth Scan against localhost (127.0.0.1) because
+    Windows does not support scanning your own machine (localhost) this
+    way."
+  Now connect scan is used instead of SYN scan. [David]
+
+o Fixed a bug that prevented the --resume option from working on
+  Windows. The error message was:
+  ..\utils.cc(996): CreateFileMapping(), file 'testresume', length 103,
+  mflags 000 00006: The parameter is incorrect.(87)
+  [Fixed by David, reported by Rob Nicholls]
+
+o Zenmap's new web page (http://insecure.org/nmap/zenmap/) is now
+  shown in the Zenmap about dialogue.
+
+o On Windows, paths beginning with \ are now considered absolute when
+  used with the --script option. jah (jah(a)zadkiel.plus.com) suggested
+  this. [David]
+
+o Zenmap no longer double-spaces its output (by inadvertently
+  duplicating newlines) when viewing scan results that were saved to a
+  file. [Joao Medeiros]
+
+o Upgraded the shipped LibPCRE from version 7.2 to 7.4. [Kris]
+
+o Fixed Zenmap crash that occurred when selecting Help from the Compare
+  Results window. [Kris]
+
+o Updated robots.nse to prevent printing robots.txt comments. [Kris]
+
+o Many version detection match lines were improved to match even when
+  newlines appear in binary data returned by the service. [Fixed by
+  Doug, suggested by Lionel Cons]
+
 4.50
 
-o Bumped up the version number to the big 4.50!
+o Bumped up the version number to the big 10th anniversary 4.50
+release!  See http://insecure.org/stf/Nmap-4.50-Release.html .
 
 4.49RC7
 
@@ -130,7 +226,7 @@ o Renamed some Zenmap Python packages to allow Zenmap and Umit to be
 
 o Updated nmap-mac-prefixes with the latest IEEE data.  Also added
   back Cooperative Linux virtual NIC which was inadvertently removed in
-  a previous release.
+  a previous release. [Fyodor]
 
 4.23RC3
 
@@ -867,7 +963,7 @@ o The --scanflags option now also accepts "ECE", "CWR", "ALL" and "NONE" as
   arguments.  [Kris]
 
 o The --packet-trace option was added to NmapFE.  The Ordered Ports (-r)
-  option in now available to non-root users on NmapFE as well.  [Kris]
+  option in now available to non-root users on NmapFE as well. [Kris]
 
 4.21ALPHA1
 
@@ -1142,7 +1238,7 @@ o Fixed the --max-retries option, which wasn't being honored.  Thanks
 
 Nmap 4.20ALPHA3
 
-o Added back Win32 support thanks to a patch by kx
+o Added back Win32 support thanks to a patch by KX
 
 o Fixed the English translation of TCP sequence difficulty reported by
   Brandon Enright, and also removed fingerprint printing for 1st

@@ -34,7 +34,7 @@ end
 action = function(host, port)
 	local soc, lines, status
 
-	local catch = function() soc.close() end
+	local catch = function() soc:close() end
 	local try = nmap.new_try(catch)
 
 	-- connect to webserver 
@@ -62,9 +62,10 @@ action = function(host, port)
 		return nil
 	end
 
-	-- parse all disallowed entries
+	-- parse all disallowed entries and remove comments
 	local output = strbuf.new()
 	for w in string.gmatch(strbuf.dump(response, '\n'), "Disallow:%s*([^\n]*)\n") do
+			w = w:gsub("%s*#.*", "")
 			buildOutput(output, w)
 	end
 
