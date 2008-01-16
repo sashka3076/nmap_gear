@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: FingerPrintResults.cc 4228 2006-12-08 03:01:08Z fyodor $ */
+/* $Id: FingerPrintResults.cc 5538 2007-08-14 06:46:54Z kris $ */
 
 #include "FingerPrintResults.h"
 #include "osscan.h"
@@ -116,6 +116,7 @@ FingerPrintResults::FingerPrintResults() {
   /* We keep FPs holding at least 10 records because Gen1 OS detection
      doesn't support maxOSTries() */
   FPs = (FingerPrint **) safe_zalloc(MAX(o.maxOSTries(), 10) * sizeof(FingerPrint *));
+  maxTimingRatio = 0;
   maxTimingRatio = 0;
   numFPs = goodFP = 0;
 }
@@ -145,7 +146,7 @@ const char *FingerPrintResults::OmitSubmissionFP() {
   static char reason[128];
 
   if (o.scan_delay > 500) { // This can screw up the sequence timing
-    snprintf(reason, sizeof(reason), "Scan delay (%d) is greater than 500", o.scan_delay);
+    Snprintf(reason, sizeof(reason), "Scan delay (%d) is greater than 500", o.scan_delay);
     return reason;
   }
 
@@ -158,16 +159,22 @@ const char *FingerPrintResults::OmitSubmissionFP() {
   if (osscan_closedtcpport <= 0)
     return "Missing a closed TCP port so results incomplete";
 
-  // I'm not sure this is really necessary, but maybe.  Large routes
-  // can cause asymetric routing which leads to wrong TTL information.
-  // They can cause variable timing too.
-  if (distance > 10) {
-    snprintf(reason, sizeof(reason), "Host distance (%d network hops) is greater than ten", distance);
+  /* This can happen if the TTL in the response to the UDP probe is somehow
+     greater than the TTL in the probe itself. We exclude -1 because that is
+     used to mean the distance is unknown, though there's a chance it could
+     have come from the distance calculation. */
+  if (distance < -1) {
+    Snprintf(reason, sizeof(reason), "Host distance (%d network hops) appears to be negative", distance);
+    return reason;
+  }
+
+  if (distance > 5) {
+    Snprintf(reason, sizeof(reason), "Host distance (%d network hops) is greater than five", distance);
     return reason;
   }
 
   if (maxTimingRatio > 1.4) {
-    snprintf(reason, sizeof(reason), "maxTimingRatio (%e) is greater than 1.4", maxTimingRatio);
+    Snprintf(reason, sizeof(reason), "maxTimingRatio (%e) is greater than 1.4", maxTimingRatio);
     return reason;
   }
 

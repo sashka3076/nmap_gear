@@ -97,7 +97,12 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOps.h 4068 2006-10-14 01:25:43Z fyodor $ */
+/* $Id: NmapOps.h 6119 2007-11-03 01:31:02Z david $ */
+
+#include "nmap.h"
+#include "global_structures.h"
+#include "output.h"
+#include <string>
 
 class NmapOps {
  public:
@@ -118,7 +123,7 @@ class NmapOps {
 // The time this obj. was instantiated   or last ReInit()ed.
   const struct timeval *getStartTime() { return &start_time; }
   // Number of milliseconds since getStartTime().  The current time is an
-  // optional argument to avoid an extre gettimeofday() call.
+  // optional argument to avoid an extra gettimeofday() call.
   int TimeSinceStartMS(struct timeval *now=NULL); 
   struct in_addr v4source();
   const struct in_addr *v4sourceip();
@@ -163,6 +168,9 @@ class NmapOps {
   int sendpref;
   bool packetTrace() { return (debugging >= 3)? true : pTrace;  }
   bool versionTrace() { return packetTrace()? true : vTrace;  }
+#ifndef NOLUA
+  bool scriptTrace() { return packetTrace()? true : scripttrace; }
+#endif
   // Note that packetTrace may turn on at high debug levels even if
   // setPacketTrace(false) has been called
   void setPacketTrace(bool pt) { pTrace = pt;  }
@@ -172,25 +180,28 @@ class NmapOps {
   int verbose;
   int randomize_hosts;
   int spoofsource; /* -S used */
+  int fastscan;
   char device[64];
   int interactivemode;
   int ping_group_sz;
   int generate_random_ips; /* -iR option */
-  FingerPrintDB *reference_FPs1; /* Used in the old OS scan system. */
   FingerPrintDB *reference_FPs; /* Used in the new OS scan system. */
   u16 magic_port;
   unsigned short magic_port_set; /* Was this set by user? */
   int num_ping_synprobes;
   /* The "synprobes" are also used when doing a connect() ping */
-  u16 ping_synprobes[MAX_PROBE_PORTS];
+  u16 *ping_synprobes;
   int num_ping_ackprobes;
-  u16 ping_ackprobes[MAX_PROBE_PORTS];
+  u16 *ping_ackprobes;
   int num_ping_udpprobes;
-  u16 ping_udpprobes[MAX_PROBE_PORTS];
+  u16 *ping_udpprobes;
+  int num_ping_protoprobes;
+  u16 *ping_protoprobes;
   /* Scan timing/politeness issues */
   int timing_level; // 0-5, corresponding to Paranoid, Sneaky, Polite, Normal, Aggressive, Insane
   int max_parallelism; // 0 means it has not been set
   int min_parallelism; // 0 means it has not been set
+  double topportlevel; // -1 means it has not been set
 
   /* The maximum number of OS detection (gen2) tries we will make
      without any matches before giving up on a host.  We may well give
@@ -297,17 +308,36 @@ class NmapOps {
   int ttl; // Time to live
   int badsum;
   char *datadir;
+  /* A map from abstract data file names like "nmap-services" and "nmap-os-db"
+     to paths which have been requested by the user. nmap_fetchfile will return
+     the file names defined in this map instead of searching for a matching
+     file. */
+  std::map<std::string, std::string> requested_data_files;
+  /* A map from data file names to the paths at which they were actually found.
+     Only files that were actually read should be in this map. */
+  std::map<std::string, std::string> loaded_data_files;
   bool mass_dns;
   int resolve_all;
   char *dns_servers;
   bool log_errors;
+  bool traceroute;
+  bool reason;
+
+#ifndef NOLUA
+  int script;
+  char *scriptargs;
+  int scriptversion;
+  int scripttrace;
+  int scriptupdatedb;
+  void chooseScripts(char* argument);
+  std::vector<std::string> chosenScripts;
+#endif
 
   /* ip options used in build_*_raw() */
   u8 *ipoptions;
   int ipoptionslen;
   int ipopt_firsthop;	// offset in ipoptions where is first hop for source/strict routing
   int ipopt_lasthop;	// offset in ipoptions where is space for targets ip for source/strict routing
-
 
   // Statistics Options set in nmap.cc
   int numhosts_scanned;

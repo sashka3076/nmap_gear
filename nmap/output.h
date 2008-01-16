@@ -1,6 +1,6 @@
 
 /***************************************************************************
- * output.c -- Handles the Nmap output system.  This currently involves    *
+ * output.h -- Handles the Nmap output system.  This currently involves    *
  * console-style human readable output, XML output, Script |<iddi3         *
  * output, and the legacy greppable output (used to be called "machine     *
  * readable").  I expect that future output forms (such as HTML) may be    *
@@ -101,7 +101,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: output.h 3896 2006-08-29 04:03:03Z fyodor $ */
+/* $Id: output.h 5450 2007-08-11 05:11:47Z fyodor $ */
 
 #ifndef OUTPUT_H
 #define OUTPUT_H
@@ -117,10 +117,12 @@
 #define LOG_SKID_NOXLT 4096
 #define LOG_MAX LOG_SKID_NOXLT /* The maximum log type value */
 
+#define LOG_PLAIN LOG_NORMAL|LOG_SKID|LOG_STDOUT
+
 #define LOG_NAMES {"normal", "machine", "$Cr!pT |<!dd!3", "XML"}
 
 #include "portlist.h"
-#include "tcpip.h"
+#include "nmap.h"
 #include "global_structures.h"
 
 /* Prints the familiar Nmap tabular output showing the "interesting"
@@ -191,6 +193,9 @@ void printosscanoutput(Target *currenths);
    service scan (if it was performed) */
 void printserviceinfooutput(Target *currenths);
 
+void printhostscriptresults(Target *currenths);
+char* formatScriptOutput(struct script_scan_result ssr);
+
 /* Print a detailed list of Nmap interfaces and routes to
    normal/skiddy/stdout output */
 int print_iflist(void);
@@ -201,6 +206,10 @@ void printStatusMessage();
 /* Prints the statistics and other information that goes at the very end
    of an Nmap run */
 void printfinaloutput();
+
+/* Prints the names of data files that were loaded and the paths at which they
+   were found. */
+void printdatafilepaths();
 
 char* xml_convert (const char* str);
 #endif /* OUTPUT_H */

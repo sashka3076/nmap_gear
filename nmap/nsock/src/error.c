@@ -54,7 +54,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: error.c 3870 2006-08-25 01:47:53Z fyodor $ */
+/* $Id: error.c 5496 2007-08-11 06:28:53Z fyodor $ */
 
 #include "error.h"
 
@@ -63,15 +63,6 @@ va_list  ap;va_start(ap, fmt);
 fflush(stdout);vfprintf(stderr, fmt, ap);
 fprintf(stderr, "\n");va_end(ap);
 exit(1);}
-
-void myerror(char *fmt, ...) {
-va_list  ap;va_start(ap, fmt);
-fflush(stdout);
-vfprintf(stderr, fmt, ap);
-fprintf(stderr, "\n");
-va_end(ap);
-return;
-}
 
 void pfatal(char *fmt, ...) {
 va_list  ap;va_start(ap, fmt);

@@ -54,7 +54,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: netutils.c 3870 2006-08-25 01:47:53Z fyodor $ */
+/* $Id: netutils.c 4317 2007-01-01 00:23:39Z fyodor $ */
 
 #include "netutils.h"
 #include "error.h"
@@ -124,7 +124,7 @@ static int maxfds = -1;
     } else return 0;
   }
 #endif
-#endif // !WIN32
+#endif /* !WIN32 */
   return 0;
 }
 

@@ -55,7 +55,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_internal.h 3870 2006-08-25 01:47:53Z fyodor $ */
+/* $Id: nsock_internal.h 5496 2007-08-11 06:28:53Z fyodor $ */
 
 #ifndef NSOCK_INTERNAL_H
 #define NSOCK_INTERNAL_H
@@ -136,6 +136,9 @@ struct event_lists {
   gh_list read_events;
   gh_list write_events;
   gh_list timer_events;
+  #if HAVE_PCAP
+  gh_list pcap_read_events;
+  #endif 
   gh_list free_events; /* When an event is deleted, we stick it here for
 			  later reuse */
   struct timeval next_ev; /* The soonest time that either a timer event goes
@@ -226,6 +229,8 @@ struct msiod {
   unsigned long id; /* Every iod has an id which is always unique for the
 		       same nspool (unless you create billions of them) */
   void *userdata;
+  
+  void *pcap;	   /* Pointer to mspcap struct (used only if pcap support is included) */
 };
 
 
@@ -320,6 +325,11 @@ void handle_write_result(mspool *ms, msevent *nse,
 
 void handle_timer_result(mspool *ms, msevent *nse, 
 			 enum nse_status status);
+
+#if HAVE_PCAP
+void handle_pcap_read_result(mspool *ms, msevent *nse, 
+			       enum nse_status status);
+#endif
 
 void nsock_trace(mspool *ms, char *fmt, ...)
      __attribute__ ((format (printf, 2, 3)));

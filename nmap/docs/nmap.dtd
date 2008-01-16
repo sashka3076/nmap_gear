@@ -1,7 +1,7 @@
 <!--
     nmap.dtd
     This is the DTD for nmap's XML output (-oX) format.
-    $Id: nmap.dtd 3636 2006-07-04 23:04:56Z fyodor $
+    $Id: nmap.dtd 5760 2007-09-03 02:55:01Z fyodor $
 
     Originally written by:
     William McVey <wam@cisco.com> <wam+nmap@wamber.net>
@@ -21,7 +21,7 @@
     specify "one each of this list of elements, in any order".  If there
     is a construct similar to SGML's '&' operator, please let me know.
 
-    Portions Copyright (c) 2001-2005 Insecure.Com LLC
+    Portions Copyright (c) 2001-2007 Insecure.Com LLC
     Portions Copyright (c) 2001 by Cisco systems, Inc.
  
     Permission to use, copy, modify, and distribute modified and
@@ -42,9 +42,10 @@
 -->
 
 <!-- parameter entities to specify common "types" used elsewhere in the DTD -->
+<!ENTITY % attr_alpha "CDATA" >
 <!ENTITY % attr_numeric "CDATA" >
 <!ENTITY % attr_ipaddr "CDATA" >
-<!ENTITY % attr_numeric "CDATA" >
+<!ENTITY % attr_percent "CDATA" >
 <!ENTITY % attr_percent "CDATA" >
 <!ENTITY % attr_type "(ipv4 | ipv6 | mac)" >
 
@@ -104,6 +105,7 @@
 <!ATTLIST taskbegin
 			task		CDATA		#REQUIRED
 			time		%attr_numeric;	#REQUIRED
+			extrainfo	CDATA		#IMPLIED
 >
 
 <!-- this element is written in timing.c:printStats() -->
@@ -121,6 +123,7 @@
 <!ATTLIST taskend
 			task		CDATA		#REQUIRED
 			time		%attr_numeric;	#REQUIRED
+			extrainfo	CDATA		#IMPLIED
 >
 
 <!-- 
@@ -130,12 +133,14 @@
 -->
 <!ELEMENT host		( status, address , (address | hostnames |
                           smurf | ports | os | distance | uptime | 
-                          tcpsequence | ipidsequence | tcptssequence )* ) >
-
+                          tcpsequence | ipidsequence | tcptssequence |
+                          hostscript | trace)*, times ) >
 
 <!-- these elements are written by output.c:write_xml_initial_hostinfo() -->
 <!ELEMENT status	EMPTY >
-<!ATTLIST status	state		%host_states;	#REQUIRED >
+<!ATTLIST status	state		%host_states;	#REQUIRED 
+		  reason	CDATA		#REQUIRED 
+ >
 
 <!ELEMENT address	EMPTY >
 <!ATTLIST address	
@@ -160,20 +165,31 @@
 
 <!ELEMENT ports		(extraports* , port*) >
 
-<!ELEMENT extraports	EMPTY >
+<!ELEMENT extraports	(extrareasons)* >
 <!ATTLIST extraports
 			state		%port_states;	#REQUIRED
 			count		%attr_numeric;  #REQUIRED	
 >
 
-<!ELEMENT port		(state , owner? , service? ) >
+<!ELEMENT extrareasons EMPTY >
+<!ATTLIST extrareasons
+			reason		CDATA	#REQUIRED
+			count		CDATA	#REQUIRED
+>
+
+<!ELEMENT port		(state , owner? , service?, script*) >
 <!ATTLIST port
 			protocol	%port_protocols;	#REQUIRED
 			portid		%attr_numeric;	#REQUIRED
 >
 
 <!ELEMENT state		EMPTY >
-<!ATTLIST state		state		%port_states;	#REQUIRED >
+<!ATTLIST state
+		state		%port_states;	#REQUIRED 
+		reason		CDATA	#REQUIRED
+		reason_ttl	CDATA	#REQUIRED			
+		reason_ip	CDATA	#IMPLIED
+>
 
 <!ELEMENT owner		EMPTY >
 <!ATTLIST owner		name		CDATA		#REQUIRED >
@@ -195,6 +211,12 @@
                         ostype          CDATA           #IMPLIED
                         devicetype      CDATA           #IMPLIED
                         servicefp       CDATA           #IMPLIED
+>
+
+<!ELEMENT script	EMPTY >
+<!ATTLIST script	
+	id	CDATA	#REQUIRED
+	output	CDATA	#REQUIRED
 >
 
 <!ELEMENT os		( portused* , osclass*, osmatch*, osfingerprint* ) >
@@ -258,6 +280,32 @@
 			values		CDATA		#IMPLIED
 >
 
+<!ELEMENT trace (hop*, error?) >
+<!ATTLIST trace
+      proto   CDATA   #REQUIRED
+      port    CDATA   #REQUIRED
+>
+
+<!ELEMENT hop EMPTY>
+<!ATTLIST hop
+      ttl     CDATA   #REQUIRED
+      rtt     CDATA   #IMPLIED
+      ipaddr  CDATA   #IMPLIED
+      host    CDATA   #IMPLIED
+>
+
+<!ELEMENT error EMPTY>
+<!ATTLIST error
+     errorstr   CDATA #IMPLIED
+>
+
+<!ELEMENT times EMPTY>
+<!ATTLIST times
+	srtt	CDATA	#REQUIRED
+	rttvar	CDATA	#REQUIRED
+	to	CDATA	#REQUIRED
+>
+
 <!-- these elements are generated in output.c:printfinaloutput() -->
 <!ELEMENT runstats	(finished, hosts) >
 
@@ -272,3 +320,5 @@
 			down		%attr_numeric;	"0"
 			total		%attr_numeric;	#REQUIRED
 >
+
+<!ELEMENT hostscript ( script+ )>

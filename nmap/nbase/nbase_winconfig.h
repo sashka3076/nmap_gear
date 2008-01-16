@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_winconfig.h 3899 2006-08-29 05:42:35Z fyodor $ */
+/* $Id: nbase_winconfig.h 6224 2007-11-15 17:28:23Z david $ */
 
 #ifndef NBASE_WINCONFIG_H
 #define NBASE_WINCONFIG_H
@@ -117,7 +117,7 @@
 #define HAVE_SYS_STAT_H 1
 #define HAVE_MEMCPY 1
 #define HAVE_STRERROR 1
-#define HAVE_SYS_SOCKIO_H 1
+/* #define HAVE_SYS_SOCKIO_H 1 */
 /* #undef HAVE_TERMIOS_H */
 #define HAVE_ERRNO_H 1
 #define HAVE_GAI_STRERROR 1
@@ -142,9 +142,13 @@
 #define HAVE_AF_INET6 1
 #define HAVE_SOCKADDR_STORAGE 1
 
-/* Without this, Windows will give us all sorts of crap about using functions
+/* Without these, Windows will give us all sorts of crap about using functions
    like strcpy() even if they are done safely */
 #define _CRT_SECURE_NO_DEPRECATE 1
+#ifndef _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS 1
+#endif 
+#pragma warning(disable: 4996)
 
 #ifdef __GNUC__
 #define bzero(addr, num) __builtin_memset (addr, '\0', num)

@@ -97,18 +97,25 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: charpool.cc 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: charpool.cc 6206 2007-11-13 01:17:39Z david $ */
 
+#include <stddef.h>
+
+#include "nbase.h"
 
 /* Character pool memory allocation */
 #include "charpool.h"
+#include "nmap_error.h"
 
 static char *charpool[16];
 static int currentcharpool;
 static int currentcharpoolsz;
 static char *nextchar;
 
-#define ALIGN_ON sizeof(char *)
+/* Allocated blocks are allocated to multiples of ALIGN_ON. This is the
+   definition used by the malloc in Glibc 2.7, which says that it "suffices for
+   nearly all current machines and C compilers." */
+#define ALIGN_ON (2 * sizeof(size_t))
 
 static int cp_init(void) {
   static int charpool_initialized = 0;

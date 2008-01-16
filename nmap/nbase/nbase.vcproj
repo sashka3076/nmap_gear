@@ -155,10 +155,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\getopt1.c"
-				>
-			</File>
-			<File
 				RelativePath=".\inet_ntop.c"
 				>
 			</File>

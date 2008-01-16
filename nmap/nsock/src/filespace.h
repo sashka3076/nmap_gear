@@ -54,7 +54,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: filespace.h 3870 2006-08-25 01:47:53Z fyodor $ */
+/* $Id: filespace.h 4317 2007-01-01 00:23:39Z fyodor $ */
 
 #ifndef FILESPACE_H
 #define FILESPACE_H
@@ -136,7 +136,7 @@ char *tmpstr;
 if (len < 0) return -1;
 if (len == 0) return 0;
 
-// printf("fscat: current_alloc=%d; current_size=%d; len=%d\n", fs->current_alloc, fs->current_size, len);
+/* printf("fscat: current_alloc=%d; current_size=%d; len=%d\n", fs->current_alloc, fs->current_size, len); */
 
   if (fs->current_alloc - fs->current_size < len + 2) {
     fs->current_alloc = (int) (fs->current_alloc * 1.4 + 1 );

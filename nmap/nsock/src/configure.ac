@@ -1,8 +1,95 @@
 # Require autoconf 2.13 -*- mode: fundamental; -*-
+
+# Because nsock is usually distributed with Nmap, the necessary files
+# config.guess, config.guess, and install-sh are not distributed with
+# nbase. Rather they are gotten from Nmap.
+
 AC_PREREQ(2.13)
 
 dnl Process this file with autoconf to produce a configure script.
 AC_INIT(nsock_core.c)
+
+dnl use nsock_config.h instad of -D macros
+AC_CONFIG_HEADER(nsock_config.h)
+
+dnl Host specific hacks
+AC_CANONICAL_HOST
+
+linux=no
+macosx=no
+needs_cpp_precomp=no
+
+case "$host" in
+  *alpha-dec-osf*)
+    AC_DEFINE(DEC)
+    ;;
+  *-netbsd* | *-knetbsd*-gnu)
+    AC_DEFINE(NETBSD)
+    ;;
+  *-openbsd*)
+    AC_DEFINE(OPENBSD)
+    ;;
+  *-sgi-irix5*)
+    AC_DEFINE(IRIX)
+    ;;
+  *-sgi-irix6*)
+    AC_DEFINE(IRIX)
+    ;;
+  *-hpux*)
+    AC_DEFINE(HPUX)
+    ;;
+  *-solaris2.0*)  
+    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+    AC_DEFINE(SOLARIS)
+    ;;
+  *-solaris2.[[1-9]][[0-9]]*)
+    AC_DEFINE(SOLARIS)
+    ;;
+  *-solaris2.1*)
+    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+    AC_DEFINE(SOLARIS)
+    ;;
+  *-solaris2.2*)
+    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+    AC_DEFINE(SOLARIS)
+    ;;
+  *-solaris2.3*)
+    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+    AC_DEFINE(SOLARIS)
+    ;;
+  *-solaris2.4*)
+    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+    AC_DEFINE(SOLARIS)
+    ;;
+  *-solaris2.5.1)
+    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+    AC_DEFINE(SOLARIS)
+    ;;
+  *-solaris*)
+    AC_DEFINE(SOLARIS)
+    ;;
+  *-sunos4*)
+    AC_DEFINE(SUNOS)
+    AC_DEFINE(SPRINTF_RETURNS_STRING)
+    ;;
+  *-linux*)
+    linux=yes
+    AC_DEFINE(LINUX)
+    AC_DEFINE(PCAP_TIMEOUT_IGNORED)  # libpcap doesn't even LOOK at
+                                     # the timeout you give it under Linux
+    ;;
+  *-freebsd* | *-kfreebsd*-gnu | *-dragonfly*)
+    AC_DEFINE(FREEBSD)
+    ;;
+  *-bsdi*)
+    AC_DEFINE(BSDI)
+    ;;
+  *-apple-darwin*)
+    macosx=yes
+    AC_DEFINE(MACOSX)
+    ;;
+esac
+
 
 AC_ARG_WITH(localdirs,
   [  --with-localdirs        Explicitly ask compiler to use /usr/local/{include,libs} if they exist ],
@@ -26,9 +113,6 @@ if test "$user_localdirs" = 1; then
    fi
 fi
 
-dnl use nsock_config.h instad of -D macros
-AC_CONFIG_HEADER(nsock_config.h)
-
 dnl Checks for programs.
 AC_PROG_CC
  if test -n "$GCC"; then
@@ -40,9 +124,6 @@ dnl AC_PATH_PROG(MAKEDEPEND, makedepend)
 
 AC_SUBST(COMPAT_OBJS)
 AC_SUBST(COMPAT_SRCS)
-
-dnl Host specific hacks
-AC_CANONICAL_HOST
 
 dnl Checks for libraries.
 dnl AC_CHECK_LIB(m, pow)
@@ -210,7 +291,7 @@ AC_CACHE_CHECK(if struct icmp exists, ac_cv_struct_icmp_exists,
 #               include <netinet/in.h>               
 #               define __USE_BSD
 #               define __FAVOR_BSD
-#               define __BSD_SOURCE
+#               define _BSD_SOURCE
 #               include <netinet/ip.h>
 #               include <netinet/ip_icmp.h>],
                 [unsigned int i = sizeof(struct icmp)],
@@ -228,7 +309,7 @@ AC_CACHE_CHECK(if struct ip exists, ac_cv_struct_ip_exists,
 #               include <netinet/in.h>               
 #               define __USE_BSD
 #               define __FAVOR_BSD
-#               define __BSD_SOURCE
+#               define _BSD_SOURCE
 #               include <netinet/ip.h>],
                 [unsigned int i = sizeof(struct ip)],
         ac_cv_struct_ip_exists=yes,
@@ -245,7 +326,7 @@ AC_CACHE_CHECK(if struct ip has ip_sum member, ac_cv_ip_has_ip_sum,
 #               include <netinet/in.h>
 #               define __USE_BSD
 #               define __FAVOR_BSD
-#               define __BSD_SOURCE
+#               define _BSD_SOURCE
 #               include <netinet/ip.h>
 #               include <netinet/ip_icmp.h>],
                 [unsigned int i = sizeof(((struct ip *)0)->ip_sum)],

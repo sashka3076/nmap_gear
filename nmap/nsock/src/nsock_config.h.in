@@ -55,7 +55,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_config.h.in 3870 2006-08-25 01:47:53Z fyodor $ */
+/* $Id: nsock_config.h.in 5646 2007-08-23 01:28:27Z david $ */
 
 #undef HAVE_STRUCT_IP
 
@@ -63,3 +63,16 @@
 
 #undef SPRINTF_RETURNS_STRING
 
+#undef DEC
+#undef LINUX
+#undef FREEBSD
+#undef OPENBSD
+#undef SOLARIS
+#undef SUNOS
+#undef BSDI
+#undef IRIX
+#undef HPUX
+#undef NETBSD
+#undef MACOSX
+
+#undef HAVE_OPENSSL

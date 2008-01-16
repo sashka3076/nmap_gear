@@ -97,13 +97,10 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: charpool.h 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: charpool.h 5389 2007-08-11 03:35:46Z fyodor $ */
 
 #ifndef CHARPOOL_H
 #define CHARPOOL_H
-
-#include "utils.h"
-#include "nmap_error.h"
 
 void *cp_alloc(int sz);
 char *cp_strdup(const char *src);

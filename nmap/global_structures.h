@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: global_structures.h 4004 2006-09-25 09:08:56Z fyodor $ */
+/* $Id: global_structures.h 6119 2007-11-03 01:31:02Z david $ */
 
 
 #ifndef GLOBAL_STRUCTURES_H
@@ -191,14 +191,14 @@ typedef struct FingerTest {
   char *OS_name;
   struct OS_Classification OS_class[MAX_OS_CLASSIFICATIONS_PER_FP];
   int num_OS_Classifications;
-  int line; /* For reference prints, the line # in nmap-os-fingerprints */
+  int line; /* For reference prints, the line # in nmap-os-db */
   const char *name;
   struct AVal *results;
   struct FingerTest *next;
  } FingerPrint;
 
 /* This structure contains the important data from the fingerprint
-   database (nmap-os-db or nmap-os-fingerprints) */
+   database (nmap-os-db) */
 typedef struct FingerPrintDB {
   FingerPrint **prints;
   FingerPrint *MatchPoints;
@@ -242,6 +242,6 @@ struct scan_lists {
 	int prot_count;
 };
 
-typedef enum { STYPE_UNKNOWN, HOST_DISCOVERY, ACK_SCAN, SYN_SCAN, FIN_SCAN, XMAS_SCAN, UDP_SCAN, CONNECT_SCAN, NULL_SCAN, WINDOW_SCAN, RPC_SCAN, MAIMON_SCAN, IPPROT_SCAN, PING_SCAN, PING_SCAN_ARP, IDLE_SCAN, BOUNCE_SCAN, SERVICE_SCAN, OS_SCAN} stype;
+typedef enum { STYPE_UNKNOWN, HOST_DISCOVERY, ACK_SCAN, SYN_SCAN, FIN_SCAN, XMAS_SCAN, UDP_SCAN, CONNECT_SCAN, NULL_SCAN, WINDOW_SCAN, RPC_SCAN, MAIMON_SCAN, IPPROT_SCAN, PING_SCAN, PING_SCAN_ARP, IDLE_SCAN, BOUNCE_SCAN, SERVICE_SCAN, OS_SCAN, SCRIPT_SCAN, TRACEROUTE, REF_TRACEROUTE}stype;
 
 #endif /*GLOBAL_STRUCTURES_H */

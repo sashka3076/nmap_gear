@@ -54,7 +54,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_write.c 3870 2006-08-25 01:47:53Z fyodor $ */
+/* $Id: nsock_write.c 5538 2007-08-14 06:46:54Z kris $ */
 
 #include "nsock.h"
 #include "nsock_internal.h"
@@ -122,13 +122,13 @@ nsock_event_id nsock_printf(nsock_pool ms_pool, nsock_iod ms_iod,
 		    userdata);
   assert(nse);
 
-  res = vsnprintf(buf, sizeof(buf), format, ap);
+  res = Vsnprintf(buf, sizeof(buf), format, ap);
   va_end(ap);
 
   if (res != -1) {
     if (res > sizeof(buf)) {
       buf2 = (char * ) safe_malloc(res + 16);
-      res2 = vsnprintf(buf2, sizeof(buf), format, ap);
+      res2 = Vsnprintf(buf2, sizeof(buf), format, ap);
       if (res2 == -1 || res2 > res) {
 	free(buf2);
 	buf2 = NULL;

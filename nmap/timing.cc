@@ -99,10 +99,11 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: timing.cc 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: timing.cc 5455 2007-08-11 05:16:56Z fyodor $ */
 
 #include "timing.h"
 #include "NmapOps.h"
+#include "utils.h"
 
 extern NmapOps o;
 
@@ -159,7 +160,7 @@ void adjust_timeouts2(const struct timeval *sent,
   else {
     if (delta >= 8000000 || delta < 0) {
       if (o.verbose)
-	error("adjust_timeout: packet supposedly had rtt of %lu microseconds.  Ignoring time.", delta);
+	error("%s: packet supposedly had rtt of %lu microseconds.  Ignoring time.", __func__, delta);
       return;
     }
     delta -= to->srtt;
@@ -176,7 +177,7 @@ void adjust_timeouts2(const struct timeval *sent,
     to->timeout = to->srtt + (to->rttvar << 2);  
   }
   if (to->rttvar > 2300000) {
-    fprintf(stderr, "RTTVAR has grown to over 2.3 seconds, decreasing to 2.0\n");
+    error("RTTVAR has grown to over 2.3 seconds, decreasing to 2.0");
     to->rttvar = 2000000;
   }
   
@@ -224,7 +225,7 @@ void enforce_scan_delay(struct timeval *tv) {
   time_diff = TIMEVAL_MSEC_SUBTRACT(now, lastcall);
   if (time_diff < (int) o.scan_delay) {  
     if (o.debugging > 1) {
-      printf("Sleeping for %d milliseconds in enforce_scan_delay()\n", o.scan_delay - time_diff);
+      log_write(LOG_PLAIN, "Sleeping for %d milliseconds in %s()\n", o.scan_delay - time_diff, __func__);
     }
     usleep((o.scan_delay - time_diff) * 1000);
     gettimeofday(&lastcall, NULL);
@@ -421,18 +422,22 @@ bool ScanProgressMeter::beginOrEndTask(const struct timeval *now, const char *ad
   tm = localtime(&tv_sec);
   if (beginning) {
     log_write(LOG_STDOUT, "Initiating %s at %02d:%02d", scantypestr, tm->tm_hour, tm->tm_min);
+    log_write(LOG_XML, "<taskbegin task=\"%s\" time=\"%lu\"", scantypestr, (unsigned long) now->tv_sec);
     if (additional_info) {
       log_write(LOG_STDOUT, " (%s)", additional_info);
+      log_write(LOG_XML, " extrainfo=\"%s\"", additional_info);
     }
     log_write(LOG_STDOUT, "\n");
-    log_write(LOG_XML, "<taskbegin task=\"%s\" time=\"%lu\" />\n", scantypestr, (unsigned long) now->tv_sec);
+    log_write(LOG_XML, " />\n");
   } else {
     log_write(LOG_STDOUT, "Completed %s at %02d:%02d, %.2fs elapsed", scantypestr, tm->tm_hour, tm->tm_min, TIMEVAL_MSEC_SUBTRACT(*now, begin) / 1000.0);
+    log_write(LOG_XML, "<taskend task=\"%s\" time=\"%lu\"", scantypestr, (unsigned long) now->tv_sec);
     if (additional_info) {
       log_write(LOG_STDOUT, " (%s)", additional_info);
+      log_write(LOG_XML, " extrainfo=\"%s\"", additional_info);
     }
     log_write(LOG_STDOUT, "\n");
-    log_write(LOG_XML, "<taskend task=\"%s\" time=\"%lu\" />\n", scantypestr, (unsigned long) now->tv_sec);
+    log_write(LOG_XML, " />\n");
   }
   log_flush(LOG_STDOUT|LOG_XML);
   return true;

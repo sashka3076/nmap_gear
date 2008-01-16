@@ -1,8 +1,8 @@
 
 /***************************************************************************
- * scanengine.h -- Includes much of the "engine" functions for scanning,   *
- * such as pos_scan and super_scan.  It also includes dependant functions  *
- * such as those for collectiong SYN/connect scan responses.               *
+ * scan_engine.h -- Includes much of the "engine" functions for scanning,  *
+ * such as pos_scan and ultra_scan.  It also includes dependant functions  *
+ * such as those for collecting SYN/connect scan responses.                *
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
@@ -98,18 +98,18 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: scan_engine.h 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: scan_engine.h 5856 2007-09-19 19:43:23Z kris $ */
 
 #ifndef SCAN_ENGINE_H
 #define SCAN_ENGINE_H
 
-#include "portlist.h"
-#include "tcpip.h"
+#include "nmap.h"
 #include "global_structures.h"
+#include <vector>
 
 /* 3rd generation Nmap scanning function.  Handles most Nmap port scan types */
 void ultra_scan(std::vector<Target *> &Targets, struct scan_lists *ports, 
-		stype scantype);
+		stype scantype, struct timeout_info *to = NULL);
 
 /* Handles the "positive-response" scans (where we get a response
    telling us that the port is open based on the probe.  This includes
@@ -121,12 +121,6 @@ void pos_scan(Target *target, u16 *portarray, int numports, stype scantype);
    allow FTP bounce scan, I should really allow SOCKS proxy scan.  */
 void bounce_scan(Target *target, u16 *portarray, int numports,
 		 struct ftpinfo *ftp);
-
-/* Handles the scan types where no positive-acknowledgement of open
-   port is received (those scans are in pos_scan).  Super_scan
-   includes scans such as FIN/XMAS/NULL/Maimon/UDP and IP Proto scans */
-void super_scan(Target *target, u16 *portarray, int numports,
-		stype scantype);
 
 /* Determines an ideal number of hosts to be scanned (port scan, os
    scan, version detection, etc.) in parallel after the ping scan is

@@ -98,13 +98,29 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: Target.h 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: Target.h 5561 2007-08-15 19:26:26Z kris $ */
 
 #ifndef TARGET_H
 #define TARGET_H
 
 #include "nmap.h"
 #include "FingerPrintResults.h"
+
+#ifndef NOLUA
+#include "nse_main.h"
+#endif
+
+#include "portreasons.h"
+#include "portlist.h"
+#include "tcpip.h"
+
+#ifndef INET6_ADDRSTRLEN
+#define INET6_ADDRSTRLEN 46
+#endif
+
+enum osscan_flags {
+	OS_NOTPERF=0, OS_PERF, OS_PERF_UNREL
+};
 
 struct host_timeout_nfo {
   unsigned long msecs_used; /* How many msecs has this Target used? */
@@ -165,6 +181,7 @@ class Target {
      been set yet.  */
   void setDirectlyConnected(bool connected);
   bool directlyConnected();
+  int directlyConnectedOrUnset(); /* 1-directly connected, 0-no, -1-we don't know*/
 
   /* If the host is NOT directly connected, you can set the next hop
      value here. It is OK to pass in a sockaddr_in or sockaddr_in6
@@ -211,25 +228,32 @@ class Target {
    qualifier, while the full name may include it (e.g. "eth1:1").  If
    these are non-null, they will overwrite the stored version */
   void setDeviceNames(const char *name, const char *fullname);
-  const char *deviceName() { return *devname? devname : NULL; }
-  const char *deviceFullName() { return *devfullname? devfullname : NULL; }
+  const char *deviceName();
+  const char *deviceFullName();
+
+  int osscanPerformed(void);
+  void osscanSetFlag(int flag);
 
   struct seq_info seq;
   int distance;
   FingerPrintResults *FPR1; /* FP results get by the old OS scan system. */
   FingerPrintResults *FPR; /* FP results get by the new OS scan system. */
-  int osscan_performed; /* nonzero if an osscan was performed */
   PortList ports;
-  /*
-  unsigned int up;
-  unsigned int down; */
+
+  // unsigned int up;
+  // unsigned int down;
   int wierd_responses; /* echo responses from other addresses, Ie a network broadcast address */
   unsigned int flags; /* HOST_UP, HOST_DOWN, HOST_FIREWALLED, HOST_BROADCAST (instead of HOST_BROADCAST use wierd_responses */
   struct timeout_info to;
+  char *hostname; // Null if unable to resolve or unset
 
+#ifndef NOLUA
+  ScriptResults scriptResults;
+#endif
+
+  state_reason_t reason;
 
   private:
-  char *hostname; // Null if unable to resolve or unset
   void Initialize();
   void FreeInternal(); // Free memory allocated inside this object
  // Creates a "presentation" formatted string out of the IPv4/IPv6 address
@@ -237,16 +261,18 @@ class Target {
   struct sockaddr_storage targetsock, sourcesock, nexthopsock;
   size_t targetsocklen, sourcesocklen, nexthopsocklen;
   int directly_connected; // -1 = unset; 0 = no; 1 = yes
-#ifndef INET6_ADDRSTRLEN
-#define INET6_ADDRSTRLEN 46
-#endif
   char targetipstring[INET6_ADDRSTRLEN];
   char *nameIPBuf; /* for the NameIP(void) function to return */
   u8 MACaddress[6], SrcMACaddress[6], NextHopMACaddress[6];  
   bool MACaddress_set, SrcMACaddress_set, NextHopMACaddress_set;
   struct host_timeout_nfo htn;
   devtype interface_type;
-  char devname[32], devfullname[32];
+  char devname[32];
+	char devfullname[32];
+  /* 0 (OS_NOTPERF) if os detection not performed
+   * 1 (OS_PERF) if os detection performed 
+   * 2 (OS_PERF_UNREL) if an unreliable os detection has been performed */
+  int osscan_flag; 
 };
 
 #endif /* TARGET_H */

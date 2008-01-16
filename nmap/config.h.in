@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: config.h.in 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: config.h.in 6338 2007-11-27 19:32:49Z fyodor $ */
 
 #ifndef CONFIG_H
 #define CONFIG_H
@@ -147,11 +147,11 @@
 
 #undef HAVE_TERMIOS_H
 
+#undef HAVE_PCRE_H
+
 #undef HAVE_PCRE_PCRE_H
 
 #undef BSD_NETWORKING
-
-#undef HAVE_INET_ATON
 
 #undef HAVE_STRCASESTR
 

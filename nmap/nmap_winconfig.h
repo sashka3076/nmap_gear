@@ -99,17 +99,19 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap_winconfig.h 4228 2006-12-08 03:01:08Z fyodor $ */
+/* $Id: nmap_winconfig.h 5403 2007-08-11 04:06:09Z fyodor $ */
 
 #ifndef NMAP_WINCONFIG_H
 #define NMAP_WINCONFIG_H
 /* Without this, Windows will give us all sorts of crap about using functions
    like strcpy() even if they are done safely */
 #define _CRT_SECURE_NO_DEPRECATE 1
-#define NMAP_VERSION "4.20"
 #define NMAP_NAME "Nmap"
 #define NMAP_URL "http://insecure.org"
 #define NMAP_PLATFORM "i686-pc-windows-windows"
 #define NMAPDATADIR "c:\\nmap" /* FIXME: I really need to make this dynamic */
+
+/* Apparently __func__ isn't yet supported */
+#define __func__ __FUNCTION__
 
 #endif /* NMAP_WINCONFIG_H */

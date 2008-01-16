@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOutputTable.h 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: NmapOutputTable.h 5419 2007-08-11 04:27:37Z fyodor $ */
 
 #ifndef NMAPOUTPUTTABLE_H
 #define NMAPOUTPUTTABLE_H
@@ -118,11 +118,15 @@ struct NmapOutputTableCell {
   char *str;
   int strlength;
   bool weAllocated; // If we allocated str, we must free it.
+  bool fullrow;
 };
 
 class NmapOutputTable {
  public:
-  // Create a table of the given dimensions
+  // Create a table of the given dimensions. Any completely
+  // blank rows will be removed when printableTable() is called.
+  // If the number of table rows is unknown then the highest
+  // number of possible rows should be specified.
   NmapOutputTable(int nrows, int ncols);
   ~NmapOutputTable();
 
@@ -130,9 +134,14 @@ class NmapOutputTable {
   // ptr (and you better not free it until this table is destroyed ).  Skip the itemlen parameter if you
   // don't know (and the function will use strlen).
   void addItem(unsigned int row, unsigned int column, bool copy, const char *item, int itemlen = -1);
+  // Same as above but if fullrow is true, 'item' spans across all columns. The spanning starts from
+  // the column argument (ie. 0 will be the first column)
+  void addItem(unsigned int row, unsigned int column, bool fullrow, bool copy, const char *item, int itemlen = -1);
+
   // Like addItem except this version takes a printf-style format string followed by varargs
-  void addItemFormatted(unsigned int row, unsigned int column, const char *fmt, ...)
-    __attribute__ ((format (printf, 4, 5)));
+  void addItemFormatted(unsigned int row, unsigned int column, bool fullrow, const char *fmt, ...)
+	  __attribute__ ((format (printf, 4, 5)));
+
   // Returns the maximum size neccessary to create a printableTable() (the 
   // actual size could be less);
   int printableSize();
@@ -142,10 +151,12 @@ class NmapOutputTable {
   // function again, and it will also be invalidated if you free the
   // table. If size is not NULL, it will be filled with the size of
   // the ASCII table in bytes (not including the terminating NUL)
+  // All blank rows will be removed from the returned string
   char *printableTable(int *size);
 
  private:
 
+  bool emptyRow(unsigned int nrow);
   // The table, squished into 1D.  Access a member via getCellAddy
   struct NmapOutputTableCell *table;
   struct NmapOutputTableCell *getCellAddy(unsigned int row, unsigned int col) {
@@ -167,8 +178,4 @@ class NmapOutputTable {
 
 
 #endif /* NMAPOUTPUTTABLE_H */
-
-
-
-
 

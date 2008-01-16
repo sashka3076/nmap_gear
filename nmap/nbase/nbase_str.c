@@ -97,10 +97,12 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_str.c 3899 2006-08-29 05:42:35Z fyodor $ */
+/* $Id: nbase_str.c 5540 2007-08-14 07:31:12Z kris $ */
 
 #include "nbase.h"
 #include <string.h>
+#include <stdarg.h>
+#include <stdio.h>
 
 #ifndef HAVE_STRCASESTR
 char *strcasestr(const char *haystack, const char *pneedle) {
@@ -145,6 +147,30 @@ int Strncpy(char *dest, const char *src, size_t n) {
   return -1;
 }
 
+int Vsnprintf(char *s, size_t n, const char *fmt, va_list ap)
+{
+	int ret;
+
+	ret = vsnprintf(s, n, fmt, ap);
+
+	if (ret < 0 || (unsigned) ret >= n)
+		s[n - 1] = '\0';
+
+	return ret;
+}
+
+int Snprintf(char *s, size_t n, const char *fmt, ...)
+{
+	va_list ap;
+	int ret;
+
+	va_start(ap, fmt);
+	ret = Vsnprintf(s, n, fmt, ap);
+	va_end(ap);
+
+	return ret;
+}
+
 /* Trivial function that returns nonzero if all characters in str of length strlength are
    printable (as defined by isprint()) */
 int stringisprintable(const char *str, int strlength) {
@@ -164,4 +190,57 @@ void replacenonprintable(char *str, int strlength, char replchar) {
       str[i] = replchar;
 
   return;
+}
+
+/* Returns the position of the last directory separator (slash, also backslash
+   on Win32) in a path. Returns -1 if none was found. */
+static int find_last_path_separator(const char *path) {
+#ifndef WIN32
+  const char *PATH_SEPARATORS = "/";
+#else
+  const char *PATH_SEPARATORS = "\\/";
+#endif
+  const char *p;
+
+  p = path + strlen(path) - 1;
+  while (p >= path) {
+    if (strchr(PATH_SEPARATORS, *p) != NULL)
+      return p - path;
+    p--;
+  }
+
+  return -1;
+}
+
+/* Returns the directory name part of a path (everything up to the last
+   directory separator). If there is no separator, returns ".". If there is only
+   one separator and it is the first character, returns "/". Returns NULL on
+   error. The returned string must be freed. */
+char *path_get_dirname(const char *path) {
+  char *result;
+  int i;
+
+  i = find_last_path_separator(path);
+  if (i == -1)
+    return strdup(".");
+  if (i == 0)
+    return strdup("/");
+
+  result = (char *) malloc(i + 1);
+  if (result == NULL)
+    return NULL;
+  strncpy(result, path, i);
+  result[i] = '\0';
+
+  return result;
+}
+
+/* Returns the file name part of a path (everything after the last directory
+   separator). Returns NULL on error. The returned string must be freed. */
+char *path_get_basename(const char *path) {
+  int i;
+
+  i = find_last_path_separator(path);
+
+  return strdup(path + i + 1);
 }

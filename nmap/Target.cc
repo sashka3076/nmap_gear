@@ -98,18 +98,18 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: Target.cc 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: Target.cc 5538 2007-08-14 06:46:54Z kris $ */
 
 #ifdef WIN32
 #include "nmap_winconfig.h"
 #endif
 
-#include <dnet.h>
-
 #include "Target.h"
-#include "osscan.h"
+#include <dnet.h>
 #include "nbase.h"
 #include "NmapOps.h"
+#include "utils.h"
+#include "nmap_error.h"
 
 extern NmapOps o;
 
@@ -123,7 +123,7 @@ void Target::Initialize() {
   distance = -1;
   FPR1 = NULL;
   FPR = NULL;
-  osscan_performed = 0;
+  osscan_flag = OS_NOTPERF;
   wierd_responses = flags = 0;
   memset(&to, 0, sizeof(to));
   memset(&targetsock, 0, sizeof(targetsock));
@@ -140,7 +140,18 @@ void Target::Initialize() {
   htn.msecs_used = 0;
   htn.toclock_running = false;
   interface_type = devt_other;
-  devname[0] = devfullname[0] = '\0';
+	devname[0] = '\0';
+	devfullname[0] = '\0';
+  state_reason_init(&reason);
+}
+
+
+const char * Target::deviceName() { 
+	return (devname[0] != '\0')? devname : NULL;
+}
+
+const char * Target::deviceFullName() { 
+	return (devfullname[0] != '\0')? devfullname : NULL; 
 }
 
 void Target::Recycle() {
@@ -306,7 +317,7 @@ const char *Target::NameIP(char *buf, size_t buflen) {
   assert(buf);
   assert(buflen > 8);
   if (hostname) {
-    snprintf(buf, buflen, "%s (%s)", hostname, targetipstring);
+    Snprintf(buf, buflen, "%s (%s)", hostname, targetipstring);
   } else Strncpy(buf, targetipstring, buflen);
   return buf;
 }
@@ -336,6 +347,10 @@ bool Target::nextHop(struct sockaddr_storage *next_hop, size_t *next_hop_len) {
      been set yet.  */
 void Target::setDirectlyConnected(bool connected) {
   directly_connected = connected? 1 : 0;
+}
+
+int Target::directlyConnectedOrUnset(){
+    return directly_connected;
 }
 
 bool Target::directlyConnected() {
@@ -433,3 +448,15 @@ const u8 *Target::SrcMACAddress() {
 const u8 *Target::NextHopMACAddress() {
   return (NextHopMACaddress_set)? NextHopMACaddress : NULL;
 }
+
+int Target::osscanPerformed(void) {
+	return osscan_flag;
+}
+
+void Target::osscanSetFlag(int flag) {
+	if(osscan_flag == OS_PERF_UNREL)
+		return;
+	else
+		osscan_flag = flag;
+}
+

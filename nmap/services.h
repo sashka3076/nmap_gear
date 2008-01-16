@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: services.h 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: services.h 6088 2007-10-30 04:40:10Z david $ */
 
 
 #ifndef SERVICES_H
@@ -110,9 +110,8 @@
 #endif
 #include "nmap.h"
 #include "global_structures.h"
-#include "charpool.h"
-#include "nmap_error.h"
-#include "utils.h"
+
+#include "nbase.h"
 
 #define SERVICE_TABLE_SIZE 1024
 
@@ -125,11 +124,12 @@
 
 struct service_list {
   struct servent *servent;
+  double ratio;
   struct service_list *next;
 };
 
+int addportsfromservmask(char *mask, u8 *porttbl, int range_type);
 struct servent *nmap_getservbyport(int port, const char *proto);
-struct scan_lists *getfastports(int tcpscan, int udpscan);
-struct scan_lists *getdefaultports(int tcpscan, int udpscan);
+struct scan_lists *gettoppts(double level, char *portlist);
 
 #endif

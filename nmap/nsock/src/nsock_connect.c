@@ -53,7 +53,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_connect.c 3870 2006-08-25 01:47:53Z fyodor $ */
+/* $Id: nsock_connect.c 6246 2007-11-16 02:23:47Z kris $ */
 
 #include "nsock.h"
 #include "nsock_internal.h"
@@ -194,7 +194,7 @@ nsock_event_id nsock_connect_ssl(nsock_pool nsp, nsock_iod nsiod,
 		    userdata);
   assert(nse);
   
-  // Set our SSL_SESSION so we can benefit from session-id reuse.
+  /* Set our SSL_SESSION so we can benefit from session-id reuse. */
   nsi_set_ssl_session(nsi, (SSL_SESSION *) ssl_session);
   
   if (ms->tracelevel > 0)
@@ -230,7 +230,7 @@ nsock_event_id nsock_reconnect_ssl(nsock_pool nsp, nsock_iod nsiod,
   nse = msevent_new(ms, NSE_TYPE_CONNECT_SSL, nsi, timeout_msecs, handler, userdata);
   assert(nse);
 
-  // Set our SSL_SESSION so we can benefit from session-id reuse.
+  /* Set our SSL_SESSION so we can benefit from session-id reuse. */
   nsi_set_ssl_session(nsi, (SSL_SESSION *) ssl_session);
 
   if (ms->tracelevel > 0)
@@ -345,7 +345,7 @@ int nsi_getlastcommunicationinfo(nsock_iod ms_iod, int *protocol,
     if (remote) memset(remote, 0, socklen);
     if (local) memset(local, 0, socklen);
     if (protocol) *protocol = -1;
-    if (*af) *af = -1;
+    if (af) *af = -1;
   }
   return ret;
 }

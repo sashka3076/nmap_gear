@@ -101,7 +101,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase.h 3899 2006-08-29 05:42:35Z fyodor $ */
+/* $Id: nbase.h 6066 2007-10-29 00:30:23Z fyodor $ */
 
 #ifndef NBASE_H
 #define NBASE_H
@@ -122,7 +122,7 @@
  *   will generally be one of the following: LINUX, FREEBSD, NETBSD,
  *   OPENBSD, SOLARIS, SUNOS, BSDI, IRIX, NETBSD
  *
- * * Insures that GNU getopt_* functions exist (such as getopt_long_only
+ * * Insures that getopt_* functions exist (such as getopt_long_only)
  *
  * * Various string functions such as Strncpy() and strcasestr() see protos 
  *   for more info.
@@ -270,17 +270,12 @@ extern "C" int snprintf (char *, size_t, const char *, ...);
 extern "C" int vsnprintf (char *, size_t, const char *, va_list);
 #endif
 
-/* GNU getopt replacements ... Anyone have a BSD licensed version of these? */
 #ifdef HAVE_GETOPT_H
 #include <getopt.h>
 #else
-/* The next half-dozen lines are from gcc-2.95 ... -Fyodor */
-/* Include getopt.h for the sake of getopt_long.
-   We don't need the declaration of getopt, and it could conflict
-   with something from a system header file, so effectively nullify that.  */
-#define getopt getopt_loser
+#ifndef HAVE_GETOPT_LONG_ONLY
 #include "getopt.h"
-#undef getopt
+#endif
 #endif /* HAVE_GETOPT_H */
 
 /* More Windows-specific stuff */
@@ -293,6 +288,18 @@ extern "C" int vsnprintf (char *, size_t, const char *, va_list);
 #define S_ISDIR(m)      (((m) & _S_IFMT) == _S_IFDIR)
 #endif
 
+/* Windows doesn't have the access() defines */
+#ifndef F_OK
+#define F_OK 00
+#endif
+#ifndef W_OK
+#define W_OK 02
+#endif
+#ifndef R_OK
+#define R_OK 04
+#endif
+
+#define access _access
 #define stat _stat /* wtf was ms thinking? */
 #define execve _execve
 #define getpid _getpid
@@ -373,6 +380,10 @@ unsigned int sleep(unsigned int seconds);
    it must truncate */
 int Strncpy(char *dest, const char *src, size_t n);
 
+int Vsnprintf(char *, size_t, const char *, va_list)
+     __attribute__ ((format (printf, 3, 0)));
+int Snprintf(char *, size_t, const char *, ...)
+     __attribute__ ((format (printf, 3, 4)));
 
 /* Trivial function that returns nonzero if all characters in str of
    length strlength are printable (as defined by isprint()) */
@@ -380,6 +391,10 @@ int stringisprintable(const char *str, int strlength);
 
 /* Convert non-printable characters to replchar in the string */
 void replacenonprintable(char *str, int strlength, char replchar);
+
+/* Portable, incompatible replacements for dirname and basename. */
+char *path_get_dirname(const char *path);
+char *path_get_basename(const char *path);
 
 /* A few simple wrappers for the most common memory allocation routines which will exit() if the
 	allocation fails, so you don't always have to check -- see nbase_memalloc.c */

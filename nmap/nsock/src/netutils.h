@@ -54,7 +54,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: netutils.h 3870 2006-08-25 01:47:53Z fyodor $ */
+/* $Id: netutils.h 5546 2007-08-14 19:21:47Z stoiko $ */
 
 #ifndef NETUTILS_H
 #define NETUTILS_H
@@ -66,6 +66,8 @@
 
 #ifdef WIN32
 #include "nbase_winconfig.h"
+/* nbase_winunix.h somehow reason.h to get included */
+#include "nbase_winunix.h"
 #endif
 
 /* Take a file descriptor and put it in non-blocking mode */

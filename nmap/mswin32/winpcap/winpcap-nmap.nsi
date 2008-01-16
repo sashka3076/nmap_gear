@@ -1,13 +1,18 @@
 ;; Custom winpcap for nmap
 ;; Started by Doug Hoyte, April 2006
 
+;; Eddie Bell
+;; Updated to 4.0, June 2007
+;; Updated to 4.01, July 2007
+;; Updated to 4.02, November 2007
+
 ;--------------------------------
 
 ; The name of the installer
-Name "winpcap-nmap-3.1"
+Name "winpcap-nmap-4.02"
 
 ; The file to write
-OutFile "winpcap-nmap-3.1.B.exe"
+OutFile "winpcap-nmap-4.02.exe"
 
 ; The default installation directory
 InstallDir $PROGRAMFILES\WinPcap
@@ -39,7 +44,8 @@ UninstPage instfiles
 Function .onInit
   var /GLOBAL inst_ver
   var /GLOBAL my_ver
-
+  StrCpy $my_ver "4.0.0.1040" 
+  
   IfSilent do_silent no_silent
 
   do_silent:
@@ -61,16 +67,9 @@ Function .onInit
     IntOp $R5 $R1 & 0x0000FFFF
     StrCpy $inst_ver "$R2.$R3.$R4.$R5"
 
-    GetDllVersion "wpcap.dll" $R0 $R1
-    IntOp $R2 $R0 / 0x00010000
-    IntOp $R3 $R0 & 0x0000FFFF
-    IntOp $R4 $R1 / 0x00010000
-    IntOp $R5 $R1 & 0x0000FFFF
-    StrCpy $my_ver "$R2.$R3.$R4.$R5"
-
     StrCmp $inst_ver $my_ver same_ver
 
-    MessageBox MB_YESNO|MB_ICONQUESTION "WinPcap version $inst_ver exists on this system. Replace with version $my_ver" IDYES finish
+    MessageBox MB_YESNO|MB_ICONQUESTION "WinPcap version $inst_ver exists on this system. Replace with version $my_ver?" IDYES finish
     quit
 
   same_ver:
@@ -97,9 +96,6 @@ Section "" ;No components page, name is not important
   SetOutPath $INSTDIR
   
   ; Put file there
-  File daemon_mgm.exe
-  File NetMonInstaller.exe
-  File npf_mgm.exe
   File rpcapd.exe
   File LICENSE
 
@@ -107,23 +103,34 @@ Section "" ;No components page, name is not important
 
   SetOutPath $SYSDIR
 
-  File Packet.dll
   File pthreadVC.dll
-  File WanPacket.dll
   File wpcap.dll
 
-  SetOutPath $SYSDIR\drivers
+  ; Check windows version
+  ReadRegStr $R0 HKLM "SOFTWARE\Microsoft\Windows NT\CurrentVersion" VersionNumber
+  StrCmp $R0 '6.0'vista_files no_vista_files
 
-  File npf.sys
+  no_vista_files:
+    File Packet.dll
+    File WanPacket.dll
+    Goto install
 
-  ; Install some basic registry keys
-  WriteRegStr HKLM "Software\WinPcap" "" '"$INSTDIR"'
+  vista_files:
+    File vista\Packet.dll
 
-  ; Write the uninstall keys for Windows
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\winpcap-nmap" "DisplayName" "winpcap-nmap 3.1"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\winpcap-nmap" "UninstallString" '"$INSTDIR\uninstall.exe"'
-  WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\winpcap-nmap" "NoModify" 1
-  WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\winpcap-nmap" "NoRepair" 1
+  install:
+    SetOutPath $SYSDIR\drivers
+
+    File npf.sys
+
+    ; Install some basic registry keys
+    WriteRegStr HKLM "Software\WinPcap" "" '"$INSTDIR"'
+
+    ; Write the uninstall keys for Windows
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\winpcap-nmap" "DisplayName" "winpcap-nmap 4.02"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\winpcap-nmap" "UninstallString" '"$INSTDIR\uninstall.exe"'
+    WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\winpcap-nmap" "NoModify" 1
+    WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\winpcap-nmap" "NoRepair" 1
 
 SectionEnd ; end the section
 
@@ -135,9 +142,6 @@ Section "Uninstall"
   DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\winpcap-nmap"
   DeleteRegKey HKLM "Software\WinPcap"
 
-  Delete $INSTDIR\daemon_mgm.exe
-  Delete $INSTDIR\NetMonInstaller.exe
-  Delete $INSTDIR\npf_mgm.exe
   Delete $INSTDIR\rpcapd.exe
   Delete $INSTDIR\LICENSE
   Delete $INSTDIR\uninstall.exe

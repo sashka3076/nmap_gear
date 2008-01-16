@@ -56,7 +56,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_ssl.c 3870 2006-08-25 01:47:53Z fyodor $ */
+/* $Id: nsock_ssl.c 4317 2007-01-01 00:23:39Z fyodor $ */
 
 
 #include "nsock.h"
@@ -123,7 +123,7 @@ void Nsock_SSL_Init() {
   SSL_CTX_set_session_cache_mode(
      sslnfo->ctx,  SSL_SESS_CACHE_OFF | SSL_SESS_CACHE_NO_AUTO_CLEAR );
   SSL_CTX_sess_set_cache_size( sslnfo->ctx, 1 ); 
-  SSL_CTX_set_timeout( sslnfo->ctx, 3600); // pretty unnecessary
+  SSL_CTX_set_timeout( sslnfo->ctx, 3600); /* pretty unnecessary */
 
 }
 

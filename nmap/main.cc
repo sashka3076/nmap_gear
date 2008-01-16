@@ -97,14 +97,11 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: main.cc 4123 2006-11-03 05:36:41Z fyodor $ */
+/* $Id: main.cc 5538 2007-08-14 06:46:54Z kris $ */
 
 #include "nmap.h"
-#include "osscan.h"
-#include "scan_engine.h"
-#include "idle_scan.h"
-#include "timing.h"
 #include "NmapOps.h"
+#include "utils.h"
 
 #ifdef MTRACE
 #include "mcheck.h"
@@ -140,14 +137,9 @@ extern NmapOps o;  /* option structure */
 int main(int argc, char *argv[]) {
   /* The "real" main is nmap_main().  This function hijacks control at the
      beginning to do the following:
-     1) Check if Nmap called under name listed in INTERACTIVE_NAMES or with
-     interactive.
+     1) Check if Nmap was called with --interactive.
      2) Start interactive mode or just call nmap_main
   */
-  char *interactive_names[] = INTERACTIVE_NAMES;
-  int numinames = sizeof(interactive_names) / sizeof(char *);
-  int nameidx;
-  char *nmapcalledas;
   char command[2048];
   int myargc, fakeargc;
   char **myargv = NULL, **fakeargv = NULL;
@@ -200,15 +192,8 @@ int main(int argc, char *argv[]) {
 #endif
 #endif
 
-  /* First we figure out whether the name nmap is called as qualifies it 
-     for interactive mode treatment */
-  nmapcalledas = strrchr(argv[0], '/');
-  if (!nmapcalledas) {
-    nmapcalledas = argv[0];
-  } else nmapcalledas++;
-
   if ((cptr = getenv("NMAP_ARGS"))) {
-    if (snprintf(command, sizeof(command), "nmap %s", cptr) >= (int) sizeof(command)) {
+    if (Snprintf(command, sizeof(command), "nmap %s", cptr) >= (int) sizeof(command)) {
         error("Warning: NMAP_ARGS variable is too long, truncated");
     }
     /* copy rest of command-line arguments */
@@ -223,14 +208,6 @@ int main(int argc, char *argv[]) {
     ret = nmap_main(myargc, myargv);
     arg_parse_free(myargv);
     return ret;
-  }
-
-  for(nameidx = 0; nameidx < numinames; nameidx++) {
-    if (strcasecmp(nmapcalledas, interactive_names[nameidx]) == 0) {
-      printf("Entering Interactive Mode because argv[0] == %s\n", nmapcalledas);
-      interactivemode = 1;
-      break;
-    }
   }
 
   if (interactivemode == 0 &&
@@ -336,18 +313,23 @@ int main(int argc, char *argv[]) {
 	    if ((pptr = getenv("PATH"))) {
 	      Strncpy(path, pptr, sizeof(path));
 	      pptr = path;
+	      /* Get the name Nmap was called as. */
+	      char *nmapcalledas = path_get_basename(argv[0]);
+	      if (nmapcalledas == NULL)
+		pfatal("Could not get nmap executable basename");
 	      while(pptr && *pptr) {
 		endptr = strchr(pptr, ':');
 		if (endptr) { 
 		  *endptr = '\0';
 		}
-		snprintf(nmappath, sizeof(nmappath), "%s/%s", pptr, nmapcalledas);
+		Snprintf(nmappath, sizeof(nmappath), "%s/%s", pptr, nmapcalledas);
 		if (stat(nmappath, &st) != -1)
 		  break;
 		nmappath[0] = '\0';
 		if (endptr) pptr = endptr + 1;
 		else pptr = NULL;
 	      }
+	      free(nmapcalledas);
 	    }
 	  }
 	}
@@ -373,7 +355,7 @@ int main(int argc, char *argv[]) {
 	  }
 	} else {
 	  fakeargc = 1;
-	  fakeargv = (char **) malloc(sizeof(char *) * 2);
+	  fakeargv = (char **) safe_malloc(sizeof(char *) * 2);
 	  fakeargv[0] = nmappath;
 	  fakeargv[1] = NULL;
 	}

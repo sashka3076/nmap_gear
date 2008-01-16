@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: getaddrinfo.c 3899 2006-08-29 05:42:35Z fyodor $ */
+/* $Id: getaddrinfo.c 5538 2007-08-14 06:46:54Z kris $ */
 
 #include "nbase.h"
 
@@ -133,7 +133,7 @@ const char *gai_strerror(int errcode) {
   case EAI_NONAME:
     return "hostname nor servname provided, or not known";
   default:
-    snprintf(customerr, sizeof(customerr), "unknown error (%d)", errcode);
+    Snprintf(customerr, sizeof(customerr), "unknown error (%d)", errcode);
     return "unknown error.";
   }
   return NULL; /* unreached */

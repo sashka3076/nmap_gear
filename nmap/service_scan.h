@@ -98,15 +98,17 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: service_scan.h 3977 2006-09-12 03:35:29Z fyodor $ */
+/* $Id: service_scan.h 5389 2007-08-11 03:35:46Z fyodor $ */
 
 #ifndef SERVICE_SCAN_H
 #define SERVICE_SCAN_H
 
 #include "nmap.h"
 #include "global_structures.h"
+#include "portlist.h"
 
 #include <vector>
+
 #ifdef HAVE_PCRE_PCRE_H
 # include <pcre/pcre.h>
 #else

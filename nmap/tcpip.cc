@@ -98,13 +98,16 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: tcpip.cc 4228 2006-12-08 03:01:08Z fyodor $ */
+/* $Id: tcpip.cc 6321 2007-11-26 23:44:20Z david $ */
 #ifdef WIN32
 #include "nmap_winconfig.h"
 #endif
+#include "portreasons.h"
 #include <dnet.h>
 #include "tcpip.h"
 #include "NmapOps.h"
+#include "Target.h"
+#include "utils.h"
 
 #if HAVE_SYS_TIME_H
 #include <sys/time.h>
@@ -158,8 +161,18 @@ setsockopt(sd, IPPROTO_IP, IP_HDRINCL, (const char *) &one, sizeof(one));
 #endif
 }
 
+void set_ttl(int sd, int ttl)
+{
+#ifdef IP_TTL
+	if (sd == -1)
+		return;
+
+	setsockopt(sd, IPPROTO_IP, IP_TTL, (const char *) &ttl, sizeof ttl);
+#endif
+}
+
 // Takes a protocol number like IPPROTO_TCP, IPPROTO_UDP, or
-// IPPROTO_TCP and returns a ascii representation (or "unknown" if it
+// IPPROTO_IP and returns a ascii representation (or "unknown" if it
 // doesn't recognize the number).  If uppercase is true, the returned
 // value will be in all uppercase letters.  You can skip this
 // parameter to use lowercase.
@@ -181,13 +194,13 @@ const char *proto2ascii(u8 proto, bool uppercase) {
 }
 
 static char *ll2shortascii(unsigned long long bytes, char *buf, int buflen) {
-  if (buflen < 2 || !buf) fatal("Bogus parameter passed to ll2shortascii");
+  if (buflen < 2 || !buf) fatal("Bogus parameter passed to %s", __func__);
 
   if (bytes > 1000000) {
-    snprintf(buf, buflen, "%.3fMB", bytes / 1000000.0);
+    Snprintf(buf, buflen, "%.3fMB", bytes / 1000000.0);
   } else if (bytes > 10000) {
-    snprintf(buf, buflen, "%.3fKB", bytes / 1000.0);
-  } else snprintf(buf, buflen, "%uB", (unsigned int) bytes);
+    Snprintf(buf, buflen, "%.3fKB", bytes / 1000.0);
+  } else Snprintf(buf, buflen, "%uB", (unsigned int) bytes);
     
   return buf;
 }
@@ -199,9 +212,9 @@ char *getFinalPacketStats(char *buf, int buflen) {
   char sendbytesasc[16], recvbytesasc[16];
 
   if (buflen <= 10 || !buf)
-    fatal("getFinalPacketStats called with woefully inadequate parameters");
+    fatal("%s called with woefully inadequate parameters", __func__);
 
-  snprintf(buf, buflen, 
+  Snprintf(buf, buflen, 
 #if WIN32
 	  "Raw packets sent: %I64u (%s) | Rcvd: %I64u (%s)",
 #else
@@ -249,10 +262,10 @@ void PacketTrace::traceArp(pdirection pdir, const u8 *frame, u32 len,
   if (frame[21] == 1) /* arp REQUEST */ {
     inet_ntop(AF_INET, frame+38, who_has, sizeof(who_has));
     inet_ntop(AF_INET, frame+28, tell, sizeof(tell));
-    snprintf(arpdesc, sizeof(arpdesc), "who-has %s tell %s", who_has, tell);
+    Snprintf(arpdesc, sizeof(arpdesc), "who-has %s tell %s", who_has, tell);
   } else { /* ARP REPLY */
     inet_ntop(AF_INET, frame+28, who_has, sizeof(who_has));
-    snprintf(arpdesc, sizeof(arpdesc), 
+    Snprintf(arpdesc, sizeof(arpdesc), 
 	     "reply %s is-at %02X:%02X:%02X:%02X:%02X:%02X", who_has, 
 	     frame[22], frame[23], frame[24], frame[25], frame[26], frame[27]);
   }
@@ -280,13 +293,13 @@ static void tcppacketoptinfo(u8 *optp, int len, char *result, int bufsize) {
   ch = '<';
   
   while(len > 0 && bufsize > 2) {
-	snprintf(p, bufsize, "%c", ch);
+	Snprintf(p, bufsize, "%c", ch);
 	bufsize--;
 	p++;
     opcode=*q++;	
     if (!opcode) { /* End of List */
 	  
-	  snprintf(p, bufsize, "eol");
+	  Snprintf(p, bufsize, "eol");
 	  bufsize -= strlen(p);
 	  p += strlen(p);
 	  
@@ -294,7 +307,7 @@ static void tcppacketoptinfo(u8 *optp, int len, char *result, int bufsize) {
 	  
     } else if (opcode == 1) { /* No Op */
 	  
-	  snprintf(p, bufsize, "nop");
+	  Snprintf(p, bufsize, "nop");
 	  bufsize -= strlen(p);
 	  p += strlen(p);
 	  
@@ -308,7 +321,7 @@ static void tcppacketoptinfo(u8 *optp, int len, char *result, int bufsize) {
       q++;
       memcpy(&tmpshort, q, 2);
 	  
-	  snprintf(p, bufsize, "mss %u", ntohs(tmpshort));
+	  Snprintf(p, bufsize, "mss %u", ntohs(tmpshort));
 	  bufsize -= strlen(p);
 	  p += strlen(p);
 
@@ -322,7 +335,7 @@ static void tcppacketoptinfo(u8 *optp, int len, char *result, int bufsize) {
 	  
       q++;
 
-	  snprintf(p, bufsize, "wsacle %u", *q);
+	  Snprintf(p, bufsize, "wscale %u", *q);
 	  bufsize -= strlen(p);
 	  p += strlen(p); 
 	  
@@ -334,7 +347,7 @@ static void tcppacketoptinfo(u8 *optp, int len, char *result, int bufsize) {
       if(len<2)
         break; /* SACK permitted option has 2 bytes */
 	  
-	  snprintf(p, bufsize, "sackOK");
+	  Snprintf(p, bufsize, "sackOK");
 	  bufsize -= strlen(p);
 	  p += strlen(p); 
 	  
@@ -350,17 +363,17 @@ static void tcppacketoptinfo(u8 *optp, int len, char *result, int bufsize) {
 	  q++;
 	  
 	  if((sackoptlen-2) % 8 != 0) {
-		snprintf(p, bufsize, "malformed sack");
+		Snprintf(p, bufsize, "malformed sack");
 		bufsize -= strlen(p);
 		p += strlen(p); 
 	  } else {
-		snprintf(p, bufsize, "sack %d ", (sackoptlen-2)/8);
+		Snprintf(p, bufsize, "sack %d ", (sackoptlen-2)/8);
 		bufsize -= strlen(p);
 		p += strlen(p);
 		for(int i = 0; i < sackoptlen - 2; i += 8) {
 		  memcpy(&tmpword1, q + i, 4);
 		  memcpy(&tmpword2, q + i + 4, 4);
-		  snprintf(p, bufsize, "{%u:%u}", tmpword1, tmpword2);
+		  Snprintf(p, bufsize, "{%u:%u}", tmpword1, tmpword2);
 		  bufsize -= strlen(p);
 		  p += strlen(p);
 		}
@@ -378,7 +391,7 @@ static void tcppacketoptinfo(u8 *optp, int len, char *result, int bufsize) {
       memcpy(&tmpword1, q, 4);
       memcpy(&tmpword2, q+4, 4);
 
-	  snprintf(p, bufsize, "timestamp %u %u", ntohl(tmpword1), ntohl(tmpword2));
+	  Snprintf(p, bufsize, "timestamp %u %u", ntohl(tmpword1), ntohl(tmpword2));
 	  bufsize -= strlen(p);
 	  p += strlen(p);
 
@@ -395,7 +408,7 @@ static void tcppacketoptinfo(u8 *optp, int len, char *result, int bufsize) {
 	return;
   }
 
-  snprintf(p, bufsize, ">");
+  Snprintf(p, bufsize, ">");
 }
 
 /* Returns a buffer of ASCII information about a packet that may look
@@ -407,8 +420,8 @@ static void tcppacketoptinfo(u8 *optp, int len, char *result, int bufsize) {
 static const char *ippackethdrinfo(const u8 *packet, u32 len) {
   static char protoinfo[512];
   struct ip *ip = (struct ip *) packet;
-  struct tcphdr *tcp;
-  udphdr_bsd *udp;
+  struct tcp_hdr *tcp;
+  struct udp_hdr *udp;
   char ipinfo[512];
   char srchost[INET6_ADDRSTRLEN], dsthost[INET6_ADDRSTRLEN];
   char *p;
@@ -430,11 +443,11 @@ static const char *ippackethdrinfo(const u8 *packet, u32 len) {
   frag_off = 8 * (ntohs(ip->ip_off) & 8191) /* 2^13 - 1 */;
   more_fragments = ntohs(ip->ip_off) & IP_MF;
   if (frag_off || more_fragments) {
-    snprintf(fragnfo, sizeof(fragnfo), " frag offset=%d%s", frag_off, more_fragments ? "+" : "");
+    Snprintf(fragnfo, sizeof(fragnfo), " frag offset=%d%s", frag_off, more_fragments ? "+" : "");
   }
   
 
-  snprintf(ipinfo, sizeof(ipinfo), "ttl=%d id=%d iplen=%d%s %s%s%s", 
+  Snprintf(ipinfo, sizeof(ipinfo), "ttl=%d id=%d iplen=%d%s %s%s%s", 
 	  ip->ip_ttl, ntohs(ip->ip_id), ntohs(ip->ip_len), fragnfo,
 	  ip->ip_hl==5?"":"ipopts={",
 	  ip->ip_hl==5?"":print_ip_options((u8*)ip + sizeof(struct ip), MIN((ip->ip_hl-5)*4,len-sizeof(struct ip))),
@@ -446,11 +459,11 @@ static const char *ippackethdrinfo(const u8 *packet, u32 len) {
     char buf[32];
 	char tcpoptinfo[256] = "";
 	
-    tcp = (struct tcphdr *)  (packet + ip->ip_hl * 4);
+    tcp = (struct tcp_hdr *)  (packet + ip->ip_hl * 4);
     if (frag_off > 8 || len < (u32) ip->ip_hl * 4 + 8) 
-      snprintf(protoinfo, sizeof(protoinfo), "TCP %s:?? > %s:?? ?? %s (incomplete)", srchost, dsthost, ipinfo);
+      Snprintf(protoinfo, sizeof(protoinfo), "TCP %s:?? > %s:?? ?? %s (incomplete)", srchost, dsthost, ipinfo);
     else if (frag_off == 8) {// at least we can get TCP flags and ACKn
-      tcp = (struct tcphdr *)((u8 *) tcp - frag_off); // ugly?
+      tcp = (struct tcp_hdr *)((u8 *) tcp - frag_off); // ugly?
       p = tflags;
       /* These are basically in tcpdump order */
       if (tcp->th_flags & TH_SYN) *p++ = 'S';
@@ -459,7 +472,7 @@ static const char *ippackethdrinfo(const u8 *packet, u32 len) {
       if (tcp->th_flags & TH_PUSH) *p++ = 'P';
       if (tcp->th_flags & TH_ACK) {
 	*p++ = 'A';
-	snprintf(tcpinfo, sizeof(tcpinfo), " ack=%lu", 
+	Snprintf(tcpinfo, sizeof(tcpinfo), " ack=%lu", 
 		 (unsigned long) ntohl(tcp->th_ack));
       }
       if (tcp->th_flags & TH_URG) *p++ = 'U';
@@ -467,27 +480,27 @@ static const char *ippackethdrinfo(const u8 *packet, u32 len) {
       if (tcp->th_flags & TH_CWR) *p++ = 'C'; /* rfc 2481/3168 */
       *p++ = '\0';
 
-	  if((u32) tcp->th_off * 4 > sizeof(struct tcphdr)) {
+	  if((u32) tcp->th_off * 4 > sizeof(struct tcp_hdr)) {
 		// tcp options
 		if(len < (u32) ip->ip_hl * 4 + (u32) tcp->th_off * 4 - frag_off) {
-		  snprintf(tcpoptinfo, sizeof(tcpoptinfo), "option incomplete");
+		  Snprintf(tcpoptinfo, sizeof(tcpoptinfo), "option incomplete");
 		  
 		} else {
-		  tcppacketoptinfo((u8*) tcp + sizeof(struct tcphdr),
-					 tcp->th_off*4 - sizeof(struct tcphdr),
+		  tcppacketoptinfo((u8*) tcp + sizeof(struct tcp_hdr),
+					 tcp->th_off*4 - sizeof(struct tcp_hdr),
 					 tcpoptinfo, sizeof(tcpoptinfo));
 		}
 	  }
 
-      snprintf(protoinfo, sizeof(protoinfo), "TCP %s:?? > %s:?? %s %s %s %s",
+      Snprintf(protoinfo, sizeof(protoinfo), "TCP %s:?? > %s:?? %s %s %s %s",
 			   srchost, dsthost, tflags, ipinfo, tcpinfo, tcpoptinfo);
     } else if (len < (u32) ip->ip_hl * 4 + 16) { // we can get ports and seq
-      snprintf(tcpinfo, sizeof(tcpinfo), "seq=%lu (incomplete)", (unsigned long) ntohl(tcp->th_seq));
-      snprintf(protoinfo, sizeof(protoinfo), "TCP %s:%d > %s:%d ?? %s %s",
+      Snprintf(tcpinfo, sizeof(tcpinfo), "seq=%lu (incomplete)", (unsigned long) ntohl(tcp->th_seq));
+      Snprintf(protoinfo, sizeof(protoinfo), "TCP %s:%d > %s:%d ?? %s %s",
 	       srchost, ntohs(tcp->th_sport), dsthost, ntohs(tcp->th_dport), ipinfo, tcpinfo);
     } else { // at least first 16 bytes of TCP header are there
 
-      snprintf(tcpinfo, sizeof(tcpinfo), "seq=%lu win=%hu", 
+      Snprintf(tcpinfo, sizeof(tcpinfo), "seq=%lu win=%hu", 
 	       (unsigned long) ntohl(tcp->th_seq),
 	       ntohs(tcp->th_win));
       p = tflags;
@@ -498,7 +511,7 @@ static const char *ippackethdrinfo(const u8 *packet, u32 len) {
       if (tcp->th_flags & TH_PUSH) *p++ = 'P';
       if (tcp->th_flags & TH_ACK) {
 	*p++ = 'A';
-	snprintf(buf, sizeof(buf), " ack=%lu", 
+	Snprintf(buf, sizeof(buf), " ack=%lu", 
 		 (unsigned long) ntohl(tcp->th_ack));
 	strncat(tcpinfo, buf, sizeof(tcpinfo) - strlen(tcpinfo) - 1);
       }
@@ -507,34 +520,36 @@ static const char *ippackethdrinfo(const u8 *packet, u32 len) {
       if (tcp->th_flags & TH_CWR) *p++ = 'C'; /* rfc 2481/3168 */
       *p++ = '\0';
 
-	  if((u32) tcp->th_off * 4 > sizeof(struct tcphdr)) {
+	  if((u32) tcp->th_off * 4 > sizeof(struct tcp_hdr)) {
 		// tcp options
 		if(len < (u32) ip->ip_hl * 4 + (u32) tcp->th_off * 4) {
-		  snprintf(tcpoptinfo, sizeof(tcpoptinfo), "option incomplete");
+		  Snprintf(tcpoptinfo, sizeof(tcpoptinfo), "option incomplete");
 		  
 		} else {
-		  tcppacketoptinfo((u8*) tcp + sizeof(struct tcphdr),
-					 tcp->th_off*4 - sizeof(struct tcphdr),
+		  tcppacketoptinfo((u8*) tcp + sizeof(struct tcp_hdr),
+					 tcp->th_off*4 - sizeof(struct tcp_hdr),
 					 tcpoptinfo, sizeof(tcpoptinfo));
 		}
 	  }
 
-      snprintf(protoinfo, sizeof(protoinfo), "TCP %s:%d > %s:%d %s %s %s %s",
+      Snprintf(protoinfo, sizeof(protoinfo), "TCP %s:%d > %s:%d %s %s %s %s",
 	       srchost, ntohs(tcp->th_sport), dsthost, ntohs(tcp->th_dport),
 			   tflags, ipinfo, tcpinfo, tcpoptinfo);
     }
   } else if (ip->ip_p == IPPROTO_UDP && frag_off) {
-      snprintf(protoinfo, sizeof(protoinfo), "UDP %s:?? > %s:?? fragment %s (incomplete)", srchost, dsthost, ipinfo);
+      Snprintf(protoinfo, sizeof(protoinfo), "UDP %s:?? > %s:?? fragment %s (incomplete)", srchost, dsthost, ipinfo);
   } else if (ip->ip_p == IPPROTO_UDP) {
-    udp =  (udphdr_bsd *) (packet + sizeof(struct ip));
+    udp =  (struct udp_hdr *) (packet + sizeof(struct ip));
 
-    snprintf(protoinfo, sizeof(protoinfo), "UDP %s:%d > %s:%d %s",
+    Snprintf(protoinfo, sizeof(protoinfo), "UDP %s:%d > %s:%d %s",
 	     srchost, ntohs(udp->uh_sport), dsthost, ntohs(udp->uh_dport),
 	     ipinfo);
   } else if (ip->ip_p == IPPROTO_ICMP && frag_off) {
-      snprintf(protoinfo, sizeof(protoinfo), "ICMP %s > %s fragment %s (incomplete)", srchost, dsthost, ipinfo);
+      Snprintf(protoinfo, sizeof(protoinfo), "ICMP %s > %s fragment %s (incomplete)", srchost, dsthost, ipinfo);
   } else if (ip->ip_p == IPPROTO_ICMP) {
     char icmptype[128];
+    char *ip2dst;
+    struct ip *ip2;
     struct ppkt {
       unsigned char type;
       unsigned char code;
@@ -545,43 +560,69 @@ static const char *ippackethdrinfo(const u8 *packet, u32 len) {
     ping = (struct ppkt *) ((ip->ip_hl * 4) + (char *) ip);
     switch(ping->type) {
     case 0:
-      strcpy(icmptype, "Echo reply"); break;
+      strcpy(icmptype, "echo reply"); break;
     case 3:
+      ip2 = (struct ip *) ((char *) ip + (ip->ip_hl * 4) + 8);
+      tcp = (struct tcp_hdr *) ((char *) ip2 + (ip2->ip_hl * 4));
+      udp = (struct udp_hdr *) ((char *) ip2 + (ip2->ip_hl * 4));
+      ip2dst = inet_ntoa(ip2->ip_dst);
       switch (ping->code) {
       case 0:
-	strcpy(icmptype, "network unreachable"); break;
+	Snprintf(icmptype, sizeof icmptype, "network %s unreachable", ip2dst);
+	break;
       case 1:
-	strcpy(icmptype, "host unreachable"); break;
+	Snprintf(icmptype, sizeof icmptype, "host %s unreachable", ip2dst);
+	break;
       case 2:
-	strcpy(icmptype, "protocol unreachable"); break;
+	Snprintf(icmptype, sizeof icmptype, "protocol %u unreachable", ip2->ip_p);
+	break;
       case 3:
-	strcpy(icmptype, "port unreachable"); break;
+	if (ip2->ip_p == IPPROTO_UDP)
+	  Snprintf(icmptype, sizeof icmptype, "port %u unreachable", ntohs(udp->uh_dport));
+	else if (ip2->ip_p == IPPROTO_TCP)
+	  Snprintf(icmptype, sizeof icmptype, "port %u unreachable", ntohs(tcp->th_dport));
+	else
+	  strcpy(icmptype, "port unreachable");
+	break;
       case 4:
-	strcpy(icmptype, "fragmentation required"); break;
+	strcpy(icmptype, "fragmentation required");
+	break;
       case 5:
-	strcpy(icmptype, "source route failed"); break;
+	strcpy(icmptype, "source route failed");
+	break;
       case 6:
-	strcpy(icmptype, "destination network unknown"); break;
+	Snprintf(icmptype, sizeof icmptype, "destination network %s unknown", ip2dst);
+	break;
       case 7:
-	strcpy(icmptype, "destination host unknown"); break;
+	Snprintf(icmptype, sizeof icmptype, "destination host %s unknown", ip2dst);
+	break;
       case 8:
-	strcpy(icmptype, "source host isolated"); break;
+	strcpy(icmptype, "source host isolated");
+	break;
       case 9:
-	strcpy(icmptype, "destination network administratively prohibited"); break;
+	Snprintf(icmptype, sizeof icmptype, "destination network %s administratively prohibited", ip2dst);
+	break;
       case 10:
-	strcpy(icmptype, "destination host administratively prohibited"); break;
+	Snprintf(icmptype, sizeof icmptype, "destination host %s administratively prohibited", ip2dst);
+	break;
       case 11:
-	strcpy(icmptype, "network unreachable for TOS"); break;
+	Snprintf(icmptype, sizeof icmptype, "network %s unreachable for TOS", ip2dst);
+	break;
       case 12:
-	strcpy(icmptype, "host unreachable for TOS"); break;
+	Snprintf(icmptype, sizeof icmptype, "host %s unreachable for TOS", ip2dst);
+	break;
       case 13:
-	strcpy(icmptype, "communication administratively prohibited by filtering"); break;
+	strcpy(icmptype, "communication administratively prohibited by filtering");
+	break;
       case 14:
-	strcpy(icmptype, "host precedence violation"); break;
+	strcpy(icmptype, "host precedence violation");
+	break;
       case 15:
-	strcpy(icmptype, "precedence cutoff in effect"); break;
+	strcpy(icmptype, "precedence cutoff in effect");
+	break;
       default:
-	strcpy(icmptype, "unknown unreachable code"); break;
+	strcpy(icmptype, "unknown unreachable code");
+	break;
       }
       break;
     case 4:
@@ -594,7 +635,7 @@ static const char *ippackethdrinfo(const u8 *packet, u32 len) {
       else strcpy(icmptype, "unknown redirect");
       break;
     case 8:
-      strcpy(icmptype, "Echo request"); break;
+      strcpy(icmptype, "echo request"); break;
     case 11:
       if (ping->code == 0)
 	strcpy(icmptype, "TTL=0 during transit");
@@ -633,11 +674,11 @@ static const char *ippackethdrinfo(const u8 *packet, u32 len) {
       strcpy(icmptype, "Unknown type"); break;
       break;
     }
-    snprintf(protoinfo, sizeof(protoinfo), "ICMP %s > %s %s (type=%d/code=%d) %s",
+    Snprintf(protoinfo, sizeof(protoinfo), "ICMP %s > %s %s (type=%d/code=%d) %s",
 	     srchost, dsthost, icmptype, ping->type, ping->code, ipinfo);
   } else {
-    snprintf(protoinfo, sizeof(protoinfo), "Unknown protocol (%d): %s", 
-	     ip->ip_p, ipinfo);
+    Snprintf(protoinfo, sizeof(protoinfo), "Unknown protocol (%d) %s > %s: %s", 
+	     ip->ip_p, srchost, dsthost, ipinfo);
   }    
 
   return protoinfo;
@@ -704,7 +745,7 @@ void PacketTrace::traceConnect(u8 proto, const struct sockaddr *sock,
   if (connectrc == 0)
     Strncpy(errbuf, "Connected", sizeof(errbuf));
   else {
-    snprintf(errbuf, sizeof(errbuf), "%s", strerror(connect_errno));
+    Snprintf(errbuf, sizeof(errbuf), "%s", strerror(connect_errno));
   }
 
   if (sin->sin_family == AF_INET) {
@@ -754,7 +795,7 @@ const char *inet_socktop(struct sockaddr_storage *ss) {
                 (char *) NULL,
 #endif /* HAVE_IPV6 */
                 buf, sizeof(buf)) == NULL) {
-    fatal("Failed to convert target address to presentation format in inet_socktop!?!  Error: %s", strerror(socket_errno()));
+    fatal("Failed to convert target address to presentation format in %s!?!  Error: %s", __func__, strerror(socket_errno()));
   }
   return buf;
 }
@@ -886,6 +927,9 @@ pcap_t *my_pcap_open_live(const char *device, int snaplen, int promisc,
   pcap_t *pt;
   char pcapdev[128];
   int failed = 0;
+
+  assert(device != NULL);
+
 #ifdef WIN32
 /* Nmap normally uses device names obtained through dnet for interfaces, but Pcap has its own
 naming system.  So the conversion is done here */
@@ -905,7 +949,7 @@ fatal("Call to pcap_open_live(%s, %d, %d, %d) failed three times. Reported error
           "LINUX: If you are getting Socket type not supported, try modprobe af_packet or recompile your kernel with SOCK_PACKET enabled.\n"
           "*BSD:  If you are getting device not configured, you need to recompile your kernel with Berkeley Packet Filter support.  If you are getting No such file or directory, try creating the device (eg cd /dev; MAKEDEV <device>; or use mknod).\n"
           "*WINDOWS:  Nmap only supports ethernet interfaces on Windows for most operations because Microsoft disabled raw sockets as of Windows XP SP2.  Depending on the reason for this error, it is possible that the --unprivileged command-line argument will help.\n"
-          "SOLARIS:  If you are trying to scan localhost and getting '/dev/lo0: No such file or directory', complain to Sun.  I don't think Solaris can support advanced localhost scans.  You can probably use \"-P0 -sT localhost\" though.\n\n", pcapdev, snaplen, promisc, to_ms, err0r);
+          "SOLARIS:  If you are trying to scan localhost and getting '/dev/lo0: No such file or directory', complain to Sun.  I don't think Solaris can support advanced localhost scans.  You can probably use \"-PN -sT localhost\" though.\n\n", pcapdev, snaplen, promisc, to_ms, err0r);
       } else {
 	error("pcap_open_live(%s, %d, %d, %d) FAILED. Reported error: %s.  Will wait %d seconds then retry.", pcapdev, snaplen, promisc, to_ms, err0r, (int) pow(5.0, failed));	
       }
@@ -957,6 +1001,28 @@ answer = ~sum;          /* ones-complement, then truncate to 16 bits */
 return(answer);
 }
 
+/* for computing TCP/UDP checksums, see TCP/IP Illustrated p. 145 */
+unsigned short magic_tcpudp_cksum(const struct in_addr *src,
+				  const struct in_addr *dst,
+				  u8 proto, u16 len, char *hstart)
+{
+	struct pseudo {
+		struct in_addr src;
+		struct in_addr dst;        
+		u8 zero;
+		u8 proto;        
+		u16 length;
+	} *hdr = (struct pseudo *) (hstart - sizeof(struct pseudo));
+
+	hdr->src = *src;
+	hdr->dst = *dst;
+	hdr->zero = 0;
+	hdr->proto = proto;
+	hdr->length = htons(len);
+
+	return in_cksum((unsigned short *) hdr, len + sizeof(struct pseudo));
+}
+
 /* LEGACY resolve() function that only supports IPv4 -- see IPv6 version
    above.  Tries to resolve given hostname and stores
    result in ip .  returns 0 if hostname cannot
@@ -965,7 +1031,7 @@ int resolve(char *hostname, struct in_addr *ip) {
   struct hostent *h;
 
   if (!hostname || !*hostname)
-    fatal("NULL or zero-length hostname passed to resolve()");
+    fatal("NULL or zero-length hostname passed to %s()", __func__);
 
   if (inet_pton(AF_INET, hostname, ip))
     return 1; /* damn, that was easy ;) */
@@ -985,8 +1051,8 @@ int resolve(char *hostname, struct in_addr *ip) {
    call eth_close_cached() to close whichever device (if any) is
    cached.  Returns NULL if it fails to open the device. */
 eth_t *eth_open_cached(const char *device) {
-  if (!device) fatal("eth_open_cached() called with NULL device name!");
-  if (!*device) fatal("eth_open_cached() called with empty device name!");
+  if (!device) fatal("%s() called with NULL device name!", __func__);
+  if (!*device) fatal("%s() called with empty device name!", __func__);
 
   if (strcmp(device, etht_cache_device_name) == 0) {
     /* Yay, we have it cached. */
@@ -1098,21 +1164,11 @@ u8 *build_tcp_raw(const struct in_addr *source, const struct in_addr *victim,
 		  u8 *tcpopt, int tcpoptlen,
 		  char *data, u16 datalen, u32 *outpacketlen) {
 
-struct pseudo_header { 
-  /*for computing TCP checksum, see TCP/IP Illustrated p. 145 */
-  u32 s_addy;
-  u32 d_addr;
-  u8 zer0;
-  u8 protocol;
-  u16 length;
-};
 int packetlen = sizeof(struct ip) + ipoptlen + 
-	sizeof(struct tcphdr) + tcpoptlen + datalen;
+	sizeof(struct tcp_hdr) + tcpoptlen + datalen;
 u8 *packet = (u8 *) safe_malloc(packetlen);
 struct ip *ip = (struct ip *) packet;
-struct tcphdr *tcp = (struct tcphdr *) ((u8*)ip + sizeof(struct ip) + ipoptlen);
-struct pseudo_header *pseudo = 
-	(struct pseudo_header *) ((u8*)tcp - sizeof(struct pseudo_header));
+struct tcp_hdr *tcp = (struct tcp_hdr *) ((u8*)ip + sizeof(struct ip) + ipoptlen);
 static int myttl = 0;
 
 assert(victim);
@@ -1120,7 +1176,7 @@ assert(source);
 assert(ipoptlen%4==0);
 
 if (tcpoptlen % 4)
-  fatal("build_tcp_raw() called with an option length argument of %d which is illegal because it is not divisible by 4. Just add \\0 padding to the end.", tcpoptlen);
+  fatal("%s() called with an option length argument of %d which is illegal because it is not divisible by 4. Just add \\0 padding to the end.", __func__, tcpoptlen);
 
 
 /* Time to live */
@@ -1130,14 +1186,8 @@ if (ttl == -1) {
   myttl = ttl;
 }
 
-pseudo->s_addy = source->s_addr;
-pseudo->d_addr = victim->s_addr;
-pseudo->zer0	= 0;
-pseudo->protocol = IPPROTO_TCP;
-pseudo->length	= htons(sizeof(struct tcphdr) + tcpoptlen + datalen);
-
 /* Fill tcp header */
-memset(tcp, 0, sizeof(struct tcphdr));
+memset(tcp, 0, sizeof(struct tcp_hdr));
 tcp->th_sport = htons(sport);
 tcp->th_dport = htons(dport);
 if (seq) {
@@ -1160,22 +1210,23 @@ if (window)
   tcp->th_win = htons(window);
 else tcp->th_win = htons(1024 * (myttl % 4 + 1)); /* Who cares */
 
-/* Urgend pointer */
+/* Urgent pointer */
 if (urp)
   tcp->th_urp = htons(urp);
 
 /* And the options */
 if (tcpoptlen)
-  memcpy((u8*)tcp + sizeof(struct tcphdr), tcpopt, tcpoptlen);
+  memcpy((u8*)tcp + sizeof(struct tcp_hdr), tcpopt, tcpoptlen);
 /* We should probably copy the data over too */
 if (data && datalen)
-  memcpy((u8*)tcp + sizeof(struct tcphdr) + tcpoptlen, data, datalen);
+  memcpy((u8*)tcp + sizeof(struct tcp_hdr) + tcpoptlen, data, datalen);
 
 #if STUPID_SOLARIS_CHECKSUM_BUG
-tcp->th_sum = sizeof(struct tcphdr) + tcpoptlen + datalen; 
+tcp->th_sum = sizeof(struct tcp_hdr) + tcpoptlen + datalen; 
 #else
-tcp->th_sum = in_cksum((unsigned short *)pseudo, sizeof(struct tcphdr) + 
-		       tcpoptlen + sizeof(struct pseudo_header) + datalen);
+tcp->th_sum = magic_tcpudp_cksum(source, victim, IPPROTO_TCP,
+				 sizeof(struct tcp_hdr) + tcpoptlen + datalen,
+				 (char *) tcp);
 #endif
 
 if ( o.badsum )
@@ -1281,7 +1332,7 @@ do {
 	    strerror(err));
       error("Offending packet: %s", ippackethdrinfo(packet, len));
       if (numerrors == 10) {
-	error("Omitting future Sendto error messages now that %d have been shown.  Use -d2 if you really want to see them.", numerrors);
+	error("Omitting future %s error messages now that %d have been shown.  Use -d2 if you really want to see them.", __func__, numerrors);
       }
     }
 
@@ -1311,8 +1362,8 @@ int send_ip_packet(int sd, struct eth_nfo *eth, u8 *packet, unsigned int packetl
   struct sockaddr_in sock;
   int res;
   struct ip *ip = (struct ip *) packet;
-  struct tcphdr *tcp = NULL;
-  udphdr_bsd *udp;
+  struct tcp_hdr *tcp = NULL;
+  struct udp_hdr *udp;
   u8 *eth_frame = NULL;
   eth_t *ethsd;
   bool ethsd_opened = false;
@@ -1330,7 +1381,7 @@ int send_ip_packet(int sd, struct eth_nfo *eth, u8 *packet, unsigned int packetl
     if (!eth->ethsd) {
       ethsd = eth_open_cached(eth->devname);
       if (!ethsd) 
-	fatal("send_ip_packet: Failed to open ethernet device (%s)", eth->devname);
+	fatal("%s: Failed to open ethernet device (%s)", __func__, eth->devname);
       ethsd_opened = true;
     } else ethsd = eth->ethsd;
     res = eth_send(ethsd, eth_frame, 14 + packetlen);
@@ -1352,10 +1403,10 @@ int send_ip_packet(int sd, struct eth_nfo *eth, u8 *packet, unsigned int packetl
   if (packetlen >= 20) {
     sock.sin_addr.s_addr = ip->ip_dst.s_addr;
     if (ip->ip_p == IPPROTO_TCP && packetlen >= (unsigned int) ip->ip_hl * 4 + 20) {
-      tcp = (struct tcphdr *) ((u8 *) ip + ip->ip_hl * 4);
+      tcp = (struct tcp_hdr *) ((u8 *) ip + ip->ip_hl * 4);
       sock.sin_port = tcp->th_dport;
     } else if (ip->ip_p == IPPROTO_UDP && packetlen >= (unsigned int) ip->ip_hl * 4 + 8) {
-      udp = (udphdr_bsd *) ((u8 *) ip + ip->ip_hl * 4);
+      udp = (struct udp_hdr *) ((u8 *) ip + ip->ip_hl * 4);
       sock.sin_port = udp->uh_dport;
     }
   }
@@ -1410,13 +1461,13 @@ char *ping = (char *) &pingpkt;
    icmplen = 20;
    memset(datastart, 0, 12);
    datastart += 12;
-   datalen -= 12;
+   //datalen -= 12;
  } else if (ptype == 17 && pcode == 0) /* icmp netmask req */ {
    icmplen = 12;
    *datastart++ = 0;
-   datalen -= 4;
+   //datalen -= 4;
  } else 
-   fatal("Unknown icmp type/code (%d/%d) in build_icmp_raw", ptype, pcode);
+   fatal("Unknown icmp type/code (%d/%d) in %s", ptype, pcode, __func__);
 
  if (datalen > 0) {
    icmplen += MIN(dlen, datalen);
@@ -1434,10 +1485,70 @@ if ( o.badsum )
 
 return build_ip_raw(source, victim,
 		    IPPROTO_ICMP,
-		    o.ttl, get_random_u16(), tos, df,
+		    ttl, ipid, tos, df,
 		    ipopt, ipoptlen,
 		    ping, icmplen,
 		    packetlen);
+}
+
+/* Builds an IGMP packet (including an IP header) by packing the fields
+   with the given information.  It allocates a new buffer to store the
+   packet contents, and then returns that buffer.  The packet is not
+   actually sent by this function.  Caller must delete the buffer when
+   finished with the packet.  The packet length is returned in packetlen,
+   which must be a valid int pointer.
+ */
+u8 *build_igmp_raw(const struct in_addr *source, const struct in_addr *victim, 
+		   int ttl, u16 ipid, u8 tos, bool df,
+		   u8 *ipopt, int ipoptlen,
+		   u8 ptype, u8 pcode,
+		   char *data, u16 datalen, u32 *packetlen) {
+ struct {
+   u8 igmp_type;
+   u8 igmp_code;
+   u16 igmp_cksum;
+   u32 var; /* changes between types, unused. usually group address. */
+   u8 data[1500];
+ } igmp;
+ u32 *datastart = (u32 *) igmp.data;
+ int dlen = sizeof(igmp.data); 
+ int igmplen = 0;
+ char *pkt = (char *) &igmp;
+
+ igmp.igmp_type = ptype;
+ igmp.igmp_code = pcode;
+
+ if (ptype == 0x11) { /* Membership Query */
+   igmplen = 8;
+ } else if (ptype == 0x12) { /* v1 Membership Report */
+   igmplen = 8;
+ } else if (ptype == 0x16) { /* v2 Membership Report */
+   igmplen = 8;
+ } else if (ptype == 0x17) { /* v2 Leave Group */
+   igmplen = 8;
+ } else if (ptype == 0x22) { /* v3 Membership Report */
+   igmplen = 8;
+ } else {
+   fatal("Unknown igmp type (%d) in %s", ptype, __func__);
+ }
+
+ if (datalen > 0) {
+   igmplen += MIN(dlen, datalen);
+   memset(datastart, 0, MIN(dlen, datalen));
+ }
+
+ igmp.igmp_cksum = 0;
+ igmp.igmp_cksum = in_cksum((unsigned short *)pkt, igmplen);
+
+ if (o.badsum)
+   --igmp.igmp_cksum;
+
+ return build_ip_raw(source, victim,
+		     IPPROTO_IGMP,
+		     ttl, ipid, tos, df,
+		     ipopt, ipoptlen,
+		     pkt, igmplen,
+		     packetlen);
 }
 
 
@@ -1446,8 +1557,8 @@ return build_ip_raw(source, victim,
 int readtcppacket(const u8 *packet, int readdata) {
 
 struct ip *ip = (struct ip *) packet;
-struct tcphdr *tcp = (struct tcphdr *) (packet + sizeof(struct ip));
-const unsigned char *data = packet +  sizeof(struct ip) + sizeof(struct tcphdr);
+struct tcp_hdr *tcp = (struct tcp_hdr *) (packet + sizeof(struct ip));
+const unsigned char *data = packet +  sizeof(struct ip) + sizeof(struct tcp_hdr);
 int tot_len;
 struct in_addr bullshit, bullshit2;
 char sourcehost[16];
@@ -1455,7 +1566,7 @@ int i;
 int realfrag = 0;
 
 if (!packet) {
-  fprintf(stderr, "readtcppacket: packet is NULL!\n");
+  error("%s: packet is NULL!", __func__);
   return -1;
     }
 
@@ -1467,36 +1578,35 @@ strncpy(sourcehost, inet_ntoa(bullshit), 16);
 i =  4 * (ntohs(ip->ip_hl) + ntohs(tcp->th_off));
 if (ip->ip_p== IPPROTO_TCP) {
   if (realfrag) 
-    printf("Packet is fragmented, offset field: %u\n", realfrag);
+    log_write(LOG_PLAIN, "Packet is fragmented, offset field: %u\n", realfrag);
   else {
-    printf("TCP packet: %s:%d -> %s:%d (total: %d bytes)\n", sourcehost, 
-	   ntohs(tcp->th_sport), inet_ntoa(bullshit2), 
-	   ntohs(tcp->th_dport), tot_len);
-    printf("Flags: ");
-    if (!tcp->th_flags) printf("(none)");
-    if (tcp->th_flags & TH_RST) printf("RST ");
-    if (tcp->th_flags & TH_SYN) printf("SYN ");
-    if (tcp->th_flags & TH_ACK) printf("ACK ");
-    if (tcp->th_flags & TH_PUSH) printf("PSH ");
-    if (tcp->th_flags & TH_FIN) printf("FIN ");
-    if (tcp->th_flags & TH_URG) printf("URG ");
-    printf("\n");
+    log_write(LOG_PLAIN, "TCP packet: %s:%d -> %s:%d (total: %d bytes)\n", sourcehost, 
+	      ntohs(tcp->th_sport), inet_ntoa(bullshit2), 
+	      ntohs(tcp->th_dport), tot_len);
+    log_write(LOG_PLAIN, "Flags: ");
+    if (!tcp->th_flags) log_write(LOG_PLAIN, "(none)");
+    if (tcp->th_flags & TH_RST) log_write(LOG_PLAIN, "RST ");
+    if (tcp->th_flags & TH_SYN) log_write(LOG_PLAIN, "SYN ");
+    if (tcp->th_flags & TH_ACK) log_write(LOG_PLAIN, "ACK ");
+    if (tcp->th_flags & TH_PUSH) log_write(LOG_PLAIN, "PSH ");
+    if (tcp->th_flags & TH_FIN) log_write(LOG_PLAIN, "FIN ");
+    if (tcp->th_flags & TH_URG) log_write(LOG_PLAIN, "URG ");
+    log_write(LOG_PLAIN, "\n");
 
-    printf("ipid: %hu ttl: %hu ", ntohs(ip->ip_id), ip->ip_ttl);
+    log_write(LOG_PLAIN, "ipid: %hu ttl: %hu ", ntohs(ip->ip_id), ip->ip_ttl);
 
-    if (tcp->th_flags & (TH_SYN | TH_ACK)) printf("Seq: %u\tAck: %u\n", 
-						  (unsigned int) ntohl(tcp->th_seq), (unsigned int) ntohl(tcp->th_ack));
-    else if (tcp->th_flags & TH_SYN) printf("Seq: %u\n", (unsigned int) ntohl(tcp->th_seq));
-    else if (tcp->th_flags & TH_ACK) printf("Ack: %u\n", (unsigned int) ntohl(tcp->th_ack));
+    if (tcp->th_flags & (TH_SYN | TH_ACK)) log_write(LOG_PLAIN, "Seq: %u\tAck: %u\n", (unsigned int) ntohl(tcp->th_seq), (unsigned int) ntohl(tcp->th_ack));
+    else if (tcp->th_flags & TH_SYN) log_write(LOG_PLAIN, "Seq: %u\n", (unsigned int) ntohl(tcp->th_seq));
+    else if (tcp->th_flags & TH_ACK) log_write(LOG_PLAIN, "Ack: %u\n", (unsigned int) ntohl(tcp->th_ack));
   }
 }
 if (readdata && i < tot_len) {
-  printf("Data portion:\n");
+  log_write(LOG_PLAIN, "Data portion:\n");
   while(i < tot_len)  {
-    printf("%2X%c", data[i], ((i+1) %16)? ' ' : '\n');
+    log_write(LOG_PLAIN, "%2X%c", data[i], ((i+1) %16)? ' ' : '\n');
     i++;
   }
-  printf("\n");
+  log_write(LOG_PLAIN, "\n");
 }
 return 0;
 }
@@ -1506,8 +1616,8 @@ return 0;
 int readudppacket(const u8 *packet, int readdata) {
 
 struct ip *ip = (struct ip *) packet;
-udphdr_bsd *udp = (udphdr_bsd *) (packet + sizeof(struct ip));
-const unsigned char *data = packet +  sizeof(struct ip) + sizeof(udphdr_bsd);
+struct udp_hdr *udp = (struct udp_hdr *) (packet + sizeof(struct ip));
+const unsigned char *data = packet +  sizeof(struct ip) + sizeof(struct udp_hdr);
 int tot_len;
 struct in_addr bullshit, bullshit2;
 char sourcehost[16];
@@ -1515,7 +1625,7 @@ int i;
 int realfrag = 0;
 
 if (!packet) {
-  fprintf(stderr, "readudppacket: packet is NULL!\n");
+  error("%s: packet is NULL!", __func__);
   return -1;
     }
 
@@ -1527,22 +1637,22 @@ strncpy(sourcehost, inet_ntoa(bullshit), 16);
 i =  4 * (ntohs(ip->ip_hl)) + 8;
 if (ip->ip_p== IPPROTO_UDP) {
   if (realfrag) 
-    printf("Packet is fragmented, offset field: %u\n", realfrag);
+    log_write(LOG_PLAIN, "Packet is fragmented, offset field: %u\n", realfrag);
   else {
-    printf("UDP packet: %s:%d -> %s:%d (total: %d bytes)\n", sourcehost, 
-	   ntohs(udp->uh_sport), inet_ntoa(bullshit2), 
-	   ntohs(udp->uh_dport), tot_len);
+    log_write(LOG_PLAIN, "UDP packet: %s:%d -> %s:%d (total: %d bytes)\n", sourcehost, 
+	      ntohs(udp->uh_sport), inet_ntoa(bullshit2), 
+	      ntohs(udp->uh_dport), tot_len);
 
-    printf("ttl: %hu ", ip->ip_ttl);
+    log_write(LOG_PLAIN, "ttl: %hu ", ip->ip_ttl);
   }
 }
  if (readdata && i < tot_len) {
-   printf("Data portion:\n");
+   log_write(LOG_PLAIN, "Data portion:\n");
    while(i < tot_len)  {
-     printf("%2X%c", data[i], ((i+1)%16)? ' ' : '\n');
+     log_write(LOG_PLAIN, "%2X%c", data[i], ((i+1)%16)? ' ' : '\n');
      i++;
    }
-   printf("\n");
+   log_write(LOG_PLAIN, "\n");
  }
  return 0;
 }
@@ -1577,21 +1687,12 @@ u8 *build_udp_raw(struct in_addr *source, const struct in_addr *victim,
  		  u16 sport, u16 dport,
  		  char *data, u16 datalen, u32 *outpacketlen) 
 {
-  int packetlen = sizeof(struct ip) + ipoptlen + sizeof(udphdr_bsd) + datalen;
+  int packetlen = sizeof(struct ip) + ipoptlen + sizeof(struct udp_hdr) + datalen;
   u8 *packet = (u8 *) safe_malloc(packetlen);
   struct ip *ip = (struct ip *) packet;
-  udphdr_bsd *udp = (udphdr_bsd *) ((u8*)ip + sizeof(struct ip) + ipoptlen);
+  struct udp_hdr *udp = (struct udp_hdr *) ((u8*)ip + sizeof(struct ip) + ipoptlen);
   static int myttl = 0;
   
-  struct pseudo_udp_hdr {
-    struct in_addr source;
-    struct in_addr dest;        
-    u8 zer0;
-    u8 proto;        
-    u16 length;
-  } *pseudo = (struct pseudo_udp_hdr *) ((u8 *)udp - sizeof(struct pseudo_udp_hdr));
-
-
   /* check that required fields are there and not too silly */
   assert(victim);
   assert(source);
@@ -1607,28 +1708,24 @@ u8 *build_udp_raw(struct in_addr *source, const struct in_addr *victim,
   udp->uh_sport = htons(sport);
   udp->uh_dport = htons(dport);
   udp->uh_sum   = 0;
-  udp->uh_ulen  = htons(sizeof(udphdr_bsd) + datalen);
+  udp->uh_ulen  = htons(sizeof(struct udp_hdr) + datalen);
   
   /* We should probably copy the data over too */
   if (data)
-    memcpy((u8*)udp + sizeof(udphdr_bsd), data, datalen);
-  
-  /* Now the pseudo header for checksuming */
-  pseudo->source.s_addr = source->s_addr;
-  pseudo->dest.s_addr = victim->s_addr;
-  pseudo->zer0  = 0;
-  pseudo->proto = IPPROTO_UDP;
-  pseudo->length = htons(sizeof(udphdr_bsd) + datalen);
+    memcpy((u8*)udp + sizeof(struct udp_hdr), data, datalen);
   
   /* OK, now we should be able to compute a valid checksum */
 #if STUPID_SOLARIS_CHECKSUM_BUG
-  udp->uh_sum = sizeof(udphdr_bsd) + datalen;
+  udp->uh_sum = sizeof(struct udp_hdr) + datalen;
 #else
-  udp->uh_sum = in_cksum((unsigned short *)pseudo, 20 /* pseudo + UDP headers */ + datalen);
+  udp->uh_sum = magic_tcpudp_cksum(source, victim, IPPROTO_UDP,
+				   sizeof(struct udp_hdr) + datalen, (char *) udp);
 #endif
   
-  if ( o.badsum )
+  if ( o.badsum ) {
     --udp->uh_sum;
+    if (udp->uh_sum == 0) udp->uh_sum = 0xffff; // UDP checksum=0 means no checksum
+  }
   
   fill_ip_raw(ip, packetlen, ipopt, ipoptlen,
 	tos, ipid, df?IP_DF:0, myttl, IPPROTO_UDP,
@@ -1740,8 +1837,47 @@ fcntl(sd, F_SETFL, options);
 return 1;
 }
 
+/* returns -1 if we can't use select() on the pcap device, 0 for timeout, and
+ * >0 for success. If select() fails we bail out because it couldn't work with
+ * the file descriptor we got from my_pcap_get_selectable_fd()
+ */
+int pcap_select(pcap_t *p, struct timeval *timeout)
+{
+	int fd, ret;
+	fd_set rfds;
+
+	if ((fd = my_pcap_get_selectable_fd(p)) == -1)
+		return -1;
+
+	FD_ZERO(&rfds);
+	FD_SET(fd, &rfds);
+
+	do {
+		errno = 0;
+		ret = select(fd + 1, &rfds, NULL, NULL, timeout);
+		if (ret == -1) {
+			if (errno == EINTR)
+				error("%s: %s", __func__, strerror(errno));
+			else
+				fatal("Your system does not support select()ing on pcap devices (%s). PLEASE REPORT THIS ALONG WITH DETAILED SYSTEM INFORMATION TO THE nmap-dev MAILING LIST!", strerror(errno));
+		}
+	} while (ret == -1);
+
+	return ret;
+}
+
+int pcap_select(pcap_t *p, long usecs)
+{
+	struct timeval tv;
+
+	tv.tv_sec = usecs / 1000000;
+	tv.tv_usec = usecs % 1000000;
+
+	return pcap_select(p, &tv);
+}
+
 /* Read an IP packet using libpcap .  We return the packet and take
-   a pcap descripter and a pointer to the packet length (which we set
+   a pcap descriptor and a pointer to the packet length (which we set
    in the function. If you want a maximum length returned, you
    should specify that in pcap_open_live() */
 
@@ -1760,7 +1896,6 @@ unsigned int offset = 0;
 struct pcap_pkthdr head;
 char *p;
 int datalink;
-int pcap_descriptor=-1; // -1 means we CANNOT select()
 int timedout = 0;
 struct timeval tv_start, tv_end;
 static char *alignedbuf = NULL;
@@ -1769,12 +1904,12 @@ static int warning = 0;
 
 if (linknfo) { memset(linknfo, 0, sizeof(*linknfo)); }
 
-if (!pd) fatal("NULL packet device passed to readip_pcap");
+if (!pd) fatal("NULL packet device passed to %s", __func__);
 
  if (to_usec < 0) {
    if (!warning) {
      warning = 1;
-     error("WARNING: Negative timeout value (%lu) passed to readip_pcap() -- using 0", to_usec);
+     error("WARNING: Negative timeout value (%lu) passed to %s() -- using 0", to_usec, __func__);
    }
    to_usec = 0;
  }
@@ -1842,7 +1977,7 @@ if (!pd) fatal("NULL packet device passed to readip_pcap");
      p = (char *) pcap_next(pd, &head);
    }
    if (head.caplen > 100000) {
-     fatal("FATAL: readip_pcap: bogus caplen from libpcap (%d) on interface type %d", head.caplen, datalink);
+     fatal("FATAL: %s: bogus caplen from libpcap (%d) on interface type %d", __func__, head.caplen, datalink);
    } 
    error("FATAL:  Unknown datalink type (%d). Caplen: %d; Packet:\n", datalink, head.caplen);
    lamont_hdump(p, head.caplen);
@@ -1853,10 +1988,6 @@ if (!pd) fatal("NULL packet device passed to readip_pcap");
    gettimeofday(&tv_start, NULL);
  }
 
- pcap_descriptor = -1;
- if (pcap_selectable_fd_valid())  
-   pcap_descriptor = my_pcap_get_selectable_fd(pd);
-
  do {
 #ifdef WIN32
    gettimeofday(&tv_end, NULL);
@@ -1866,31 +1997,11 @@ if (!pd) fatal("NULL packet device passed to readip_pcap");
 #endif
 
    p = NULL;
-   if (pcap_descriptor != -1) {
-     fd_set rfds;
-     struct timeval sel_tv;
-     int rv=0;
 
-     FD_ZERO(&rfds);
-     FD_SET(pcap_descriptor, &rfds);
-
-     sel_tv.tv_sec = to_usec/1000000;
-     sel_tv.tv_usec = to_usec%1000000;
-
-     rv = select(pcap_descriptor+1, &rfds, NULL, NULL, to_usec ? &sel_tv : NULL);
-
-     if (rv == -1) {
-       fatal("Your system does not support select()ing on pcap devices (%s). PLEASE REPORT THIS ALONG WITH DETAILED SYSTEM INFORMATION TO THE nmap-dev MAILING LIST!", strerror(errno));
-     } else if (rv == 0) {
-       timedout = 1;
-     } else {
-       p = (char *) pcap_next(pd, &head);
-     }
-   } else {
-     // THIS CALL CAN BLOCK INAPPROPRIATLEY! (ie, will block until it sees another
-     // packet - to_usec notwithstanding) Use the select() code if possible.
+   if (pcap_select(pd, to_usec) == 0)
+     timedout = 1;
+   else
      p = (char *) pcap_next(pd, &head);
-   }
 
    if (p) {
      if (head.caplen <= offset) {
@@ -1924,10 +2035,7 @@ if (timedout) {
  }
  *len = head.caplen - offset;
  if (*len > alignedbufsz) {
-   alignedbuf = (char *) realloc(alignedbuf, *len);
-   if (!alignedbuf) {
-     fatal("Unable to realloc %d bytes of mem", *len);
-   }
+   alignedbuf = (char *) safe_realloc(alignedbuf, *len);
    alignedbufsz = *len;
  }
  memcpy(alignedbuf, p, *len);
@@ -1961,8 +2069,9 @@ if (timedout) {
 bool pcap_selectable_fd_valid() {
 #if defined(WIN32) || defined(MACOSX)
   return false;
-#endif
+#else
   return true;
+#endif
 }
 
 /* Call this instead of pcap_get_selectable_fd directly (or your code
@@ -1992,6 +2101,20 @@ bool pcap_recv_timeval_valid() {
 #endif
 }
 
+/* Prints stats from a pcap descriptor (number of received and dropped
+   packets). */
+void pcap_print_stats(int logt, pcap_t *pd) {
+  struct pcap_stat stat;
+
+  assert(pd != NULL);
+
+  if (pcap_stats(pd, &stat) < 0) {
+    error("%s: %s\n", __func__, pcap_geterr(pd));
+    return;
+  }
+
+  log_write(logt, "pcap stats: %u packets received by filter, %u dropped by kernel.\n", stat.ps_recv, stat.ps_drop);
+}
 
 /* A trivial functon that maintains a cache of IP to MAC Address
    entries.  If the command is ARPCACHE_GET, this func looks for the
@@ -2015,7 +2138,7 @@ static bool NmapArpCache(int command, struct sockaddr_storage *ss, u8 *mac) {
   int i;
 
   if (sin->sin_family != AF_INET) 
-    fatal("NmapArpCache() can only take IPv4 addresses.  Sorry");
+    fatal("%s() can only take IPv4 addresses.  Sorry", __func__);
   
   if (command == ARPCACHE_GET) {
     for(i=0; i < ArpCacheSz; i++) {
@@ -2064,14 +2187,13 @@ int read_arp_reply_pcap(pcap_t *pd, u8 *sendermac, struct in_addr *senderIP,
   int timedout = 0;
   int badcounter = 0;
   struct timeval tv_start, tv_end;
-  int pcap_descriptor = -1;
 
-  if (!pd) fatal("NULL packet device passed to readarp_reply_pcap");
+  if (!pd) fatal("NULL packet device passed to %s", __func__);
 
   if (to_usec < 0) {
     if (!warning) {
       warning = 1;
-      error("WARNING: Negative timeout value (%lu) passed to %s() -- using 0", to_usec, __FUNCTION__);
+      error("WARNING: Negative timeout value (%lu) passed to %s() -- using 0", to_usec, __func__);
     }
     to_usec = 0;
   }
@@ -2081,7 +2203,7 @@ int read_arp_reply_pcap(pcap_t *pd, u8 *sendermac, struct in_addr *senderIP,
     fatal("Cannot obtain datalink information: %s", pcap_geterr(pd));
 
   if (datalink != DLT_EN10MB)
-    fatal("readarp_reply_pcap called on interfaces that is datatype %d rather than DLT_EN10MB (%d)", datalink, DLT_EN10MB);
+    fatal("%s called on interfaces that is datatype %d rather than DLT_EN10MB (%d)", __func__, datalink, DLT_EN10MB);
 
   if (to_usec > 0) {
     gettimeofday(&tv_start, NULL);
@@ -2099,36 +2221,12 @@ int read_arp_reply_pcap(pcap_t *pd, u8 *sendermac, struct in_addr *senderIP,
     }
 #endif
 
-   pcap_descriptor = -1;
-   if (pcap_selectable_fd_valid())  
-     pcap_descriptor = my_pcap_get_selectable_fd(pd);
-    
    p = NULL;
-   if (pcap_descriptor != -1) {
-     fd_set rfds;
-     struct timeval sel_tv;
-     int rv=0;
 
-     FD_ZERO(&rfds);
-     FD_SET(pcap_descriptor, &rfds);
-
-     sel_tv.tv_sec = to_usec/1000000;
-     sel_tv.tv_usec = to_usec%1000000;
-
-     rv = select(pcap_descriptor+1, &rfds, NULL, NULL, to_usec ? &sel_tv : NULL);
-
-     if (rv == -1) {
-       fatal("Your system does not support select()ing on pcap devices (%s). PLEASE REPORT THIS ALONG WITH DETAILED SYSTEM INFORMATION TO THE nmap-dev MAILING LIST!", strerror(errno));
-     } else if (rv == 0) {
-       timedout = 1;
-     } else {
-       p = (u8 *) pcap_next(pd, &head);
-     }
-   } else {
-     // THIS CALL CAN BLOCK INAPPROPRIATLEY! (ie, will block until it sees another
-     // packet - to_usec notwithstanding) Use the select() code if possible.
+   if (pcap_select(pd, to_usec) == 0)
+     timedout = 1;
+   else
      p = (u8 *) pcap_next(pd, &head);
-   }
 
     if (p && head.caplen >= 42) { /* >= because Ethernet padding makes 60 */
       /* frame type 0x0806 (arp), hw type eth (0x0001), prot ip (0x0800),
@@ -2251,7 +2349,7 @@ static bool doArp(const char *dev, const u8 *srcmac,
   bool foundit = false;
 
   if (targetsin->sin_family != AF_INET || srcsin->sin_family != AF_INET)
-    fatal("%s can only handle IPv4 addresses", __FUNCTION__);
+    fatal("%s can only handle IPv4 addresses", __func__);
 
   /* Start listening */
   pd = my_pcap_open_live(dev, 50, 1, 25);
@@ -2259,7 +2357,7 @@ static bool doArp(const char *dev, const u8 *srcmac,
 
   /* Prepare probe and sending stuff */
   ethsd = eth_open_cached(dev);
-  if (!ethsd) fatal("%s: failed to open device %s", __FUNCTION__, dev);
+  if (!ethsd) fatal("%s: failed to open device %s", __func__, dev);
   eth_pack_hdr(frame, ETH_ADDR_BROADCAST, *srcmac, ETH_TYPE_ARP);
   arp_pack_hdr_ethip(frame + ETH_HDR_LEN, ARP_OP_REQUEST, *srcmac, 
 		     srcsin->sin_addr, ETH_ADDR_BROADCAST, 
@@ -2271,7 +2369,7 @@ static bool doArp(const char *dev, const u8 *srcmac,
     /* Send the sucker */
     rc = eth_send(ethsd, frame, sizeof(frame));
     if (rc != sizeof(frame)) {
-      error("WARNING: %s: eth_send of ARP packet returned %u rather than expected %d bytes\n", __FUNCTION__, rc, (int) sizeof(frame));
+      error("WARNING: %s: eth_send of ARP packet returned %u rather than expected %d bytes\n", __func__, rc, (int) sizeof(frame));
     }
     PacketTrace::traceArp(PacketTrace::SENT, (u8 *) frame, sizeof(frame), &now);
     num_sends++;
@@ -2288,7 +2386,7 @@ static bool doArp(const char *dev, const u8 *srcmac,
       /* Now listen until we reach our next timeout or get an answer */
       rc = read_arp_reply_pcap(pd, targetmac, &rcvdIP, timeleft, &rcvdtime);
       if (rc == -1) fatal("%s: Received -1 response from readarp_reply_pcap", 
-			  __FUNCTION__);
+			  __func__);
       if (rc == 1) {
 	/* Yay, I got one! But is it the right one? */
 	if (rcvdIP.s_addr != targetsin->sin_addr.s_addr)
@@ -2339,7 +2437,7 @@ bool setTargetNextHopMAC(Target *target) {
     target->TargetSockAddr(&targetss, &sslen);
   } else {
     if (!target->nextHop(&targetss, &sslen))
-      fatal("%s: Failed to determine nextHop to target", __FUNCTION__);
+      fatal("%s: Failed to determine nextHop to target", __func__);
   }
 
   /* First, let us check the Nmap arp cache ... */
@@ -2354,8 +2452,10 @@ bool setTargetNextHopMAC(Target *target) {
   if (arp_get(a, &ae) == 0) {
     NmapArpCache(ARPCACHE_SET, &targetss, ae.arp_ha.addr_eth.data);
     target->setNextHopMACAddress(ae.arp_ha.addr_eth.data);
+    arp_close(a);
     return true;
   }
+  arp_close(a);
 
   /* OK, the last choice is to send our own damn ARP request (and
      retransmissions if necessary) to determine the MAC */
@@ -2391,8 +2491,8 @@ void set_pcap_filter(const char *device,
     fatal("Failed to lookup subnet/netmask for device (%s): %s", device, err0r);
   
   va_start(ap, bpf);
-  if (vsnprintf(buf, sizeof(buf), bpf, ap) >= (int) sizeof(buf))
-    fatal("set_pcap_filter called with too-large filter arg\n");
+  if (Vsnprintf(buf, sizeof(buf), bpf, ap) >= (int) sizeof(buf))
+    fatal("%s called with too-large filter arg\n", __func__);
   va_end(ap);
 
   /* Due to apparent bug in libpcap */
@@ -2470,8 +2570,8 @@ static int collect_dnet_routes(const struct route_entry *entry, void *arg) {
   /* Make sure we have room for the new route */
   if (dcrn->numroutes >= dcrn->capacity) {
     dcrn->capacity <<= 2;
-    dcrn->routes = (struct sys_route *) realloc(dcrn->routes, 
-						dcrn->capacity * sizeof(struct sys_route));
+    dcrn->routes = (struct sys_route *) safe_realloc(dcrn->routes, 
+						     dcrn->capacity * sizeof(struct sys_route));
   }
   
   /* Now for the important business */
@@ -2500,54 +2600,73 @@ static int collect_dnet_routes(const struct route_entry *entry, void *arg) {
 #if WIN32
 static int collect_dnet_interfaces(const struct intf_entry *entry, void *arg) {
   struct dnet_collector_route_nfo *dcrn = (struct dnet_collector_route_nfo *) arg;
-  int i;
-  int numifaces = dcrn->numifaces;
+  bool primary_done;
+  int num_aliases_done;
 
+  primary_done = false;
+  num_aliases_done = 0;
+  while (!primary_done || num_aliases_done < entry->intf_alias_num) {
     /* Make sure we have room for the new route */
    if (dcrn->numifaces >= dcrn->capacity) {
     dcrn->capacity <<= 2;
-    dcrn->ifaces = (struct interface_info *) realloc(dcrn->ifaces, 
-						dcrn->capacity * sizeof(struct interface_info));
+    dcrn->ifaces = (struct interface_info *) safe_realloc(dcrn->ifaces, 
+							  dcrn->capacity * sizeof(struct interface_info));
    }
-   if (entry->intf_addr.addr_type == ADDR_TYPE_IP) {
-	addr_ntos(&entry->intf_addr, (struct sockaddr *) &dcrn->ifaces[numifaces].addr);
-	dcrn->ifaces[numifaces].netmask_bits = entry->intf_addr.addr_bits;
-   } else {
-	   for(i=0; i < (int) entry->intf_alias_num; i++) {
-		   if (entry->intf_alias_addrs[i].addr_type == ADDR_TYPE_IP) {
-			   addr_ntos(&entry->intf_alias_addrs[i], (struct sockaddr *) &dcrn->ifaces[numifaces].addr);
-			   dcrn->ifaces[numifaces].netmask_bits = entry->intf_alias_addrs[i].addr_bits;
-			   break;
-		   }
-		   if (i == (int) entry->intf_alias_num)
-			   return 0; /* No IPv4 addresses found for this interface */
-	   }
+
+   /* The first time through the loop we add the primary interface record. After
+      that we add the aliases one at a time. */
+   if (!primary_done) {
+     if (entry->intf_addr.addr_type == ADDR_TYPE_IP) {
+       addr_ntos(&entry->intf_addr, (struct sockaddr *) &dcrn->ifaces[dcrn->numifaces].addr);
+       dcrn->ifaces[dcrn->numifaces].netmask_bits = entry->intf_addr.addr_bits;
+     }
+     primary_done = true;
+   } else if (num_aliases_done < (int) entry->intf_alias_num) {
+     if (entry->intf_alias_addrs[num_aliases_done].addr_type == ADDR_TYPE_IP) {
+       addr_ntos(&entry->intf_alias_addrs[num_aliases_done], (struct sockaddr *) &dcrn->ifaces[dcrn->numifaces].addr);
+       dcrn->ifaces[dcrn->numifaces].netmask_bits = entry->intf_alias_addrs[num_aliases_done].addr_bits;
+     }
+     num_aliases_done++;
    }
 
    /* OK, address/netmask found.  Let's get the name */
-   Strncpy(dcrn->ifaces[numifaces].devname, entry->intf_name, sizeof(dcrn->ifaces[numifaces].devname));
-   Strncpy(dcrn->ifaces[numifaces].devfullname, entry->intf_name, sizeof(dcrn->ifaces[numifaces].devfullname));
+   Strncpy(dcrn->ifaces[dcrn->numifaces].devname, entry->intf_name, sizeof(dcrn->ifaces[dcrn->numifaces].devname));
+   Strncpy(dcrn->ifaces[dcrn->numifaces].devfullname, entry->intf_name, sizeof(dcrn->ifaces[dcrn->numifaces].devfullname));
 
    /* Interface type */
    if (entry->intf_type == INTF_TYPE_ETH) {
-	   dcrn->ifaces[numifaces].device_type = devt_ethernet;
+	   dcrn->ifaces[dcrn->numifaces].device_type = devt_ethernet;
 	   /* Collect the MAC address since this is ethernet */
-	   memcpy(dcrn->ifaces[numifaces].mac, &entry->intf_link_addr.addr_eth.data, 6);
+	   memcpy(dcrn->ifaces[dcrn->numifaces].mac, &entry->intf_link_addr.addr_eth.data, 6);
    }
    else if (entry->intf_type == INTF_TYPE_LOOPBACK)
-	   dcrn->ifaces[numifaces].device_type = devt_loopback;
+	   dcrn->ifaces[dcrn->numifaces].device_type = devt_loopback;
    else if (entry->intf_type == INTF_TYPE_TUN)
-	   dcrn->ifaces[numifaces].device_type = devt_p2p;
-   else dcrn->ifaces[numifaces].device_type = devt_other;
+	   dcrn->ifaces[dcrn->numifaces].device_type = devt_p2p;
+   else dcrn->ifaces[dcrn->numifaces].device_type = devt_other;
    
    /* Is the interface up and running? */
-   dcrn->ifaces[numifaces].device_up = (entry->intf_flags & INTF_FLAG_UP)? true : false;
+   dcrn->ifaces[dcrn->numifaces].device_up = (entry->intf_flags & INTF_FLAG_UP)? true : false;
 
    /* For the rest of the information, we must open the interface directly ... */
    dcrn->numifaces++;
-   return 0;
+  }
+  return 0;
 }
 #endif /* WIN32 */
+
+pcap_if_t *getpcapinterfaces() {
+  #ifndef WIN32
+    return NULL;
+  #endif
+  pcap_if_t *p_ifaces;
+
+  if((pcap_findalldevs(&p_ifaces, NULL)) == -1) {
+    fatal("pcap_findalldevs() : Cannot retrieve pcap interfaces");
+    return NULL;
+  }
+  return p_ifaces;
+}
 
 struct interface_info *getinterfaces(int *howmany) {
   static bool initialized = 0;
@@ -2578,16 +2697,15 @@ int sd;
 
 #if WIN32
 /* On Win32 we just use Dnet to determine the interface list */
-
       dcrn.routes = NULL;
       dcrn.numroutes = 0;
       dcrn.capacity = ii_capacity; // I'm reusing this struct for ii now
       dcrn.ifaces = mydevs;
       dcrn.numifaces = 0;
 	  it = intf_open();
-	  if (!it) fatal("%s: intf_open() failed", __FUNCTION__);
+	  if (!it) fatal("%s: intf_open() failed", __func__);
 	  if (intf_loop(it, collect_dnet_interfaces, &dcrn) != 0)
-		  fatal("%s: intf_loop() failed", __FUNCTION__);
+		  fatal("%s: intf_loop() failed", __func__);
 	  intf_close(it);	
 	  mydevs = dcrn.ifaces;
 	  numifaces = dcrn.numifaces;
@@ -2595,7 +2713,7 @@ int sd;
 #else // !Win32
     /* Dummy socket for ioctl */
     sd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sd < 0) pfatal("socket in getinterfaces");
+    if (sd < 0) pfatal("socket in %s", __func__);
     bufsz = 20480;
     buf = (u8 *) safe_zalloc(bufsz);
     ifc.ifc_len = bufsz;
@@ -2605,7 +2723,7 @@ int sd;
     }
     ifr = (struct ifreq *) buf;
     if (ifc.ifc_len == 0) 
-      fatal("getinterfaces: SIOCGIFCONF claims you have no network interfaces!\n");
+      fatal("%s: SIOCGIFCONF claims you have no network interfaces!\n", __func__);
 #if HAVE_SOCKADDR_SA_LEN
     /*    len = MAX(sizeof(struct sockaddr), ifr->ifr_addr.sa_len);*/
     len = ifr->ifr_addr.sa_len + sizeof(ifr->ifr_name);
@@ -2614,20 +2732,21 @@ int sd;
     /* len = sizeof(SA); */
 #endif
 
-#if TCPIP_DEBUGGING
+    /* Debugging code
     printf("ifnet list length = %d\n",ifc.ifc_len);
     printf("sa_len = %d\n",len);
     hdump((unsigned char *) buf, ifc.ifc_len);
     printf("ifr = %X\n",(unsigned)(*(char **)&ifr));
     printf("Size of struct ifreq: %d\n", sizeof(struct ifreq));
-#endif
+    */
 
     for(; ifr && ifr->ifr_name[0] && ((u8 *)ifr) < buf + ifc.ifc_len;
 	ifr = (struct ifreq *)(((char *)ifr) + len)) {
-#if TCPIP_DEBUGGING
+
+      /* debugging code 
       printf("ifr_name size = %d\n", sizeof(ifr->ifr_name));
       printf("ifr = %X\n",(unsigned)(*(char **)&ifr));
-#endif
+      */
 
       /* On some platforms (such as FreeBSD), the length of each ifr changes
 	 based on the sockaddr type used, so we get the next length now */
@@ -2691,12 +2810,13 @@ int sd;
 	eth_t *ethsd = eth_open_cached(mydevs[numifaces].devname);
 	eth_addr_t ethaddr;
 
-	if (!ethsd) 
-	  fatal("%s: Failed to open ethernet interface (%s). A possible cause on BSD operating systems is running out of BPF devices (see http://seclists.org/lists/nmap-dev/2006/Jan-Mar/0014.html).", __FUNCTION__,
-		mydevs[numifaces].devname);
+	if (!ethsd) {
+	  error("Warning: Unable to open interface %s -- skipping it.", mydevs[numifaces].devname);
+	  continue;
+	}
 	if (eth_get(ethsd, &ethaddr) != 0) 
 	  fatal("%s: Failed to obtain MAC address for ethernet interface (%s)",
-		__FUNCTION__, mydevs[numifaces].devname);
+		__func__, mydevs[numifaces].devname);
 	memcpy(mydevs[numifaces].mac, ethaddr.data, 6);
 #endif /*SIOCGIFHWADDR*/
 
@@ -2711,8 +2831,7 @@ int sd;
       numifaces++;
       if (numifaces == ii_capacity)  {      
 	ii_capacity <<= 2;
-	mydevs = (struct interface_info *) realloc(mydevs, sizeof(struct interface_info) * ii_capacity);
-	assert(mydevs);
+	mydevs = (struct interface_info *) safe_realloc(mydevs, sizeof(struct interface_info) * ii_capacity);
       }
       mydevs[numifaces].devname[0] = mydevs[numifaces].devfullname[0] = '\0';
     }
@@ -2734,7 +2853,7 @@ struct interface_info *getInterfaceByIP(struct sockaddr_storage *ss) {
   int ifnum;
 
   if (sin->sin_family != AF_INET)
-    fatal("%s called with non-IPv4 address", __FUNCTION__);
+    fatal("%s called with non-IPv4 address", __func__);
 
   ifaces = getinterfaces(&numifaces);
 
@@ -2799,7 +2918,7 @@ struct sys_route *getsysroutes(int *howmany) {
   struct sockaddr_in *sin;
   struct interface_info *ii;
 
-  if (!howmany) fatal("NULL howmany ptr passed to getsysroutes()");
+  if (!howmany) fatal("NULL howmany ptr passed to %s()", __func__);
 
   if (!routes) {
     routes = (struct sys_route *) safe_zalloc(route_capacity * sizeof(struct sys_route));
@@ -2885,7 +3004,7 @@ struct sys_route *getsysroutes(int *howmany) {
 	numroutes++;
 	if (numroutes >= route_capacity) {
 	  route_capacity <<= 2;
-	  routes = (struct sys_route *) realloc(routes, route_capacity * sizeof(struct sys_route));
+	  routes = (struct sys_route *) safe_realloc(routes, route_capacity * sizeof(struct sys_route));
 	}
       }
     } else {
@@ -2896,9 +3015,9 @@ struct sys_route *getsysroutes(int *howmany) {
       dcrn.ifaces = ifaces;
       dcrn.numifaces = numifaces;
       route_t *dr = route_open();
-      if (!dr) fatal("%s: route_open() failed", __FUNCTION__);
+      if (!dr) fatal("%s: route_open() failed", __func__);
       if (route_loop(dr, collect_dnet_routes, &dcrn) != 0) {
-	fatal("%s: route_loop() failed", __FUNCTION__);
+	fatal("%s: route_loop() failed", __func__);
       }
       route_close(dr);
       /* These values could have changed in the callback */
@@ -2941,11 +3060,11 @@ bool route_dst(const struct sockaddr_storage *const dst, struct route_nfo *rnfo)
   int i;
   u32 mask;
   struct sockaddr_in *ifsin, *dstsin;
-  if (!dst) fatal("route_nfo passed a NULL dst address");
+  if (!dst) fatal("%s passed a NULL dst address", __func__);
   dstsin = (struct sockaddr_in *)dst;
 
   if (dstsin->sin_family != AF_INET)
-    fatal("Sorry -- route_dst currently only supports IPv4");
+    fatal("Sorry -- %s currently only supports IPv4", __func__);
 
   /* First let us deal with the case where a user requested a specific spoofed IP/dev */
   if (o.spoofsource || *o.device) {
@@ -3132,7 +3251,7 @@ void broadcast_socket(int sd) {
   if(sd == 501) return;
 #endif
   if (setsockopt(sd, SOL_SOCKET, SO_BROADCAST, (const char *)&one, sizeof(int)) != 0) {
-    fprintf(stderr, "Failed to secure socket broadcasting permission\n");
+    error("Failed to secure socket broadcasting permission");
     perror("setsockopt");
   }
 }
@@ -3158,14 +3277,14 @@ int recvtime(int sd, char *buf, int len, int seconds, int *timedout) {
   if (res > 0 ) {
     res = recv(sd, buf, len, 0);
     if (res >= 0) return res;
-    perror("recv in recvtime");
+    gh_perror("recv in %s", __func__);
     return 0; 
   }
   else if (!res) {
     if (timedout) *timedout = 1;
     return 0;
   }
-  perror("select() in recvtime");
+  gh_perror("select() in %s", __func__);
   return -1;
 }
 
@@ -3179,7 +3298,7 @@ int recvtime(int sd, char *buf, int len, int seconds, int *timedout) {
    parameters (if non-null) are filled with 0.  Remember that the
    correct way to check for errors is to look at the return value
    since a zero ts or echots could possibly be valid. */
-int gettcpopt_ts(struct tcphdr *tcp, u32 *timestamp, u32 *echots) {
+int gettcpopt_ts(struct tcp_hdr *tcp, u32 *timestamp, u32 *echots) {
 
   unsigned char *p;
   int len = 0;

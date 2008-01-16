@@ -97,17 +97,21 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: protocols.cc 3943 2006-09-05 08:39:32Z fyodor $ */
+/* $Id: protocols.cc 6088 2007-10-30 04:40:10Z david $ */
 
 #include "protocols.h"
 #include "NmapOps.h"
+#include "services.h"
+#include "charpool.h"
+#include "nmap_error.h"
+#include "utils.h"
 
 extern NmapOps o;
 static int numipprots = 0;
 static struct protocol_list *protocol_table[PROTOCOL_TABLE_SIZE];
+static int protocols_initialized = 0;
 
 static int nmap_protocols_init() {
-  static int protocols_initialized = 0;
   if (protocols_initialized) return 0;
 
   char filename[512];
@@ -120,8 +124,8 @@ static int nmap_protocols_init() {
   struct protocol_list *current, *previous;
   int res;
 
-  if (nmap_fetchfile(filename, sizeof(filename), "nmap-protocols") == -1) {
-    error("Unable to find nmap-protocols!  Resorting to /etc/protocol");
+  if (nmap_fetchfile(filename, sizeof(filename), "nmap-protocols") != 1) {
+    error("Unable to find nmap-protocols!  Resorting to /etc/protocols");
     strcpy(filename, "/etc/protocols");
   }
 
@@ -129,6 +133,8 @@ static int nmap_protocols_init() {
   if (!fp) {
     fatal("Unable to open %s for reading protocol information", filename);
   }
+  /* Record where this data file was found. */
+  o.loaded_data_files["nmap-protocols"] = filename;
 
   memset(protocol_table, 0, sizeof(protocol_table));
   
@@ -178,6 +184,33 @@ static int nmap_protocols_init() {
 }
 
 
+/* Adds protocols whose names match mask to porttbl.
+ * Increases the prot_count in ports by the number of protocols added.
+ * Returns the number of protocols added.
+ */
+
+
+int addprotocolsfromservmask(char *mask, u8 *porttbl) {
+  struct protocol_list *current;
+  int bucket, t=0;
+
+  if (!protocols_initialized && nmap_protocols_init() == -1)
+    fatal("%s: Couldn't get protocol numbers", __func__);
+
+  for(bucket = 0; bucket < PROTOCOL_TABLE_SIZE; bucket++) {
+    for(current = protocol_table[bucket % PROTOCOL_TABLE_SIZE]; current; current = current->next) {
+      if (wildtest(mask, current->protoent->p_name)) {
+        porttbl[ntohs(current->protoent->p_proto)] |= SCAN_PROTOCOLS;
+        t++;
+      }
+    }
+  }
+
+  return t;
+
+}
+
+
 struct protoent *nmap_getprotbynum(int num) {
   struct protocol_list *current;
 
@@ -192,67 +225,4 @@ struct protoent *nmap_getprotbynum(int num) {
 
   /* Couldn't find it ... oh well. */
   return NULL;
-  
 }
-
-/* By default we do all prots 0-255. */
-struct scan_lists *getdefaultprots(void) {
-  int protindex = 0;
-  struct scan_lists *scanlist;
-  /*struct protocol_list *current;*/
-  int bucket;
-  int protsneeded = 256;
-
-  if (nmap_protocols_init() == -1)
-    fatal("getdefaultprots(): Couldn't get protocol numbers");
-  
-  scanlist = (struct scan_lists *) safe_zalloc(sizeof(struct scan_lists));
-  scanlist->prots = (unsigned short *) safe_zalloc((protsneeded) * sizeof(unsigned short));
-  scanlist->prot_count = protsneeded;
-
-  for(bucket = 0; bucket < protsneeded; bucket++) {
-    scanlist->prots[protindex++] = bucket;
-  }
-  return scanlist;
-}
-
-struct scan_lists *getfastprots(void) {
-  int protindex = 0;
-  struct scan_lists *scanlist;
-  char usedprots[256];
-  struct protocol_list *current;
-  int bucket;
-  int protsneeded = 0;
-
-  if (nmap_protocols_init() == -1)
-    fatal("Getfastprots: Couldn't get protocol numbers");
-  
-  memset(usedprots, 0, sizeof(usedprots));
-
-  for(bucket = 0; bucket < PROTOCOL_TABLE_SIZE; bucket++) {  
-    for(current = protocol_table[bucket % PROTOCOL_TABLE_SIZE];
-	current; current = current->next) {
-      if (!usedprots[ntohs(current->protoent->p_proto)])
-	usedprots[ntohs(current->protoent->p_proto)] = 1;
-	protsneeded++;
-    }
-  }
-
-  scanlist = (struct scan_lists *) safe_zalloc(sizeof(struct scan_lists));
-  scanlist->prots = (unsigned short *) safe_zalloc((protsneeded ) * sizeof(unsigned short));
-  scanlist->prot_count = protsneeded;
-
-  for(bucket = 0; bucket < 256; bucket++) {
-    if (usedprots[bucket])
-      scanlist->prots[protindex++] = bucket;
-  }
-
-  return scanlist;
-}
-
-
-
-
-
-
-

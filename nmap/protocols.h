@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: protocols.h 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: protocols.h 6088 2007-10-30 04:40:10Z david $ */
 
 #ifndef PROTOCOLS_H
 #define PROTOCOLS_H
@@ -108,9 +108,7 @@
 
 #include "nmap.h"
 #include "global_structures.h"
-#include "charpool.h"
-#include "nmap_error.h"
-#include "utils.h"
+#include "nbase.h"
 
 #define PROTOCOL_TABLE_SIZE 256
 
@@ -119,9 +117,7 @@ struct protocol_list {
   struct protocol_list *next;
 };
 
+int addprotocolsfromservmask(char *mask, u8 *porttbl);
 struct protoent *nmap_getprotbynum(int num);
-struct scan_lists *getfastprots(void);
-struct scan_lists *getdefaultprots(void);
-
 
 #endif

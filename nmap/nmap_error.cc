@@ -96,7 +96,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap_error.cc 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: nmap_error.cc 5461 2007-08-11 05:36:05Z fyodor $ */
 
 #include "nmap_error.h"
 #include "output.h"
@@ -167,7 +167,7 @@ void pfatal(const char *err, ...) {
   log_write(o.log_errors? LOG_NORMAL|LOG_STDERR : LOG_STDERR, ": %s (%d)\n", 
 	    strerror(errno), errno);
 #endif /* WIN32 perror() compatability switch */
-  if (o.log_errors) log_flush(LOG_STDOUT);
+  if (o.log_errors) log_flush(LOG_NORMAL);
   fflush(stderr);
   exit(1);
 }
@@ -204,7 +204,7 @@ void gh_perror(const char *err, ...) {
   log_write(o.log_errors? LOG_NORMAL|LOG_STDERR : LOG_STDERR, ": %s (%d)\n", 
 	    strerror(errno), errno);
 #endif /* WIN32 perror() compatability switch */
-  if (o.log_errors) log_flush(LOG_STDOUT);
+  if (o.log_errors) log_flush(LOG_NORMAL);
   fflush(stderr);
   return;
 }

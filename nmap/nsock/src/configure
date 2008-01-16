@@ -309,7 +309,7 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT RANLIB ac_ct_RANLIB COMPAT_OBJS COMPAT_SRCS build build_cpu build_vendor build_os host host_cpu host_vendor host_os CPP EGREP LIBNBASE_LIBS NBASEDIR LIBOBJS LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS build build_cpu build_vendor build_os host host_cpu host_vendor host_os CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT RANLIB ac_ct_RANLIB COMPAT_OBJS COMPAT_SRCS CPP EGREP LIBNBASE_LIBS NBASEDIR LIBOBJS LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -1297,6 +1297,246 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
+          ac_config_headers="$ac_config_headers nsock_config.h"
+
+
+ac_aux_dir=
+for ac_dir in $srcdir $srcdir/.. $srcdir/../..; do
+  if test -f $ac_dir/install-sh; then
+    ac_aux_dir=$ac_dir
+    ac_install_sh="$ac_aux_dir/install-sh -c"
+    break
+  elif test -f $ac_dir/install.sh; then
+    ac_aux_dir=$ac_dir
+    ac_install_sh="$ac_aux_dir/install.sh -c"
+    break
+  elif test -f $ac_dir/shtool; then
+    ac_aux_dir=$ac_dir
+    ac_install_sh="$ac_aux_dir/shtool install -c"
+    break
+  fi
+done
+if test -z "$ac_aux_dir"; then
+  { { echo "$as_me:$LINENO: error: cannot find install-sh or install.sh in $srcdir $srcdir/.. $srcdir/../.." >&5
+echo "$as_me: error: cannot find install-sh or install.sh in $srcdir $srcdir/.. $srcdir/../.." >&2;}
+   { (exit 1); exit 1; }; }
+fi
+ac_config_guess="$SHELL $ac_aux_dir/config.guess"
+ac_config_sub="$SHELL $ac_aux_dir/config.sub"
+ac_configure="$SHELL $ac_aux_dir/configure" # This should be Cygnus configure.
+
+# Make sure we can run config.sub.
+$ac_config_sub sun4 >/dev/null 2>&1 ||
+  { { echo "$as_me:$LINENO: error: cannot run $ac_config_sub" >&5
+echo "$as_me: error: cannot run $ac_config_sub" >&2;}
+   { (exit 1); exit 1; }; }
+
+echo "$as_me:$LINENO: checking build system type" >&5
+echo $ECHO_N "checking build system type... $ECHO_C" >&6
+if test "${ac_cv_build+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_cv_build_alias=$build_alias
+test -z "$ac_cv_build_alias" &&
+  ac_cv_build_alias=`$ac_config_guess`
+test -z "$ac_cv_build_alias" &&
+  { { echo "$as_me:$LINENO: error: cannot guess build type; you must specify one" >&5
+echo "$as_me: error: cannot guess build type; you must specify one" >&2;}
+   { (exit 1); exit 1; }; }
+ac_cv_build=`$ac_config_sub $ac_cv_build_alias` ||
+  { { echo "$as_me:$LINENO: error: $ac_config_sub $ac_cv_build_alias failed" >&5
+echo "$as_me: error: $ac_config_sub $ac_cv_build_alias failed" >&2;}
+   { (exit 1); exit 1; }; }
+
+fi
+echo "$as_me:$LINENO: result: $ac_cv_build" >&5
+echo "${ECHO_T}$ac_cv_build" >&6
+build=$ac_cv_build
+build_cpu=`echo $ac_cv_build | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\1/'`
+build_vendor=`echo $ac_cv_build | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\2/'`
+build_os=`echo $ac_cv_build | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
+
+
+echo "$as_me:$LINENO: checking host system type" >&5
+echo $ECHO_N "checking host system type... $ECHO_C" >&6
+if test "${ac_cv_host+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_cv_host_alias=$host_alias
+test -z "$ac_cv_host_alias" &&
+  ac_cv_host_alias=$ac_cv_build_alias
+ac_cv_host=`$ac_config_sub $ac_cv_host_alias` ||
+  { { echo "$as_me:$LINENO: error: $ac_config_sub $ac_cv_host_alias failed" >&5
+echo "$as_me: error: $ac_config_sub $ac_cv_host_alias failed" >&2;}
+   { (exit 1); exit 1; }; }
+
+fi
+echo "$as_me:$LINENO: result: $ac_cv_host" >&5
+echo "${ECHO_T}$ac_cv_host" >&6
+host=$ac_cv_host
+host_cpu=`echo $ac_cv_host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\1/'`
+host_vendor=`echo $ac_cv_host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\2/'`
+host_os=`echo $ac_cv_host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
+
+
+
+linux=no
+macosx=no
+needs_cpp_precomp=no
+
+case "$host" in
+  *alpha-dec-osf*)
+    cat >>confdefs.h <<\_ACEOF
+#define DEC 1
+_ACEOF
+
+    ;;
+  *-netbsd* | *-knetbsd*-gnu)
+    cat >>confdefs.h <<\_ACEOF
+#define NETBSD 1
+_ACEOF
+
+    ;;
+  *-openbsd*)
+    cat >>confdefs.h <<\_ACEOF
+#define OPENBSD 1
+_ACEOF
+
+    ;;
+  *-sgi-irix5*)
+    cat >>confdefs.h <<\_ACEOF
+#define IRIX 1
+_ACEOF
+
+    ;;
+  *-sgi-irix6*)
+    cat >>confdefs.h <<\_ACEOF
+#define IRIX 1
+_ACEOF
+
+    ;;
+  *-hpux*)
+    cat >>confdefs.h <<\_ACEOF
+#define HPUX 1
+_ACEOF
+
+    ;;
+  *-solaris2.0*)
+    cat >>confdefs.h <<\_ACEOF
+#define STUPID_SOLARIS_CHECKSUM_BUG 1
+_ACEOF
+
+    cat >>confdefs.h <<\_ACEOF
+#define SOLARIS 1
+_ACEOF
+
+    ;;
+  *-solaris2.[1-9][0-9]*)
+    cat >>confdefs.h <<\_ACEOF
+#define SOLARIS 1
+_ACEOF
+
+    ;;
+  *-solaris2.1*)
+    cat >>confdefs.h <<\_ACEOF
+#define STUPID_SOLARIS_CHECKSUM_BUG 1
+_ACEOF
+
+    cat >>confdefs.h <<\_ACEOF
+#define SOLARIS 1
+_ACEOF
+
+    ;;
+  *-solaris2.2*)
+    cat >>confdefs.h <<\_ACEOF
+#define STUPID_SOLARIS_CHECKSUM_BUG 1
+_ACEOF
+
+    cat >>confdefs.h <<\_ACEOF
+#define SOLARIS 1
+_ACEOF
+
+    ;;
+  *-solaris2.3*)
+    cat >>confdefs.h <<\_ACEOF
+#define STUPID_SOLARIS_CHECKSUM_BUG 1
+_ACEOF
+
+    cat >>confdefs.h <<\_ACEOF
+#define SOLARIS 1
+_ACEOF
+
+    ;;
+  *-solaris2.4*)
+    cat >>confdefs.h <<\_ACEOF
+#define STUPID_SOLARIS_CHECKSUM_BUG 1
+_ACEOF
+
+    cat >>confdefs.h <<\_ACEOF
+#define SOLARIS 1
+_ACEOF
+
+    ;;
+  *-solaris2.5.1)
+    cat >>confdefs.h <<\_ACEOF
+#define STUPID_SOLARIS_CHECKSUM_BUG 1
+_ACEOF
+
+    cat >>confdefs.h <<\_ACEOF
+#define SOLARIS 1
+_ACEOF
+
+    ;;
+  *-solaris*)
+    cat >>confdefs.h <<\_ACEOF
+#define SOLARIS 1
+_ACEOF
+
+    ;;
+  *-sunos4*)
+    cat >>confdefs.h <<\_ACEOF
+#define SUNOS 1
+_ACEOF
+
+    cat >>confdefs.h <<\_ACEOF
+#define SPRINTF_RETURNS_STRING 1
+_ACEOF
+
+    ;;
+  *-linux*)
+    linux=yes
+    cat >>confdefs.h <<\_ACEOF
+#define LINUX 1
+_ACEOF
+
+    cat >>confdefs.h <<\_ACEOF
+#define PCAP_TIMEOUT_IGNORED 1
+_ACEOF
+  # libpcap doesn't even LOOK at
+                                     # the timeout you give it under Linux
+    ;;
+  *-freebsd* | *-kfreebsd*-gnu | *-dragonfly*)
+    cat >>confdefs.h <<\_ACEOF
+#define FREEBSD 1
+_ACEOF
+
+    ;;
+  *-bsdi*)
+    cat >>confdefs.h <<\_ACEOF
+#define BSDI 1
+_ACEOF
+
+    ;;
+  *-apple-darwin*)
+    macosx=yes
+    cat >>confdefs.h <<\_ACEOF
+#define MACOSX 1
+_ACEOF
+
+    ;;
+esac
+
+
 
 # Check whether --with-localdirs or --without-localdirs was given.
 if test "${with_localdirs+set}" = set; then
@@ -1322,9 +1562,6 @@ if test "$user_localdirs" = 1; then
      CFLAGS="$CFLAGS -I/usr/local/include"
    fi
 fi
-
-          ac_config_headers="$ac_config_headers nsock_config.h"
-
 
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
@@ -2340,86 +2577,6 @@ else
 fi
 
 
-
-
-
-ac_aux_dir=
-for ac_dir in $srcdir $srcdir/.. $srcdir/../..; do
-  if test -f $ac_dir/install-sh; then
-    ac_aux_dir=$ac_dir
-    ac_install_sh="$ac_aux_dir/install-sh -c"
-    break
-  elif test -f $ac_dir/install.sh; then
-    ac_aux_dir=$ac_dir
-    ac_install_sh="$ac_aux_dir/install.sh -c"
-    break
-  elif test -f $ac_dir/shtool; then
-    ac_aux_dir=$ac_dir
-    ac_install_sh="$ac_aux_dir/shtool install -c"
-    break
-  fi
-done
-if test -z "$ac_aux_dir"; then
-  { { echo "$as_me:$LINENO: error: cannot find install-sh or install.sh in $srcdir $srcdir/.. $srcdir/../.." >&5
-echo "$as_me: error: cannot find install-sh or install.sh in $srcdir $srcdir/.. $srcdir/../.." >&2;}
-   { (exit 1); exit 1; }; }
-fi
-ac_config_guess="$SHELL $ac_aux_dir/config.guess"
-ac_config_sub="$SHELL $ac_aux_dir/config.sub"
-ac_configure="$SHELL $ac_aux_dir/configure" # This should be Cygnus configure.
-
-# Make sure we can run config.sub.
-$ac_config_sub sun4 >/dev/null 2>&1 ||
-  { { echo "$as_me:$LINENO: error: cannot run $ac_config_sub" >&5
-echo "$as_me: error: cannot run $ac_config_sub" >&2;}
-   { (exit 1); exit 1; }; }
-
-echo "$as_me:$LINENO: checking build system type" >&5
-echo $ECHO_N "checking build system type... $ECHO_C" >&6
-if test "${ac_cv_build+set}" = set; then
-  echo $ECHO_N "(cached) $ECHO_C" >&6
-else
-  ac_cv_build_alias=$build_alias
-test -z "$ac_cv_build_alias" &&
-  ac_cv_build_alias=`$ac_config_guess`
-test -z "$ac_cv_build_alias" &&
-  { { echo "$as_me:$LINENO: error: cannot guess build type; you must specify one" >&5
-echo "$as_me: error: cannot guess build type; you must specify one" >&2;}
-   { (exit 1); exit 1; }; }
-ac_cv_build=`$ac_config_sub $ac_cv_build_alias` ||
-  { { echo "$as_me:$LINENO: error: $ac_config_sub $ac_cv_build_alias failed" >&5
-echo "$as_me: error: $ac_config_sub $ac_cv_build_alias failed" >&2;}
-   { (exit 1); exit 1; }; }
-
-fi
-echo "$as_me:$LINENO: result: $ac_cv_build" >&5
-echo "${ECHO_T}$ac_cv_build" >&6
-build=$ac_cv_build
-build_cpu=`echo $ac_cv_build | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\1/'`
-build_vendor=`echo $ac_cv_build | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\2/'`
-build_os=`echo $ac_cv_build | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
-
-
-echo "$as_me:$LINENO: checking host system type" >&5
-echo $ECHO_N "checking host system type... $ECHO_C" >&6
-if test "${ac_cv_host+set}" = set; then
-  echo $ECHO_N "(cached) $ECHO_C" >&6
-else
-  ac_cv_host_alias=$host_alias
-test -z "$ac_cv_host_alias" &&
-  ac_cv_host_alias=$ac_cv_build_alias
-ac_cv_host=`$ac_config_sub $ac_cv_host_alias` ||
-  { { echo "$as_me:$LINENO: error: $ac_config_sub $ac_cv_host_alias failed" >&5
-echo "$as_me: error: $ac_config_sub $ac_cv_host_alias failed" >&2;}
-   { (exit 1); exit 1; }; }
-
-fi
-echo "$as_me:$LINENO: result: $ac_cv_host" >&5
-echo "${ECHO_T}$ac_cv_host" >&6
-host=$ac_cv_host
-host_cpu=`echo $ac_cv_host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\1/'`
-host_vendor=`echo $ac_cv_host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\2/'`
-host_os=`echo $ac_cv_host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
 
 
 
@@ -4357,7 +4514,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 #               include <netinet/in.h>
 #               define __USE_BSD
 #               define __FAVOR_BSD
-#               define __BSD_SOURCE
+#               define _BSD_SOURCE
 #               include <netinet/ip.h>
 #               include <netinet/ip_icmp.h>
 int
@@ -4426,7 +4583,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 #               include <netinet/in.h>
 #               define __USE_BSD
 #               define __FAVOR_BSD
-#               define __BSD_SOURCE
+#               define _BSD_SOURCE
 #               include <netinet/ip.h>
 int
 main ()
@@ -4494,7 +4651,7 @@ cat >>conftest.$ac_ext <<_ACEOF
 #               include <netinet/in.h>
 #               define __USE_BSD
 #               define __FAVOR_BSD
-#               define __BSD_SOURCE
+#               define _BSD_SOURCE
 #               include <netinet/ip.h>
 #               include <netinet/ip_icmp.h>
 int
@@ -5156,6 +5313,14 @@ s,@ECHO_C@,$ECHO_C,;t t
 s,@ECHO_N@,$ECHO_N,;t t
 s,@ECHO_T@,$ECHO_T,;t t
 s,@LIBS@,$LIBS,;t t
+s,@build@,$build,;t t
+s,@build_cpu@,$build_cpu,;t t
+s,@build_vendor@,$build_vendor,;t t
+s,@build_os@,$build_os,;t t
+s,@host@,$host,;t t
+s,@host_cpu@,$host_cpu,;t t
+s,@host_vendor@,$host_vendor,;t t
+s,@host_os@,$host_os,;t t
 s,@CC@,$CC,;t t
 s,@CFLAGS@,$CFLAGS,;t t
 s,@LDFLAGS@,$LDFLAGS,;t t
@@ -5167,14 +5332,6 @@ s,@RANLIB@,$RANLIB,;t t
 s,@ac_ct_RANLIB@,$ac_ct_RANLIB,;t t
 s,@COMPAT_OBJS@,$COMPAT_OBJS,;t t
 s,@COMPAT_SRCS@,$COMPAT_SRCS,;t t
-s,@build@,$build,;t t
-s,@build_cpu@,$build_cpu,;t t
-s,@build_vendor@,$build_vendor,;t t
-s,@build_os@,$build_os,;t t
-s,@host@,$host,;t t
-s,@host_cpu@,$host_cpu,;t t
-s,@host_vendor@,$host_vendor,;t t
-s,@host_os@,$host_os,;t t
 s,@CPP@,$CPP,;t t
 s,@EGREP@,$EGREP,;t t
 s,@LIBNBASE_LIBS@,$LIBNBASE_LIBS,;t t

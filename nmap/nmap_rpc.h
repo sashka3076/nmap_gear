@@ -1,6 +1,6 @@
 
 /***************************************************************************
- * rpc.h -- Functions related to the RPCGrind (-sR) facility of Nmap.      *
+ * nmap_rpc.h -- Functions related to the RPCGrind (-sR) facility of Nmap. *
  * This includes reading the nmap-rpc services file and sending rpc        *
  * queries and interpreting responses.  The actual scan engine used for    *
  * rpc grinding is pos_scan (which is not in this file)                    *
@@ -99,17 +99,14 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap_rpc.h 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: nmap_rpc.h 5389 2007-08-11 03:35:46Z fyodor $ */
 
 #ifndef NMAP_RPC_H
 #define NMAP_RPC_H
 
 #include "nmap.h"
 #include "global_structures.h"
-#include "charpool.h"
-#include "nmap_error.h"
-#include "utils.h"
-#include "timing.h"
+#include "portlist.h"
 
 /* rpc related #define's */
 #define RECORD_MARKING 4        /* length of recoder marking (bytes)     */
@@ -188,10 +185,4 @@ void get_rpc_results(Target *target, struct portinfo *scan,
 void close_rpc_query_sockets();
 
 #endif /* NMAP_RPC_H */
-
-
-
-
-
-
 

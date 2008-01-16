@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: FingerPrintResults.h 4026 2006-10-02 03:21:40Z fyodor $ */
+/* $Id: FingerPrintResults.h 5422 2007-08-11 04:30:24Z fyodor $ */
 
 #ifndef FINGERPRINTRESULTS_H
 #define FINGERPRINTRESULTS_H
@@ -105,6 +105,7 @@
 class FingerPrintResults;
 
 #include "nmap.h"
+#include "global_structures.h"
 
 /* Maximum number of results allowed in one of these things ... */
 #define MAX_FP_RESULTS 36

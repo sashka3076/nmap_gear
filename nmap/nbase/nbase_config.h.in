@@ -99,7 +99,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_config.h.in 3899 2006-08-29 05:42:35Z fyodor $ */
+/* $Id: nbase_config.h.in 6066 2007-10-29 00:30:23Z fyodor $ */
 #ifndef NBASE_CONFIG_H
 #define NBASE_CONFIG_H
 
@@ -166,9 +166,9 @@
 
 #undef HAVE_SIGNAL
 
-#undef HAVE_GETOPT_LONG
+#undef HAVE_GETOPT
 
-#undef HAVE_INET_ATON
+#undef HAVE_GETOPT_LONG_ONLY
 
 #undef HAVE_NETINET_IN_SYSTEM_H
 
@@ -232,7 +232,5 @@
 #undef IRIX
 #undef HPUX
 #undef NETBSD
-
-#undef HAVE_OPENSSL
 
 #endif /* NBASE_CONFIG_H */

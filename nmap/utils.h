@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: utils.h 3994 2006-09-16 02:25:20Z fyodor $ */
+/* $Id: utils.h 6236 2007-11-15 22:42:17Z kris $ */
 
 #ifndef UTILS_H
 #define UTILS_H
@@ -136,6 +136,8 @@
 #  include <time.h>
 # endif
 #endif
+
+#include "nbase.h"
 
 #include "nmap_error.h"
 #include "nmap.h"
@@ -188,6 +190,8 @@ template<class T> T box(T bmin, T bmax, T bnum) {
     return bmin;
   return bnum;
 }
+
+int wildtest(char *wild, char *test);
 
 void hdump(unsigned char *packet, unsigned int len);
 void lamont_hdump(char *cp, unsigned int length);
@@ -250,17 +254,6 @@ char* print_ip_options(u8* ipopt, int ipoptlen);
 #ifndef HAVE_STRERROR
 char *strerror(int errnum);
 #endif
-
-/* Convert a comma-separated list of ASCII u16-sized numbers into the
-   given 'dest' array, which is of total size (meaning sizeof() as
-   opposed to numelements) of destsize.  If min_elem and max_elem are
-   provided, each number must be within (or equal to) those
-   constraints.  The number of numbers stored in 'dest' is returned,
-   except that -1 is returned in the case of an error. If -1 is
-   returned and errorstr is non-null, *errorstr is filled with a ptr to a
-   static string literal describing the error. */
-int numberlist2array(char *expr, u16 *dest, int destsize, char **errorstr, 
-		     u16 min_elem=0, u16 max_elem=65535);
 
 /* mmap() an entire file into the address space.  Returns a pointer
    to the beginning of the file.  The mmap'ed length is returned

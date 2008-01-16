@@ -1,4 +1,4 @@
-$Id: NMAP_MODIFICATIONS 4219 2006-12-03 00:34:19Z fyodor $
+$Id: NMAP_MODIFICATIONS 6414 2007-12-03 23:51:26Z david $
 
 This is Dug Song's excellent Libdnet networking library version 1.10.
 It has been stripped down for inclusion within Nmap and modified as follows:
@@ -310,3 +310,183 @@ Griffin):
 
  struct intf_handle {
         struct ifcombo   ifcombo[MIB_IF_TYPE_MAX];
+
+o Fix a compiler "may be used unitialized" warning:
+Index: addr-util.c
+===================================================================
+--- addr-util.c (revision 3855)
++++ addr-util.c (working copy)
+@@ -177,6 +177,8 @@
+        struct { int base, len; } best, cur;
+        char *p = dst;
+        int i;
++
++       cur.len = best.len = 0;
+
+        if (len < 46)
+                return (NULL);
+
+o Removed config.sub, config.guess, install-sh, ltmain.sh, and missing from the
+  config directory. These files are found in the parent (i.e., Nmap's)
+  directory. Also removed config/mkinstalldirs because it is replaced with
+  $(install_sh) -d. Change Makefile.am not to use ac_aux_dir, which is an
+  internal Autoconf variable.
+Index: configure.in
+===================================================================
+--- configure.in	(revision 6317)
++++ configure.in	(working copy)
+@@ -6,8 +6,6 @@
+ dnl $Id: NMAP_MODIFICATIONS 6414 2007-12-03 23:51:26Z david $
+ 
+ AC_INIT(include/dnet.h)
+-AC_CONFIG_AUX_DIR(config)
+-AC_SUBST(ac_aux_dir)
+ 
+ AM_INIT_AUTOMAKE(libdnet, 1.10)
+ AM_CONFIG_HEADER(include/config.h)
+Index: Makefile.am
+===================================================================
+--- Makefile.am	(revision 6317)
++++ Makefile.am	(working copy)
+@@ -10,16 +10,12 @@
+ 
+ CLEANFILES =	dnet-config
+ 
+-AUX_DIST =	$(ac_aux_dir)/acinclude.m4	\
+-		$(ac_aux_dir)/config.guess	\
+-		$(ac_aux_dir)/config.sub	\
+-		$(ac_aux_dir)/install-sh	\
+-		$(ac_aux_dir)/ltmain.sh		\
+-		$(ac_aux_dir)/missing		\
+-		$(ac_aux_dir)/mkinstalldirs
++aux_dir = config
+ 
++AUX_DIST =	$(aux_dir)/acinclude.m4
++
+ dist-hook:
+-	(cd $(distdir) && mkdir $(ac_aux_dir))
++	(cd $(distdir) && mkdir $(aux_dir))
+ 	for file in $(AUX_DIST); do \
+ 		cp $$file $(distdir)/$$file; \
+ 	done
+
+o Remember the entry->intf_len before zeroing entry in _ifrow_to_entry.
+intf_loop relies on passing the length inside the structure to make sure
+interface aliases are accounted for.
+Index: src/intf-win32.c
+===================================================================
+--- src/intf-win32.c	(revision 6288)
++++ src/intf-win32.c	(working copy)
+@@ -103,7 +103,12 @@
+ 	struct addr *ap, *lap;
+ 	int i;
+ 	
++	/* The total length of the entry may be passed in inside entry.
++	   Remember it and clear the entry. */
++	u_int intf_len = entry->intf_len;
+ 	memset(entry, 0, sizeof(*entry));
++	/* Restore the length. */
++	entry->intf_len = intf_len;
+ 
+ 	for (i = 0; i < intf->ifcombo[ifrow->dwType].cnt; i++) {
+ 		if (intf->ifcombo[ifrow->dwType].idx[i] == ifrow->dwIndex)
+
+o Forced interface type numbers to be canonicalized to internal numbers to
+avoid accessing uninitialized memory when an unknown device name is
+given.
+Index: libdnet-stripped/src/intf-win32.c
+===================================================================
+--- libdnet-stripped/src/intf-win32.c	(revision 6413)
++++ libdnet-stripped/src/intf-win32.c	(working copy)
+@@ -42,9 +42,12 @@
+ static char *
+ _ifcombo_name(int type)
+ {
+-	char *name = "net";	/* XXX */
++	/* Unknown interface types get the prefix "net". */
++	char *name = "net";
+ 	
+-	if (type == MIB_IF_TYPE_ETHERNET) {
++	if (type == MIB_IF_TYPE_ETHERNET || type == IF_TYPE_IEEE80211) {
++		/* INTF_TYPE_IEEE80211 is used for wireless devices on
++		   Windows Vista. */
+ 		name = "eth";
+ 	} else if (type == MIB_IF_TYPE_TOKENRING) {
+ 		name = "tr";
+@@ -60,9 +63,12 @@
+ 	return (name);
+ }
+ 
++/* Return a canonical internal interface type number for the given
++ * device string. */
+ static int
+ _ifcombo_type(const char *device)
+ {
++	/* Unknown device names (like "net") get mapped to INTF_TYPE_OTHER. */
+ 	int type = INTF_TYPE_OTHER;
+ 	
+ 	if (strncmp(device, "eth", 3) == 0) {
+@@ -81,6 +87,20 @@
+ 	return (type);
+ }
+ 
++/* Map an MIB_IFROW.dwType interface type into an internal interface
++   type. The internal types are never exposed to users of this library;
++   they exist only for the sake of ordering interface types within an
++   intf_handle, which has an array of ifcombo structures ordered by
++   type. Entries in an intf_handle must not be stored or accessed by a
++   raw MIB_IFROW.dwType number because they will not be able to be found
++   by a device name such as "net0" if the device name does not map
++   exactly to the dwType. */
++static int
++_if_type_canonicalize(int type)
++{
++	return _ifcombo_type(_ifcombo_name(type));
++}
++
+ static void
+ _ifcombo_add(struct ifcombo *ifc, DWORD idx)
+ {
+@@ -102,6 +122,7 @@
+ {
+ 	struct addr *ap, *lap;
+ 	int i;
++	int type;
+ 	
+ 	/* The total length of the entry may be passed in inside entry.
+ 	   Remember it and clear the entry. */
+@@ -110,14 +131,15 @@
+ 	/* Restore the length. */
+ 	entry->intf_len = intf_len;
+ 
+-	for (i = 0; i < intf->ifcombo[ifrow->dwType].cnt; i++) {
+-		if (intf->ifcombo[ifrow->dwType].idx[i] == ifrow->dwIndex)
++	type = _if_type_canonicalize(ifrow->dwType);
++	for (i = 0; i < intf->ifcombo[type].cnt; i++) {
++		if (intf->ifcombo[type].idx[i] == ifrow->dwIndex)
+ 			break;
+ 	}
+-	/* XXX - dwType matches MIB-II ifType. */
++	/* XXX - type matches MIB-II ifType. */
+ 	snprintf(entry->intf_name, sizeof(entry->intf_name), "%s%lu",
+-	    _ifcombo_name(ifrow->dwType), i);
+-	entry->intf_type = (uint16_t)ifrow->dwType;
++	    _ifcombo_name(type), i);
++	entry->intf_type = (uint16_t)type;
+ 	
+ 	/* Get interface flags. */
+ 	entry->intf_flags = 0;
+@@ -201,9 +223,11 @@
+ 	 * XXX - like IP_ADAPTER_INFO ComboIndex
+ 	 */
+ 	for (i = 0; i < intf->iftable->dwNumEntries; i++) {
++		int type;
+ 		ifrow = &intf->iftable->table[i];
+-		if (ifrow->dwType < MIB_IF_TYPE_MAX) {
+-			_ifcombo_add(&intf->ifcombo[ifrow->dwType],
++		type = _if_type_canonicalize(ifrow->dwType);
++		if (type < MIB_IF_TYPE_MAX) {
++			_ifcombo_add(&intf->ifcombo[type],
+ 			    ifrow->dwIndex);
+ 		} else
+ 			return (-1);

@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: targets.h 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: targets.h 6056 2007-10-28 00:05:03Z kris $ */
 
 #ifndef TARGETS_H
 #define TARGETS_H
@@ -155,18 +155,18 @@ struct tcpqueryinfo {
 };
 
 struct pingtech {
-  unsigned int icmpscan: 1,
-    rawicmpscan: 1,
+  unsigned int rawicmpscan: 1,
     connecttcpscan: 1,
     rawtcpscan: 1,
-    rawudpscan: 1;
+    rawudpscan: 1,
+    rawprotoscan: 1;
 };
 
 
 /* Ports is the list of ports the user asked to be scanned (0 terminated),
    you can just pass NULL (it is only a stupid optimization that needs it) */
 Target *nexthost(HostGroupState *hs, TargetGroup *exclude_group, 
-		 struct scan_lists *ports, int *pingtype);
+		 struct scan_lists *ports, int pingtype);
 /* loads an exclude file into a excluded target list */
 TargetGroup* load_exclude(FILE *fExclude, char *szExclude);
 /* a debugging routine to dump an exclude list to stdout. */
@@ -175,13 +175,4 @@ int dumpExclude(TargetGroup*exclude_group);
    time you call nexthost(). */
 void returnhost(HostGroupState *hs);
 #endif /* TARGETS_H */
-
-
-
-
-
-
-
-
-
 

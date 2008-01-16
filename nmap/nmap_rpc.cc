@@ -1,6 +1,6 @@
 
 /***************************************************************************
- * rpc.cc -- Functions related to the RPCGrind (-sR) facility of Nmap.     *
+ * nmap_rpc.cc -- Functions related to the RPCGrind (-sR) facility of Nmap *
  * This includes reading the nmap-rpc services file and sending rpc        *
  * queries and interpreting responses.  The actual scan engine used for    *
  * rpc grinding is pos_scan (which is not in this file)                    *
@@ -99,11 +99,16 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap_rpc.cc 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: nmap_rpc.cc 5452 2007-08-11 05:13:16Z fyodor $ */
 
 
 #include "nmap_rpc.h"
 #include "NmapOps.h"
+#include "Target.h"
+#include "charpool.h"
+#include "timing.h"
+#include "nmap_error.h"
+#include "utils.h"
 
 extern NmapOps o;
 static struct rpc_info ri;
@@ -133,7 +138,7 @@ static void rpc_services_init() {
   ri.names = (char **) cp_alloc(ri.num_alloc * sizeof(char *));
   ri.numbers = (unsigned long *) cp_alloc(ri.num_alloc * sizeof(unsigned long));
 
-  if (nmap_fetchfile(filename, sizeof(filename), "nmap-rpc") == -1) {
+  if (nmap_fetchfile(filename, sizeof(filename), "nmap-rpc") != 1) {
     error("Unable to find nmap-rpc!  Resorting to /etc/rpc");
     strcpy(filename, "/etc/rpc");
   }
@@ -142,6 +147,8 @@ static void rpc_services_init() {
   if (!fp) {
     fatal("Unable to open %s for reading rpc information", filename);
   }
+  /* Record where this data file was found. */
+  o.loaded_data_files["nmap-rpc"] = filename;
 
   while(fgets(line, sizeof(line), fp)) {
     lineno++;
@@ -228,7 +235,7 @@ int send_rpc_query(const struct in_addr *target_host, unsigned short portno,
     rpc_xid_base = (unsigned long) get_random_uint();
   
   if (o.debugging > 1) {
-    printf("Sending RPC probe for program %li to %hu/%s -- scan_offset=%d trynum=%d xid=%lX\n", program, portno, proto2ascii(ipproto), scan_offset, trynum, rpc_xid_base + ((portno & 0x3FFF) << 16) + (trynum << 30) +  scan_offset);
+    log_write(LOG_PLAIN, "Sending RPC probe for program %li to %hu/%s -- scan_offset=%d trynum=%d xid=%lX\n", program, portno, proto2ascii(ipproto), scan_offset, trynum, rpc_xid_base + ((portno & 0x3FFF) << 16) + (trynum << 30) +  scan_offset);
   }
 
   /* First we check whether we have to create a new connection -- we 
@@ -255,14 +262,14 @@ int send_rpc_query(const struct in_addr *target_host, unsigned short portno,
     
   if (ipproto == IPPROTO_TCP && tcp_rpc_socket == -1) {
     if ((tcp_rpc_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1)
-      pfatal("Socket troubles in send_rpc_query");
+      pfatal("Socket troubles in %s", __func__);
     /* I should unblock the socket here and timeout the connect() */
     res = connect(tcp_rpc_socket, (struct sockaddr *) &sock, 
 		  sizeof(struct sockaddr_in));
     if (res == -1) {
       if (o.debugging) {
-	gh_perror("Failed to connect to port %d of %s in send_rpc_query",
-		  portno, inet_ntoa(*target_host));
+	gh_perror("Failed to connect to port %d of %s in %s",
+		  portno, inet_ntoa(*target_host), __func__);
       }
       close(tcp_rpc_socket);
       tcp_rpc_socket = -1;
@@ -271,7 +278,7 @@ int send_rpc_query(const struct in_addr *target_host, unsigned short portno,
     unblock_socket(tcp_rpc_socket);
   } else if (ipproto == IPPROTO_UDP && udp_rpc_socket == -1) {
     if ((udp_rpc_socket = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
-      pfatal("UDP socket troubles in send_rpc_query");
+      pfatal("UDP socket troubles in %s", __func__);
     unblock_socket(udp_rpc_socket);
   }
   
@@ -307,7 +314,7 @@ int send_rpc_query(const struct in_addr *target_host, unsigned short portno,
 
     if (res == -1) {
       if (o.debugging) {
-	gh_perror("Sendto in send_rpc_query");
+	gh_perror("Sendto in %s", __func__);
 	close(udp_rpc_socket);
 	udp_rpc_socket = -1;
       }
@@ -320,7 +327,7 @@ int send_rpc_query(const struct in_addr *target_host, unsigned short portno,
     res = Send(tcp_rpc_socket, rpch_buf, sizeof(struct rpc_hdr) + sizeof(unsigned long), 0);
     if (res == -1) {
       if (o.debugging) {
-	gh_perror("Write in send_rpc_query");
+	gh_perror("Write in %s", __func__);
       }
       close(tcp_rpc_socket);
       tcp_rpc_socket = -1;
@@ -350,9 +357,9 @@ static int rpc_are_we_done(char *msg, int msg_len, Target *target,
     /* This is not a valid reply -- we kill the port 
        (from an RPC perspective) */ 
     if (o.debugging > 1) {
-      printf("Port %hu/%s labelled NON_RPC because of invalid sized message (%d)\n", 
-	     rsi->rpc_current_port->portno, 
-	     proto2ascii(rsi->rpc_current_port->proto, true), msg_len);
+      log_write(LOG_PLAIN, "Port %hu/%s labelled NON_RPC because of invalid sized message (%d)\n", 
+		rsi->rpc_current_port->portno, 
+		proto2ascii(rsi->rpc_current_port->proto, true), msg_len);
     }
     rsi->rpc_status = RPC_STATUS_NOT_RPC;
     ss->numqueries_outstanding = 0;
@@ -365,7 +372,7 @@ static int rpc_are_we_done(char *msg, int msg_len, Target *target,
   if (((scan_offset >> 16) & 0x3FFF) != (unsigned long) (rsi->rpc_current_port->portno & 0x3FFF)) {
     /* Doh -- this doesn't seem right */
     if (o.debugging > 1) {
-      printf("Port %hu/%s labelled NON_RPC because ((scan_offset >> 16) & 0x3FFF) is %li\n", rsi->rpc_current_port->portno, proto2ascii(rsi->rpc_current_port->proto, true), ((scan_offset >> 16) & 0x3FFF));
+      log_write(LOG_PLAIN, "Port %hu/%s labelled NON_RPC because ((scan_offset >> 16) & 0x3FFF) is %li\n", rsi->rpc_current_port->portno, proto2ascii(rsi->rpc_current_port->proto, true), ((scan_offset >> 16) & 0x3FFF));
     }
     rsi->rpc_status = RPC_STATUS_NOT_RPC;
     ss->numqueries_outstanding = 0;
@@ -404,7 +411,7 @@ static int rpc_are_we_done(char *msg, int msg_len, Target *target,
   }
      
   if (trynum > current->trynum) {
-    error("Bogus trynum %d when we are only up to %d in get_rpc_results", trynum, current->trynum);
+    error("Bogus trynum %d when we are only up to %d in %s", trynum, current->trynum, __func__);
     rsi->rpc_status = RPC_STATUS_NOT_RPC;
     ss->numqueries_outstanding = 0;
     return 1;
@@ -504,7 +511,7 @@ unsigned long current_msg_len;
    if (tcp_rpc_socket > max_sd)
      max_sd = tcp_rpc_socket;
  } else {
-   error("Unable to find listening socket in get_rpc_results");
+   error("Unable to find listening socket in %s", __func__);
    return;
  }
 
@@ -529,18 +536,18 @@ unsigned long current_msg_len;
      if (res < 0) {
        /* Doh! */
        if (o.debugging || o.verbose)
-	 gh_perror("recvfrom in get_rpc_results");
+	 gh_perror("recvfrom in %s", __func__);
        ss->numqueries_outstanding = 0;
        rsi->rpc_status = RPC_STATUS_NOT_RPC;
        return;
      }
      if (o.debugging > 1)
-       printf("Received %d byte UDP packet\n", res);
+       log_write(LOG_PLAIN, "Received %d byte UDP packet\n", res);
      /* Now we check that the response is from the expected host/port */
      if (from.sin_addr.s_addr != target->v4host().s_addr ||
 	 from.sin_port != htons(rsi->rpc_current_port->portno)) {
        if (o.debugging > 1) {
-	 printf("Received UDP packet from %d.%d.%d.%d/%hu when expecting packet from %d.%d.%d.%d/%hu\n", NIPQUAD(from.sin_addr.s_addr), ntohs(from.sin_port), NIPQUAD(target->v4host().s_addr), rsi->rpc_current_port->portno);
+	 log_write(LOG_PLAIN, "Received UDP packet from %d.%d.%d.%d/%hu when expecting packet from %d.%d.%d.%d/%hu\n", NIPQUAD(from.sin_addr.s_addr), ntohs(from.sin_port), NIPQUAD(target->v4host().s_addr), rsi->rpc_current_port->portno);
        }
        continue;
      }
@@ -555,9 +562,9 @@ unsigned long current_msg_len;
      if (res <= 0) {
        if (o.debugging) {
 	 if (res == -1)
-	   gh_perror("Failed to read() from tcp rpc socket in get_rpc_results");
+	   gh_perror("Failed to read() from tcp rpc socket in %s", __func__);
 	 else {
-	   error("Lamer on port %u closed RPC socket on me in get_rpc_results", rsi->rpc_current_port->portno);
+	   error("Lamer on port %u closed RPC socket on me in %s", rsi->rpc_current_port->portno, __func__);
 	 }
        }
        ss->numqueries_outstanding = 0;
@@ -571,10 +578,10 @@ unsigned long current_msg_len;
        /* This is suspiciously small -- I'm assuming this is not the first
 	  part of a valid RPC packet */
        if (o.debugging > 1) {
-	 printf("Port %hu/%s labelled NON_RPC because tcp_readlen is %d (should be at least 28)\n", 
-		rsi->rpc_current_port->portno, 
-		proto2ascii(rsi->rpc_current_port->proto, true), 
-		(int) tcp_readlen);
+	 log_write(LOG_PLAIN, "Port %hu/%s labelled NON_RPC because tcp_readlen is %d (should be at least 28)\n", 
+		   rsi->rpc_current_port->portno, 
+		   proto2ascii(rsi->rpc_current_port->proto, true), 
+		   (int) tcp_readlen);
        }
        ss->numqueries_outstanding = 0;
        rsi->rpc_status = RPC_STATUS_NOT_RPC;
@@ -585,9 +592,10 @@ unsigned long current_msg_len;
 						     
      if (current_msg_len > tcp_readlen - 4) {
        if (o.debugging > 1) {
-	 printf("Port %hu/%s labelled NON_RPC because current_msg_len is %li while tcp_readlen is %d\n", rsi->rpc_current_port->portno, 
-		proto2ascii(rsi->rpc_current_port->proto, true), 
-		current_msg_len, (int) tcp_readlen);
+	 log_write(LOG_PLAIN, "Port %hu/%s labelled NON_RPC because current_msg_len is %li while tcp_readlen is %d\n",
+		   rsi->rpc_current_port->portno, 
+		   proto2ascii(rsi->rpc_current_port->proto, true), 
+		   current_msg_len, (int) tcp_readlen);
        }
        ss->numqueries_outstanding = 0;
        rsi->rpc_status = RPC_STATUS_NOT_RPC;
@@ -615,10 +623,10 @@ unsigned long current_msg_len;
        if (current_msg_len < 24 || current_msg_len > 32) {
 	 ss->numqueries_outstanding = 0;
 	 if (o.debugging > 1) {
-	   printf("Port %hu/%s labelled NON_RPC because current_msg_len is %li\n", 
-		  rsi->rpc_current_port->portno, 
-		  proto2ascii(rsi->rpc_current_port->proto, true), 
-		  current_msg_len);
+	   log_write(LOG_PLAIN, "Port %hu/%s labelled NON_RPC because current_msg_len is %li\n", 
+		     rsi->rpc_current_port->portno, 
+		     proto2ascii(rsi->rpc_current_port->proto, true), 
+		     current_msg_len);
 	 }
 	 rsi->rpc_status = RPC_STATUS_NOT_RPC;
 	 return;
@@ -649,13 +657,4 @@ void close_rpc_query_sockets() {
     tcp_rpc_socket = -1;
   }
 }
-
-
-
-
-
-
-
-
-
 

@@ -98,13 +98,17 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: MACLookup.cc 4134 2006-11-06 02:14:35Z fyodor $ */
+/* $Id: MACLookup.cc 5403 2007-08-11 04:06:09Z fyodor $ */
 
 
 /* Character pool memory allocation */
 #include "MACLookup.h"
+#include "NmapOps.h"
 #include "nmap.h"
 #include "nmap_error.h"
+#include "charpool.h"
+
+extern NmapOps o;
 
 struct MAC_entry {
   int prefix; /* -1 means none set */
@@ -145,7 +149,7 @@ static void mac_prefix_init() {
   MacTable.table = (struct MAC_entry **) safe_zalloc(MacTable.table_capacity * sizeof(struct MAC_entry *));
 
   /* Now it is time to read in all of the entries ... */
-  if (nmap_fetchfile(filename, sizeof(filename), "nmap-mac-prefixes") == -1){
+  if (nmap_fetchfile(filename, sizeof(filename), "nmap-mac-prefixes") != 1){
     error("Cannot find nmap-mac-prefixes: Ethernet vendor corolation will not be performed");
     return;
   }
@@ -155,6 +159,8 @@ static void mac_prefix_init() {
     error("Unable to open %s.  Ethernet vendor correlation will not be performed ", filename);
     return;
   }
+  /* Record where this data file was found. */
+  o.loaded_data_files["nmap-mac-prefixes"] = filename;
 
   while(fgets(line, sizeof(line), fp)) {
     lineno++;
@@ -218,7 +224,7 @@ static struct MAC_entry *findMACEntry(int prefix) {
 const char *MACPrefix2Corp(const u8 *prefix) {
   struct MAC_entry *ent;
 
-  if (!prefix) fatal("MACPrefix2Corp called with a NULL prefix");
+  if (!prefix) fatal("%s called with a NULL prefix", __func__);
   mac_prefix_init();
 
   ent = findMACEntry(MacCharPrefix2Key(prefix));
@@ -232,8 +238,8 @@ const char *MACPrefix2Corp(const u8 *prefix) {
    is not particularly efficient and so should be rewriteen if it is
    called often */
 bool MACCorp2Prefix(const char *vendorstr, u8 *mac_data) {
-  if (!vendorstr) fatal("%s: vendorstr is NULL", __FUNCTION__);
-  if (!mac_data) fatal("%s: mac_data is NULL", __FUNCTION__);
+  if (!vendorstr) fatal("%s: vendorstr is NULL", __func__);
+  if (!mac_data) fatal("%s: mac_data is NULL", __func__);
   mac_prefix_init();
 
   for(int i = 0; i < MacTable.table_capacity; i++ ) {

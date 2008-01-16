@@ -99,12 +99,12 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: timing.h 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: timing.h 5389 2007-08-11 03:35:46Z fyodor $ */
 
 #ifndef NMAP_TIMING_H
 #define NMAP_TIMING_H
 
-#include "tcpip.h"
+#include "nmap.h"
 #include "global_structures.h"
 
 /* Call this function on a newly allocated struct timeout_info to

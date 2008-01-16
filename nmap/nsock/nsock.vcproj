@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="8.00"
+	Version="8,00"
 	Name="nsock"
 	ProjectGUID="{F8D6D1E3-D4EA-402C-98AA-168E5309BAF4}"
-        RootNamespace="nsock"
+	RootNamespace="nsock"
 	Keyword="Win32Proj"
 	>
 	<Platforms>
@@ -41,7 +41,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="..\nbase\;include"
+				AdditionalIncludeDirectories="..\nbase\;include;..\mswin32\pcap-include;..\mswin32;..\"
 				PreprocessorDefinitions="WIN32;_DEBUG;_LIB"
 				MinimalRebuild="true"
 				ExceptionHandling="0"
@@ -107,8 +107,8 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-                               AdditionalOptions="/D &quot;_CRT_SECURE_NO_DEPRECATE&quot;"
-				AdditionalIncludeDirectories="..\nbase\;include"
+				AdditionalOptions="/D &quot;_CRT_SECURE_NO_DEPRECATE&quot;"
+				AdditionalIncludeDirectories="..\nbase\;include;..\mswin32\pcap-include;..\mswin32;..\"
 				PreprocessorDefinitions="WIN32;NDEBUG;_LIB"
 				ExceptionHandling="0"
 				RuntimeLibrary="0"
@@ -189,6 +189,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\src\nsock_pcap.c"
+				>
+			</File>
+			<File
 				RelativePath=".\src\nsock_pool.c"
 				>
 			</File>
@@ -236,6 +240,10 @@
 			</File>
 			<File
 				RelativePath=".\src\nsock_internal.h"
+				>
+			</File>
+			<File
+				RelativePath=".\src\nsock_pcap.h"
 				>
 			</File>
 			<File

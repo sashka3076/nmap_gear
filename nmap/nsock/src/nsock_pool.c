@@ -56,7 +56,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_pool.c 3870 2006-08-25 01:47:53Z fyodor $ */
+/* $Id: nsock_pool.c 6261 2007-11-17 03:10:46Z kris $ */
 
 #include "nsock_internal.h"
 #include "gh_list.h"
@@ -168,6 +168,9 @@ nsock_pool nsp_new(void *userdata) {
   gh_list_init(&nsp->evl.read_events);
   gh_list_init(&nsp->evl.write_events);
   gh_list_init(&nsp->evl.timer_events);
+  #if HAVE_PCAP
+  gh_list_init(&nsp->evl.pcap_read_events);
+  #endif 
   gh_list_init(&nsp->evl.free_events);
   nsp->evl.next_ev.tv_sec = 0;
   nsp->evl.events_pending = 0;
@@ -192,6 +195,9 @@ void nsp_delete(nsock_pool ms_pool) {
                                &nsp->evl.read_events,
                                &nsp->evl.write_events,
                                &nsp->evl.timer_events,
+                               #if HAVE_PCAP
+                               &nsp->evl.pcap_read_events,
+                               #endif
                                0
                              };
    int current_list_idx;
@@ -208,6 +214,7 @@ void nsp_delete(nsock_pool ms_pool) {
 	current_list_idx++) {
       while(GH_LIST_COUNT(event_lists[current_list_idx]) > 0) {
 	nse = (msevent *) gh_list_pop(event_lists[current_list_idx]);
+	assert(nse);
 	nse->status = NSE_STATUS_KILL;
 	nsock_trace_handler_callback(nsp, nse);
 	nse->handler(nsp, nse, nse->userdata);

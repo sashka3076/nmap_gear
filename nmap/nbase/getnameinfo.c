@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: getnameinfo.c 3899 2006-08-29 05:42:35Z fyodor $ */
+/* $Id: getnameinfo.c 5538 2007-08-14 06:46:54Z kris $ */
 #include "nbase.h"
 
 #if HAVE_NETDB_H
@@ -127,7 +127,7 @@ int getnameinfo(const struct sockaddr *sa, size_t salen,
     return EAI_FAMILY;
   
   if (serv != NULL) {
-    snprintf(serv, servlen, "%d", ntohs(sin->sin_port));
+    Snprintf(serv, servlen, "%d", ntohs(sin->sin_port));
     return 0;
   }
   

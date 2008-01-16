@@ -104,6 +104,8 @@
 #include "osscan2.h"
 #include "timing.h"
 #include "NmapOps.h"
+#include "Target.h"
+#include "utils.h"
 #include <dnet.h>
 #include <list>
 
@@ -466,8 +468,8 @@ private:
   void sendTIcmpProbe(HostOsScanStats *hss, int probeNo);
   /* Response process functions. */
   bool processTSeqResp(HostOsScanStats *hss, struct ip *ip, int replyNo);
-  bool processTOpsResp(HostOsScanStats *hss, struct tcphdr *tcp, int replyNo);
-  bool processTWinResp(HostOsScanStats *hss, struct tcphdr *tcp, int replyNo);
+  bool processTOpsResp(HostOsScanStats *hss, struct tcp_hdr *tcp, int replyNo);
+  bool processTWinResp(HostOsScanStats *hss, struct tcp_hdr *tcp, int replyNo);
   bool processTEcnResp(HostOsScanStats *hss, struct ip *ip);
   bool processT1_7Resp(HostOsScanStats *hss, struct ip *ip, int replyNo);
   bool processTUdpResp(HostOsScanStats *hss, struct ip *ip);
@@ -477,7 +479,7 @@ private:
   void makeTOpsFP(HostOsScanStats *hss);
   void makeTWinFP(HostOsScanStats *hss);
 
-  bool get_tcpopt_string(struct tcphdr *tcp, int mss, char *result, int maxlen);
+  bool get_tcpopt_string(struct tcp_hdr *tcp, int mss, char *result, int maxlen);
 
   int rawsd; /* raw socket descriptor */
   struct eth_nfo eth;
@@ -780,7 +782,7 @@ list<OFProbe *>::iterator HostOsScanStats::getActiveProbe(OFProbeType type, int 
   if(probeI == probesActive.end()) {
     /* not found!? */ 
     if(o.debugging > 1)
-      printf("Probe doesn't exist! Probe type: %d. Probe subid: %d\n", type, subid);
+      log_write(LOG_PLAIN, "Probe doesn't exist! Probe type: %d. Probe subid: %d\n", type, subid);
     return probesActive.end();
   }
   
@@ -809,8 +811,8 @@ double HostOsScanStats::timingRatio() {
   int msec_taken = TIMEVAL_MSEC_SUBTRACT(seq_send_times[NUM_SEQ_SAMPLES -1 ], 
 					 seq_send_times[0]);
   if (o.debugging) {
-    printf("OS detection timingRatio() == (%.3f - %.3f) * 1000 / %d == %.3f\n",
-	   seq_send_times[NUM_SEQ_SAMPLES - 1].tv_sec + seq_send_times[NUM_SEQ_SAMPLES - 1].tv_usec / 1000000.0, seq_send_times[0].tv_sec + (float) seq_send_times[0].tv_usec / 1000000.0, msec_ideal, (float) msec_taken / msec_ideal);
+    log_write(LOG_PLAIN, "OS detection timingRatio() == (%.3f - %.3f) * 1000 / %d == %.3f\n",
+	      seq_send_times[NUM_SEQ_SAMPLES - 1].tv_sec + seq_send_times[NUM_SEQ_SAMPLES - 1].tv_usec / 1000000.0, seq_send_times[0].tv_sec + (float) seq_send_times[0].tv_usec / 1000000.0, msec_ideal, (float) msec_taken / msec_ideal);
   }
   return (double) msec_taken / msec_ideal;
 }
@@ -924,13 +926,13 @@ HostOsScan::HostOsScan(Target *t) {
     memcpy(eth.srcmac, t->SrcMACAddress(), 6);
     memcpy(eth.dstmac, t->NextHopMACAddress(), 6);
     if ((eth.ethsd = eth_open_cached(t->deviceName())) == NULL)
-      fatal("%s: Failed to open ethernet device (%s)", __FUNCTION__, t->deviceName());
+      fatal("%s: Failed to open ethernet device (%s)", __func__, t->deviceName());
     rawsd = -1;
     ethptr = &eth;
   } else {
     /* Init our raw socket */
     if ((rawsd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0 )
-      pfatal("socket troubles in get_fingerprint");
+      pfatal("socket troubles in %s", __func__);
     unblock_socket(rawsd);
     broadcast_socket(rawsd);
 #ifndef WIN32
@@ -1281,8 +1283,8 @@ void HostOsScan::sendNextProbe(HostOsScanStats *hss) {
   hss->moveProbeToActiveList(probeI);
 
   if (o.debugging > 1) {
-    printf("Send probe (type: %s, subid: %d) to %s\n",
-           probe->typestr(), probe->subid, hss->target->targetipstr());
+    log_write(LOG_PLAIN, "Send probe (type: %s, subid: %d) to %s\n",
+              probe->typestr(), probe->subid, hss->target->targetipstr());
   }
   
 }
@@ -1409,7 +1411,7 @@ void HostOsScan::sendTUdpProbe(HostOsScanStats *hss, int probeNo) {
 
 bool HostOsScan::processResp(HostOsScanStats *hss, struct ip *ip, unsigned int len, struct timeval *rcvdtime) {
   struct ip *ip2;
-  struct tcphdr *tcp;
+  struct tcp_hdr *tcp;
   struct icmp *icmp;
   int testno;
   bool isPktUseful = false;
@@ -1423,7 +1425,7 @@ bool HostOsScan::processResp(HostOsScanStats *hss, struct ip *ip, unsigned int l
   
   if (ip->ip_p == IPPROTO_TCP) {
     if(len < 20) return false;
-    tcp = ((struct tcphdr *) (((char *) ip) + 4 * ip->ip_hl));
+    tcp = ((struct tcp_hdr *) (((char *) ip) + 4 * ip->ip_hl));
     if(len < (unsigned int)(4 * tcp->th_off)) return false;
     testno = ntohs(tcp->th_dport) - tcpPortBase;
     
@@ -1519,8 +1521,8 @@ bool HostOsScan::processResp(HostOsScanStats *hss, struct ip *ip, unsigned int l
       adjust_times(hss, probe, rcvdtime);
 
 	if(o.debugging > 1)
-	  printf("Got a valid response for probe (type: %s subid: %d) from %s\n",
-			 probe->typestr(), probe->subid, hss->target->targetipstr());
+	  log_write(LOG_PLAIN, "Got a valid response for probe (type: %s subid: %d) from %s\n",
+		    probe->typestr(), probe->subid, hss->target->targetipstr());
 
     /* delete the probe. */
     hss->removeActiveProbe(probeI);
@@ -1571,14 +1573,18 @@ void HostOsScan::makeFP(HostOsScanStats *hss) {
 	  /* Replace TTL with initial TTL. */
 	  for(pAV = hss->FPtests[i]->results; pAV; pAV = pAV->next) {
 		if(pAV->attribute == "T") {
+		  /* Found TTL item. The value for this attribute is the
+		     received TTL encoded in decimal. We replace it with the
+		     initial TTL encoded in hex. */
 		  ttl = atoi(pAV->value);
-		  /* found TTL item */
 
 		  if(hss->distance_guess == -1)
 			hss->distance_guess = get_initial_ttl_guess(ttl) - ttl;
 
 		  if(hss->distance != -1) {
-			/* We've gotten response for the UDP probe and thus have the "true" hop count. */
+			/* We've gotten response for the UDP probe and thus have
+			   the "true" hop count. Add the received TTL to the hop
+			   count to get the initial TTL. */
 			sprintf(pAV->value, "%hX", ttl + hss->distance);
 		  } else {
 			/* Guess the initial TTL value */
@@ -1602,7 +1608,7 @@ void HostOsScan::makeFP(HostOsScanStats *hss) {
     }
     last = i;
   }
-  if (last) hss->FPtests[last]->next = NULL;
+  if (last != -1) hss->FPtests[last]->next = NULL;
 
   /*  printf("%s", fp2ascii(FP)); */
 
@@ -1626,6 +1632,7 @@ void HostOsScan::makeTSeqFP(HostOsScanStats *hss) {
   int tcp_ipid_seqclass; /* TCP IPID SEQ TYPE defines in nmap.h */
   int icmp_ipid_seqclass; /* ICMP IPID SEQ TYPE defines in nmap.h */
   int good_tcp_ipid_num, good_icmp_ipid_num;
+  int tsnewval = 0;
 
   struct AVal *seq_AVs;
 
@@ -1674,15 +1681,15 @@ void HostOsScan::makeTSeqFP(HostOsScanStats *hss) {
       avg_ts_hz += dhz / ( hss->si.responses - 1);
     }
 
-    if (avg_ts_hz > 0 && avg_ts_hz < 3.9) { /* relatively wide range because sampling time so short and frequency so slow */
+    if (avg_ts_hz > 0 && avg_ts_hz < 5.66) { /* relatively wide range because sampling time so short and frequency so slow */
       hss->si.ts_seqclass = TS_SEQ_2HZ;
       hss->si.lastboot = hss->seq_send_times[0].tv_sec - (hss->si.timestamps[0] / 2); 
     }
-    else if (avg_ts_hz > 85 && avg_ts_hz < 115) {
+    else if (avg_ts_hz > 70 && avg_ts_hz < 150) {
       hss->si.ts_seqclass = TS_SEQ_100HZ;
       hss->si.lastboot = hss->seq_send_times[0].tv_sec - (hss->si.timestamps[0] / 100);
     }
-    else if (avg_ts_hz > 900 && avg_ts_hz < 1100) {
+    else if (avg_ts_hz > 724 && avg_ts_hz < 1448) {
       hss->si.ts_seqclass = TS_SEQ_1000HZ;
       hss->si.lastboot = hss->seq_send_times[0].tv_sec - (hss->si.timestamps[0] / 1000); 
     }
@@ -1894,6 +1901,7 @@ void HostOsScan::makeTSeqFP(HostOsScanStats *hss) {
 
     /* TCP Timestamp option sequencing */
     switch(hss->si.ts_seqclass) {
+
     case TS_SEQ_ZERO:
       seq_AVs[avnum].next = &seq_AVs[avnum+1]; avnum++;
       seq_AVs[avnum].attribute = "TS";
@@ -1905,7 +1913,29 @@ void HostOsScan::makeTSeqFP(HostOsScanStats *hss) {
     case TS_SEQ_OTHER_NUM:
       seq_AVs[avnum].next = &seq_AVs[avnum+1]; avnum++;
       seq_AVs[avnum].attribute = "TS";
-      sprintf(seq_AVs[avnum].value, "%X", (unsigned int)(0.5 + log(avg_ts_hz)/log(2.0)));
+
+      /* Here we "cheat" a little to make the classes correspond more
+	 closely to common real-life frequencies (particularly 100)
+	 which aren't powers of two. */
+      if (avg_ts_hz <= 5.66) {
+	/* 1 would normally range from 1.4 - 2.82, but we expand that
+	   to 0 - 5.66, so we won't ever even get a value of 2.  Needs
+	   to be wide because our test is so fast that it is hard to
+	   match slow frequencies exactly.  */
+	tsnewval = 1;
+      } else if (avg_ts_hz > 70 && avg_ts_hz <= 150) {
+	/* mathematically 7 would be 90.51 - 181, but we change to 70-150 to 
+	   better align with common freq 100 */
+	tsnewval = 7;
+      } else if (avg_ts_hz > 150 && avg_ts_hz <= 350) {
+	/* would normally be 181 - 362.  Now aligns better with 200 */
+	tsnewval = 8;
+      } else {
+	/* Do a log base2 rounded to nearest int */
+	tsnewval = (unsigned int)(0.5 + log(avg_ts_hz)/log(2.0));
+      }
+
+      sprintf(seq_AVs[avnum].value, "%X", tsnewval);
       break;
     case TS_SEQ_UNSUPPORTED:
       seq_AVs[avnum].next = &seq_AVs[avnum+1]; avnum++;
@@ -1915,7 +1945,7 @@ void HostOsScan::makeTSeqFP(HostOsScanStats *hss) {
     }
   }
   else {
-    log_write(LOG_STDOUT|LOG_NORMAL|LOG_SKID,
+    log_write(LOG_PLAIN,
 			  "Insufficient responses for TCP sequencing (%d), OS detection may be less accurate\n", hss->si.responses);
   }
 }
@@ -1973,7 +2003,7 @@ void HostOsScan::makeTWinFP(HostOsScanStats *hss) {
 bool HostOsScan::processTSeqResp(HostOsScanStats *hss, struct ip *ip, int replyNo) {
   assert(replyNo>=0 && replyNo<NUM_SEQ_SAMPLES);
 
-  struct tcphdr *tcp;
+  struct tcp_hdr *tcp;
   int seq_response_num;  /* response # for sequencing */
   u32 timestamp = 0; /* TCP timestamp we receive back */
 
@@ -1983,11 +2013,11 @@ bool HostOsScan::processTSeqResp(HostOsScanStats *hss, struct ip *ip, int replyN
   }
   hss->lastipid = ip->ip_id;
   
-  tcp = ((struct tcphdr *) (((char *) ip) + 4 * ip->ip_hl));
+  tcp = ((struct tcp_hdr *) (((char *) ip) + 4 * ip->ip_hl));
 
   if ((tcp->th_flags & TH_RST)) {
     if (hss->si.responses == 0) {     
-      fprintf(stderr, "WARNING:  RST from %s port %d -- is this port really open?\n",
+      error("WARNING:  RST from %s port %d -- is this port really open?",
               hss->target->targetipstr(), hss->openTCPPort);
     }
     return false;
@@ -2035,7 +2065,7 @@ bool HostOsScan::processTSeqResp(HostOsScanStats *hss, struct ip *ip, int replyN
   return false;
 }
 
-bool HostOsScan::processTOpsResp(HostOsScanStats *hss, struct tcphdr *tcp, int replyNo) {
+bool HostOsScan::processTOpsResp(HostOsScanStats *hss, struct tcp_hdr *tcp, int replyNo) {
   assert(replyNo>=0 || replyNo<6);
   bool opsParseResult;
   
@@ -2077,7 +2107,7 @@ bool HostOsScan::processTOpsResp(HostOsScanStats *hss, struct tcphdr *tcp, int r
   return true;
 }
 
-bool HostOsScan::processTWinResp(HostOsScanStats *hss, struct tcphdr *tcp, int replyNo) {
+bool HostOsScan::processTWinResp(HostOsScanStats *hss, struct tcp_hdr *tcp, int replyNo) {
   assert(replyNo>=0 || replyNo<6);
   
   if (hss->FP_TWin || hss->TWin_AVs[replyNo]) return false;
@@ -2116,7 +2146,7 @@ bool HostOsScan::processTEcnResp(HostOsScanStats *hss, struct ip *ip) {
   char *p;
   int numtests = 7;
   int current_testno = 0;
-  struct tcphdr *tcp = ((struct tcphdr *) (((char *) ip) + 4 * ip->ip_hl));
+  struct tcp_hdr *tcp = ((struct tcp_hdr *) (((char *) ip) + 4 * ip->ip_hl));
   bool opsParseResult;
 
   if (hss->FP_TEcn) return false;
@@ -2208,7 +2238,7 @@ bool HostOsScan::processT1_7Resp(HostOsScanStats *hss, struct ip *ip, int replyN
   assert(replyNo>=0 && replyNo<7);
  
   int numtests;
-  struct tcphdr *tcp = ((struct tcphdr *) (((char *) ip) + 4 * ip->ip_hl));
+  struct tcp_hdr *tcp = ((struct tcp_hdr *) (((char *) ip) + 4 * ip->ip_hl));
   struct AVal *AVs;
   int current_testno = 0;
   
@@ -2373,7 +2403,7 @@ bool HostOsScan::processTUdpResp(HostOsScanStats *hss, struct ip *ip) {
   int numtests;
   unsigned short checksum;
   unsigned short *checksumptr;
-  udphdr_bsd *udp;
+  struct udp_hdr *udp;
   struct AVal *AVs;
   int i;
   int current_testno = 0;
@@ -2395,7 +2425,7 @@ bool HostOsScan::processTUdpResp(HostOsScanStats *hss, struct ip *ip) {
   assert(icmp->icmp_type == 3 && icmp->icmp_code == 3);
   
   ip2 = (struct ip*)((char *)icmp + 8);
-  udp = (udphdr_bsd *)((char *)ip2 + 4 * ip->ip_hl);
+  udp = (struct udp_hdr *)((char *)ip2 + 4 * ip->ip_hl);
 
   /* The ports should match. */
   if (ntohs(udp->uh_sport) != hss->upi.sport || ntohs(udp->uh_dport) != hss->upi.dport) {
@@ -2449,7 +2479,7 @@ bool HostOsScan::processTUdpResp(HostOsScanStats *hss, struct ip *ip) {
 
   /* unused filed not zero in Destination Unreachable Message */
   AVs[current_testno].attribute = "UN";
-  sprintf(AVs[current_testno].value, "%hX", ntohl(icmp->icmp_hun.ih_void));
+  sprintf(AVs[current_testno].value, "%hX", ntohl(icmp->icmp_void));
 
   current_testno++;
 
@@ -2728,7 +2758,7 @@ bool HostOsScan::processTIcmpResp(HostOsScanStats *hss, struct ip *ip, int reply
   return true;
 }
 
-bool HostOsScan::get_tcpopt_string(struct tcphdr *tcp, int mss, char *result, int maxlen) {
+bool HostOsScan::get_tcpopt_string(struct tcp_hdr *tcp, int mss, char *result, int maxlen) {
   char *p,*q;
   u16 tmpshort;
   u32 tmpword;
@@ -2736,8 +2766,8 @@ bool HostOsScan::get_tcpopt_string(struct tcphdr *tcp, int mss, char *result, in
   int opcode;
 
   p = result;
-  length = (tcp->th_off * 4) - sizeof(struct tcphdr);
-  q = ((char *)tcp) + sizeof(struct tcphdr);
+  length = (tcp->th_off * 4) - sizeof(struct tcp_hdr);
+  q = ((char *)tcp) + sizeof(struct tcp_hdr);
 
   /*
    * Example parsed result: M5B4ST11NW2
@@ -2828,7 +2858,7 @@ HostOsScanInfo::HostOsScanInfo(Target *t, OsScanInfo *OsSI) {
 
   if (target->FPR == NULL)
     target->FPR = new FingerPrintResults;
-  target->osscan_performed = 1;
+  target->osscanSetFlag(OS_PERF);
   
   hss = new HostOsScanStats(t);
 }
@@ -2871,10 +2901,10 @@ OsScanInfo::OsScanInfo(vector<Target *> &Targets) {
          Targets[targetno]->ports.getStateCounts(IPPROTO_TCP, PORT_UNFILTERED) == 0)) {
       if (o.osscan_limit) {
         if (o.verbose)
-          log_write(LOG_STDOUT|LOG_NORMAL|LOG_SKID, "Skipping OS Scan against %s due to absence of open (or perhaps closed) ports\n", Targets[targetno]->NameIP());
+          log_write(LOG_PLAIN, "Skipping OS Scan against %s due to absence of open (or perhaps closed) ports\n", Targets[targetno]->NameIP());
         continue;
       } else {   
-        log_write(LOG_STDOUT|LOG_NORMAL|LOG_SKID,"Warning:  OS detection for %s will be MUCH less reliable because we did not find at least 1 open and 1 closed TCP port\n", Targets[targetno]->targetipstr());
+        Targets[targetno]->osscanSetFlag(OS_PERF_UNREL);
       }
     }
 
@@ -2901,7 +2931,7 @@ HostOsScanInfo *OsScanInfo::findIncompleteHost(struct sockaddr_storage *ss) {
   struct sockaddr_in *sin = (struct sockaddr_in *) ss;
 
   if (sin->sin_family != AF_INET)
-    fatal("UltraScanInfo::findIncompleteHost passed a non IPv4 address");
+    fatal("%s passed a non IPv4 address", __func__);
 
   for(hostI = incompleteHosts.begin(); hostI != incompleteHosts.end(); hostI++) {
     if ((*hostI)->target->v4hostip()->s_addr == sin->sin_addr.s_addr)
@@ -3002,20 +3032,13 @@ int send_closedudp_probe_2(struct udpprobeinfo &upi, int sd,
   static u16 id = 0x1042; 
   u8 packet[328]; /* 20 IP hdr + 8 UDP hdr + 300 data */
   struct ip *ip = (struct ip *) packet;
-  udphdr_bsd *udp = (udphdr_bsd *) (packet + sizeof(struct ip));
+  struct udp_hdr *udp = (struct udp_hdr *) (packet + sizeof(struct ip));
   struct in_addr *source;
   int datalen = 300;
   unsigned char *data = packet + 28;
   unsigned short realcheck; /* the REAL checksum */
   int res;
   int decoy;
-  struct pseudo_udp_hdr {
-    struct in_addr source;
-    struct in_addr dest;        
-    u8 zero;
-    u8 proto;        
-    u16 length;
-  } *pseudo = (struct pseudo_udp_hdr *) ((char *)udp - 12) ;
 
   /* if (!patternbyte) patternbyte = (get_random_uint() % 60) + 65; */
   memset(data, patternbyte, datalen);
@@ -3030,41 +3053,32 @@ int send_closedudp_probe_2(struct udpprobeinfo &upi, int sd,
 
   /* check that required fields are there and not too silly */
   if ( !victim || !sport || !dport || (!eth && sd < 0)) {
-    fprintf(stderr, "send_closedudp_probe_2: One or more of your parameters suck!\n");
+    error("%s: One or more of your parameters suck!", __func__);
     return 1;
   }
 
   for(decoy=0; decoy < o.numdecoys; decoy++) {
     source = &o.decoys[decoy];
 
-    memset((char *) packet, 0, sizeof(struct ip) + sizeof(udphdr_bsd));
+    memset((char *) packet, 0, sizeof(struct ip) + sizeof(struct udp_hdr));
 
     udp->uh_sport = htons(sport);
     udp->uh_dport = htons(dport);
     udp->uh_ulen = htons(8 + datalen);
 
-    /* Now the psuedo header for checksuming */
-    pseudo->source.s_addr = source->s_addr;
-    pseudo->dest.s_addr = victim->s_addr;
-    pseudo->proto = IPPROTO_UDP;
-    pseudo->length = htons(sizeof(udphdr_bsd) + datalen);
-  
     /* OK, now we should be able to compute a valid checksum */
-    realcheck = in_cksum((unsigned short *)pseudo, 20 /* pseudo + UDP headers */ +
-                         datalen);
+    realcheck = magic_tcpudp_cksum(source, victim, IPPROTO_UDP,
+				   sizeof(struct udp_hdr) + datalen, (char *) udp);
 #if STUPID_SOLARIS_CHECKSUM_BUG
-    udp->uh_sum = sizeof(udphdr_bsd) + datalen;
+    udp->uh_sum = sizeof(struct udp_hdr) + datalen;
 #else
     udp->uh_sum = realcheck;
 #endif
 
-    /* Goodbye, pseudo header! */
-    memset(pseudo, 0, sizeof(*pseudo));
-  
     /* Now for the ip header */
     ip->ip_v = 4;
     ip->ip_hl = 5;
-    ip->ip_len = htons(sizeof(struct ip) + sizeof(udphdr_bsd) + datalen);
+    ip->ip_len = htons(sizeof(struct ip) + sizeof(struct udp_hdr) + datalen);
     ip->ip_id = id;
     ip->ip_ttl = myttl;
     ip->ip_p = IPPROTO_UDP;
@@ -3088,14 +3102,10 @@ int send_closedudp_probe_2(struct udpprobeinfo &upi, int sd,
       upi.patternbyte = patternbyte;
       upi.target.s_addr = ip->ip_dst.s_addr;
     }
-    if (TCPIP_DEBUGGING > 1) {
-      log_write(LOG_STDOUT, "Raw UDP packet creation completed!  Here it is:\n");
-      readudppacket(packet,1);
-    }
   
     if ((res = send_ip_packet(sd, eth, packet, ntohs(ip->ip_len))) == -1)
       {
-        perror("send_ip_packet in send_closedupd_probe_2");
+        gh_perror("send_ip_packet in %s", __func__);
         return 1;
       }
   }
@@ -3114,6 +3124,13 @@ int get_initial_ttl_guess(u8 ttl) {
     return 255;
 }
 
+/* This function takes an array of "numSamples" IP IDs and analyzes
+ them to determine their sequenceability classification.  It returns
+ one of the IPID_SEQ_* classifications defined in nmap.h .  If the
+ function cannot determine the sequence, IPID_SEQ_UNKNOWN is returned.
+ This islocalhost argument is a boolean specifying whether these
+ numbers were generated by scanning localhost.  NOTE: the "ipids" argument
+ may be modified if localhost is set to true. */
 int get_ipid_sequence(int numSamples, int *ipids, int islocalhost) {
   u16 ipid_diffs[32];
   int i;
@@ -3254,7 +3271,7 @@ static void begin_sniffer(HostOsScan *HOS, vector<Target *> &Targets) {
 
   if (doIndividual) {
     for(targetno = 0; targetno < Targets.size(); targetno++) {
-      len = snprintf(dst_hosts + filterlen, 
+      len = Snprintf(dst_hosts + filterlen, 
                      sizeof(dst_hosts) - filterlen,
                      "%ssrc host %s", (targetno == 0)? "" : " or ",
                      Targets[targetno]->targetipstr());
@@ -3262,7 +3279,7 @@ static void begin_sniffer(HostOsScan *HOS, vector<Target *> &Targets) {
         fatal("ran out of space in dst_hosts");
       filterlen += len;
     }
-    len = snprintf(dst_hosts + filterlen, sizeof(dst_hosts) - filterlen, ")))");
+    len = Snprintf(dst_hosts + filterlen, sizeof(dst_hosts) - filterlen, ")))");
     if (len < 0 || len + filterlen >= (int) sizeof(dst_hosts))
       fatal("ran out of space in dst_hosts");
   }
@@ -3271,16 +3288,16 @@ static void begin_sniffer(HostOsScan *HOS, vector<Target *> &Targets) {
   HOS->pd = my_pcap_open_live(Targets[0]->deviceName(), 8192,  (o.spoofsource)? 1 : 0, pcap_selectable_fd_valid()? 200 : 2);
 
   if (doIndividual)
-    len = snprintf(pcap_filter, sizeof(pcap_filter), "dst host %s and (icmp or (tcp and (%s", 
+    len = Snprintf(pcap_filter, sizeof(pcap_filter), "dst host %s and (icmp or (tcp and (%s", 
                    inet_ntoa(Targets[0]->v4source()), dst_hosts);
   else
-    len = snprintf(pcap_filter, sizeof(pcap_filter), "dst host %s and (icmp or tcp)", 
+    len = Snprintf(pcap_filter, sizeof(pcap_filter), "dst host %s and (icmp or tcp)", 
                    inet_ntoa(Targets[0]->v4source()));
   if (len < 0 || len >= (int) sizeof(pcap_filter))
     fatal("ran out of space in pcap filter");
   filterlen = len;
     
-  if (o.debugging > 2) printf("Pcap filter: %s\n", pcap_filter);
+  if (o.debugging > 2) log_write(LOG_PLAIN, "Pcap filter: %s\n", pcap_filter);
   set_pcap_filter(Targets[0]->deviceName(), HOS->pd, pcap_filter);
   
   return;
@@ -3337,7 +3354,7 @@ static void doSeqTests(OsScanInfo *OSI, HostOsScan *HOS) {
   do {
     if(timeToSleep > 0) {
       if(o.debugging > 1) {
-        printf("Sleep %dus for next sequence probe\n", timeToSleep);
+        log_write(LOG_PLAIN, "Sleep %dus for next sequence probe\n", timeToSleep);
       }
       usleep(timeToSleep);
     }
@@ -3349,9 +3366,9 @@ static void doSeqTests(OsScanInfo *OSI, HostOsScan *HOS) {
     if(o.debugging > 2) {
 	  for(hostI = OSI->incompleteHosts.begin(); hostI != OSI->incompleteHosts.end(); hostI++) {
         hss = (*hostI)->hss;
-        printf("Host %s. ProbesToSend %d: \tProbesActive %d\n",
-               hss->target->targetipstr(), hss->numProbesToSend(),
-               hss->numProbesActive());
+        log_write(LOG_PLAIN, "Host %s. ProbesToSend %d: \tProbesActive %d\n",
+                  hss->target->targetipstr(), hss->numProbesToSend(),
+                  hss->numProbesActive());
       }
     }
     
@@ -3406,7 +3423,7 @@ static void doSeqTests(OsScanInfo *OSI, HostOsScan *HOS) {
       if(to_usec < 2000) to_usec = 2000;
       
       if(o.debugging > 2)
-        printf("pcap wait time is %ld.\n", to_usec);
+        log_write(LOG_PLAIN, "pcap wait time is %ld.\n", to_usec);
       
       ip = (struct ip*) readip_pcap(HOS->pd, &bytes, to_usec, &rcvdtime, &linkhdr);
     
@@ -3504,7 +3521,7 @@ static void doTUITests(OsScanInfo *OSI, HostOsScan *HOS) {
 
     if(timeToSleep > 0) {
       if(o.debugging > 1) {
-        printf("Time to sleep %d. Sleeping. \n", timeToSleep);
+        log_write(LOG_PLAIN, "Time to sleep %d. Sleeping. \n", timeToSleep);
       }
     
       usleep(timeToSleep);
@@ -3518,9 +3535,9 @@ static void doTUITests(OsScanInfo *OSI, HostOsScan *HOS) {
       for(hostI = OSI->incompleteHosts.begin(); 
           hostI != OSI->incompleteHosts.end(); hostI++) {
         hss = (*hostI)->hss;
-        printf("Host %s. ProbesToSend %d: \tProbesActive %d\n",
-               hss->target->targetipstr(), hss->numProbesToSend(),
-               hss->numProbesActive());
+        log_write(LOG_PLAIN, "Host %s. ProbesToSend %d: \tProbesActive %d\n",
+                  hss->target->targetipstr(), hss->numProbesToSend(),
+                  hss->numProbesActive());
       }
     }
     
@@ -3575,7 +3592,7 @@ static void doTUITests(OsScanInfo *OSI, HostOsScan *HOS) {
       if(to_usec < 2000) to_usec = 2000;
       
       if(o.debugging > 2)
-        printf("pcap wait time is %ld.\n", to_usec);
+        log_write(LOG_PLAIN, "pcap wait time is %ld.\n", to_usec);
       
       ip = (struct ip*) readip_pcap(HOS->pd, &bytes, to_usec, &rcvdtime, &linkhdr);
     
@@ -3657,7 +3674,7 @@ static void endRound(OsScanInfo *OSI, HostOsScan *HOS, int roundNum) {
         hsi->FP_matches[roundNum].num_perfect_matches > 0) {
       memcpy(&(hsi->target->seq), &hsi->hss->si, sizeof(struct seq_info));
       if (roundNum > 0) {
-        if(o.verbose) error("WARNING:  OS didn't match until the try #%d", roundNum + 1);
+        if(o.verbose) error("WARNING:  OS didn't match until try #%d", roundNum + 1);
       }
       hsi->target->FPR->goodFP = roundNum;
       match_fingerprint(hsi->target->FPR->FPs[roundNum], hsi->target->FPR, 
@@ -3742,24 +3759,6 @@ static void printFP(OsScanInfo *OSI) {
   }
 }
 
-static void doOsScan1(OsScanInfo *OSI) {
-  list<HostOsScanInfo *>::iterator hostI;
-
-  if(!o.reference_FPs1)
-    o.reference_FPs1 = parse_fingerprint_reference_file("nmap-os-fingerprints");
-  
-  for(hostI = OSI->incompleteHosts.begin(); 
-      hostI != OSI->incompleteHosts.end(); hostI++) {
-    /* If the fingerprint found was so good that we want the user to
-       submit it, don't do gen1 os scan because the results might bias
-       the user into a wrong submission (or make the user less likely
-       to actually submit */
-    if ((*hostI)->target->FPR->OmitSubmissionFP()) {
-      os_scan((*hostI)->target);
-    }
-  }
-}
-
 /* Goes through every unmatched host in OSI.  If a host has completed
    the maximum number of OS detection tries allowed for it without
    matching, it is transferred to the passed in unMatchedHosts list.
@@ -3838,8 +3837,8 @@ static int os_scan_2(vector<Target *> &Targets) {
       bool plural = (OSI->numIncompleteHosts() != 1);
       if (!plural) {
 	(*(OSI->incompleteHosts.begin()))->target->NameIP(targetstr, sizeof(targetstr));
-      } else snprintf(targetstr, sizeof(targetstr), "%d hosts", (int) OSI->numIncompleteHosts());
-      printf("%s OS detection (try #%d) against %s\n", (itry == 0)? "Initiating" : "Retrying", itry + 1, targetstr);
+      } else Snprintf(targetstr, sizeof(targetstr), "%d hosts", (int) OSI->numIncompleteHosts());
+      log_write(LOG_PLAIN, "%s OS detection (try #%d) against %s\n", (itry == 0)? "Initiating" : "Retrying", itry + 1, targetstr);
       log_flush_all();
     }
     startRound(OSI, HOS, itry);
@@ -3865,14 +3864,6 @@ static int os_scan_2(vector<Target *> &Targets) {
        Normally let output.cc to print the FP. */
     if(o.debugging > 1)
       printFP(OSI);
-    
-    /*
-     * For the incomplete hosts,  we fall back on the former os_scan engine which has
-     * a larger os-fingerprint db.
-     */
-    if(o.osscan != OS_SCAN_SYS_2_ONLY) {      
-      doOsScan1(OSI);
-    }
   }
 
   delete HOS;
