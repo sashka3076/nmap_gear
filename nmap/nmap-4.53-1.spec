@@ -3,7 +3,7 @@
 # to the rpmbuild command line.
 
 %define name nmap
-%define version 4.52
+%define version 4.53
 %define release 1
 %define _prefix /usr
 

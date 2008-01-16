@@ -1,4 +1,29 @@
-# Nmap Changelog ($Id: CHANGELOG 6663 2008-01-01 22:15:52Z fyodor $); -*-text-*-
+# Nmap Changelog ($Id: CHANGELOG 6676 2008-01-12 22:39:34Z fyodor $); -*-text-*-
+4.53
+
+o Impoved Windows executable installer by making uninstall work better
+  on systems which changed the default install path.  The shortcut is
+  also now deleted properly on Vista. [Rob Nicholls]
+
+o Windows installer is now generated using NSIS 2.34 rather than
+  2.13. [Fyodor]
+
+o Added UPnP-info NSE script by Thomas Buchanan. It gathers
+  information from the UPnP service (UDP port 1900) which listens on
+  many network devices such as routers, printers, and networked media
+  players.
+
+o Fixed a --traceroute bug (assertion failure crash) which occured
+  when the first hop of the first host in a tracegroup (reference
+  trace) times out.  Thanks to Sebastián García for the bug report and
+  testing, and Eddie for the patch.
+
+o Fix a problem which prevented proper port number matching in
+  NSE scripts (port_or_service function) due to a variable
+  shadowing bug. [Sven Klemm]
+
+o Improved rpcinfo.nse to better sort and display available RPC
+  services. [Sven Klemm]
 
 4.52
 
@@ -23,7 +48,7 @@ o Fixed multiple NSE scripts that weren't always properly closing their
   "bad argument #1 to 'close' (nsock expected, got no value)" [Kris]
 
 o Added a new version detection probe for the Trend Micro OfficeScan
-  product line. [Tom Sellers]
+  product line. [Tom Sellers, Doug]
 
 4.51BETA
 
