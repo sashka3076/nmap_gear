@@ -40,7 +40,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -79,7 +79,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -99,7 +99,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: TargetGroup.h 6633 2007-12-22 06:32:03Z fyodor $ */
+/* $Id: TargetGroup.h 6858 2008-02-28 18:52:06Z fyodor $ */
 
 #ifndef TARGETGROUP_H
 #define TARGETGROUP_H
@@ -134,6 +134,8 @@ class TargetGroup {
   char get_targets_type() {return targets_type;};
   /* get the netmask */
   int get_mask() {return netmask;};
+  /* is the current expression a named host */
+  int get_namedhost() {return namedhost;};
   /* Skip an octet in the range array */
   int skip_range(_octet_nums octet);
  private:
@@ -160,6 +162,8 @@ class TargetGroup {
 		  the fields are not valid */
   unsigned long ipsleft; 
 
+  // is the current target expression a named host
+  int namedhost;
 };
 
 class HostGroupState {

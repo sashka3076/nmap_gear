@@ -23,12 +23,12 @@
 
 APP_NAME = "zenmap"
 APP_DISPLAY_NAME = "Zenmap"
-APP_WEB_SITE = "http://insecure.org/nmap/zenmap"
-APP_DOWNLOAD_SITE = "http://insecure.org/nmap/download.html"
-APP_COPYRIGHT = "Copyright 2007 Insecure.Com LLC"
+APP_WEB_SITE = "http://nmap.org/zenmap"
+APP_DOWNLOAD_SITE = "http://nmap.org/download.html"
+APP_COPYRIGHT = "Copyright 2005-2008 Insecure.Com LLC"
 
 NMAP_DISPLAY_NAME = "Nmap"
-NMAP_WEB_SITE = "http://insecure.org/nmap"
+NMAP_WEB_SITE = "http://nmap.org"
 
 UMIT_DISPLAY_NAME = "Umit"
 UMIT_WEB_SITE = "http://umit.sourceforge.net/"

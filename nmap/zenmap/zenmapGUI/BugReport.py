@@ -75,7 +75,7 @@ far more likely to be answered than those sent to Fyodor directly.
 
 Code patches to fix bugs are even better than bug reports. Basic \
 instructions for creating patch files with your changes are available at \
-http://insecure.org/nmap/data/HACKING. Patches may be sent to nmap-dev \
+http://nmap.org/data/HACKING. Patches may be sent to nmap-dev \
 (recommended) or to Fyodor directly.
 """ % {"app": escape(APP_DISPLAY_NAME), "nmap": escape(NMAP_DISPLAY_NAME), "nmap_web": escape(NMAP_WEB_SITE)})
         self.vbox.add(self.text)

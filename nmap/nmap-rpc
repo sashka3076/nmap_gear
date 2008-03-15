@@ -1,9 +1,9 @@
 # Known RPC numbers Nmap uses for RPC grinding -*- mode: fundamental; -*-
-# $Id: nmap-rpc 6610 2007-12-20 23:07:11Z fyodor $
+# $Id: nmap-rpc 6728 2008-01-17 07:22:03Z fyodor $
 # This was created by Vik Bajaj <vbajaj@sas.upenn.edu> with help
 # from various members of the nmap-hackers list.  
 # To join nmap-hackers send mail to nmap-hackers-subscribe@insecure.org
-# Nmap is available from http://www.insecure.org/nmap/
+# Nmap is available from http://nmap.org
 # All the rpc services we could find as of Feb26, 2005
 # Tweaked a bit by Fyodor <fyodor@insecure.org>
 #
@@ -17,9 +17,9 @@
 #
 # ident "@(#)rpc        1.11    95/07/14 SMI"   /* SVr4.0 1.2   */
 #
-# $Date: 2007-12-20 15:07:11 -0800 (Thu, 20 Dec 2007) $
+# $Date: 2008-01-16 23:22:03 -0800 (Wed, 16 Jan 2008) $
 #
-# $Revision: 6610 $
+# $Revision: 6728 $
 #
 # Master RPC program number data base (/etc/rpc).
 #

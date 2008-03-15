@@ -38,7 +38,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -77,7 +77,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.cc 6633 2007-12-22 06:32:03Z fyodor $ */
+/* $Id: nmap.cc 6858 2008-02-28 18:52:06Z fyodor $ */
 
 #include "nmap.h"
 #include "osscan.h"
@@ -293,7 +293,7 @@ printf("%s %s ( %s )\n"
        "  -oN/-oX/-oS/-oG <file>: Output scan in normal, XML, s|<rIpt kIddi3,\n"
        "     and Grepable format, respectively, to the given filename.\n"
        "  -oA <basename>: Output in the three major formats at once\n"
-       "  -v: Increase verbosity level (use twice for more effect)\n"
+       "  -v: Increase verbosity level (use twice or more for greater effect)\n"
        "  -d[level]: Set or increase debugging level (Up to 9 is meaningful)\n"
        "  --open: Only show open (or possibly open) ports\n"
        "  --packet-trace: Show all packets sent and received\n"
@@ -359,6 +359,7 @@ static int ip_is_reserved(struct in_addr *ip)
     case 6:         /* USA Army ISC                 */
     case 7:         /* used for BGP protocol        */
     case 10:        /* the infamous 10.0.0.0/8      */
+    case 14:        /* 014/8 is IANA reserved       */
     case 23:        /* 023/8 is IANA reserved       */
     case 27:        /* 027/8 is IANA reserved       */
     case 31:        /* 031/8 is IANA reserved       */
@@ -386,8 +387,8 @@ static int ip_is_reserved(struct in_addr *ip)
   if (i1 == 172 && i2 >= 16 && i2 <= 31)
     return 1;
 
-  /* 173-185/8 is IANA reserved */
-  if (i1 >= 173 && i1 <= 185)
+  /* 175-185/8 is IANA reserved */
+  if (i1 >= 175 && i1 <= 185)
     return 1;
 
   /* 192.168.0.0/16 is reserved for private nets by RFC1819 */
@@ -819,7 +820,7 @@ int nmap_main(int argc, char *argv[]) {
       } else if (optcmp(long_options[option_index].name, "log-errors") == 0) {
         o.log_errors = 1;
       } else if (strcmp(long_options[option_index].name, "webxml") == 0) {
-	o.setXSLStyleSheet("http://www.insecure.org/nmap/data/nmap.xsl");
+	o.setXSLStyleSheet("http://nmap.org/data/nmap.xsl");
       } else if (strcmp(long_options[option_index].name, "oN") == 0) {
 	normalfilename = logfilename(optarg, tm);
       } else if (strcmp(long_options[option_index].name, "oG") == 0 ||

@@ -37,7 +37,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -76,7 +76,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -985,13 +985,8 @@ static void parse_etchosts(char *fname) {
     while (*tp == ' ' || *tp == '\t') tp++;
 
     if (sscanf(tp, "%15s %255s", ipaddrstr, hname) == 2) {
-      if (inet_pton(AF_INET, ipaddrstr, &ia)) {
-        he = new host_elem;
-        he->name = strdup(hname);
-        he->addr = (u32) ia.s_addr;
-        he->cache_hits = 0;
-        etchosts[he->addr % HASH_TABLE_SIZE].push_front(he);
-      }
+      if (inet_pton(AF_INET, ipaddrstr, &ia))
+        addto_etchosts(ia.s_addr, hname);
     }
   }
 
@@ -1041,7 +1036,8 @@ static void addto_etchosts(u32 ip, const char *hname) {
     for(i = 0; i < HASH_TABLE_SIZE; i++) {
       while((it = find_if(etchosts[i].begin(), etchosts[i].end(), remove_and_age)) != etchosts[i].end()) {
         etchosts[i].erase(it);
-        total_size--;
+        if((total_size--) < HASH_TABLE_SIZE/2)
+		break;
       }
     }
   }

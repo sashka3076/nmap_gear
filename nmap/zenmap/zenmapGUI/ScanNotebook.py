@@ -674,7 +674,7 @@ command is missing or something else went wrong. Please, try to remove and recre
                 self.parsed.parse()
                 log.debug(">>> Successfully parsed!")
             except:
-                log.debug(">>> An exception occourried during xml ouput parsing")
+                log.debug(">>> An exception occurred during xml ouput parsing")
                 try:
                     error = self.command_execution.get_error()
                 except:
@@ -691,7 +691,7 @@ command is missing or something else went wrong. Please, try to remove and recre
                     need_root.destroy()
                 else:
                     unknown_problem = HIGAlertDialog(\
-                        message_format=_('An unexpected error occourried!'),\
+                        message_format=_('An unexpected error occurred!'),\
                         secondary_text=error)
                     unknown_problem.run()
                     unknown_problem.destroy()
@@ -859,7 +859,7 @@ Fingerprints Found!"),
 
         if response == gtk.RESPONSE_OK:
             import webbrowser
-            webbrowser.open("http://www.insecure.org/nmap/submit/")
+            webbrowser.open("http://nmap.org/submit/")
         
 
     def __verify_comments_changes(self):

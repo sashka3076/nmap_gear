@@ -162,6 +162,12 @@
           arguments="List of targeted ports"
           need_root="0"/>
           
+  <option name="IPProto Probe"
+          option="-PO%s"
+          hint="IP protocol probes to ping a host or network"
+          arguments="List of targeted ports"
+          need_root="1"/>
+          
   <option name="ICMP ping"
           option="-PE"
           hint="ICMP ping a host or network"
@@ -361,13 +367,13 @@
           need_root="0"/>
           
   <option name="Max time between probes"
-          option="--scan_delay %s"
+          option="--max_scan_delay %s"
           hint="Maximum time between scan probes"
           arguments=""
           need_root="0"/>
           
   <option name="Min time between probes"
-          option="--max_scan_delay %s"
+          option="--scan_delay %s"
           hint="Minimum time between scan probes"
           arguments=""
           need_root="0"/>

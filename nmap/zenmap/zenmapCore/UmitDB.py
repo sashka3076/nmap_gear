@@ -158,7 +158,7 @@ class UmitDB(object):
             yield Scans(scans_id=sid)
 
     def cleanup(self, save_time):
-        log.debug(">>> Cleanning up data base.")
+        log.debug(">>> Cleaning up data base.")
         log.debug(">>> Removing results olders than %s seconds" % save_time)
         self.cursor.execute("SELECT scans_id FROM scans WHERE date < ?", (time() - save_time,))
         
@@ -167,7 +167,7 @@ class UmitDB(object):
             self.cursor.execute("DELETE FROM scans WHERE scans_id = ?", (sid, ))
         else:
             connection.commit()
-            log.debug(">>> Data base sucessfully cleanned up!")
+            log.debug(">>> Data base successfully cleaned up!")
         
 
 class Scans(Table, object):
@@ -176,7 +176,7 @@ class Scans(Table, object):
         if "scans_id" in kargs.keys():
             self.scans_id = kargs["scans_id"]
         else:
-            log.debug(">>>Ceating new scan result entry at data base")
+            log.debug(">>> Creating new scan result entry at data base")
             fields = ["scan_name", "nmap_xml_output", "date"]
             
             for k in kargs.keys():

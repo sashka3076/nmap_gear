@@ -150,10 +150,10 @@ then try to report the bug once again."))
             cancel_dialog.destroy()
         else:
             ok_dialog = HIGAlertDialog(type=gtk.MESSAGE_INFO,
-                                       message_format=_("Bug sucessfully reported!"),
+                                       message_format=_("Bug successfully reported!"),
                                        secondary_text=_("The bug description was \
-sucessfully reported. A web page with detailed description about this report is \
-going to be openned in your default web browser."))
+successfully reported. A web page with detailed description about this report is \
+going to be opened in your default web browser."))
             ok_dialog.run()
             ok_dialog.destroy()
 

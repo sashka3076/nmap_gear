@@ -42,7 +42,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -81,7 +81,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -101,7 +101,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: output.cc 6633 2007-12-22 06:32:03Z fyodor $ */
+/* $Id: output.cc 6858 2008-02-28 18:52:06Z fyodor $ */
 
 #include "output.h"
 #include "osscan.h"
@@ -794,6 +794,12 @@ char* formatScriptOutput(struct script_scan_result ssr) {
 }
 #endif /* NOLUA */
 
+
+/* Note that this escapes newlines, which is generally needed in
+   attributes to avoid parser normalization, but might not be needed
+   or desirable in XML content outside of attributes.  So if we find
+   some cases where we don't want \r\n\t escaped, we'll have to add a
+   parameter to control this. */
 char* xml_convert (const char* str) {
   char *temp, ch=0, prevch = 0, *p;
   int strl = strlen(str);
@@ -802,6 +808,15 @@ char* xml_convert (const char* str) {
   for (p = temp;(prevch = ch, ch = *str);str++) {
     char *a;
     switch (ch) {
+    case '\t':
+      a = "&#x9;";
+      break;
+    case '\r':
+      a = "&#xd;";
+      break;
+    case '\n':
+      a = "&#xa;";
+      break;
     case '<':
       a = "&lt;";
       break;
@@ -1567,7 +1582,7 @@ void printosscanoutput(Target *currenths) {
 	log_write(LOG_PLAIN, "\n");
       }
       if (osscanSys == 2 && !reason) {
-	log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT,"No exact OS matches for host (If you know what OS is running on it, see http://insecure.org/nmap/submit/ ).\nTCP/IP fingerprint:\n%s\n",
+	log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT,"No exact OS matches for host (If you know what OS is running on it, see http://nmap.org/submit/ ).\nTCP/IP fingerprint:\n%s\n",
 		  mergeFPs(FPR->FPs, FPR->numFPs, true,
 			   currenths->v4hostip(), distance, currenths->MACAddress(),
 			   FPR->osscan_opentcpport, FPR->osscan_closedtcpport, FPR->osscan_closedudpport,
@@ -1602,7 +1617,7 @@ void printosscanoutput(Target *currenths) {
     if ((o.verbose > 1 || o.debugging) && reason)
       log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT,"OS fingerprint not ideal because: %s\n", reason);
     if (osscanSys == 2 && !reason) {
-      log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT,"No OS matches for host (If you know what OS is running on it, see http://insecure.org/nmap/submit/ ).\nTCP/IP fingerprint:\n%s\n",
+      log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT,"No OS matches for host (If you know what OS is running on it, see http://nmap.org/submit/ ).\nTCP/IP fingerprint:\n%s\n",
 		mergeFPs(FPR->FPs, FPR->numFPs, true,
 			 currenths->v4hostip(), distance, currenths->MACAddress(),
 			 FPR->osscan_opentcpport, FPR->osscan_closedtcpport, FPR->osscan_closedudpport,
@@ -1628,11 +1643,11 @@ void printosscanoutput(Target *currenths) {
   } else { assert(0); }
   
   if (o.debugging || o.verbose) {
-    char *xml_osfp = xml_convert(mergeFPs(FPR->FPs, FPR->numFPs, false,
+    char *xml_osfp = xml_convert(mergeFPs(FPR->FPs, FPR->numFPs, !reason,
 				 currenths->v4hostip(), distance, currenths->MACAddress(),
 				 FPR->osscan_opentcpport, FPR->osscan_closedtcpport, FPR->osscan_closedudpport,
-				 false));
-    log_write(LOG_XML,"<osfingerprint fingerprint=\"\n%s\" />\n", xml_osfp);
+				 !reason));
+    log_write(LOG_XML,"<osfingerprint fingerprint=\"%s\" />\n", xml_osfp);
     free(xml_osfp);
   }
   
@@ -1869,11 +1884,11 @@ void printfinaloutput() {
     log_write(LOG_STDOUT, "Note: Host seems down. If it is really up, but blocking our ping probes, try -PN\n");
   else if (o.numhosts_up > 0) {
     if (o.osscan && o.servicescan)
-      log_write(LOG_PLAIN, "OS and Service detection performed. Please report any incorrect results at http://insecure.org/nmap/submit/ .\n");
+      log_write(LOG_PLAIN, "OS and Service detection performed. Please report any incorrect results at http://nmap.org/submit/ .\n");
     else if (o.osscan)
-      log_write(LOG_PLAIN, "OS detection performed. Please report any incorrect results at http://insecure.org/nmap/submit/ .\n");
+      log_write(LOG_PLAIN, "OS detection performed. Please report any incorrect results at http://nmap.org/submit/ .\n");
     else if (o.servicescan)
-      log_write(LOG_PLAIN, "Service detection performed. Please report any incorrect results at http://insecure.org/nmap/submit/ .\n");
+      log_write(LOG_PLAIN, "Service detection performed. Please report any incorrect results at http://nmap.org/submit/ .\n");
   }
 
   log_write(LOG_STDOUT|LOG_SKID, "Nmap done: %d %s (%d %s up) scanned in %.3f seconds\n", o.numhosts_scanned, (o.numhosts_scanned == 1)? "IP address" : "IP addresses", o.numhosts_up, (o.numhosts_up == 1)? "host" : "hosts",  o.TimeSinceStartMS(&tv) / 1000.0);

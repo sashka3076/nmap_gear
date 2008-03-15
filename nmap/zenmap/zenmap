@@ -105,7 +105,7 @@ A required module was not found.
                 d = HIGAlertDialog(type=gtk.MESSAGE_ERROR,
                                    message_format=_("Bug not reported"),
                                    secondary_text=_("""A critical error \
-occourried during %s execution,
+occurred during %s execution,
 and it was not properly reported to our bug tracker. Please,
 copy the error message bellow and report it on our bug tracker.
 

@@ -43,6 +43,7 @@ from zenmapCore.I18N import _
 class ProfileEditor(HIGWindow):
     def __init__(self, profile_name=None, delete=True):
         HIGWindow.__init__(self)
+        self.connect("delete_event", self.quit)
         self.set_title(_('Profile Editor'))
         self.set_position(gtk.WIN_POS_CENTER)
         
@@ -262,7 +263,7 @@ for this profile.'))
             dialog.destroy()
             
             if response == gtk.RESPONSE_CANCEL:
-                return None
+                return True
         self.destroy()
         
         for i in xrange(self.scan_notebook.get_n_pages()):

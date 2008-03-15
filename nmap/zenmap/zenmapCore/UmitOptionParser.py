@@ -34,7 +34,7 @@ class UmitOptionParser(OptionParser):
         self.set_usage("%prog [options] [result files]")
 
         ## Open Scan Results (GUI)
-        ### Run, openning the specified scan result file, which should be
+        ### Run, opening the specified scan result file, which should be
         ### a nmap XML output or an usr (Umit Scan Result) xml file.
         ### This option should be verified if there is no options, and user
         ### specified some positional arguments, which should be considered as
@@ -126,12 +126,12 @@ used more than once to get even more verbosity"))
         #                 nargs=2,
         #                 help=_("*NOT IMPLEMENTED* - Take two scan result files \
         # (Nmap XML output or usr, Umit Scan Result), make a text diff and print it in \
-        # the terminal without openning the graphical interface."))
+        # the terminal without opening the graphical interface."))
 
         ## NSE Facilitator (GUI)
         ### Opens and go straigh to NSE Facilitator interface.
         ### If a positional argument is given, it can be an nse script which
-        ### should be openned by the NSE Facilitator interface
+        ### should be opened by the NSE Facilitator interface
         # self.add_option("-s", "--nse-facilitator",
         #                 default=False,
         #                 action="store_true",

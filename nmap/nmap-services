@@ -1,7 +1,7 @@
 # Well known service port numbers -*- mode: fundamental; -*-
-# From the Nmap security scanner ( http://www.insecure.org/nmap/ )
+# From the Nmap security scanner ( http://nmap.org )
 #
-# $Id: nmap-services 6563 2007-12-19 01:26:32Z doug $
+# $Id: nmap-services 6783 2008-02-02 20:37:06Z fyodor $
 # For a HUGE list of services (including these and others), 
 # see http://www.graffiti.com/services
 tcpmux            1/tcp      # TCP Port Service Multiplexer [rfc-1078]
@@ -2127,6 +2127,7 @@ openmanage        7273/tcp   # Dell OpenManage
 icb               7326/tcp   # Internet Citizen's Band
 pythonds          7464/tcp   # Python Documentation Server
 qaz               7597/tcp   # Quaz trojan worm
+hddtemp           7634/tcp   # A cross-platform hard disk temperature monitoring daemon
 cucme-1           7648/udp   # cucme live video/audio server
 cucme-2           7649/udp   # cucme live video/audio server
 cucme-3           7650/udp   # cucme live video/audio server

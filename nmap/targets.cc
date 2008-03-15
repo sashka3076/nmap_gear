@@ -39,7 +39,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -78,7 +78,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: targets.cc 6633 2007-12-22 06:32:03Z fyodor $ */
+/* $Id: targets.cc 6858 2008-02-28 18:52:06Z fyodor $ */
 
 
 #include "targets.h"
@@ -496,6 +496,13 @@ do {
       hidx = hs->current_batch_sz;
       hs->hostbatch[hidx] = new Target();
       hs->hostbatch[hidx]->setTargetSockAddr(&ss, sslen);
+
+      /* put target expression in target if we have a named host without netmask */
+      if ( hs->current_expression.get_targets_type() == TargetGroup::IPV4_NETMASK  &&
+	  hs->current_expression.get_namedhost() &&
+	  !strchr( hs->target_expressions[hs->next_expression-1], '/' ) ) {
+	hs->hostbatch[hidx]->setTargetName(hs->target_expressions[hs->next_expression-1]);
+      }
 
       /* We figure out the source IP/device IFF
 	 1) We are r00t AND

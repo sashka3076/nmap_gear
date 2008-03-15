@@ -816,18 +816,24 @@ Wait until the scan is finished and then try to save it again.'))
     def _edit_scan_profile_cb(self, p):
         page = self.scan_notebook.get_nth_page\
                 (self.scan_notebook.get_current_page())
-        profile = page.toolbar.selected_profile
-        
-        pe = ProfileEditor(profile)
+
+        if page:
+            pe = ProfileEditor(page.toolbar.selected_profile)
+        else:
+            pe = ProfileEditor()
+
         pe.set_notebook(self.scan_notebook)
         
         pe.show_all()
     
     def _new_scan_profile_with_selected_cb(self, p):
         page = self.scan_notebook.get_nth_page(self.scan_notebook.get_current_page())
-        profile = page.toolbar.selected_profile
-        
-        pe = ProfileEditor(profile, delete=False)
+
+        if page:
+            pe = ProfileEditor(page.toolbar.selected_profile, delete=False)
+        else:
+            pe = ProfileEditor()
+
         pe.clean_profile_info()
         pe.set_notebook(self.scan_notebook)
         

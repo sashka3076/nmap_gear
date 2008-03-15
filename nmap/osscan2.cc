@@ -2,7 +2,7 @@
 /***************************************************************************
  * osscan2.cc -- Routines used for 2nd Generation OS detection via         *
  * TCP/IP fingerprinting.  * For more information on how this works in     *
- * Nmap, see http://insecure.org/nmap/osdetect/                            *
+ * Nmap, see http://nmap.org/osdetect/                                     *
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
@@ -39,7 +39,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -78,7 +78,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -138,23 +138,23 @@ extern NmapOps o;
  *  7-12:   T2~T7 probes.
  *
  * option 0: WScale (10), Nop, MSS (1460), Timestamp, SackP
- * option 1: MSS (1400), WScale (0), Nop, SackP, T
- * option 2: T, Nop, Nop, WScale (5), Nop, MSS (640)
- * option 3: SackP, T, WScale (10), Nop
- * option 4: MSS (536), SackP, T, WScale (10), Nop
- * option 5: MSS (265), SackP, Nop, Nop, T, Nop, End
+ * option 1: MSS (1400), WScale (0), SackP, T(0xFFFFFFFF,0x0), EOL
+ * option 2: T(0xFFFFFFFF, 0x0), Nop, Nop, WScale (5), Nop, MSS (640)
+ * option 3: SackP, T(0xFFFFFFFF,0x0), WScale (10), EOL
+ * option 4: MSS (536), SackP, T(0xFFFFFFFF,0x0), WScale (10), EOL
+ * option 5: MSS (265), SackP, T(0xFFFFFFFF,0x0)
  * option 6: WScale (10), Nop, MSS (1460), SackP, Nop, Nop
- * option 7-11: WScale (10), Nop, MSS (265), T, SackP
- * option 12: WScale (15), Nop, MSS (265), T, SackP
+ * option 7-11: WScale (10), Nop, MSS (265), T(0xFFFFFFFF,0x0), SackP
+ * option 12: WScale (15), Nop, MSS (265), T(0xFFFFFFFF,0x0), SackP
  */
 static struct {
   u8* val;
   int len;
 } prbOpts[] = {
   {(u8*) "\003\003\012\001\002\004\005\264\010\012\377\377\377\377\000\000\000\000\004\002", 20},
-  {(u8*) "\002\004\005\170\003\003\000\004\002\010\012\377\377\377\377\000\000\000\000\0", 20},
+  {(u8*) "\002\004\005\170\003\003\000\004\002\010\012\377\377\377\377\000\000\000\000\000", 20},
   {(u8*) "\010\012\377\377\377\377\000\000\000\000\001\001\003\003\005\001\002\004\002\200", 20},
-  {(u8*) "\004\002\010\012\377\377\377\377\000\000\000\000\003\003\012\0", 16},
+  {(u8*) "\004\002\010\012\377\377\377\377\000\000\000\000\003\003\012\000", 16},
   {(u8*) "\002\004\002\030\004\002\010\012\377\377\377\377\000\000\000\000\003\003\012\0", 20},
   {(u8*) "\002\004\001\011\004\002\010\012\377\377\377\377\000\000\000\000", 16},
   {(u8*) "\003\003\012\001\002\004\005\264\004\002\001\001", 12},

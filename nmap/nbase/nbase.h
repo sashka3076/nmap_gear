@@ -5,7 +5,7 @@
  * using libnbase can guarantee the availability of functions like         *
  * (v)snprintf and inet_pton.  This library also provides consistency and  *
  * extended features for some functions.  It was originally written for    *
- * use in the Nmap Security Scanner ( http://www.insecure.org/nmap/ ).     *
+ * use in the Nmap Security Scanner ( http://nmap.org ).                   *
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
@@ -42,7 +42,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -81,7 +81,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -101,7 +101,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase.h 6636 2007-12-22 06:32:28Z fyodor $ */
+/* $Id: nbase.h 6860 2008-02-28 18:52:22Z fyodor $ */
 
 #ifndef NBASE_H
 #define NBASE_H

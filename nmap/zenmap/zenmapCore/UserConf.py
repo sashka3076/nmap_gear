@@ -120,8 +120,9 @@ profile_editor_content = '''<?xml version="1.0"?>
       <option name="Window Scan"/>
       <option name="Xmas Tree"/>
     </option_list>    
-    <option_list label="Special scans: ">
+    <option_list label="Non-TCP scans: ">
       <option name="None"/>
+      <option name="UDP Scan"/>
       <option name="IP protocol Scan"/>
       <option name="List Scan"/>
       <option name="Ping scanning"/>
@@ -152,6 +153,7 @@ profile_editor_content = '''<?xml version="1.0"?>
     <option_check label="ACK ping" option="TCP ACK" arg_type="str"/>
     <option_check label="SYN ping" option="TCP SYN" arg_type="str"/>
     <option_check label="UDP probes" option="UDP Probe" arg_type="str"/>
+    <option_check label="IPProto probes" option="IPProto Probe" arg_type="str"/>
   </Ping>
   <Target label="Target options">
     <option_check label="Excluded hosts/networks" option="Excluded hosts/networks" arg_type="str"/>
@@ -168,7 +170,7 @@ profile_editor_content = '''<?xml version="1.0"?>
     <option_check label="Set network interface" option="Set network interface" arg_type="str"/>
   </Source>
   <Other label="Other options">
-    <option_check label="Extra options definied by user" option="Extra" arg_type="str"/>
+    <option_check label="Extra options defined by user" option="Extra" arg_type="str"/>
     <option_check label="Set IPv4 time to live (ttl)" option="Set IPv4 ttl" arg_type="str"/>
     <option_check label="Fragment IP packets" option="Fragment IP Packets"/>
     <option_check label="Verbosity level" option="Verbose" arg_type="level"/>
@@ -353,6 +355,12 @@ options_content = '''<?xml version="1.0"?>
           hint="UDP probes to ping a host or network"
           arguments="List of targeted ports"
           need_root="0"/>
+          
+  <option name="IPProto Probe"
+          option="-PO%s"
+          hint="IP protocol probes to ping a host or network"
+          arguments="List of targeted ports"
+          need_root="1"/>
           
   <option name="ICMP ping"
           option="-PE"
@@ -553,13 +561,13 @@ options_content = '''<?xml version="1.0"?>
           need_root="0"/>
           
   <option name="Max time between probes"
-          option="--scan_delay %s"
+          option="--max_scan_delay %s"
           hint="Maximum time between scan probes"
           arguments=""
           need_root="0"/>
           
   <option name="Min time between probes"
-          option="--max_scan_delay %s"
+          option="--scan_delay %s"
           hint="Minimum time between scan probes"
           arguments=""
           need_root="0"/>
@@ -615,8 +623,9 @@ wizard_content = '''<?xml version="1.0"?>
       <option name="Window Scan"/>
       <option name="Xmas Tree"/>
     </option_list>
-    <option_list label="Special scans: ">
+    <option_list label="Non-TCP scans: ">
       <option name="None"/>
+      <option name="UDP Scan"/>
       <option name="IP protocol Scan"/>
       <option name="List Scan"/>
       <option name="Ping scanning"/>
@@ -642,6 +651,7 @@ wizard_content = '''<?xml version="1.0"?>
     <option_check label="ACK ping" option="TCP ACK" arg_type="str"/>
     <option_check label="SYN ping" option="TCP SYN" arg_type="str"/>
     <option_check label="UDP probes" option="UDP Probe" arg_type="str"/>
+    <option_check label="IPProto probes" option="IPProto Probe" arg_type="str"/>
   </Ping>
   <Target label="Target options">
     <option_check label="Excluded hosts/networks" option="Excluded hosts/networks" arg_type="str"/>
@@ -654,7 +664,7 @@ wizard_content = '''<?xml version="1.0"?>
     <option_check label="Set source port" option="Set source port" arg_type="str"/>
   </Source>
   <Other label="Other options">
-    <option_check label="Extra options definied by user" option="Extra" arg_type="str"/>
+    <option_check label="Extra options defined by user" option="Extra" arg_type="str"/>
     <option_check label="Set IPv4 time to live (ttl)" option="Set IPv4 ttl" arg_type="str"/>
     <option_check label="Fragment IP packets" option="Fragment IP Packets"/>
     <option_check label="Verbosity level" option="Verbose" arg_type="level"/>

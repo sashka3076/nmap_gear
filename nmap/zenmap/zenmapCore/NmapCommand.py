@@ -216,11 +216,11 @@ before trying to start scan!")
         else:
             self.command_stderr = self.get_error()
             
-            log.critical("An error occourried during the scan execution!")
+            log.critical("An error occurred during the scan execution!")
             log.critical('%s' % self.command_stderr)
             log.critical("Command that raised the exception: '%s'" % " ".join(self.command))
             
-            raise Exception("An error occourried during the scan execution!\n'%s'" % \
+            raise Exception("An error occurred during the scan execution!\n'%s'" % \
                             self.command_stderr)
 
     def scan_progress(self):

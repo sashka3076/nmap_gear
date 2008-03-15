@@ -3,7 +3,7 @@
 #     --define "__python /usr/bin/python2.5"
 
 %define name zenmap
-%define version 4.53
+%define version 4.60
 %define release 1
 %define _prefix /usr
 
@@ -16,10 +16,10 @@ Name: %{name}
 Version: %{version}
 Release: %{release}
 Epoch: 2
-License: http://www.insecure.org/nmap/man/man-legal.html
+License: http://nmap.org/man/man-legal.html
 Group: Applications/System
-Source0: http://www.insecure.org/nmap/dist/nmap-%{version}.tgz
-URL: http://www.insecure.org/nmap/
+Source0: http://nmap.org/dist/nmap-%{version}.tgz
+URL: http://nmap.org
 BuildArch: noarch
 
 # Disable automatic dependency calculation because we want to provide
@@ -43,7 +43,22 @@ from Umit, an Nmap GUI created as part of the Google Summer of Code.
 %setup -q -n nmap-%{version}
 
 %build
-%configure --without-openssl --with-zenmap PYTHON="%{__python}"
+# Cannot use configure macro because noarch-redhat-linux is not
+# recognized by the auto tools in the tarball.  Upgrading to the
+# latest GNU CVS config.sub/config.guess on 3/15/08 didn't fix it.  So
+# I'm using this approach, as is done by other projects, such as
+# http://mono.ximian.com/monobuild/snapshot/snapshot_packages/noarch/xsp/96614/xsp.spec
+# -Fyodor
+./configure --prefix=%{_prefix} \
+	    --libexecdir=%{_prefix}/lib \
+	    --bindir=%{_prefix}/bin \
+	    --datadir=%{_prefix}/share \
+	    --libdir=%{_prefix}/lib \
+	    --mandir=%{_prefix}/share/man \
+	    --infodir=%{_prefix}/share/info \
+	    --sysconfdir=%{_sysconfdir} \
+	    --without-openssl \
+	    --with-zenmap PYTHON="%{__python}"
 make build-zenmap DESTDIR=$RPM_BUILD_ROOT
 
 %install

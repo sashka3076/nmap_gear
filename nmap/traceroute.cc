@@ -36,7 +36,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -75,7 +75,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -325,8 +325,8 @@ Traceroute::getTracePort (u8 proto, Target * t) {
     u16 open_port = 1;
     u16 closed_port = 1;
     u16 filtered_port = 1;
-    u16 state = 0;
     u16 port = 0;
+    int state = -1;
     struct Port *np;
 
     /* Use the first specified port for ping traceroutes */
@@ -347,20 +347,30 @@ Traceroute::getTracePort (u8 proto, Target * t) {
         open_port = (!scaninfo.open_response) ? 0 : 1;
     }
 
-    /* First we try to find an open port, if not we try to find a closed
-     * port and lastly we try to find a filtered port */
-    if (open_port && t->ports.getStateCounts (proto, scaninfo.open_state))
-        state = scaninfo.open_state;
-    else if (closed_port && t->ports.getStateCounts (proto, scaninfo.closed_state))
-        state = scaninfo.closed_state;
-    else if (filtered_port && t->ports.getStateCounts (proto, PORT_FILTERED)) {
+    /* For UDP we try for a closed port, then an open one.  For everything else
+     * we try the opposite.  When all else fails, we try for filtered */
+    if (proto == IPPROTO_UDP) {
+        if (closed_port && t->ports.getStateCounts (proto, scaninfo.closed_state))
+            state = scaninfo.closed_state;
+        else if (open_port && t->ports.getStateCounts (proto, scaninfo.open_state))
+            state = scaninfo.open_state;
+    } else {
+        if (open_port && t->ports.getStateCounts (proto, scaninfo.open_state))
+            state = scaninfo.open_state;
+        else if (closed_port && t->ports.getStateCounts (proto, scaninfo.closed_state))
+            state = scaninfo.closed_state;
+    }
+
+    if (state == -1 && filtered_port &&
+        t->ports.getStateCounts (proto, PORT_FILTERED)) {
         state = PORT_FILTERED;
         if (o.verbose)
             log_write (LOG_PLAIN, "%s: only filtered %s available, results may be incorrect\n",
                        t->targetipstr (), o.ipprotscan ? "protocols" : "ports");
-    } else {
-        return -1;
     }
+
+    if (state == -1)
+        return -1;
 
     np = t->ports.nextPort (NULL, proto, state);
     if (!np)
