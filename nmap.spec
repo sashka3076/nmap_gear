@@ -1,13 +1,13 @@
 Name: nmap
 Version: 4.20
-Release: alt2
+Release: alt3
 Serial: 20020501
 
 Summary: Network exploration tool and security scanner
 License: GPL
 Group: Monitoring
 Url: http://www.insecure.org/nmap
-Packager: Nmap Development Team <nmap@packages.altlinux.org>
+Packager: Dmitry V. Levin <ldv@altlinux.org>
 
 %define srcname nmap-%version
 Source: %url/dist/%srcname.tar
@@ -23,7 +23,6 @@ Patch5: nmap-4.04-alt-libdnet.patch
 Patch6: nmap-4.01-alt-nmapfe.desktop.patch
 Patch7: nmap-4.20-owl-osscan.patch
 
-PreReq: shadow-utils
 Requires: chrooted-resolv, libdnet >= 0:1.11-alt4
 BuildRequires: gcc-c++, libcap-devel, libdnet-devel, libgtk+2-devel
 BuildRequires: libpcap-devel >= 2:0.8, libpcre-devel, libssl-devel
@@ -82,11 +81,17 @@ install -pD -m644 %_sourcedir/nmapfe-48.png %buildroot%_liconsdir/nmapfe.png
 /usr/sbin/groupadd -r -f nmapuser
 /usr/sbin/useradd -r -g nmapuser -d /dev/null -s /dev/null -n nmapuser >/dev/null 2>&1 ||:
 
+%post frontend
+%update_menus
+
+%postun frontend
+%clean_menus
+
 %files
 %_bindir/nmap
 %_datadir/nmap
 %_man1dir/nmap.*
-%doc CHANGELOG.bz2 HACKING docs/{README,*.txt}
+%doc CHANGELOG.bz2 docs/{README,*.txt}
 
 %files frontend
 %_bindir/nmapfe
@@ -99,6 +104,10 @@ install -pD -m644 %_sourcedir/nmapfe-48.png %buildroot%_liconsdir/nmapfe.png
 %_liconsdir/*
 
 %changelog
+* Fri Apr 11 2008 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.20-alt3
+- Use %%update_menus/%%clean_menus for frontend subpackage again.
+- Do not package developer docs.
+
 * Fri Oct 19 2007 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.20-alt2
 - Use 1st generation OS detection system by default.
 
