@@ -101,7 +101,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: output.cc 6858 2008-02-28 18:52:06Z fyodor $ */
+/* $Id: output.cc 7179 2008-04-23 22:42:41Z david $ */
 
 #include "output.h"
 #include "osscan.h"
@@ -123,7 +123,7 @@ namespace std {};
 using namespace std;
 
 extern NmapOps o;
-static char *logtypes[LOG_NUM_FILES]=LOG_NAMES;
+static const char *logtypes[LOG_NUM_FILES]=LOG_NAMES;
 
 /* Used in creating skript kiddie style output.  |<-R4d! */
 static void skid_output(char *s)
@@ -430,7 +430,7 @@ void printportoutput(Target *currenths, PortList *plist) {
   char grepvers[256];
   char grepown[64];
   char *p;
-  char *state;
+  const char *state;
   char serviceinfo[64];
   char *name=NULL;
   int i;
@@ -761,9 +761,9 @@ char* formatScriptOutput(struct script_scan_result ssr) {
 
 	int line = 0;
 #ifdef WIN32
-	char* sep = "\r\n";
+	const char* sep = "\r\n";
 #else
-	char* sep = "\n";
+	const char* sep = "\n";
 #endif
 	std::string line_prfx = "|  ";
 	
@@ -806,7 +806,7 @@ char* xml_convert (const char* str) {
   temp = (char *) safe_malloc(strl*6+1);
   char *end = temp + strl * 6 + 1;
   for (p = temp;(prevch = ch, ch = *str);str++) {
-    char *a;
+    const char *a;
     switch (ch) {
     case '\t':
       a = "&#x9;";
@@ -1146,7 +1146,7 @@ void output_ports_to_machine_parseable_output(struct scan_lists *ports,
 }
 
 /* Simple helper function for output_xml_scaninfo_records */
-static void doscaninfo(char *type, char *proto, unsigned short *ports, 
+static void doscaninfo(const char *type, const char *proto, unsigned short *ports, 
 		  int numports) {
   log_write(LOG_XML, "<scaninfo type=\"%s\" protocol=\"%s\" numservices=\"%d\" services=\"", type, proto, numports);
   output_rangelist_given_ports(LOG_XML, ports, numports);
@@ -1359,9 +1359,9 @@ static void printosclassificationoutput(const struct OS_Classification_Results *
     // Now to create the fodder for normal output
     for (classno=0; classno < OSR->OSC_num_matches; classno++) {
       /* We have processed enough if any of the following are true */
-      if (!guess && OSR->OSC_Accuracy[classno] < 1.0 ||
+      if ((!guess && OSR->OSC_Accuracy[classno] < 1.0) ||
 	  OSR->OSC_Accuracy[classno] <= OSR->OSC_Accuracy[0] - 0.1 ||
-	  OSR->OSC_Accuracy[classno] < 1.0 && classno > 9)
+	  (OSR->OSC_Accuracy[classno] < 1.0 && classno > 9))
 	break;
       if (addtochararrayifnew(types, &numtypes, MAX_OS_CLASSMEMBERS, OSR->OSC[classno]->Device_Type) == -1)
 	overflow = 1;
@@ -1452,44 +1452,15 @@ void printosscanoutput(Target *currenths) {
   char numlst[512]; /* For creating lists of numbers */
   char *p; /* Used in manipulating numlst above */
   FingerPrintResults *FPR;
-  int osscanSys = 0;
   int distance = -1;
   int osscan_flag;
   
   if (!(osscan_flag = currenths->osscanPerformed()))
     return;
    
-  if (currenths->FPR == NULL && currenths->FPR1 == NULL) {
+  if (currenths->FPR == NULL)
     return;
-  } else if (currenths->FPR != NULL && currenths->FPR1 == NULL) {
-    osscanSys = 2;
-    FPR = currenths->FPR;
-  } else if (currenths->FPR == NULL && currenths->FPR1 != NULL) {
-    osscanSys = 1;
-    FPR = currenths->FPR1;
-  }
-  else {
-    /* Neither is NULL. This happens when new OS scan system fails to
-       get a perfect match and falls back on the old OS scan
-       system. */
-    if (currenths->FPR->num_perfect_matches > 0) {
-      osscanSys = 2;
-      FPR = currenths->FPR; /* Just an ensurance. */
-    } else if (currenths->FPR1->num_perfect_matches > 0) {
-      osscanSys = 1;
-      FPR = currenths->FPR1;
-    } else if (currenths->FPR->overall_results == OSSCAN_SUCCESS) {
-      osscanSys = 2;
-      FPR = currenths->FPR;
-    } else if (currenths->FPR1->overall_results == OSSCAN_SUCCESS) {
-      osscanSys = 1;
-      FPR = currenths->FPR1;
-    } else {
-      /* Both fails. */
-      osscanSys = 2;
-      FPR = currenths->FPR;
-    }
-  }
+  FPR = currenths->FPR;
 
   if (currenths->distance != -1)
 	distance = currenths->distance;
@@ -1581,7 +1552,7 @@ void printosscanoutput(Target *currenths) {
 	}
 	log_write(LOG_PLAIN, "\n");
       }
-      if (osscanSys == 2 && !reason) {
+      if (!reason) {
 	log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT,"No exact OS matches for host (If you know what OS is running on it, see http://nmap.org/submit/ ).\nTCP/IP fingerprint:\n%s\n",
 		  mergeFPs(FPR->FPs, FPR->numFPs, true,
 			   currenths->v4hostip(), distance, currenths->MACAddress(),
@@ -1593,8 +1564,8 @@ void printosscanoutput(Target *currenths) {
 	  log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT,"No exact OS matches for host (test conditions non-ideal).");
 	  if (o.verbose > 1 || o.debugging)
 	    log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT, 
-		      "\nTCP/IP fingerprint by osscan system #%d:\n%s",
-		      osscanSys, mergeFPs(FPR->FPs, FPR->numFPs, false,
+		      "\nTCP/IP fingerprint:\n%s",
+		      mergeFPs(FPR->FPs, FPR->numFPs, false,
 					  currenths->v4hostip(), distance, currenths->MACAddress(),
 					  FPR->osscan_opentcpport, FPR->osscan_closedtcpport, FPR->osscan_closedudpport,
 					  false));
@@ -1616,7 +1587,7 @@ void printosscanoutput(Target *currenths) {
     const char *reason = FPR->OmitSubmissionFP();
     if ((o.verbose > 1 || o.debugging) && reason)
       log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT,"OS fingerprint not ideal because: %s\n", reason);
-    if (osscanSys == 2 && !reason) {
+    if (!reason) {
       log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT,"No OS matches for host (If you know what OS is running on it, see http://nmap.org/submit/ ).\nTCP/IP fingerprint:\n%s\n",
 		mergeFPs(FPR->FPs, FPR->numFPs, true,
 			 currenths->v4hostip(), distance, currenths->MACAddress(),
@@ -1625,8 +1596,8 @@ void printosscanoutput(Target *currenths) {
     } else {
       log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT,"No OS matches for host\n");
       if (o.verbose > 1)
-	log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT, "\nTCP/IP fingerprint by osscan system #%d:\n%s",
-		  osscanSys, mergeFPs(FPR->FPs, FPR->numFPs, false,
+	log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT, "\nTCP/IP fingerprint:\n%s",
+		  mergeFPs(FPR->FPs, FPR->numFPs, false,
 				      currenths->v4hostip(), distance, currenths->MACAddress(),
 				      FPR->osscan_opentcpport, FPR->osscan_closedtcpport, FPR->osscan_closedudpport,
 				      false));
@@ -1634,8 +1605,8 @@ void printosscanoutput(Target *currenths) {
   } else if (FPR->overall_results == OSSCAN_TOOMANYMATCHES || (FPR->num_perfect_matches > 8 && !o.debugging)) {
     log_write(LOG_PLAIN,"Too many fingerprints match this host to give specific OS details\n");
     if (o.debugging || o.verbose > 1) {
-      log_write(LOG_PLAIN,"TCP/IP fingerprint by osscan system #%d:\n%s",
-		osscanSys, mergeFPs(FPR->FPs, FPR->numFPs, false,
+      log_write(LOG_PLAIN,"TCP/IP fingerprint:\n%s",
+		mergeFPs(FPR->FPs, FPR->numFPs, false,
 				    currenths->v4hostip(), distance, currenths->MACAddress(),
 				    FPR->osscan_opentcpport, FPR->osscan_closedtcpport, FPR->osscan_closedudpport,
 				    false));
@@ -1678,13 +1649,9 @@ void printosscanoutput(Target *currenths) {
       while(*p) p++;
     }
     
-    log_write(LOG_XML, "<tcpsequence index=\"%li\" class=\"%s\" difficulty=\"%s\" values=\"%s\" />\n", (long) currenths->seq.index, seqclass2ascii(currenths->seq.seqclass), seqidx2difficultystr(currenths->seq.index), numlst); 
-    if (o.verbose) {
-      if (osscanSys == 1)
-	log_write(LOG_PLAIN,"%s", seqreport1(&(currenths->seq)));
-      else if(osscanSys == 2)
-	log_write(LOG_PLAIN,"%s", seqreport(&(currenths->seq)));
-    }
+    log_write(LOG_XML, "<tcpsequence index=\"%li\" difficulty=\"%s\" values=\"%s\" />\n", (long) currenths->seq.index, seqidx2difficultystr(currenths->seq.index), numlst); 
+    if (o.verbose)
+      log_write(LOG_PLAIN,"%s", seqreport(&(currenths->seq)));
     
     log_write(LOG_MACHINE,"\tSeq Index: %d", currenths->seq.index);
   }
@@ -1738,7 +1705,7 @@ void printserviceinfooutput(Target *currenths) {
   char hostname_tbl[MAX_SERVICE_INFO_FIELDS][MAXHOSTNAMELEN];
   char ostype_tbl[MAX_SERVICE_INFO_FIELDS][64];
   char devicetype_tbl[MAX_SERVICE_INFO_FIELDS][64];
-  char *delim;
+  const char *delim;
 
   for (i=0; i<MAX_SERVICE_INFO_FIELDS; i++)
     hostname_tbl[i][0] = ostype_tbl[i][0] = devicetype_tbl[i][0] = '\0';
@@ -1857,7 +1824,7 @@ void printStatusMessage() {
   
   log_write(LOG_STDOUT, 
 	    "Stats: %d:%02d:%02d elapsed; %d hosts completed (%d up), %d undergoing %s\n", 
-	    time/60/24, time/60 % 24, time % 60, o.numhosts_scanned - o.numhosts_scanning, 
+	    time/60/60, time/60 % 60, time % 60, o.numhosts_scanned - o.numhosts_scanning, 
 	    o.numhosts_up, o.numhosts_scanning, scantype2str(o.current_scantype));
 }
 
@@ -1990,7 +1957,7 @@ void printdatafilepaths() {
     /* If all the files were from the same directory and we're in verbose mode,
        print a brief message unless we are also in debugging mode. */
     log_write(LOG_PLAIN, "Read data files from: %s\n", dir.c_str());
-  } else if (num_dirs == 1 && o.debugging || num_dirs > 1) {
+  } else if ( (num_dirs == 1 && o.debugging) || num_dirs > 1) {
     /* If files were read from more than one directory, or if they were read
        from one directory and we are in debugging mode, display all the files
        grouped by directory. */

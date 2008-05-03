@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: Target.h 6858 2008-02-28 18:52:06Z fyodor $ */
+/* $Id: Target.h 7145 2008-04-11 03:54:44Z david $ */
 
 #ifndef TARGET_H
 #define TARGET_H
@@ -246,8 +246,7 @@ class Target {
 
   struct seq_info seq;
   int distance;
-  FingerPrintResults *FPR1; /* FP results get by the old OS scan system. */
-  FingerPrintResults *FPR; /* FP results get by the new OS scan system. */
+  FingerPrintResults *FPR; /* FP results get by the OS scan system. */
   PortList ports;
 
   // unsigned int up;

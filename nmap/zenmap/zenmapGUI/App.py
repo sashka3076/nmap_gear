@@ -97,7 +97,15 @@ speed experience. Download it at http://psyco.sf.net/"""))
 
     def __run_gui(self):
         log.info(">>> GUI Mode")
+
+        # Cause an exception if PyGTK can't open a display. Normally this just
+        # produces a warning, but the lack of a display eventually causes a
+        # segmentation fault. See http://live.gnome.org/PyGTK/WhatsNew210.
+        import warnings
+        warnings.filterwarnings("error", module = "gtk")
         import gtk
+        warnings.resetwarnings()
+
         import gobject
 
         # Commented until we decide what to do with the splash screen.
@@ -113,8 +121,7 @@ speed experience. Download it at http://psyco.sf.net/"""))
             gtk.gdk.threads_init()
             gtk.gdk.threads_enter()
 
-        # Create and show the main window as soon as possible
-        gobject.idle_add(self.__create_show_main_window)
+        self.__create_show_main_window()
 
         # Run main loop
         #gobject.threads_init()

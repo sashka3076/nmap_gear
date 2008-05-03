@@ -97,7 +97,9 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: main.cc 6858 2008-02-28 18:52:06Z fyodor $ */
+/* $Id: main.cc 7182 2008-04-24 03:23:01Z fyodor $ */
+
+#include <signal.h>
 
 #include "nmap.h"
 #include "NmapOps.h"
@@ -155,7 +157,6 @@ int main(int argc, char *argv[]) {
   char *endptr;
   int interactivemode = 0;
   int fd;
-  struct timeval tv;
   int arglen = 0;
 
 #ifdef __amigaos__
@@ -177,10 +178,6 @@ int main(int argc, char *argv[]) {
   // MTRACE should only be defined during debug sessions.
   mtrace();
 #endif
-
-  /* You never know when "random" numbers will come in handy ... */
-  gettimeofday(&tv, NULL);
-  srand((tv.tv_sec ^ tv.tv_usec) ^ getpid());
 
   /* Trap these sigs for cleanup */
 #if HAVE_SIGNAL

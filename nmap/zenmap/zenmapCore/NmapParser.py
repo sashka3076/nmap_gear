@@ -902,7 +902,6 @@ class NmapParserSAX(ParserBasics, ContentHandler):
 
     def _parse_host_tcpsequence(self, attrs):
         self.host_info.set_tcpsequence(self._parsing(attrs, ['index',
-                                                             'class',
                                                              'difficulty',
                                                              'values']))
     
@@ -1206,7 +1205,6 @@ class NmapParserSAX(ParserBasics, ContentHandler):
             if type(host.tcpsequence) == type({}):
                 self.write_parser.startElement("tcpsequence",
                     Attributes({"index":host.tcpsequence.get("index", ""),
-                            "class":host.tcpsequence.get("class", ""),
                             "difficulty":host.tcpsequence.get("difficulty", ""),
                             "values":host.tcpsequence.get("values", "")}))
                 self.write_parser.endElement("tcpsequence")

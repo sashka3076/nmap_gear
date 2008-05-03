@@ -98,11 +98,12 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_rnd.c 6860 2008-02-28 18:52:22Z fyodor $ */
+/* $Id: nbase_rnd.c 7259 2008-04-30 20:43:09Z bmenrigh $ */
 
 #include "nbase.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #if HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
@@ -117,6 +118,7 @@ int get_random_bytes(void *buf, int numbytes) {
   FILE *fp = NULL;
   unsigned int i;
   short *iptr;
+  short step;
   
   if (numbytes < 0 || numbytes > 0xFFFF) return -1;
   
@@ -142,12 +144,14 @@ int get_random_bytes(void *buf, int numbytes) {
 	gettimeofday(&tv, NULL);
 	srand((tv.tv_sec ^ tv.tv_usec) ^ getpid());
       }
-      
-      for(i=0; i < sizeof(bytebuf) / sizeof(short); i++) {
-	iptr = (short *) ((char *)bytebuf + i * sizeof(short));
+      if (RAND_MAX >= 0xFFFF) {
+        step = sizeof(short);
+      } else step = 1;
+      for(i=0; i < sizeof(bytebuf) / step; i++) {
+	iptr = (short *) ((char *)bytebuf + i * step);
 	*iptr = rand();
       }
-      bytesleft = (sizeof(bytebuf) / sizeof(short)) * sizeof(short);
+      bytesleft = (sizeof(bytebuf) / step) * step;
       /*    ^^^^^^^^^^^^^^^not as meaningless as it looks  */
     } else fclose(fp);
   }

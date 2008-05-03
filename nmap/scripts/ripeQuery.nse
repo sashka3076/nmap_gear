@@ -3,7 +3,7 @@ require "ipOps"
 id = "RIPE query"
 description = "Connects to the RIPE database, extracts and prints the role: entry for the IP."
 author = "Diman Todorov <diman.todorov@gmail.com>"
-license = "See nmaps COPYING for licence"
+license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
 
 categories = {"discovery"}
 
@@ -41,5 +41,5 @@ action = function(host, port)
 		return
 	end
 	
-	return "IP belongs to: " .. value
+	return "IP belongs to: " .. value:gsub("^%s*", "")
 end

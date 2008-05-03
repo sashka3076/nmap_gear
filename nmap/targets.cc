@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: targets.cc 6858 2008-02-28 18:52:06Z fyodor $ */
+/* $Id: targets.cc 7099 2008-04-09 02:11:20Z fyodor $ */
 
 
 #include "targets.h"
@@ -130,7 +130,7 @@ static inline int gethostnum(Target *hostbatch[], Target *target) {
   return 0; // Unreached
 }
 
-char *readhoststate(int state) {
+const char *readhoststate(int state) {
   switch(state) {
   case HOST_UP:
     return "HOST_UP";
@@ -228,7 +228,7 @@ static int hostInExclude(struct sockaddr *checksock, size_t checksocklen,
       /* For Netmasks simply compare the network bits and move to the next
        * group if it does not compare, we don't care about the individual addrs */
       if (targets_type == TargetGroup::IPV4_NETMASK) {
-        mask = htonl((unsigned long) (0-1) << 32-exclude_group[i].get_mask());
+        mask = htonl((unsigned long) (0-1) << (32-exclude_group[i].get_mask()));
         if ((tmpTarget & mask) == (checkhost->sin_addr.s_addr & mask)) {
 	  exclude_group[i].rewind();
 	  return 1;
@@ -610,11 +610,12 @@ if (hs->randomize) {
 	   hs->hostbatch[i]->reason.reason_id = ER_LOCALHOST;
      }
    }
- } else if (!arpping_done)
+ } else if (!arpping_done) {
    if (pingtype & PINGTYPE_ARP) /* A host that we can't arp scan ... maybe localhost */
      massping(hs->hostbatch, hs->current_batch_sz, DEFAULT_PING_TYPES);
    else
      massping(hs->hostbatch, hs->current_batch_sz, pingtype);
+ }
  
  if (!o.noresolve) nmap_mass_rdns(hs->hostbatch, hs->current_batch_sz);
  

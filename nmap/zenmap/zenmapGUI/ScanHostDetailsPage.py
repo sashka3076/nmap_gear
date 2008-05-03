@@ -321,9 +321,6 @@ class HostDetails(HIGVBox):
             for v in tcpseq['values'].split(','):
                 combo.append_text(v)
             
-            table.attach(HIGEntryLabel(_('Class:')),0,1,0,1)
-            table.attach(HIGEntryLabel(tcpseq['class']),1,2,0,1)
-            
             table.attach(HIGEntryLabel(_('Difficulty:')),0,1,1,2)
             table.attach(HIGEntryLabel(tcpseq['difficulty']),1,2,1,2)
             

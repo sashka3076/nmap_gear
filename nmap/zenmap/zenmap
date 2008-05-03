@@ -55,7 +55,14 @@ if not DEVELOPMENT:
         sys.stderr = old_stderr
 
         import traceback
+
+        # Cause an exception if PyGTK can't open a display. Normally this just
+        # produces a warning, but the lack of a display eventually causes a
+        # segmentation fault. See http://live.gnome.org/PyGTK/WhatsNew210.
+        import warnings
+        warnings.filterwarnings("error", module = "gtk")
         import gtk
+        warnings.resetwarnings()
 
         from zenmapCore.I18N import _
         from zenmapCore.Version import VERSION

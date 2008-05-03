@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOps.cc 6858 2008-02-28 18:52:06Z fyodor $ */
+/* $Id: NmapOps.cc 7099 2008-04-09 02:11:20Z fyodor $ */
 #include "nmap.h"
 #include "nbase.h"
 #include "NmapOps.h"
@@ -195,6 +195,7 @@ void NmapOps::Initialize() {
 #endif
   debugging = 0;
   verbose = 0;
+  min_packet_send_rate = 0.0; /* Unset. */
   randomize_hosts = 0;
   sendpref = PACKET_SEND_NOPREF;
   spoofsource = 0;
@@ -550,7 +551,7 @@ void NmapOps::setMaxHostGroupSz(unsigned int sz) {
      If this is never called, a default stylesheet distributed with
      Nmap is used.  If you call it with NULL as the xslname, no
      stylesheet line is printed. */
-void NmapOps::setXSLStyleSheet(char *xslname) {
+void NmapOps::setXSLStyleSheet(const char *xslname) {
   if (xsl_stylesheet) free(xsl_stylesheet);
   xsl_stylesheet = xslname? strdup(xslname) : NULL;
 }

@@ -125,8 +125,12 @@ print
 
     def set_modules_path(self):
         app_file_name = os.path.join(self.install_scripts, APP_NAME)
-        # Find where the modules are installed.
-        modules = distutils.sysconfig.get_python_lib(prefix = self.prefix)
+        # Find where the modules are installed. distutils will put them in
+        # self.install_lib, but that path can contain DESTDIR (--root option),
+        # so we must strip it off if necessary.
+        modules = self.install_lib
+        if self.root is not None and modules.startswith(self.root):
+            modules = modules[len(self.root):]
 
         re_sys = re.compile("^import sys$")
 
@@ -218,7 +222,7 @@ that is really useful for advanced users and easy to be used by newbies.""" \
 % (APP_DISPLAY_NAME, NMAP_DISPLAY_NAME),
     'version': VERSION,
     'scripts': [APP_NAME],
-    'packages': ['', 'zenmapCore', 'zenmapGUI', 'higwidgets'],
+    'packages': ['zenmapCore', 'zenmapGUI', 'higwidgets'],
     'data_files': data_files,
 }
 
@@ -266,8 +270,12 @@ elif 'py2app' in sys.argv:
     MACOSX_SETUP_ARGS = {
         'app': [extended_app_name],
         'options': {"py2app": {
+            "packages": ["gobject", "gtk", "cairo"],
+            "includes": ["atk", "pango", "pangocairo"],
             "argv_emulation": True,
-            "compressed": True
+            "compressed": True,
+            "plist": "install_scripts/macosx/Info.plist",
+            "iconfile": "install_scripts/macosx/zenmap.icns"
         }}
     }
 

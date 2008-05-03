@@ -53,7 +53,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_utils.h 6859 2008-02-28 18:52:17Z fyodor $ */
+/* $Id: nsock_utils.h 6960 2008-03-21 16:44:09Z david $ */
 #ifndef UTILS_H
 #define UTILS_H
 
@@ -101,6 +101,6 @@
 /* Timeval subtract in seconds; truncate towards zero */
 #define TIMEVAL_SEC_SUBTRACT(a,b) ((a).tv_sec - (b).tv_sec + (((a).tv_usec < (b).tv_usec) ? - 1 : 0))
 /* assign one timeval to another timeval plus some msecs: a = b + msecs */
-#define TIMEVAL_MSEC_ADD(a, b, msecs) (a).tv_sec = (b).tv_sec + ((msecs) / 1000); (a).tv_usec = (b).tv_usec + ((msecs) % 1000) * 1000; (a).tv_sec += (a).tv_usec / 1000000; (a).tv_usec %= 1000000
+#define TIMEVAL_MSEC_ADD(a, b, msecs) { (a).tv_sec = (b).tv_sec + ((msecs) / 1000); (a).tv_usec = (b).tv_usec + ((msecs) % 1000) * 1000; (a).tv_sec += (a).tv_usec / 1000000; (a).tv_usec %= 1000000; }
 
 #endif

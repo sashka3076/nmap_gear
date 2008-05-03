@@ -74,7 +74,7 @@ char* nsock_pcap_open(nsock_pool nsp, nsock_iod nsiod,
 	"LINUX: If you are getting Socket type not supported, try modprobe af_packet or recompile your kernel with SOCK_PACKET enabled.\n"
 	"*BSD:  If you are getting device not configured, you need to recompile your kernel with Berkeley Packet Filter support.  If you are getting No such file or directory, try creating the device (eg cd /dev; MAKEDEV <device>; or use mknod).\n"
 	"*WINDOWS:  Nmap only supports ethernet interfaces on Windows for most operations because Microsoft disabled raw sockets as of Windows XP SP2.  Depending on the reason for this error, it is possible that the --unprivileged command-line argument will help.\n"
-	"SOLARIS:  If you are trying to scan localhost and getting '/dev/lo0: No such file or directory', complain to Sun.  I don't think Solaris can support advanced localhost scans.  You can probably use \"-P0 -sT localhost\" though.\n\n", 
+	"SOLARIS:  If you are trying to scan localhost and getting '/dev/lo0: No such file or directory', complain to Sun.  I don't think Solaris can support advanced localhost scans.  You can probably use \"-PN -sT localhost\" though.\n\n", 
 				pcap_device, snaplen, promisc, to_ms, err0r);
 			return "nsock-pcap: can't open pcap! are you root?";
 		}

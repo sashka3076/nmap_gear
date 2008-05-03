@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOps.h 6858 2008-02-28 18:52:06Z fyodor $ */
+/* $Id: NmapOps.h 7099 2008-04-09 02:11:20Z fyodor $ */
 
 #include "nmap.h"
 #include "global_structures.h"
@@ -178,6 +178,8 @@ class NmapOps {
   bool openOnly() { return open_only; }
   void setOpenOnly(bool oo) { open_only = oo; }
   int verbose;
+  /* The requested minimum packet sending rate, or 0.0 if unset. */
+  float min_packet_send_rate;
   int randomize_hosts;
   int spoofsource; /* -S used */
   int fastscan;
@@ -237,7 +239,7 @@ class NmapOps {
      If this is never called, a default stylesheet distributed with
      Nmap is used.  If you call it with NULL as the xslname, no
      stylesheet line is printed. */
-  void setXSLStyleSheet(char *xslname);
+  void setXSLStyleSheet(const char *xslname);
   /* Returns the full path or URL that should be printed in the XML
      output xml-stylesheet element.  Returns NULL if the whole element
      should be skipped */

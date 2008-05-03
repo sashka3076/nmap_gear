@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: Target.cc 6858 2008-02-28 18:52:06Z fyodor $ */
+/* $Id: Target.cc 7145 2008-04-11 03:54:44Z david $ */
 
 #ifdef WIN32
 #include "nmap_winconfig.h"
@@ -122,7 +122,6 @@ void Target::Initialize() {
   targetname = NULL;
   memset(&seq, 0, sizeof(seq));
   distance = -1;
-  FPR1 = NULL;
   FPR = NULL;
   osscan_flag = OS_NOTPERF;
   wierd_responses = flags = 0;
@@ -178,7 +177,6 @@ void Target::FreeInternal() {
     nameIPBuf = NULL;
   }
 
-  if (FPR1) delete FPR1;
   if (FPR) delete FPR;
 }
 

@@ -3,7 +3,7 @@
 # to the rpmbuild command line.
 
 %define name nmap
-%define version 4.60
+%define version 4.62
 %define release 1
 %define _prefix /usr
 
@@ -36,7 +36,7 @@ devices are also supported, including the Sharp Zaurus and the iPAQ.
 %setup -q
 
 %build
-%configure --without-openssl --without-zenmap
+%configure --without-openssl --without-zenmap --with-libdnet=included --with-libpcap=included --with-libpcre=included --with-liblua=included
 %if "%{static}" == "1"
 make static
 %else

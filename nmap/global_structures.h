@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: global_structures.h 6858 2008-02-28 18:52:06Z fyodor $ */
+/* $Id: global_structures.h 7148 2008-04-11 18:57:32Z david $ */
 
 
 #ifndef GLOBAL_STRUCTURES_H
@@ -133,16 +133,6 @@ struct udpprobeinfo {
   u16 udplen;
   u8 patternbyte;
   struct in_addr target;
-};
-
-struct connectsockinfo {
-  fd_set fds_read;
-  fd_set fds_write;
-  fd_set fds_except;
-  struct portinfo *socklookup[2048]; /* index socket descriptor -> scan[] 
-					index.  No OS better give us
-					an SD > 2047!@#$ */
-  int maxsd;
 };
 
 /* The runtime statistics used to decide how fast to proced and how
@@ -212,8 +202,6 @@ struct timeout_info {
 
 struct seq_info {
   int responses;
-  int seqclass; /* SEQ_* defines in nmap.h.  This should be removed when
-		 we remove osscan gen1 cruft. */
   int ts_seqclass; /* TS_SEQ_* defines in nmap.h */
   time_t uptime; /* time of latest system boot (or 0 if unknown ) */
   int ipid_seqclass; /* IPID_SEQ_* defines in nmap.h */

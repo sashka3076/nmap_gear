@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: utils.cc 6858 2008-02-28 18:52:06Z fyodor $ */
+/* $Id: utils.cc 7099 2008-04-09 02:11:20Z fyodor $ */
 
 #include "nmap.h"
 #include "utils.h"
@@ -704,7 +704,7 @@ void bintohexstr(char *buf, int buflen, char *src, int srclen){
       bp += Snprintf(buf+bp, buflen-bp,"\n");
 }
 
-static inline char* STRAPP(char *fmt, ...) {
+static inline char* STRAPP(const char *fmt, ...) {
   static char buf[256];
   static int bp;
   int left = (int)sizeof(buf)-bp;

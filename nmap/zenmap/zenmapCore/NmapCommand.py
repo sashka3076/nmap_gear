@@ -32,6 +32,7 @@ try:
 except ImportError, e:
     raise ImportError(str(e) + ".\n" + _("Python 2.4 or later is required."))
 
+import zenmapCore.Paths
 from zenmapCore.NmapOptions import NmapOptions
 from zenmapCore.OptionsConf import options_file
 from zenmapCore.UmitLogging import log
@@ -176,26 +177,46 @@ class NmapCommand(object):
             except:
                 pass
 
-    def run_scan(self):
-        if self.command:
-            #self.command_process = Popen(self.command, bufsize=1, stdin=PIPE,
-            #                             stdout=PIPE, stderr=PIPE)
-            
-            # Because of problems with Windows, I passed only the file descriptors to \
-            # Popen and set stdin to PIPE
-            # Python problems... Cross-platform execution of process should be improved
-            
-            self._stdout_handler = open(self.stdout_output, "w+")
-            self._stderr_handler = open(self.stderr_output, "w+")
-            
-            self.command_process = Popen(self.command, bufsize=1,
-                                         stdin=PIPE,
-                                         stdout=self._stdout_handler.fileno(),
-                                         stderr=self._stderr_handler.fileno(),
-                                         shell=shell_state)
+    def get_path(self):
+        """Return a value for the PATH environment variable that is appropriate
+        for the current platform. It will be the PATH from the environment plus
+        possibly some platform-specific directories."""
+        path_env = os.getenv("PATH")
+        if path_env is None:
+            search_paths = []
         else:
+            search_paths = path_env.split(os.pathsep)
+        for path in zenmapCore.Paths.get_extra_executable_search_paths():
+            if path not in search_paths:
+                search_paths.append(path)
+        return os.pathsep.join(search_paths)
+
+    def run_scan(self):
+        if not self.command:
             raise Exception("You have no command to run! Please, set the command \
 before trying to start scan!")
+
+        #self.command_process = Popen(self.command, bufsize=1, stdin=PIPE,
+        #                             stdout=PIPE, stderr=PIPE)
+        
+        # Because of problems with Windows, I passed only the file descriptors to \
+        # Popen and set stdin to PIPE
+        # Python problems... Cross-platform execution of process should be improved
+        
+        self._stdout_handler = open(self.stdout_output, "w+")
+        self._stderr_handler = open(self.stderr_output, "w+")
+        
+        search_paths = self.get_path()
+        env = dict(os.environ)
+        env["PATH"] = search_paths
+        log.debug("PATH=%s" % env["PATH"])
+
+        self.command_process = Popen(self.command, bufsize=1,
+                                     stdin=PIPE,
+                                     stdout=self._stdout_handler.fileno(),
+                                     stderr=self._stderr_handler.fileno(),
+                                     shell=shell_state,
+                                     env=env)
 
     def scan_state(self):
         if self.command_process == None:

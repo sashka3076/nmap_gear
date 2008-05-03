@@ -35,19 +35,43 @@ from zenmapCore.I18N import _
 from zenmapCore.Version import VERSION
 from zenmapCore.Name import APP_NAME
 
-# Look for files relative to the script path to allow running within the build
-# directory.
-main_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
-if hasattr(sys, "frozen"):
-    main_dir = dirname(sys.executable)
+# Find out the prefix under which data files (interface definition XML,
+# pixmaps, etc.) are stored. This can vary depending on whether we are running
+# in an executable package and what type of package it is, which we check using
+# the sys.frozen attribute. See
+# http://mail.python.org/pipermail/pythonmac-sig/2004-November/012121.html.
+def get_prefix():
+    frozen = getattr(sys, "frozen", None)
+    if frozen == "macosx_app":
+        # A py2app .app bundle.
+        return os.path.join(dirname(sys.executable), "..", "Resources")
+    elif frozen is not None:
+        # Assume a py2exe executable.
+        return dirname(sys.executable)
+    else:
+        # Normal script execution. Look in the current directory to allow
+        # running from the distribution.
+        return os.path.abspath(os.path.dirname(sys.argv[0]))
 
-CONFIG_DIR = join(main_dir, "share", APP_NAME, "config")
-LOCALE_DIR = join(main_dir, "share", APP_NAME, "locale")
-MISC_DIR = join(main_dir, "share", APP_NAME, "misc")
-ICONS_DIR = join(main_dir, "share", "icons")
-PIXMAPS_DIR = join(main_dir, "share", "pixmaps")
-DOCS_DIR = join(main_dir, "share", APP_NAME, "docs")
+prefix = get_prefix()
 
+# These lines are overwritten by the installer to hard-code the installed
+# locations.
+CONFIG_DIR = join(prefix, "share", APP_NAME, "config")
+LOCALE_DIR = join(prefix, "share", APP_NAME, "locale")
+MISC_DIR = join(prefix, "share", APP_NAME, "misc")
+ICONS_DIR = join(prefix, "share", "icons")
+PIXMAPS_DIR = join(prefix, "share", "pixmaps")
+DOCS_DIR = join(prefix, "share", APP_NAME, "docs")
+
+def get_extra_executable_search_paths():
+    """Return a list of additional executable search paths as a convenience for
+    platforms where the default PATH is inadequate."""
+    if sys.platform == 'darwin':
+        return ["/usr/local/bin"]
+    elif sys.platform == 'win32':
+        return [dirname(dirname(sys.executable))]
+    return []
 
 #######
 # Paths
@@ -182,18 +206,6 @@ user home: %s" % config_file)
             if VERSION == ver:
                 return True
         return False
-
-    def root_dir(self):
-        """Retrieves root dir on current filesystem"""
-        curr_dir = getcwd()
-        while True:
-            splited = split(curr_dir)[0]
-            if curr_dir == splited:
-                break
-            curr_dir = splited
-
-        log.debug(">>> Root dir: %s" % curr_dir)
-        return curr_dir
 
     def __getattr__(self, name):
         if self.config_file_set:

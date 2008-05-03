@@ -33,8 +33,8 @@ AC_SUBST(libpcapdir)
 pcredir=libpcre
 AC_SUBST(pcredir)
 
-dnl use config.h instead of -D macros
-AC_CONFIG_HEADER(config.h)
+dnl use nmap_config.h instead of -D macros
+AC_CONFIG_HEADER(nmap_config.h)
 
 dnl Host specific hacks
 AC_CANONICAL_HOST
@@ -107,7 +107,7 @@ AC_SUBST(COMPAT_SRCS)
 AC_PATH_TOOL([STRIP], [strip], [/bin/true])
 
 needs_cpp_precomp=no
-LUAFLAGS="MYCFLAGS=\"-DLUA_USE_POSIX -DLUA_USE_DLOPEN\""
+LUAFLAGS="MYCFLAGS=\"$CFLAGS -DLUA_USE_POSIX -DLUA_USE_DLOPEN\""
 
 case "$host" in
   *alpha-dec-osf*)
@@ -158,11 +158,11 @@ case "$host" in
     AC_DEFINE(MACOSX)
     dnl on Mac OSX the math library seems to contain unwanted getopt cruft
     AC_CHECK_LIB(m, main)
-    LUAFLAGS="MYCFLAGS=\"-DLUA_USE_MACOSX\""
+    LUAFLAGS="MYCFLAGS=\"$CFLAGS -DLUA_USE_MACOSX\""
     needs_cpp_precomp=yes
     ;;
   *)
-   LUAFLAGS="MYCFLAGS=\"-DLUA_USE_POSIX -DLUA_USE_DLOPEN\""
+   LUAFLAGS="MYCFLAGS=\"$CFLAGS -DLUA_USE_POSIX -DLUA_USE_DLOPEN\""
 esac
 
 AC_SUBST(LUAFLAGS)
@@ -215,7 +215,7 @@ AC_HELP_STRING([--with-openssl=DIR],[Use optional openssl libs and includes from
     ;;
   *)
     specialssldir="$with_openssl"
-    CXXFLAGS="$CXXFLAGS -I$with_openssl/include"
+    CPPFLAGS="$CPPFLAGS -I$with_openssl/include"
     LDFLAGS="$LDFLAGS -L$with_openssl/lib"
     ;;
   esac]
@@ -274,7 +274,7 @@ AC_HELP_STRING([--with-libpcap=included], [Always use version included with Nmap
     _cppflags=$CXXFLAGS
     _ldflags=$LDFLAGS
 
-    CXXFLAGS="-I$with_libpcap/include $CXXFLAGS"
+    CPPFLAGS="-I$with_libpcap/include $CPPFLAGS"
     LDFLAGS="-L$with_libpcap/lib $LDFLAGS"
 
     AC_CHECK_HEADER(pcap.h,[
@@ -298,7 +298,7 @@ if test $have_libpcap = yes; then
     _cflags=$CXXFLAGS
     _ldflags=$LDFLAGS
 
-    CXXFLAGS="-I$LIBPCAP_INC $CXXFLAGS"
+    CPPFLAGS="-I$LIBPCAP_INC $CPPFLAGS"
     LDFLAGS="-L$LIBPCAP_LIB $LDFLAGS"
   fi
 
@@ -335,10 +335,10 @@ if test $have_libpcap = yes; then
 else
   if test "${LIBPCAP_INC+set}" = "set"; then
     LDFLAGS="-L$libpcapdir $_ldflags"
-    CXXFLAGS="$_cflags -I$LIBPCAP_INC"
+    CPPFLAGS="$CPPFLAGS -I$LIBPCAP_INC"
   else
     LDFLAGS="-L$libpcapdir $LDFLAGS"
-    CXXFLAGS="$CXXFLAGS -I$libpcapdir"
+    CPPFLAGS="$CPPFLAGS -I$libpcapdir"
   fi
   PCAP_DEPENDS='$(LIBPCAPDIR)/libpcap.a'
   PCAP_BUILD="pcap_build"
@@ -371,7 +371,7 @@ AC_HELP_STRING([--with-libpcre=included], [Always use the version included with 
     requested_included_pcre=yes
     ;;
   *)
-    CXXFLAGS="-I$with_libpcre/include $CXXFLAGS"
+    CPPFLAGS="-I$with_libpcre/include $CPPFLAGS"
     LDFLAGS="-L$with_libpcre/lib $LDFLAGS"
     have_pcre=yes
     ;;
@@ -391,7 +391,7 @@ fi
 # If we still don't have it, we use our own
 if test $have_pcre != yes ; then
   AC_CONFIG_SUBDIRS( libpcre )
-  CXXFLAGS="-I$LIBPCREDIR $CXXFLAGS"
+  CPPFLAGS="-I$LIBPCREDIR $CPPFLAGS"
   LIBPCRE_LIBS="$LIBPCREDIR/libpcre.a"
   PCRE_DEPENDS="$LIBPCREDIR/libpcre.a"
   PCRE_BUILD="pcre_build"
@@ -418,16 +418,21 @@ have_dnet=no
 requested_included_dnet=no
 LIBDNETDIR=libdnet-stripped
 
-# First we test whether they specified libdnet explicitly
+# First we test whether they specified libdnet explicitly.
+# Unlike the other included libraries (pcap, pcre, lua), we prefer our local
+# copy of libdnet. That is, with the other libraries we check for a system
+# version by default, whereas with dnet we use the local version unless
+# specifically asked to use a system version.
 AC_ARG_WITH(libdnet,
-AC_HELP_STRING([--with-libdnet=DIR], [Use an existing (compiled) dnet lib from DIR/include and DIR/lib.]),
+AC_HELP_STRING([--with-libdnet=DIR], [Use an existing (compiled) dnet lib from DIR/include and DIR/lib.])
+AC_HELP_STRING([--with-libdnet=included], [Use the libdnet version included with Nmap (default)]),
 [  case "$with_libdnet" in
   yes)
     ;;
   included)
     ;;
   *)
-    CXXFLAGS="-I$with_libdnet/include $CXXFLAGS"
+    CPPFLAGS="-I$with_libdnet/include $CPPFLAGS"
     LDFLAGS="-L$with_libdnet/lib $LDFLAGS"
     have_dnet=yes
     ;;
@@ -437,7 +442,7 @@ AC_HELP_STRING([--with-libdnet=DIR], [Use an existing (compiled) dnet lib from D
 # If they didn't provide location, we use the included one
 if test $have_dnet != yes ; then
   AC_CONFIG_SUBDIRS( libdnet-stripped )
-  CXXFLAGS="-I$LIBDNETDIR/include $CXXFLAGS"
+  CPPFLAGS="-I$LIBDNETDIR/include $CPPFLAGS"
   LIBDNET_LIBS="$LIBDNETDIR/src/.libs/libdnet.a"
   DNET_DEPENDS="$LIBDNETDIR/src/.libs/libdnet.a"
   DNET_BUILD="dnet_build"
@@ -473,7 +478,7 @@ AC_HELP_STRING([--without-liblua], [Compile without lua (this will exclude all o
   yes)
   ;;
   included)
-    CXXFLAGS="-I$LIBLUADIR $CXXFLAGS"
+    CPPFLAGS="-I$LIBLUADIR $CPPFLAGS"
     LIBLUA_LIBS="$LIBLUADIR/liblua.a"
     LUA_DEPENDS="$LIBLUADIR/liblua.a"
     LUA_BUILD="lua_build"
@@ -486,7 +491,7 @@ AC_HELP_STRING([--without-liblua], [Compile without lua (this will exclude all o
     no_lua="yes"
   ;;
   *)
-    CXXFLAGS="-I$with_liblua/include $CXXFLAGS"
+    CPPFLAGS="-I$with_liblua/include $CPPFLAGS"
     LDFLAGS="-L$with_liblua/lib $LDFLAGS"
     have_lua=yes
   ;;
@@ -509,13 +514,9 @@ else
 
   # If they didn't specify it, we try to find it
   if test $have_lua != yes; then
-    AC_CHECK_HEADER(lua.h,
-      AC_CHECK_LIB(lua, lua_call, [have_lua=yes ]),
-      [AC_CHECK_HEADERS(lua/lua.h, 
-        [AC_CHECK_LIB(lua, lua_call, [have_lua=yes])]
-      )]
-    )
-  
+    AC_CHECK_HEADERS(lua.h lua/lua.h,
+      AC_CHECK_LIB(lua, lua_call, [have_lua=yes; break],, [-lm]))
+
     AC_LANG_PUSH(C++)
     AC_MSG_CHECKING([for lua version >= 501])
     AC_RUN_IFELSE([ AC_LANG_PROGRAM(
@@ -534,7 +535,7 @@ else
   # if we didn't find we use our own
   if test $have_lua != yes; then
     AC_MSG_RESULT(no) 
-    CXXFLAGS="-I$LIBLUADIR $CXXFLAGS"
+    CPPFLAGS="-I$LIBLUADIR $CPPFLAGS"
     LIBLUA_LIBS="$LIBLUADIR/liblua.a"
     LUA_DEPENDS="$LIBLUADIR/liblua.a"
     LUA_BUILD="lua_build"
@@ -666,7 +667,7 @@ NBASEDIR="nbase"
 )
 
 LDFLAGS="$LDFLAGS -L$NBASEDIR"
-CXXFLAGS="$CXXFLAGS -I$NBASEDIR"
+CPPFLAGS="$CPPFLAGS -I$NBASEDIR"
 LIBNBASE_LIBS="-lnbase"
 
 AC_SUBST(NBASEDIR)
@@ -690,7 +691,7 @@ AC_HELP_STRING([--with-libnsock=DIR], [Compile and link to libnsock in DIR]),
 )
 
 LDFLAGS="$LDFLAGS -L$NSOCKDIR/src/"
-CXXFLAGS="$CXXFLAGS -I$NSOCKDIR/include"
+CPPFLAGS="$CPPFLAGS -I$NSOCKDIR/include"
 LIBNSOCK_LIBS="-lnsock"
 
 AC_SUBST(NSOCKDIR)

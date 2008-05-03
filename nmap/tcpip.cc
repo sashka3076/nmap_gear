@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: tcpip.cc 6858 2008-02-28 18:52:06Z fyodor $ */
+/* $Id: tcpip.cc 7157 2008-04-14 23:55:25Z fyodor $ */
 #ifdef WIN32
 #include "nmap_winconfig.h"
 #endif
@@ -450,7 +450,7 @@ static const char *ippackethdrinfo(const u8 *packet, u32 len) {
   Snprintf(ipinfo, sizeof(ipinfo), "ttl=%d id=%d iplen=%d%s %s%s%s", 
 	  ip->ip_ttl, ntohs(ip->ip_id), ntohs(ip->ip_len), fragnfo,
 	  ip->ip_hl==5?"":"ipopts={",
-	  ip->ip_hl==5?"":print_ip_options((u8*)ip + sizeof(struct ip), MIN((ip->ip_hl-5)*4,len-sizeof(struct ip))),
+	  ip->ip_hl==5?"":print_ip_options((u8*)ip + sizeof(struct ip), MIN((unsigned)(ip->ip_hl-5)*4,len-sizeof(struct ip))),
 	  ip->ip_hl==5?"":"}");
 
   if (ip->ip_p == IPPROTO_TCP) {
@@ -1312,7 +1312,7 @@ int send_frag_ip_packet(int sd, struct eth_nfo *eth, u8 *packet,
   return res;
 }
 
-static int Sendto(char *functionname, int sd, const unsigned char *packet, 
+static int Sendto(const char *functionname, int sd, const unsigned char *packet, 
 		  int len, unsigned int flags, struct sockaddr *to, int tolen) {
 
 struct sockaddr_in *sin = (struct sockaddr_in *) to;
@@ -2153,9 +2153,9 @@ static bool NmapArpCache(int command, struct sockaddr_storage *ss, u8 *mac) {
   if (ArpCacheSz == ArpCapacity) {
     if (ArpCapacity == 0) ArpCapacity = 32;
     else ArpCapacity <<= 2;
+    Cache = (struct ArpCache *) safe_realloc(Cache,
+				ArpCapacity * sizeof(struct ArpCache));
   }
-  Cache = (struct ArpCache *) safe_realloc(Cache, 
-					   ArpCapacity * sizeof(struct ArpCache));
 
   /* Ensure that it isn't already there ... */
   for(i=0; i < ArpCacheSz; i++) {
@@ -2168,6 +2168,7 @@ static bool NmapArpCache(int command, struct sockaddr_storage *ss, u8 *mac) {
   /* Add it to the end of the list */
   Cache[i].ip = sin->sin_addr.s_addr;
   memcpy(Cache[i].mac, mac, 6);
+  ArpCacheSz++;
   return true;
 }
 
@@ -2473,7 +2474,7 @@ bool setTargetNextHopMAC(Target *target) {
 
 /* Set a pcap filter */
 void set_pcap_filter(const char *device,
-		     pcap_t *pd, char *bpf, ...)
+		     pcap_t *pd, const char *bpf, ...)
 {
   va_list ap;
   char buf[3072];

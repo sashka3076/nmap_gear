@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: scan_engine.cc 6858 2008-02-28 18:52:06Z fyodor $ */
+/* $Id: scan_engine.cc 7299 2008-05-03 05:42:16Z david $ */
 
 #ifdef WIN32
 #include "nmap_winconfig.h"
@@ -286,7 +286,7 @@ public:
   /* Returns true if the given tryno and pingseq match those within this
      probe. */
   bool check_tryno_pingseq(unsigned int tryno, unsigned int pingseq) {
-    return pingseq == 0 && tryno >= this->tryno || pingseq > 0 && pingseq == this->pingseq;
+    return (pingseq == 0 && tryno >= this->tryno) || (pingseq > 0 && pingseq == this->pingseq);
   }
 
   u8 tryno; /* Try (retransmission) number of this probe */
@@ -346,8 +346,9 @@ public:
   struct sockaddr_storage latestip; 
   GroupScanStats(UltraScanInfo *UltraSI);
   ~GroupScanStats();
+  void probeSent();
   /* Returns true if the GLOBAL system says that sending is OK. */
-  bool sendOK(); 
+  bool sendOK(struct timeval *when); 
   /* Total # of probes outstanding (active) for all Hosts */
   int num_probes_active; 
   UltraScanInfo *USI; /* The USI which contains this GSS.  Use for at least
@@ -373,6 +374,9 @@ public:
   /* Value of numprobes_sent at lastping_sent time -- to ensure that we don't
      send too many pings when probes are going slowly. */
   int lastping_sent_numprobes; 
+  /* When to send the next probe, to keep the minimum up. Used only when a
+     minimum sending rate (o.min_packet_send_rate) is set. */
+  struct timeval send_no_later_than;
 
   /* The host to which global pings are sent. This is kept updated to be the
      most recent host that was found up. */
@@ -489,6 +493,9 @@ public:
      in this value. */
   unsigned int num_probes_waiting_retransmit;
   unsigned int num_probes_outstanding() { return probes_outstanding.size(); }
+  /* Call this instead of checking for num_probes_outstanding() == 0 because it
+     avoids a potential traversal of the list to find the size. */
+  unsigned int probes_outstanding_empty() { return probes_outstanding.empty(); }
 
   /* The bench is a stock of probes (compacted into just the
      probespec) that have met the current maximum tryno, and are on
@@ -653,6 +660,7 @@ public:
   list<HostScanStats *> completedHosts;
 
   ScanProgressMeter *SPM;
+  RateMeter send_rate_meter;
   struct scan_lists *ports;
   int rawsd; /* raw socket descriptor */
   pcap_t *pd;
@@ -813,7 +821,13 @@ void UltraProbe::setConnect(u16 portno) {
 ConnectScanInfo::ConnectScanInfo() {
   maxValidSD = -1;
   numSDs = 0;
-  maxSocketsAllowed = (o.max_parallelism)? o.max_parallelism : MAX(5, max_sd() - 4);
+  /* Subtracting 5 from max_sd accounts for
+     stdin
+     stdout
+     stderr
+     /dev/tty
+     /var/run/utmpx, which is opened on Mac OS X at least. */
+  maxSocketsAllowed = (o.max_parallelism)? o.max_parallelism : MAX(5, max_sd() - 5);
   FD_ZERO(&fds_read);
   FD_ZERO(&fds_write);
   FD_ZERO(&fds_except);
@@ -874,6 +888,7 @@ GroupScanStats::GroupScanStats(UltraScanInfo *UltraSI) {
   probes_sent = probes_sent_at_last_wait = 0;
   probes_replied_to = 0;
   lastping_sent = lastrcvd = USI->now;
+  send_no_later_than = USI->now;
   lastping_sent_numprobes = 0;
   pinghost = NULL;
   gettimeofday(&last_wait, NULL);
@@ -884,9 +899,26 @@ GroupScanStats::~GroupScanStats() {
   delete CSI;
 }
 
+void GroupScanStats::probeSent() {
+  /* Find the next scheduled send time for minimum-rate scanning. */
+  if (TIMEVAL_SUBTRACT(send_no_later_than, USI->now) > 0) {
+    /* The next scheduled send is in the future. That means we're ahead of
+       schedule, but it also means there's slack time during which the sending
+       rate could drop. Reschedule the send to keep that from happening. */
+    send_no_later_than = USI->now;
+  }
+  TIMEVAL_ADD(send_no_later_than, send_no_later_than,
+    (time_t) (1000000.0 / o.min_packet_send_rate));
+}
+
   /* Returns true if the GLOBAL system says that sending is OK.*/
-bool GroupScanStats::sendOK() {
+bool GroupScanStats::sendOK(struct timeval *when) {
   int recentsends;
+
+  /* In case it's not okay to send, arbitrarily say to check back in one
+     second. */
+  if (when)
+    TIMEVAL_MSEC_ADD(*when, USI->now, 1000); 
 
   if ((USI->scantype == CONNECT_SCAN || USI->ptech.connecttcpscan)
       && CSI->numSDs >= CSI->maxSocketsAllowed)
@@ -914,13 +946,34 @@ bool GroupScanStats::sendOK() {
   if (recentsends >= 50)
     return false;
 
+  /* Enforce a minimum scanning rate, if necessary. If we're ahead of schedule,
+     record the time of the next scheduled send. If we're behind schedule,
+     return true to indicate that we need to send now, regardless of any
+     congestion control. */
+  if (o.min_packet_send_rate != 0.0) {
+    if (TIMEVAL_SUBTRACT(send_no_later_than, USI->now) > 0) {
+      if (when)
+        *when = send_no_later_than;
+    } else {
+      if (when)
+        *when = USI->now;
+      return true;
+    }
+  }
+
   /* When there is only one target left, let the host congestion
      stuff deal with it. */
-  if (USI->numIncompleteHostsLessThan(2))
+  if (USI->numIncompleteHostsLessThan(2)) {
+    if (when)
+      *when = USI->now;
     return true;
+  }
 
-  if (timing.cwnd >= num_probes_active + 0.5)
+  if (timing.cwnd >= num_probes_active + 0.5) {
+    if (when)
+      *when = USI->now;
     return true;
+  }
 
   return false;
 }
@@ -1056,6 +1109,16 @@ bool HostScanStats::sendOK(struct timeval *when) {
   if (target->timedOut(&USI->now) || completed()) {
     if (when) *when = USI->now;
     return false;
+  }
+
+  /* If the group stats say we need to send a probe to enforce a minimum
+     scanning rate, then we need to step up and send a probe. */
+  if (o.min_packet_send_rate != 0.0) {
+    if (TIMEVAL_SUBTRACT(USI->gstats->send_no_later_than, USI->now) <= 0) {
+      if (when)
+        *when = USI->now;
+      return true;
+    }
   }
 
   if (rld.rld_waiting) {
@@ -1293,6 +1356,7 @@ void UltraScanInfo::Init(vector<Target *> &Targets, struct scan_lists *pts, styp
   seqmask = get_random_u32();
   scantype = scantp;
   SPM = new ScanProgressMeter(scantype2str(scantype));
+  send_rate_meter.start(&now);
   tcp_scan = udp_scan = prot_scan = ping_scan = noresp_open_scan = false;
   ping_scan_arp = false;
   memset((char *) &ptech, 0, sizeof(ptech));
@@ -1447,11 +1511,12 @@ bool UltraScanInfo::sendOK(struct timeval *when) {
   bool hgood = false;
   bool thisHostGood = false;
   bool foundgood = false;
-  ggood = gstats->sendOK();
+
+  ggood = gstats->sendOK(when);
 
   if (!ggood) {
     if (when) {
-      TIMEVAL_MSEC_ADD(lowhtime, now, 1000); 
+      lowhtime = *when;
       // Can't do anything until global is OK - means packet receipt
       // or probe timeout.
       for(host = incompleteHosts.begin(); host != incompleteHosts.end(); 
@@ -1482,6 +1547,13 @@ bool UltraScanInfo::sendOK(struct timeval *when) {
     assert(foundgood);
   }
   
+  /* Defer to the group stats if they need a shorter delay to enforce a minimum
+     packet sending rate. */
+  if (o.min_packet_send_rate != 0.0) {
+    if (TIMEVAL_MSEC_SUBTRACT(gstats->send_no_later_than, lowhtime) < 0)
+      lowhtime = gstats->send_no_later_than;
+  }
+
   if (TIMEVAL_MSEC_SUBTRACT(lowhtime, now) < 0)
     lowhtime = now;
 
@@ -1565,7 +1637,7 @@ int UltraScanInfo::removeCompletedHosts() {
       }
       if (o.debugging > 2) {
         unsigned int num_outstanding_probes;
-        num_outstanding_probes = hss->probes_outstanding.size();
+        num_outstanding_probes = hss->num_probes_outstanding();
         log_write(LOG_PLAIN, "Moving %s to completed hosts list with %d outstanding %s.\n",
                   hss->target->targetipstr(), num_outstanding_probes,
                   num_outstanding_probes == 1 ? "probe" : "probes");
@@ -2353,7 +2425,7 @@ static void ultrascan_host_pspec_update(UltraScanInfo *USI, HostScanStats *hss,
       /* Make this the new global ping host, but only if it's not waiting for
          any probes. */
       if (USI->gstats->pinghost == NULL
-        || USI->gstats->pinghost->num_probes_outstanding() == 0) {
+        || USI->gstats->pinghost->probes_outstanding_empty()) {
         if (o.debugging > 1)
           log_write(LOG_PLAIN, "Changing global ping host to %s.\n", hss->target->targetipstr());
         USI->gstats->pinghost = hss;
@@ -2483,11 +2555,14 @@ static UltraProbe *sendConnectScanProbe(UltraScanInfo *USI, HostScanStats *hss,
   else sin6->sin6_port = htons(probe->pspec()->pd.tcp.dport);
 #endif
   hss->lastprobe_sent = probe->sent = USI->now;
+  USI->gstats->probeSent();
   rc = connect(CP->sd, (struct sockaddr *)&sock, socklen);
   gettimeofday(&USI->now, NULL);
   if (rc == -1) connect_errno = socket_errno();
   PacketTrace::traceConnect(IPPROTO_TCP, (sockaddr *) &sock, socklen, rc, 
 			    connect_errno, &USI->now);
+  /* We don't record a byte count for connect probes. */
+  USI->send_rate_meter.record(0, &USI->now);
   /* This counts as probe being sent, so update structures */
   hss->probes_outstanding.push_back(probe);
   probeI = hss->probes_outstanding.end();
@@ -2579,11 +2654,13 @@ static UltraProbe *sendArpScanProbe(UltraScanInfo *USI, HostScanStats *hss,
 		     ETH_ADDR_BROADCAST,  *hss->target->v4hostip());
   gettimeofday(&USI->now, NULL);
   hss->lastprobe_sent = probe->sent = USI->now;
+  USI->gstats->probeSent();
   if ((rc = eth_send(USI->ethsd, frame, sizeof(frame))) != sizeof(frame)) {
     int err = socket_errno();
     error("WARNING:  eth_send of ARP packet returned %i rather than expected %d (errno=%i: %s)", rc, (int) sizeof(frame), err, strerror(err));
   }
   PacketTrace::traceArp(PacketTrace::SENT, (u8 *) frame, sizeof(frame), &USI->now);
+  USI->send_rate_meter.record(sizeof(frame), &USI->now);
   probe->tryno = tryno;
   probe->pingseq = pingseq;
   /* First build the probe */
@@ -2599,7 +2676,12 @@ static UltraProbe *sendArpScanProbe(UltraScanInfo *USI, HostScanStats *hss,
 }
 
 /* If this is NOT a ping probe, set pingseq to 0.  Otherwise it will be the
-   ping sequence number (they start at 1).  The probe sent is returned. */
+   ping sequence number (they start at 1).  The probe sent is returned.
+   
+   This function also handles the sending of decoys. There is no fine-grained
+   control of this; all decoys are sent at once on one call of this function.
+   This means that decoys do not honor any scan delay and may violate congestion
+   control limits. */
 static UltraProbe *sendIPScanProbe(UltraScanInfo *USI, HostScanStats *hss, 
 			    const probespec *pspec, u8 tryno, u8 pingseq) {
   u8 *packet = NULL;
@@ -2656,6 +2738,7 @@ static UltraProbe *sendIPScanProbe(UltraScanInfo *USI, HostScanStats *hss,
 	probe->setIP(packet, packetlen, pspec);
 	hss->lastprobe_sent = probe->sent = USI->now;
       }
+      USI->gstats->probeSent();
       send_ip_packet(USI->rawsd, ethptr, packet, packetlen);
       free(packet);
     }
@@ -2671,6 +2754,7 @@ static UltraProbe *sendIPScanProbe(UltraScanInfo *USI, HostScanStats *hss,
 	probe->setIP(packet, packetlen, pspec);
 	hss->lastprobe_sent = probe->sent = USI->now;
       }
+      USI->gstats->probeSent();
       send_ip_packet(USI->rawsd, ethptr, packet, packetlen);
       free(packet);
     }
@@ -2726,6 +2810,7 @@ static UltraProbe *sendIPScanProbe(UltraScanInfo *USI, HostScanStats *hss,
 	probe->setIP(packet, packetlen, pspec);
 	hss->lastprobe_sent = probe->sent = USI->now;
       }
+      USI->gstats->probeSent();
       send_ip_packet(USI->rawsd, ethptr, packet, packetlen);
       free(packet);
     }
@@ -2748,10 +2833,12 @@ static UltraProbe *sendIPScanProbe(UltraScanInfo *USI, HostScanStats *hss,
 	probe->setIP(packet, packetlen, pspec);
 	hss->lastprobe_sent = probe->sent = USI->now;
       }
+      USI->gstats->probeSent();
       send_ip_packet(USI->rawsd, ethptr, packet, packetlen);
       free(packet);
     }
   } else assert(0); /* TODO:  Maybe RPC scan and the like */
+  USI->send_rate_meter.record(packetlen, &USI->now);
   /* Now that the probe has been sent, add it to the Queue for this host */
   hss->probes_outstanding.push_back(probe);
   USI->gstats->num_probes_active++;
@@ -2811,7 +2898,7 @@ static void doAnyNewProbes(UltraScanInfo *USI) {
      sending a probe. */
   unableToSend = NULL;
   hss = USI->nextIncompleteHost();
-  while (hss != NULL && hss != unableToSend && USI->gstats->sendOK()) {
+  while (hss != NULL && hss != unableToSend && USI->gstats->sendOK(NULL)) {
     if (hss->freshPortsLeft() && hss->sendOK(NULL)) {
       sendNextScanProbe(USI, hss);
       unableToSend = NULL;
@@ -2834,7 +2921,7 @@ static void doAnyRetryStackRetransmits(UltraScanInfo *USI) {
      sending a probe. */
   unableToSend = NULL;
   hss = USI->nextIncompleteHost();
-  while (hss != NULL && hss != unableToSend && USI->gstats->sendOK()) {
+  while (hss != NULL && hss != unableToSend && USI->gstats->sendOK(NULL)) {
     if (!hss->retry_stack.empty() && hss->sendOK(NULL)) {
       sendNextRetryStackProbe(USI, hss);
       unableToSend = NULL;
@@ -2901,7 +2988,7 @@ static void doAnyPings(UltraScanInfo *USI) {
 	hss->numprobes_sent >= hss->lastping_sent_numprobes + 10 &&
 	TIMEVAL_SUBTRACT(USI->now, hss->lastrcvd) > USI->perf.pingtime && 
 	TIMEVAL_SUBTRACT(USI->now, hss->lastping_sent) > USI->perf.pingtime &&
-	USI->gstats->sendOK() && hss->sendOK(NULL)) {
+	USI->gstats->sendOK(NULL) && hss->sendOK(NULL)) {
       sendPingProbe(USI, hss);
       hss->lastping_sent = USI->now;
       hss->lastping_sent_numprobes = hss->numprobes_sent;
@@ -2910,11 +2997,11 @@ static void doAnyPings(UltraScanInfo *USI) {
 
   /* Next come global pings. We never send more than one of these at at time. */
   if (USI->gstats->pinghost != NULL && USI->gstats->pinghost->pingprobestate != PORT_UNKNOWN &&
-      USI->gstats->pinghost->num_probes_outstanding() == 0 &&
+      USI->gstats->pinghost->probes_outstanding_empty() &&
       USI->gstats->probes_sent >= USI->gstats->lastping_sent_numprobes + 20 && 
       TIMEVAL_SUBTRACT(USI->now, USI->gstats->lastrcvd) > USI->perf.pingtime && 
       TIMEVAL_SUBTRACT(USI->now, USI->gstats->lastping_sent) > USI->perf.pingtime && 
-      USI->gstats->sendOK()) {
+      USI->gstats->sendOK(NULL)) {
     sendGlobalPingProbe(USI);
     USI->gstats->lastping_sent = USI->now;
     USI->gstats->lastping_sent_numprobes = USI->gstats->probes_sent;
@@ -2966,6 +3053,12 @@ static void doAnyOutstandingRetransmits(UltraScanInfo *USI) {
   int retrans = 0; /* Number of retransmissions during a loop */
   unsigned int maxtries;
 
+  struct timeval tv_start = {0};
+  if (o.debugging) {
+    gettimeofday(&USI->now, NULL);
+    tv_start = USI->now;
+  }
+
   gettimeofday(&USI->now, NULL);
 
   /* Loop until we get through all the hosts without a retransmit or we're not
@@ -2973,7 +3066,7 @@ static void doAnyOutstandingRetransmits(UltraScanInfo *USI) {
   do {
     retrans = 0;
     for (hostI = USI->incompleteHosts.begin();
-         hostI != USI->incompleteHosts.end() && USI->gstats->sendOK();
+         hostI != USI->incompleteHosts.end() && USI->gstats->sendOK(NULL);
          hostI++) {
       host = *hostI;
       /* Skip this host if it has nothing to send. */
@@ -3006,7 +3099,14 @@ static void doAnyOutstandingRetransmits(UltraScanInfo *USI) {
         } 
       } while (probeI != host->probes_outstanding.begin());
     }
-  } while (USI->gstats->sendOK() && retrans != 0);
+  } while (USI->gstats->sendOK(NULL) && retrans != 0);
+
+  if (o.debugging) {
+    long tv_diff;
+    gettimeofday(&USI->now, NULL);
+    tv_diff = TIMEVAL_MSEC_SUBTRACT(USI->now, tv_start);
+    if (tv_diff > 30) log_write(LOG_PLAIN, "%s took %lims\n", __func__, tv_diff);
+  }
 }
 
 /* Print occasional remaining time estimates, as well as
@@ -3041,6 +3141,13 @@ static void printAnyStats(UltraScanInfo *USI) {
                   hss->target->to.rttvar);
       }
     }
+
+    log_write(LOG_PLAIN, "Current sending rates: %.2f packets / s, %.2f bytes / s.\n",
+      USI->send_rate_meter.getCurrentPacketRate(),
+      USI->send_rate_meter.getCurrentByteRate());
+    log_write(LOG_PLAIN, "Overall sending rates: %.2f packets / s, %.2f bytes / s.\n",
+      USI->send_rate_meter.getOverallPacketRate(),
+      USI->send_rate_meter.getOverallByteRate());
   }
 
   /* Now time to figure out how close we are to completion ... */
@@ -3260,6 +3367,9 @@ static bool do_one_select_round(UltraScanInfo *USI, struct timeval *stime) {
 	  newportstate = PORT_FILTERED;
 	  current_reason = ER_HOSTUNREACH;
 	  break;
+#ifdef WIN32
+	case WSAEADDRNOTAVAIL:
+#endif
 	case ETIMEDOUT:
 	case EHOSTDOWN:
 	  newhoststate = HOST_DOWN;
@@ -4694,11 +4804,21 @@ void ultra_scan(vector<Target *> &Targets, struct scan_lists *ports,
        avgdone /= USI->gstats->numtargets;
               
        USI->SPM->printStats(avgdone, NULL); // This prints something like SYN Stealth Scan Timing: About 1.14% done; ETC: 15:01 (0:43:23 remaining);
+       if (o.debugging) {
+         /* Don't update when getting the current rates, otherwise we can get
+            anomalies (rates are too low) from having just done a potentially
+            long waitForResponses without sending any packets. */
+         log_write(LOG_STDOUT, "Current sending rates: %.2f packets / s, %.2f bytes / s.\n",
+            USI->send_rate_meter.getCurrentPacketRate(&USI->now, false),
+            USI->send_rate_meter.getCurrentByteRate(&USI->now, false));
+       }
        
        log_flush(LOG_STDOUT);
 
     }
   }
+
+  USI->send_rate_meter.stop(&USI->now);
 
   /* Save the computed timeouts. */
   if (to != NULL)
@@ -4718,6 +4838,11 @@ void ultra_scan(vector<Target *> &Targets, struct scan_lists *ports,
 		   USI->gstats->num_hosts_timedout, 
 		   (USI->gstats->num_hosts_timedout == 1)? "host" : "hosts");
     USI->SPM->endTask(NULL, additional_info);
+  }
+  if (o.debugging) {
+    log_write(LOG_STDOUT, "Overall sending rates: %.2f packets / s, %.2f bytes / s.\n",
+      USI->send_rate_meter.getOverallPacketRate(),
+      USI->send_rate_meter.getOverallByteRate());
   }
 
   if (o.debugging > 2 && USI->pd != NULL)
@@ -4915,7 +5040,6 @@ void pos_scan(Target *target, u16 *portarray, int numports, stype scantype) {
   struct portinfo *scan = NULL,  *current, *next;
   struct portinfolist pil;
   struct timeval now;
-  struct connectsockinfo csi;
   struct rpcscaninfo rsi;
   unsigned long j;
   struct serviceDeductions sd;
@@ -4948,11 +5072,6 @@ void pos_scan(Target *target, u16 *portarray, int numports, stype scantype) {
 
   memset(&pil, 0, sizeof(pil));
 
-  FD_ZERO(&csi.fds_read);
-  FD_ZERO(&csi.fds_write);
-  FD_ZERO(&csi.fds_except);
-  csi.maxsd = 0;
-
   if (o.max_parallelism) {
     ss.max_width = o.max_parallelism;
   } else {
@@ -4965,8 +5084,6 @@ void pos_scan(Target *target, u16 *portarray, int numports, stype scantype) {
 
   ss.initial_packet_width = box(ss.min_width, ss.max_width, ss.initial_packet_width);
   ss.numqueries_ideal = ss.initial_packet_width;
-
-  memset(csi.socklookup, 0, sizeof(csi.socklookup));
 
   get_rpc_procs(&(rsi.rpc_progs), &(rsi.rpc_number));
   scan = (struct portinfo *) safe_malloc(rsi.rpc_number * sizeof(struct portinfo));

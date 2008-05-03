@@ -98,14 +98,14 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: tcpip.h 6858 2008-02-28 18:52:06Z fyodor $ */
+/* $Id: tcpip.h 7220 2008-04-28 17:53:32Z kris $ */
 
 
 #ifndef TCPIP_H
 #define TCPIP_H
 
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+#include "nmap_config.h"
 #endif
 
 #include "nbase.h"
@@ -760,7 +760,7 @@ int recvtime(int sd, char *buf, int len, int seconds, int *timedout);
 
 /* Sets a pcap filter function -- makes SOCK_RAW reads easier */
 #ifndef WINIP_H
-void set_pcap_filter(const char *device, pcap_t *pd, char *bpf, ...);
+void set_pcap_filter(const char *device, pcap_t *pd, const char *bpf, ...);
 #endif
 
 #endif /*TCPIP_H*/

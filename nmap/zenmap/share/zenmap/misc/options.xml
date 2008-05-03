@@ -126,6 +126,36 @@
           arguments=""
           need_root="0"/>
           
+  <option name="Script scan"
+          option="-sC"
+          hint="Try to detect version of services on scanned hosts"
+          arguments=""
+          need_root="0"/>
+          
+  <option name="Script selection"
+          option="--script=%s"
+          hint="Run selected scripts"
+          arguments="A comma-separated list of scripts categories, directories, or files"
+          need_root="0"/>
+          
+  <option name="Script arguments"
+          option="--script-args=%s"
+          hint="Arguments to give to scripts, in the form n1=v1,n2=v2,..."
+          arguments=""
+          need_root="0"/>
+          
+  <option name="Script trace"
+          option="--script-trace"
+          hint="Show data sent and received by scripts"
+          arguments=""
+          need_root="0"/>
+          
+  <option name="Update script database"
+          option="--script-updatedb"
+          hint="Update the script database"
+          arguments=""
+          need_root="0"/>
+          
   <option name="Operating system detection"
           option="-O"
           hint="Try to detect running OS on scanned hosts"

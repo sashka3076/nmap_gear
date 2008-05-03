@@ -19,8 +19,10 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
+import errno
 import gtk
 import gobject
+import os
 import re
 
 from higwidgets.hignotebooks import HIGNotebook, HIGAnimatedTabLabel
@@ -41,7 +43,7 @@ from zenmapCore.NmapCommand import NmapCommand
 from zenmapCore.NmapCommand import CommandConstructor
 from zenmapCore.UmitConf import CommandProfile, ProfileNotFound, is_maemo
 from zenmapCore.NmapParser import NmapParser
-from zenmapCore.Paths import Path
+from zenmapCore.Paths import Path, get_extra_executable_search_paths
 from zenmapCore.UmitLogging import log
 from zenmapCore.I18N import _
 
@@ -558,11 +560,28 @@ conclusion of the old scan, choose Cancel."),
         
         try:
             self.command_execution.run_scan()
-        except Exception, msg:
-            warn_dialog = HIGAlertDialog(message_format=_("Command is missing!"),
-                                         secondary_text=_("It seems that your profile's \
-command is missing or something else went wrong. Please, try to remove and recreate your profile."),
-                                         type=gtk.MESSAGE_ERROR)
+        except Exception, e:
+            text = str(e)
+            if type(e) == OSError:
+                # Handle ENOENT specially.
+                if e.errno == errno.ENOENT:
+                    # nmap_command_path comes from zenmapCore.NmapCommand.
+                    text += "\n\n" + _("This means that the nmap executable was not found in your system PATH, which is") + "\n\n" + os.getenv("PATH", _("<undefined>"))
+                    path_env = os.getenv("PATH")
+                    if path_env is None:
+                        default_paths = []
+                    else:
+                        default_paths = path_env.split(os.pathsep)
+                    extra_paths = get_extra_executable_search_paths()
+                    extra_paths = [p for p in extra_paths if p not in default_paths]
+                    if len(extra_paths) > 0:
+                        if len(extra_paths) == 1:
+                            text += "\n\n" + _("plus the extra directory")
+                        else:
+                            text += "\n\n" + _("plus the extra directories")
+                        text += "\n\n" + os.pathsep.join(extra_paths)
+            warn_dialog = HIGAlertDialog(message_format=_("Error executing command"),
+                secondary_text=text, type=gtk.MESSAGE_ERROR)
             warn_dialog.run()
             warn_dialog.destroy()
 

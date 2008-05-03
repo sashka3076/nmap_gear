@@ -104,6 +104,7 @@ profile_editor_content = '''<?xml version="1.0"?>
   <groups>
     <group name="Scan"/>
     <group name="Ping"/>
+    <group name="Scripting"/>
     <group name="Target"/>
     <group name="Source"/>
     <group name="Other"/>
@@ -155,6 +156,13 @@ profile_editor_content = '''<?xml version="1.0"?>
     <option_check label="UDP probes" option="UDP Probe" arg_type="str"/>
     <option_check label="IPProto probes" option="IPProto Probe" arg_type="str"/>
   </Ping>
+  <Scripting label="Scripting options (NSE)">
+    <option_check label="Script scan" option="Script scan"/>
+    <option_check label="Scripts to run" option="Script selection" arg_type="str"/>
+    <option_check label="Script arguments" option="Script arguments" arg_type="str"/>
+    <option_check label="Trace script execution" option="Script trace"/>
+    <!-- <option_check label="Trace script execution" option="Script trace"/> -->
+  </Scripting>
   <Target label="Target options">
     <option_check label="Excluded hosts/networks" option="Excluded hosts/networks" arg_type="str"/>
     <option_check label="Excluded hosts/networks from file" option="Excluded hosts/networks from file" arg_type="path"/>
@@ -317,6 +325,36 @@ options_content = '''<?xml version="1.0"?>
   <option name="Version detection"
           option="-sV"
           hint="Try to detect version of services on scanned hosts"
+          arguments=""
+          need_root="0"/>
+          
+  <option name="Script scan"
+          option="-sC"
+          hint="Try to detect version of services on scanned hosts"
+          arguments=""
+          need_root="0"/>
+          
+  <option name="Script selection"
+          option="--script=%s"
+          hint="Run selected scripts"
+          arguments="A comma-separated list of scripts categories, directories, or files"
+          need_root="0"/>
+          
+  <option name="Script arguments"
+          option="--script-args=%s"
+          hint="Arguments to give to scripts, in the form n1=v1,n2=v2,..."
+          arguments=""
+          need_root="0"/>
+          
+  <option name="Script trace"
+          option="--script-trace"
+          hint="Show data sent and received by scripts"
+          arguments=""
+          need_root="0"/>
+          
+  <option name="Update script database"
+          option="--script-updatedb"
+          hint="Update the script database"
           arguments=""
           need_root="0"/>
           

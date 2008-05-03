@@ -31,11 +31,7 @@
       <varlistentry>
         <term>More sophisticated version detection</term>
         <listitem>
-          <para>The Nmap
-       <bookex>
-       version detection system (<xref linkend="version-scan"/>)
-       </bookex>
-       <notbook><ulink url="http://insecure.org/vscan/">version detection system</ulink></notbook>
+          <para>The Nmap version detection system (<xref linkend="vscan"/>)
        is able to recognize thousands of different services through
        its probe and regular expression based matching system, but it
        cannot recognize everything.  For example, identifying the Skype v2 service requires two
@@ -349,7 +345,7 @@ extension does not have to be <literal>nse</literal>.
 <para>Nmap scripts are stored in a <filename>scripts</filename>
 subdirectory of the Nmap data directory
 <bookex>(see <xref linkend="data-files"/>)</bookex>
-<notbook>(see the <ulink url="http://nmap.org/man/man-misc-options.html"><option>--datadir</option>
+<notbook>(see the <ulink url="http://nmap.org/book/man-misc-options.html"><option>--datadir</option>
 option</ulink>)</notbook>
 by default.  Scripts are indexed in a database stored in
 <filename>scripts/script.db</filename>. The database lists all of the
@@ -489,14 +485,17 @@ categories.</para>
     <sect2 id="nse-format-author">
       <title><literal>author</literal> Field </title>
       <para>
-	The <literal>author</literal> field contains the name of the script author and/or a method to contact them.  If you are worried about spam, you might want to omit or obscure your email address, or give your home page URL instead.  The field is optional and not currently used.
+	The <literal>author</literal> field contains the script authors name and contact information. If you are worried about spam, you might want to omit or obscure your email address, or give your home page URL instead.  This optional field is not used by NSE, but is important for giving script authors due credit or blame. 
       </para>
     </sect2>
 
     <sect2 id="nse-format-license">
       <title><literal>license</literal> Field </title>
-      <para>
-	<remark>We're still finalizing this.  The field is optional and not currently used.  See <xref linkend="nse-license"/>.</remark>
+      <para>This field describes the license applied to the script.  All scripts currently shipped with Nmap contain:</para>
+<programlisting>
+license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
+</programlisting>
+<para>See <xref linkend="nse-license"/> for further details on contributing NSE scripts to Nmap.
       </para>
     </sect2>
 
@@ -532,7 +531,8 @@ categories.</para>
 	evaluates to <literal>true</literal>, the script action 
 	is performed. Otherwise the action is skipped. Port rules are
 	only matched against TCP or UDP ports in the
-	<literal>open</literal> or <literal>open|filtered</literal>
+	<literal>open</literal>, <literal>open|filtered</literal> or
+	<literal>unfiltered</literal>
 	states. Host rules are matched exactly once against every
 	scanned host. The action, like the rule, is a Lua function,
 	which takes a host and port table as arguments. If the script is
@@ -1400,6 +1400,68 @@ if(s) code_to_be_done_on_match end
 	    </varlistentry>
 	</variablelist>
 	</sect2>
+	<sect2 id="nse-lib-datafiles">
+	<title>Data File Parsing Functions</title>
+	<para>
+	The <literal>datafiles</literal> module provides functions for reading and parsing
+	Nmap's data files (e.g. <filename>nmap-protocol</filename>, <filename>nmap-rpc</filename>,
+	etc.).  These functions' return values are setup for use with exception handling via
+	<literal>nmap.new_try()</literal>.
+	</para>
+
+	<variablelist>
+	    <varlistentry>
+	      <term><option>bool, table = datafiles.parse_protocols()</option>
+		  <indexterm><primary>parse_protocols</primary></indexterm></term>
+	      <listitem>
+		  <para>
+			This function reads and parses Nmap's <filename>nmap-protocols</filename>
+			file.  <literal>bool</literal> is a boolen value indicating success.
+			If <literal>bool</literal> is true, then the second returned
+			value is a table with protocol numbers indexing the protocol
+			names.  If <literal>bool</literal> is false, an error message
+			is returned as the second value instead of the table.
+		  </para>
+	      </listitem>
+	    </varlistentry>
+
+	    <varlistentry>
+	      <term><option>bool, table = datafiles.parse_rpc()</option>
+		  <indexterm><primary>parse_rpc</primary></indexterm></term>
+	      <listitem>
+		  <para>
+			This function reads and parses Nmap's <filename>nmap-rpc</filename>
+			file.  <literal>bool</literal> is a boolen value indicating success.
+			If <literal>bool</literal> is true, then the second returned
+			value is a table with RPC numbers indexing the RPC names.  If
+			<literal>bool</literal> is false, an error message is returned
+			as the second value instead of the table.
+		  </para>
+	      </listitem>
+	    </varlistentry>
+
+	    <varlistentry>
+	      <term><option>bool, table = datafiles.parse_services([protocol])</option>
+		  <indexterm><primary>parse_services</primary></indexterm></term>
+	      <listitem>
+		  <para>
+			This function reads and parses Nmap's <filename>nmap-services</filename>
+			file.  <literal>bool</literal> is a boolen value indicating success.
+			If <literal>bool</literal> is true, then the second returned
+			value is a table containing two other tables:
+			<literal>tcp{}</literal> and <literal>udp{}</literal>.
+			<literal>tcp{}</literal> contains services indexed by TCP port
+			numbers.  <literal>udp{}</literal> is the same, but for UDP.
+			You can pass "tcp" or "udp" as an argument to
+			<literal>parse_services()</literal> to only get the corresponding
+			table.  If <literal>bool</literal> is false, an error message is
+			returned as the second value instead of the table.
+		  </para>
+	      </listitem>
+	    </varlistentry>
+	</variablelist>
+
+	</sect2>
 	<sect2 id="nse-lib-stdnse">
 	<title>Various Utility Functions</title>
 	<para>
@@ -1598,7 +1660,7 @@ if(s) code_to_be_done_on_match end
 		against which the script is running. If the script is run
 		according to a host rule, then no port table is passed to the
 		script. Port states on the target can still be requested from Nmap
-		using the <literal>nmap.getPortState()</literal> call.
+		using the <literal>nmap.get_port_state()</literal> call.
 	      </para>
 	    </listitem>
 	  </varlistentry>

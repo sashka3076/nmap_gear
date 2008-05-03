@@ -101,7 +101,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: idle_scan.cc 6858 2008-02-28 18:52:06Z fyodor $ */
+/* $Id: idle_scan.cc 7079 2008-04-08 19:59:56Z david $ */
 
 #include "idle_scan.h"
 #include "timing.h"
@@ -988,7 +988,7 @@ void idle_scan(Target *target, u16 *portarray, int numports,
   int portidx = 0; /* Used for splitting the port array into chunks */
   int portsleft;
   time_t starttime;
-  char scanname[32];
+  char scanname[128];
   Snprintf(scanname, sizeof(scanname), "idle scan against %s", target->NameIP());
   ScanProgressMeter SPM(scanname);
 

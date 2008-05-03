@@ -99,7 +99,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap_winconfig.h 6858 2008-02-28 18:52:06Z fyodor $ */
+/* $Id: nmap_winconfig.h 6942 2008-03-17 17:44:40Z david $ */
 
 #ifndef NMAP_WINCONFIG_H
 #define NMAP_WINCONFIG_H
@@ -107,7 +107,7 @@
    like strcpy() even if they are done safely */
 #define _CRT_SECURE_NO_DEPRECATE 1
 #define NMAP_NAME "Nmap"
-#define NMAP_URL "http://insecure.org"
+#define NMAP_URL "http://nmap.org"
 #define NMAP_PLATFORM "i686-pc-windows-windows"
 #define NMAPDATADIR "c:\\nmap" /* FIXME: I really need to make this dynamic */
 

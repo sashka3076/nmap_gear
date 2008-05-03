@@ -22,7 +22,7 @@
 import re
 
 from types import StringTypes
-from ConfigParser import NoSectionError, NoOptionError
+from ConfigParser import DuplicateSectionError, NoSectionError, NoOptionError
 
 from zenmapCore.Paths import Path
 from zenmapCore.ScanProfileConf import scan_profile_file
@@ -179,6 +179,10 @@ class SearchConfig(UmitConfigParser, object):
 
 
 class Profile(UmitConfigParser, object):
+    """This class represents not just one profile, but a whole collection of
+    them found in a config file such as scan_profiles.usp. The methods therefore
+    all take an argument that is the name of the profile to work on."""
+
     def __init__(self, user_profile=None, *args):
         UmitConfigParser.__init__(self, *args)
 
@@ -203,20 +207,44 @@ class Profile(UmitConfigParser, object):
             return self.set(profile, attribute, value)
 
     def add_profile(self, profile_name, **attributes):
-        log.debug(">>> Add Profile '%s': %s" % (profile_name, attributes))
-        try: self.add_section(profile_name)
-        except: return None
-        
-        [self._set_it(profile_name, attr, attributes[attr]) for attr in attributes if attr != "options"]
-        options = attributes["options"]
-        if type(options) in StringTypes:
-            self._set_it(profile_name, "options", options)
-        elif type(options) == type({}):
-            self._set_it(profile_name, "options", ",".join(options.keys()))
+        """Add a profile with the given name and attributes to the collection of
+        profiles. If a profile with the same name exists, it is not overwritten,
+        and the method returns immediately. The backing file for the profiles is
+        automatically updated."""
 
-        for opt in options:
-            if options[opt]:
-                self._set_it(profile_name, opt, options[opt])
+        log.debug(">>> Add Profile '%s': %s" % (profile_name, attributes))
+
+        try:
+            self.add_section(profile_name)
+        except DuplicateSectionError:
+            return None
+
+        # Set each of the attributes ("command", "hint", "options",
+        # "description", "annotation") in the ConfigParser.
+        for attr in attributes:
+            if attr == "options":
+                # We handle the "options" attribute specially because it is a
+                # dict, not a plain string.
+                options = attributes["options"]
+                assert type(options) == dict
+
+                # The "options" attribute looks like, for example,
+                #   options = Ports to scan,Verbose,Aggressive
+                self._set_it(profile_name, "options", ",".join(options.keys()))
+
+                # Some of the options take an argument, which is also stored in
+                # the scan profiles file. Arguments are the values associated
+                # with keys in the dict, if not None. For example,
+                #   ports to scan = 1-1024
+                # might be stored in the file, meaning "-p1-1024". (Notice that
+                # case is not significant.)
+                for opt in options:
+                    if options[opt]:
+                        self._set_it(profile_name, opt, options[opt])
+            else:
+                # The other attributes are just strings so simply set them.
+                self._set_it(profile_name, attr, attributes[attr])
+
         self.save_changes()
 
     def remove_profile(self, profile_name):
@@ -230,6 +258,9 @@ class Profile(UmitConfigParser, object):
         return True
 
 class CommandProfile (Profile, object):
+    """This class is a wrapper around Profile that provides accessors for the
+    attributes of a profile: command, hint, options, description, and
+    annotation."""
     def __init__(self, user_profile=''):
         if not user_profile:
             user_profile = scan_profile_file
@@ -249,12 +280,25 @@ class CommandProfile (Profile, object):
         return self._get_it(profile, 'annotation')
 
     def get_options(self, profile):
+        """Return a dict of options and their corresponding arguments. Use None
+        as the value for options that don't have an argument."""
         dic = {}
-        for opt in self._get_it(profile, 'options').split(','):
+        options_str = self._get_it(profile, 'options')
+        # If we get back an empty string, there are no options.
+        if options_str.strip() == '':
+            return dic
+        for opt in options_str.split(','):
+            opt = opt.strip()
+            # Arguments for options are stored in the same way as the list of
+            # options itself, as name-value pairs, with the option as the name
+            # and the argument as the value. So for example you might have
+            #   options = Ports to scan,Verbose,Aggressive
+            #   ports to scan = 1-1024
+            # and case is not significant in the option name.
             try:
-                dic[unicode(opt.strip())] = self._get_it(profile, opt)
+                dic[unicode(opt)] = self._get_it(profile, opt)
             except NoOptionError:
-                dic[unicode(opt.strip())] = None
+                dic[unicode(opt)] = None
         return dic
 
     def set_command(self, profile, command=''):

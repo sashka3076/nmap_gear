@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.cc 6858 2008-02-28 18:52:06Z fyodor $ */
+/* $Id: nmap.cc 7182 2008-04-24 03:23:01Z fyodor $ */
 
 #include "nmap.h"
 #include "osscan.h"
@@ -278,6 +278,7 @@ printf("%s %s ( %s )\n"
        "  --max-retries <tries>: Caps number of port scan probe retransmissions.\n"
        "  --host-timeout <time>: Give up on target after this long\n"
        "  --scan-delay/--max-scan-delay <time>: Adjust delay between probes\n"
+       "  --min-rate <number>: Send packets no slower than <number> per second\n"
        "FIREWALL/IDS EVASION AND SPOOFING:\n"
        "  -f; --mtu <val>: fragment packets (optionally w/given MTU)\n"
        "  -D <decoy1,decoy2[,ME],...>: Cloak a scan with decoys\n"
@@ -504,6 +505,7 @@ int nmap_main(int argc, char *argv[]) {
   size_t sslen;
   int option_index;
   bool iflist = false;
+  struct timeval tv;
 
   // Pre-specified timing parameters.
   // These are stored here during the parsing of the arguments so that we can
@@ -634,6 +636,7 @@ int nmap_main(int argc, char *argv[]) {
 #endif
       {"ip_options", required_argument, 0, 0},
       {"ip-options", required_argument, 0, 0},
+      {"min-rate", required_argument, 0, 0},
       {0, 0, 0, 0}
     };
 
@@ -645,6 +648,11 @@ int nmap_main(int argc, char *argv[]) {
   fakeargv[argc] = NULL;
 
   if (argc < 2 ) printusage(argv[0], -1);
+
+  /* You never know when "random" numbers will come in handy ... */
+  gettimeofday(&tv, NULL);
+  srand((tv.tv_sec ^ tv.tv_usec) ^ getpid() + 31337);
+
   Targets.reserve(100);
 #ifdef WIN32
   win_pre_init();
@@ -888,6 +896,9 @@ int nmap_main(int argc, char *argv[]) {
 	o.traceroute = true;
       } else if(strcmp(long_options[option_index].name, "reason") == 0) {
      o.reason = true;
+      } else if(optcmp(long_options[option_index].name, "min-rate") == 0) {
+        if (sscanf(optarg, "%f", &o.min_packet_send_rate) != 1 || o.min_packet_send_rate <= 0.0)
+          fatal("Argument to --min-rate must be a positive floating-point number");
       } else {
 	fatal("Unknown long option (%s) given@#!$#$", long_options[option_index].name);
       }
@@ -1439,7 +1450,7 @@ int nmap_main(int argc, char *argv[]) {
   for(i=0; i < argc; i++) 
     log_write(LOG_XML, (i == argc-1)? "%s\" " : "%s ", fakeargv[i]);
 
-  log_write(LOG_XML, "start=\"%lu\" startstr=\"%s\" version=\"%s\" xmloutputversion=\"1.01\">\n",
+  log_write(LOG_XML, "start=\"%lu\" startstr=\"%s\" version=\"%s\" xmloutputversion=\"1.02\">\n",
 	    (unsigned long) timep, mytime, NMAP_VERSION);
 
   output_xml_scaninfo_records(ports);
@@ -1483,6 +1494,7 @@ int nmap_main(int argc, char *argv[]) {
     log_write(LOG_PLAIN, "  max-scan-delay: TCP %d, UDP %d\n", o.maxTCPScanDelay(), o.maxUDPScanDelay());
     log_write(LOG_PLAIN, "  parallelism: min %d, max %d\n", o.min_parallelism, o.max_parallelism);
     log_write(LOG_PLAIN, "  max-retries: %d, host-timeout: %ld\n", o.getMaxRetransmissions(), o.host_timeout);
+    log_write(LOG_PLAIN, "  min-rate: %g\n", o.min_packet_send_rate);
     log_write(LOG_PLAIN, "---------------------------------------------\n");
   }
 
@@ -2046,10 +2058,10 @@ void init_socket(int sd) {
  * the outer part of the port expression. It's "closed".
  */
 
-static void getpts_aux(char *origexpr, int nested, u8 *porttbl, int range_type,
+static void getpts_aux(const char *origexpr, int nested, u8 *porttbl, int range_type,
                        int *portwarning, bool change_range_type = true);
 
-struct scan_lists *getpts(char *origexpr) {
+struct scan_lists *getpts(const char *origexpr) {
   u8 *porttbl;
   struct scan_lists *ports;
   int range_type = 0;
@@ -2116,7 +2128,7 @@ struct scan_lists *getpts(char *origexpr) {
    of ports in a struct scan_lists, it allocates only one list and stores it in
    the list and count arguments. For that reason, T:, U:, and P: restrictions
    are not allowed and only one bit in range_type may be set. */
-void getpts_simple(char *origexpr, int range_type,
+void getpts_simple(const char *origexpr, int range_type,
                    unsigned short **list, int *count) {
   u8 *porttbl;
   int portwarning = 0;
@@ -2154,15 +2166,15 @@ void getpts_simple(char *origexpr, int range_type,
 
 /* getpts() and getpts_simple() (see above) are wrappers for this function */
 
-static void getpts_aux(char *origexpr, int nested, u8 *porttbl, int range_type, int *portwarning, bool change_range_type) {
+static void getpts_aux(const char *origexpr, int nested, u8 *porttbl, int range_type, int *portwarning, bool change_range_type) {
   long rangestart = -2343242, rangeend = -9324423;
-  char *current_range;
+  const char *current_range;
   char *endptr;
   char servmask[128];  // A protocol name can be up to 127 chars + nul byte
   int i;
 
   /* An example of proper syntax to use in error messages. */
-  char *syntax_example;
+  const char *syntax_example;
   if (change_range_type)
     syntax_example = "-100,200-1024,T:3000-4000,U:60000-";
   else
@@ -2352,19 +2364,6 @@ n -sS -O -v example.com/24\n\
 f --spoof \"/usr/local/bin/pico -z hello.c\" -sS -oN e.log example.com/24\n\n");
 }
 
-char *seqreport1(struct seq_info *seq) {
-  static char report[512];
-
-  Snprintf(report, sizeof(report), "TCP Sequence Prediction: Difficulty=%d (%s)\n", seq->index, seqidx2difficultystr1(seq->index));
-  return report;
-}
-
-/* Convert a TCP sequence prediction difficulty index like 1264386
-   into a difficulty string like "Worthy Challenge */
-const char *seqidx2difficultystr1(unsigned long idx) {
-  return  (idx < 10)? "Trivial joke" : (idx < 80)? "Easy" : (idx < 3000)? "Medium" : (idx < 5000)? "Formidable" : (idx < 100000)? "Worthy challenge" : "Good luck!";
-}
-
 char *seqreport(struct seq_info *seq) {
   static char report[512];
 
@@ -2378,29 +2377,7 @@ const char *seqidx2difficultystr(unsigned long idx) {
   return  (idx < 3)? "Trivial joke" : (idx < 6)? "Easy" : (idx < 11)? "Medium" : (idx < 12)? "Formidable" : (idx < 16)? "Worthy challenge" : "Good luck!";
 }
 
-
-char *seqclass2ascii(int seqclass) {
-  switch(seqclass) {
-  case SEQ_CONSTANT:
-    return "constant sequence number (!)";
-  case SEQ_64K:
-    return "64K rule";
-  case SEQ_TD:
-    return "trivial time dependency";
-  case SEQ_i800:
-    return "increments by 800";
-  case SEQ_RI:
-    return "random positive increments";
-  case SEQ_TR:
-    return "truly random";
-  case SEQ_UNKNOWN:
-    return "unknown class";
-  default:
-    return "ERROR, WTF?";
-  }
-}
-
-char *ipidclass2ascii(int seqclass) {
+const char *ipidclass2ascii(int seqclass) {
   switch(seqclass) {
   case IPID_SEQ_CONSTANT:
     return "Duplicated ipid (!)";
@@ -2421,7 +2398,7 @@ char *ipidclass2ascii(int seqclass) {
   }
 }
 
-char *tsseqclass2ascii(int seqclass) {
+const char *tsseqclass2ascii(int seqclass) {
   switch(seqclass) {
   case TS_SEQ_ZERO:
     return "zero timestamp";
@@ -2446,7 +2423,7 @@ char *tsseqclass2ascii(int seqclass) {
 
 
 /* Just a routine for obtaining a string for printing based on the scantype */
-char *scantype2str(stype scantype) {
+const char *scantype2str(stype scantype) {
 
   switch(scantype) {
   case STYPE_UNKNOWN: return "Unknown Scan Type"; break;
@@ -2478,7 +2455,7 @@ char *scantype2str(stype scantype) {
 
 }
 
-char *statenum2str(int state) {
+const char *statenum2str(int state) {
   switch(state) {
   case PORT_OPEN: return "open"; break;
   case PORT_FILTERED: return "filtered"; break;
@@ -2664,7 +2641,7 @@ int nmap_fileexistsandisreadable(char* pathname) {
 	return fileexistsandisreadable(pathname);
 }
 
-int nmap_fetchfile(char *filename_returned, int bufferlen, char *file) {
+int nmap_fetchfile(char *filename_returned, int bufferlen, const char *file) {
   char *dirptr;
   int res;
   int foundsomething = 0;
