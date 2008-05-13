@@ -15,7 +15,7 @@ Source1: nmapfe-16.png
 Source2: nmapfe-32.png
 Source3: nmapfe-48.png
 
-Patch1: nmap-4.11-alt-autoheader.patch
+Patch1: nmap-4.62-alt-owl-autoheader.patch
 Patch2: nmap-4.20-alt-owl-drop-priv.patch
 Patch3: nmap-4.01-alt-dot-dir.patch
 Patch4: nmap-4.20-alt-owl-fileexistsandisreadable.patch
