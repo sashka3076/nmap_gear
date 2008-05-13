@@ -1,12 +1,12 @@
 Name: nmap
-Version: 4.20
-Release: alt3
-Serial: 20020501
+Version: 4.62
+Release: alt1
+Epoch: 20020501
 
 Summary: Network exploration tool and security scanner
 License: GPL
 Group: Monitoring
-Url: http://www.insecure.org/nmap
+Url: http://nmap.org/
 Packager: Dmitry V. Levin <ldv@altlinux.org>
 
 %define srcname nmap-%version
@@ -30,7 +30,7 @@ BuildRequires: libpcap-devel >= 2:0.8, libpcre-devel, libssl-devel
 %package frontend
 Summary: Gtk+ frontend for nmap
 Group: Monitoring
-Requires: %name = %serial:%version-%release
+Requires: %name = %epoch:%version-%release
 Provides: nmapfe = %version-%release
 
 %description
