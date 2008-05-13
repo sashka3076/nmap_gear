@@ -61,6 +61,8 @@ autoconf
 export ac_cv_header_libiberty_h=no
 %configure \
 	--with-libdnet=/usr \
+	--without-liblua \
+	--without-zenmap \
 	--with-user=nmapuser \
 	--with-chroot-empty=/var/empty \
 	--with-chroot-resolv=/var/resolv \
