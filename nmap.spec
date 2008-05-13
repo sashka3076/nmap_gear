@@ -19,7 +19,7 @@ Patch1: nmap-4.62-alt-owl-autoheader.patch
 Patch2: nmap-4.62-alt-owl-drop-priv.patch
 Patch3: nmap-4.62-alt-owl-dot-dir.patch
 Patch4: nmap-4.62-alt-owl-fileexistsandisreadable.patch
-Patch5: nmap-4.04-alt-libdnet.patch
+Patch5: nmap-4.62-alt-libdnet.patch
 Patch6: nmap-4.01-alt-nmapfe.desktop.patch
 
 Requires: chrooted-resolv, libdnet >= 0:1.11-alt4
@@ -62,7 +62,7 @@ autoconf
 
 export ac_cv_header_libiberty_h=no
 %configure \
-	--with-libdnet \
+	--with-libdnet=/usr \
 	--with-user=nmapuser \
 	--with-chroot-empty=/var/empty \
 	--with-chroot-resolv=/var/resolv \
