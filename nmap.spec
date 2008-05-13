@@ -11,9 +11,6 @@ Packager: Dmitry V. Levin <ldv@altlinux.org>
 
 %define srcname nmap-%version
 Source: %url/dist/%srcname.tar
-Source1: nmapfe-16.png
-Source2: nmapfe-32.png
-Source3: nmapfe-48.png
 
 Patch1: nmap-4.62-alt-owl-autoheader.patch
 Patch2: nmap-4.62-alt-owl-drop-priv.patch
@@ -22,14 +19,8 @@ Patch4: nmap-4.62-alt-owl-fileexistsandisreadable.patch
 Patch5: nmap-4.62-alt-libdnet.patch
 
 Requires: chrooted-resolv, libdnet >= 0:1.11-alt4
-BuildRequires: gcc-c++, libcap-devel, libdnet-devel, libgtk+2-devel
+BuildRequires: gcc-c++, libcap-devel, libdnet-devel
 BuildRequires: libpcap-devel >= 2:0.8, libpcre-devel, libssl-devel
-
-%package frontend
-Summary: Gtk+ frontend for nmap
-Group: Monitoring
-Requires: %name = %epoch:%version-%release
-Provides: nmapfe = %version-%release
 
 %description
 Nmap is an utility for network exploration or security auditing.
@@ -40,9 +31,6 @@ application versions listening behind ports), and TCP/IP fingerprinting
 target and port specification, decoy/stealth scanning, Sun RPC scanning,
 and more.
 
-%description frontend
-This package includes nmapfe, a Gtk+ frontend for nmap.
-
 %prep
 %setup -q -n %srcname
 %patch1 -p1
@@ -50,7 +38,6 @@ This package includes nmapfe, a Gtk+ frontend for nmap.
 %patch3 -p1
 %patch4 -p1
 %patch5 -p1
-find -type f -name \*.orig -delete -print
 bzip2 -9 CHANGELOG
 
 %build
@@ -71,35 +58,16 @@ export ac_cv_header_libiberty_h=no
 
 %install
 %make_install install DESTDIR=%buildroot
-install -pD -m644 %_sourcedir/nmapfe-16.png %buildroot%_miconsdir/nmapfe.png
-install -pD -m644 %_sourcedir/nmapfe-32.png %buildroot%_niconsdir/nmapfe.png
-install -pD -m644 %_sourcedir/nmapfe-48.png %buildroot%_liconsdir/nmapfe.png
 
 %pre
 /usr/sbin/groupadd -r -f nmapuser
 /usr/sbin/useradd -r -g nmapuser -d /dev/null -s /dev/null -n nmapuser >/dev/null 2>&1 ||:
-
-%post frontend
-%update_menus
-
-%postun frontend
-%clean_menus
 
 %files
 %_bindir/nmap
 %_datadir/nmap
 %_man1dir/nmap.*
 %doc CHANGELOG.bz2 docs/{README,*.txt}
-
-%files frontend
-%_bindir/nmapfe
-%_bindir/xnmap
-%_man1dir/nmapfe.*
-%_man1dir/xnmap.*
-%_desktopdir/*
-%_miconsdir/*
-%_niconsdir/*
-%_liconsdir/*
 
 %changelog
 * Fri Apr 11 2008 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.20-alt3
