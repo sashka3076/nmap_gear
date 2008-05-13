@@ -7,7 +7,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -40,7 +40,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -79,7 +79,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -99,10 +99,11 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: timing.cc 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: timing.cc 7190 2008-04-24 20:32:47Z david $ */
 
 #include "timing.h"
 #include "NmapOps.h"
+#include "utils.h"
 
 extern NmapOps o;
 
@@ -159,7 +160,7 @@ void adjust_timeouts2(const struct timeval *sent,
   else {
     if (delta >= 8000000 || delta < 0) {
       if (o.verbose)
-	error("adjust_timeout: packet supposedly had rtt of %lu microseconds.  Ignoring time.", delta);
+	error("%s: packet supposedly had rtt of %lu microseconds.  Ignoring time.", __func__, delta);
       return;
     }
     delta -= to->srtt;
@@ -176,7 +177,7 @@ void adjust_timeouts2(const struct timeval *sent,
     to->timeout = to->srtt + (to->rttvar << 2);  
   }
   if (to->rttvar > 2300000) {
-    fprintf(stderr, "RTTVAR has grown to over 2.3 seconds, decreasing to 2.0\n");
+    error("RTTVAR has grown to over 2.3 seconds, decreasing to 2.0");
     to->rttvar = 2000000;
   }
   
@@ -224,7 +225,7 @@ void enforce_scan_delay(struct timeval *tv) {
   time_diff = TIMEVAL_MSEC_SUBTRACT(now, lastcall);
   if (time_diff < (int) o.scan_delay) {  
     if (o.debugging > 1) {
-      printf("Sleeping for %d milliseconds in enforce_scan_delay()\n", o.scan_delay - time_diff);
+      log_write(LOG_PLAIN, "Sleeping for %d milliseconds in %s()\n", o.scan_delay - time_diff, __func__);
     }
     usleep((o.scan_delay - time_diff) * 1000);
     gettimeofday(&lastcall, NULL);
@@ -237,7 +238,169 @@ void enforce_scan_delay(struct timeval *tv) {
   return;    
 }
 
-ScanProgressMeter::ScanProgressMeter(char *stypestr) {
+/* Initialize the constant CURRENT_RATE_HISTORY that defines how far back we
+   look when calculating the current rates. */
+RateMeter::RateMeter() : CURRENT_RATE_HISTORY(5.0) {
+  start_tv.tv_sec = 0;
+  start_tv.tv_usec = 0;
+  stop_tv.tv_sec = 0;
+  stop_tv.tv_usec = 0;
+  last_update_tv.tv_sec = 0;
+  last_update_tv.tv_usec = 0;
+  num_packets = 0;
+  num_bytes = 0;
+  current_packet_rate = 0.0;
+  current_byte_rate = 0.0;
+  assert(!isSet(&start_tv));
+  assert(!isSet(&stop_tv));
+}
+
+void RateMeter::start(const struct timeval *now) {
+  assert(!isSet(&start_tv));
+  assert(!isSet(&stop_tv));
+  if (now == NULL)
+    gettimeofday(&start_tv, NULL);
+  else
+    start_tv = *now;
+}
+
+void RateMeter::stop(const struct timeval *now) {
+  assert(isSet(&start_tv));
+  assert(!isSet(&stop_tv));
+  if (now == NULL)
+    gettimeofday(&stop_tv, NULL);
+  else
+    stop_tv = *now;
+}
+
+/* Record a packet of length len. If now is not NULL, use it as the time the
+   packet was received rather than calling gettimeofday. */
+void RateMeter::record(u32 len, const struct timeval *now) {
+  update(1, len, now);
+}
+
+double RateMeter::getOverallPacketRate(const struct timeval *now) const {
+  return num_packets / elapsedTime(now);
+}
+
+/* Get the "current" packet rate (actually a moving average of the last few
+   seconds). If update is true (its default value), lower the rate to account
+   for the time since the last packet was received. */
+double RateMeter::getCurrentPacketRate(const struct timeval *now, bool update) {
+  if (update)
+    this->update(0, 0, now);
+
+  return current_packet_rate;
+}
+
+double RateMeter::getOverallByteRate(const struct timeval *now) const {
+  return num_bytes / elapsedTime(now);
+}
+
+/* Get the "current" byte rate (actually a moving average of the last few
+   seconds). If update is true (its default value), lower the rate to account
+   for the time since the last bytes were received. */
+double RateMeter::getCurrentByteRate(const struct timeval *now, bool update) {
+  if (update)
+    this->update(0, 0, now);
+
+  return current_byte_rate;
+}
+
+/* Update the rates to include packets additional packets and bytes additional
+   bytes. If now is not NULL, use it as the time the packets and bytes were
+   received rather than calling gettimeofday. */
+void RateMeter::update(u32 packets, u32 bytes, const struct timeval *now) {
+  struct timeval tv;
+  double diff;
+  double interval;
+  double count;
+
+  assert(isSet(&start_tv));
+  assert(!isSet(&stop_tv));
+
+  /* Update the overall counters. */
+  num_packets += packets;
+  num_bytes += bytes;
+
+  if (now == NULL) {
+    gettimeofday(&tv, NULL);
+    now = &tv;
+  }
+  if (!isSet(&last_update_tv))
+    last_update_tv = start_tv;
+
+  /* Calculate approximate moving averages of how many packets and bytes were
+     recorded in the last CURRENT_RATE_HISTORY seconds. These averages are what
+     are returned as the "current" rates. */
+
+  /* How long since the last update? */
+  diff = TIMEVAL_SUBTRACT(*now, last_update_tv) / 1000000.0;
+  assert(diff >= 0.0);
+
+  /* Find out how far back in time to look. We want to look back
+     CURRENT_RATE_HISTORY seconds, or to when the last update occurred,
+     whichever is longer. However, we never look past the start. */
+  struct timeval tmp;
+  /* Find the time CURRENT_RATE_HISTORY seconds after the start. That's our
+     threshold for deciding how far back to look. */
+  TIMEVAL_ADD(tmp, start_tv, (time_t) (CURRENT_RATE_HISTORY * 1000000.0));
+  if (TIMEVAL_AFTER(*now, tmp))
+    interval = MAX(CURRENT_RATE_HISTORY, diff);
+  else
+    interval = TIMEVAL_SUBTRACT(*now, start_tv) / 1000000.0;
+  assert(diff <= interval);
+  /* If we get packets in the very same instant that the timer is started,
+     there's no way to calculate meaningful rates. Ignore it. */
+  if (interval == 0.0)
+    return;
+
+  /* To calculate the approximate average of the packet rate over the last
+     interval seconds, we assume that the rate was constant over that interval.
+     We calculate how many packets would have been received in that interval,
+     ignoring the first diff seconds' worth:
+       (interval - diff) * current_packet_rate.
+     Then we add how many packets were received in the most recent diff seconds.
+     Divide by the width of the interval to get the average. */
+  count = (interval - diff) * current_packet_rate + packets;
+  current_packet_rate = count / interval;
+  assert(current_packet_rate >= 0.0);
+  /* Likewise with the byte rate. */
+  count = (interval - diff) * current_byte_rate + bytes;
+  current_byte_rate = count / interval;
+  assert(current_byte_rate >= 0.0);
+
+  last_update_tv = *now;
+}
+
+/* Get the number of seconds the meter has been running: if it has been stopped,
+   the amount of time between start and stop, or if it is still running, the
+   amount of time between start and now. */
+double RateMeter::elapsedTime(const struct timeval *now) const {
+  struct timeval tv;
+  const struct timeval *end_tv;
+
+  assert(isSet(&start_tv));
+
+  if (isSet(&stop_tv)) {
+    end_tv = &stop_tv;
+  } else if (now == NULL) {
+    gettimeofday(&tv, NULL);
+    end_tv = &tv;
+  } else {
+    end_tv = now;
+  }
+
+  return TIMEVAL_SUBTRACT(*end_tv, start_tv) / 1000000.0;
+}
+
+/* Returns true if tv has been initialized; i.e., its members are not all
+   zero. */
+bool RateMeter::isSet(const struct timeval *tv) {
+  return tv->tv_sec != 0 || tv->tv_usec != 0;
+}
+
+ScanProgressMeter::ScanProgressMeter(const char *stypestr) {
   scantypestr = strdup(stypestr);
   gettimeofday(&begin, NULL);
   last_print_test = begin;
@@ -421,18 +584,22 @@ bool ScanProgressMeter::beginOrEndTask(const struct timeval *now, const char *ad
   tm = localtime(&tv_sec);
   if (beginning) {
     log_write(LOG_STDOUT, "Initiating %s at %02d:%02d", scantypestr, tm->tm_hour, tm->tm_min);
+    log_write(LOG_XML, "<taskbegin task=\"%s\" time=\"%lu\"", scantypestr, (unsigned long) now->tv_sec);
     if (additional_info) {
       log_write(LOG_STDOUT, " (%s)", additional_info);
+      log_write(LOG_XML, " extrainfo=\"%s\"", additional_info);
     }
     log_write(LOG_STDOUT, "\n");
-    log_write(LOG_XML, "<taskbegin task=\"%s\" time=\"%lu\" />\n", scantypestr, (unsigned long) now->tv_sec);
+    log_write(LOG_XML, " />\n");
   } else {
     log_write(LOG_STDOUT, "Completed %s at %02d:%02d, %.2fs elapsed", scantypestr, tm->tm_hour, tm->tm_min, TIMEVAL_MSEC_SUBTRACT(*now, begin) / 1000.0);
+    log_write(LOG_XML, "<taskend task=\"%s\" time=\"%lu\"", scantypestr, (unsigned long) now->tv_sec);
     if (additional_info) {
       log_write(LOG_STDOUT, " (%s)", additional_info);
+      log_write(LOG_XML, " extrainfo=\"%s\"", additional_info);
     }
     log_write(LOG_STDOUT, "\n");
-    log_write(LOG_XML, "<taskend task=\"%s\" time=\"%lu\" />\n", scantypestr, (unsigned long) now->tv_sec);
+    log_write(LOG_XML, " />\n");
   }
   log_flush(LOG_STDOUT|LOG_XML);
   return true;

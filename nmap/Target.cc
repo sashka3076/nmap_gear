@@ -6,7 +6,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -39,7 +39,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -78,7 +78,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -98,18 +98,18 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: Target.cc 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: Target.cc 7145 2008-04-11 03:54:44Z david $ */
 
 #ifdef WIN32
 #include "nmap_winconfig.h"
 #endif
 
-#include <dnet.h>
-
 #include "Target.h"
-#include "osscan.h"
+#include <dnet.h>
 #include "nbase.h"
 #include "NmapOps.h"
+#include "utils.h"
+#include "nmap_error.h"
 
 extern NmapOps o;
 
@@ -119,11 +119,11 @@ Target::Target() {
 
 void Target::Initialize() {
   hostname = NULL;
+  targetname = NULL;
   memset(&seq, 0, sizeof(seq));
   distance = -1;
-  FPR1 = NULL;
   FPR = NULL;
-  osscan_performed = 0;
+  osscan_flag = OS_NOTPERF;
   wierd_responses = flags = 0;
   memset(&to, 0, sizeof(to));
   memset(&targetsock, 0, sizeof(targetsock));
@@ -140,7 +140,18 @@ void Target::Initialize() {
   htn.msecs_used = 0;
   htn.toclock_running = false;
   interface_type = devt_other;
-  devname[0] = devfullname[0] = '\0';
+	devname[0] = '\0';
+	devfullname[0] = '\0';
+  state_reason_init(&reason);
+}
+
+
+const char * Target::deviceName() { 
+	return (devname[0] != '\0')? devname : NULL;
+}
+
+const char * Target::deviceFullName() { 
+	return (devfullname[0] != '\0')? devfullname : NULL; 
 }
 
 void Target::Recycle() {
@@ -158,12 +169,14 @@ void Target::FreeInternal() {
   if (hostname)
     free(hostname);
 
+  if (targetname)
+    free(targetname);
+
   if (nameIPBuf) {
     free(nameIPBuf);
     nameIPBuf = NULL;
   }
 
-  if (FPR1) delete FPR1;
   if (FPR) delete FPR;
 }
 
@@ -210,6 +223,7 @@ void Target::setTargetSockAddr(struct sockaddr_storage *ss, size_t ss_len) {
     /* We had an old target sock, so we better blow away the hostname as
        this one may be new. */
     setHostName(NULL);
+    setTargetName(NULL);
   }
   memcpy(&targetsock, ss, ss_len);
   targetsocklen = ss_len;
@@ -297,6 +311,16 @@ void Target::setHostName(char *name) {
   }
 }
 
+void Target::setTargetName(char *name) {
+  if (targetname) {
+    free(targetname);
+    targetname = NULL;
+  }
+  if (name) {
+    targetname = strdup(name);
+  }
+}
+
  /* Generates a printable string consisting of the host's IP
      address and hostname (if available).  Eg "www.insecure.org
      (64.71.184.53)" or "fe80::202:e3ff:fe14:1102".  The name is
@@ -306,7 +330,7 @@ const char *Target::NameIP(char *buf, size_t buflen) {
   assert(buf);
   assert(buflen > 8);
   if (hostname) {
-    snprintf(buf, buflen, "%s (%s)", hostname, targetipstring);
+    Snprintf(buf, buflen, "%s (%s)", hostname, targetipstring);
   } else Strncpy(buf, targetipstring, buflen);
   return buf;
 }
@@ -336,6 +360,10 @@ bool Target::nextHop(struct sockaddr_storage *next_hop, size_t *next_hop_len) {
      been set yet.  */
 void Target::setDirectlyConnected(bool connected) {
   directly_connected = connected? 1 : 0;
+}
+
+int Target::directlyConnectedOrUnset(){
+    return directly_connected;
 }
 
 bool Target::directlyConnected() {
@@ -433,3 +461,15 @@ const u8 *Target::SrcMACAddress() {
 const u8 *Target::NextHopMACAddress() {
   return (NextHopMACaddress_set)? NextHopMACaddress : NULL;
 }
+
+int Target::osscanPerformed(void) {
+	return osscan_flag;
+}
+
+void Target::osscanSetFlag(int flag) {
+	if(osscan_flag == OS_PERF_UNREL)
+		return;
+	else
+		osscan_flag = flag;
+}
+

@@ -9,7 +9,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -42,7 +42,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -81,7 +81,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -101,22 +101,29 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: output.cc 4228 2006-12-08 03:01:08Z fyodor $ */
+/* $Id: output.cc 7179 2008-04-23 22:42:41Z david $ */
 
 #include "output.h"
 #include "osscan.h"
 #include "NmapOps.h"
 #include "NmapOutputTable.h"
 #include "MACLookup.h"
+#include "portreasons.h"
+#include "protocols.h"
+#include "nmap_rpc.h"
+#include "Target.h"
+#include "utils.h"
 
 #include <string>
+#include <vector>
+#include <list>
 
 /* Workaround for lack of namespace std on HP-UX 11.00 */
 namespace std {};
 using namespace std;
 
 extern NmapOps o;
-static char *logtypes[LOG_NUM_FILES]=LOG_NAMES;
+static const char *logtypes[LOG_NUM_FILES]=LOG_NAMES;
 
 /* Used in creating skript kiddie style output.  |<-R4d! */
 static void skid_output(char *s)
@@ -193,7 +200,7 @@ static char* xml_sf_convert (const char* str) {
 // returns 0 for success.
 static int getServiceXMLBuf(struct serviceDeductions *sd, char *xmlbuf, 
 		     unsigned int xmlbuflen) {
-  string versionxmlstring;
+  string versionxmlstring = "";
   char rpcbuf[128];
   char *xml_product = NULL, *xml_version = NULL, *xml_extrainfo = NULL;
   char *xml_hostname = NULL, *xml_ostype = NULL, *xml_devicetype = NULL;
@@ -262,12 +269,12 @@ static int getServiceXMLBuf(struct serviceDeductions *sd, char *xmlbuf,
   }
 
   if (o.rpcscan && sd->rpc_status == RPC_STATUS_GOOD_PROG) {
-    snprintf(rpcbuf, sizeof(rpcbuf), 
+    Snprintf(rpcbuf, sizeof(rpcbuf), 
 	     " rpcnum=\"%li\" lowver=\"%i\" highver=\"%i\" proto=\"rpc\"", 
 	     sd->rpc_program, sd->rpc_lowver, sd->rpc_highver);
   } else rpcbuf[0] = '\0';
 
-  snprintf(xmlbuf, xmlbuflen, 
+  Snprintf(xmlbuf, xmlbuflen, 
 	   "<service name=\"%s\"%s %smethod=\"%s\" conf=\"%d\"%s />", 
 	   sd->name? sd->name : "unknown",
 	   versionxmlstring.c_str(),
@@ -285,12 +292,13 @@ int print_iflist(void) {
   int numifs = 0, numroutes = 0;
   struct interface_info *iflist;
   struct sys_route *routes;
+  pcap_if_t *p_ifaces, *p_iface_iter;
   NmapOutputTable *Tbl = NULL;
   iflist = getinterfaces(&numifs);
   int i;
   /* First let's handle interfaces ... */
   if (numifs == 0) {
-    log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "INTERFACES: NONE FOUND(!)\n");
+    log_write(LOG_PLAIN, "INTERFACES: NONE FOUND(!)\n");
   } else {
     int devcol=0, shortdevcol=1, ipcol=2, typecol = 3, upcol = 4, maccol = 5;
     Tbl = new NmapOutputTable( numifs+1, 6 );
@@ -302,11 +310,11 @@ int print_iflist(void) {
     Tbl->addItem(0, maccol, false, "MAC", 3);
     for(i=0; i < numifs; i++) {
       Tbl->addItem(i+1, devcol, false, iflist[i].devfullname);
-      Tbl->addItemFormatted(i+1, shortdevcol, "(%s)", iflist[i].devname);
-      Tbl->addItemFormatted(i+1, ipcol, "%s/%d", inet_ntop_ez(&(iflist[i].addr), sizeof(iflist[i].addr)), iflist[i].netmask_bits);
+      Tbl->addItemFormatted(i+1, shortdevcol, false, "(%s)", iflist[i].devname);
+      Tbl->addItemFormatted(i+1, ipcol, false, "%s/%d", inet_ntop_ez(&(iflist[i].addr), sizeof(iflist[i].addr)), iflist[i].netmask_bits);
       if (iflist[i].device_type == devt_ethernet) {
 	Tbl->addItem(i+1, typecol, false, "ethernet");
-	Tbl->addItemFormatted(i+1, maccol, "%02X:%02X:%02X:%02X:%02X:%02X",  iflist[i].mac[0], iflist[i].mac[1], iflist[i].mac[2], iflist[i].mac[3], iflist[i].mac[4], iflist[i].mac[5]);	
+	Tbl->addItemFormatted(i+1, maccol, false, "%02X:%02X:%02X:%02X:%02X:%02X",  iflist[i].mac[0], iflist[i].mac[1], iflist[i].mac[2], iflist[i].mac[3], iflist[i].mac[4], iflist[i].mac[5]);	
       }
       else if (iflist[i].device_type == devt_loopback)
 	Tbl->addItem(i+1, typecol, false, "loopback");
@@ -315,10 +323,29 @@ int print_iflist(void) {
       else Tbl->addItem(i+1, typecol, false, "other");
       Tbl->addItem(i+1, upcol, false, (iflist[i].device_up? "up" : "down"));
     }
-    log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "************************INTERFACES************************\n");
-    log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "%s\n", Tbl->printableTable(NULL));
+    log_write(LOG_PLAIN, "************************INTERFACES************************\n");
+    log_write(LOG_PLAIN, "%s\n", Tbl->printableTable(NULL));
     log_flush_all();
     delete Tbl;
+  }
+  
+  /* Display windows device names */
+  if((p_ifaces = getpcapinterfaces()) != NULL && numifs > 0) {
+    Tbl = new NmapOutputTable(numifs+1, 2);
+    Tbl->addItem(0, 0, false, "DEV");
+    Tbl->addItem(0, 1, false, "WINDEVICE");
+    i = numifs;
+
+    for(p_iface_iter = p_ifaces; p_iface_iter != NULL && i >= 1; i--) {	
+      Tbl->addItem(i, 0, false, iflist[i-1].devname);
+      Tbl->addItem(i, 1, false, p_iface_iter->name);
+      p_iface_iter = p_iface_iter->next;
+    }
+
+    log_write(LOG_PLAIN, "%s\n", Tbl->printableTable(NULL));
+    log_flush_all();
+    delete Tbl;
+    pcap_freealldevs(p_ifaces);
   }
 
   /* OK -- time to handle routes */
@@ -327,7 +354,7 @@ int print_iflist(void) {
   u16 nbits;
   struct in_addr ia;
   if (numroutes == 0) {
-    log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "ROUTES: NONE FOUND(!)\n");
+    log_write(LOG_PLAIN, "ROUTES: NONE FOUND(!)\n");
   } else {
     int dstcol=0, devcol=1, gwcol=2;
     Tbl = new NmapOutputTable( numroutes+1, 3 );
@@ -339,13 +366,13 @@ int print_iflist(void) {
       addr_mtob(&mask_nbo, sizeof(mask_nbo), &nbits);
       assert(nbits <= 32);
       ia.s_addr = routes[i].dest;
-      Tbl->addItemFormatted(i+1, dstcol, "%s/%d", inet_ntoa(ia), nbits);
+      Tbl->addItemFormatted(i+1, dstcol, false, "%s/%d", inet_ntoa(ia), nbits);
       Tbl->addItem(i+1, devcol, false, routes[i].device->devfullname);
       if (routes[i].gw.s_addr != 0)
 	Tbl->addItem(i+1, gwcol, true, inet_ntoa(routes[i].gw));
     }
-        log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "**************************ROUTES**************************\n");
-	log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "%s\n", Tbl->printableTable(NULL));
+        log_write(LOG_PLAIN, "**************************ROUTES**************************\n");
+	log_write(LOG_PLAIN, "%s\n", Tbl->printableTable(NULL));
 	log_flush_all();
 	delete Tbl;
   }
@@ -373,10 +400,10 @@ static void getNmapServiceName(struct serviceDeductions *sd, int state,
   if (sd->name && (sd->service_tunnel != SERVICE_TUNNEL_SSL || 
 		   sd->dtype == SERVICE_DETECTION_PROBED)) {
     if (o.servicescan && state == PORT_OPEN && sd->name_confidence <= 5) 
-      len = snprintf(dst, lenremaining, "%s?", sd->name);
-    else len = snprintf(dst, lenremaining, "%s", sd->name);
+      len = Snprintf(dst, lenremaining, "%s?", sd->name);
+    else len = Snprintf(dst, lenremaining, "%s", sd->name);
   } else {
-    len = snprintf(dst, lenremaining, "%s", "unknown");
+    len = Snprintf(dst, lenremaining, "%s", "unknown");
   }
   if (len > lenremaining || len < 0) goto overflow;
   dst += len;
@@ -403,7 +430,7 @@ void printportoutput(Target *currenths, PortList *plist) {
   char grepvers[256];
   char grepown[64];
   char *p;
-  char *state;
+  const char *state;
   char serviceinfo[64];
   char *name=NULL;
   int i;
@@ -417,6 +444,7 @@ void printportoutput(Target *currenths, PortList *plist) {
   int statecol = -1; // port/protocol state
   int servicecol = -1; // service or protocol name
   int versioncol = -1;
+  int reasoncol = -1;
   //  int ownercol = -1; // Used for ident scan
   int colno = 0;
   unsigned int rowno;
@@ -428,30 +456,39 @@ void printportoutput(Target *currenths, PortList *plist) {
   log_write(LOG_XML, "<ports>");
   int prevstate = PORT_UNKNOWN;
   int istate;
+
   while ((istate = plist->nextIgnoredState(prevstate)) != PORT_UNKNOWN) {
-    log_write(LOG_XML, "<extraports state=\"%s\" count=\"%d\" />\n", 
+    log_write(LOG_XML, "<extraports state=\"%s\" count=\"%d\">\n", 
 	    statenum2str(istate), plist->getStateCounts(istate));
+    print_xml_state_summary(plist, istate);
+    log_write(LOG_XML, "</extraports>\n");
     prevstate = istate;
   }
 
   if (numignoredports == plist->numports) {
-    log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,
-              "%s %d scanned %s on %s %s ",
-	      (numignoredports == 1)? "The" : "All", numignoredports,
-	      (numignoredports == 1)? "port" : "ports", 
-	      currenths->NameIP(hostname, sizeof(hostname)), 
-	      (numignoredports == 1)? "is" : "are");
-    if (plist->numIgnoredStates() == 1) {
-      log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, statenum2str(plist->nextIgnoredState(PORT_UNKNOWN)));
+    if (numignoredports == 0) {
+      log_write(LOG_PLAIN, "0 ports scanned on %s\n", currenths->NameIP(hostname, sizeof(hostname)));
     } else {
-      prevstate = PORT_UNKNOWN;
-      while ((istate = plist->nextIgnoredState(prevstate)) != PORT_UNKNOWN) {
-	if (prevstate != PORT_UNKNOWN) log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, " or ");
-	log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "%s (%d)", statenum2str(istate), plist->getStateCounts(istate));
-	prevstate = istate;
+      log_write(LOG_PLAIN,
+		"%s %d scanned %s on %s %s ",
+		(numignoredports == 1)? "The" : "All", numignoredports,
+		(numignoredports == 1)? "port" : "ports", 
+		currenths->NameIP(hostname, sizeof(hostname)), 
+		(numignoredports == 1)? "is" : "are");
+      if (plist->numIgnoredStates() == 1) {
+	log_write(LOG_PLAIN, statenum2str(plist->nextIgnoredState(PORT_UNKNOWN)));
+      } else {
+	prevstate = PORT_UNKNOWN;
+	while ((istate = plist->nextIgnoredState(prevstate)) != PORT_UNKNOWN) {
+	  if (prevstate != PORT_UNKNOWN) log_write(LOG_PLAIN, " or ");
+	  log_write(LOG_PLAIN, "%s (%d)", statenum2str(istate), plist->getStateCounts(istate));
+	  prevstate = istate;
+	}
       }
+      if(o.reason) 
+		  print_state_summary(plist, STATE_REASON_EMPTY);
+      log_write(LOG_PLAIN, "\n");
     }
-    log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "\n");
 
     log_write(LOG_MACHINE,"Host: %s (%s)\tStatus: Up", 
 	      currenths->targetipstr(), currenths->HostName());
@@ -459,7 +496,7 @@ void printportoutput(Target *currenths, PortList *plist) {
     return;
   }
 
-  log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Interesting %s on %s:\n",
+  log_write(LOG_PLAIN,"Interesting %s on %s:\n",
 	    (o.ipprotscan)? "protocols" : "ports", 
 	    currenths->NameIP(hostname, sizeof(hostname)));
   log_write(LOG_MACHINE,"Host: %s (%s)", currenths->targetipstr(), 
@@ -471,29 +508,42 @@ void printportoutput(Target *currenths, PortList *plist) {
   prevstate = PORT_UNKNOWN;
   while ((istate = plist->nextIgnoredState(prevstate)) != PORT_UNKNOWN) {
     if (prevstate == PORT_UNKNOWN) 
-      log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "Not shown: ");
-    else log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, ", ");
+      log_write(LOG_PLAIN, "Not shown: ");
+    else log_write(LOG_PLAIN, ", ");
     char desc[32];
     if (o.ipprotscan)
-      snprintf(desc, sizeof(desc), (plist->getStateCounts(istate) == 1)? "protocol" : "protocols");
+      Snprintf(desc, sizeof(desc), (plist->getStateCounts(istate) == 1)? "protocol" : "protocols");
     else 
-      snprintf(desc, sizeof(desc), (plist->getStateCounts(istate) == 1)? "port" : "ports");
-    log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "%d %s %s", plist->getStateCounts(istate), statenum2str(istate), desc);
+      Snprintf(desc, sizeof(desc), (plist->getStateCounts(istate) == 1)? "port" : "ports");
+    log_write(LOG_PLAIN, "%d %s %s", plist->getStateCounts(istate), statenum2str(istate), desc);
     prevstate = istate;
   }
-  if (prevstate != PORT_UNKNOWN) log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "\n");
+
+  if (prevstate != PORT_UNKNOWN) log_write(LOG_PLAIN, "\n");
+
+  if(o.reason) 
+		print_state_summary(plist, STATE_REASON_FULL);
 
   /* OK, now it is time to deal with the service table ... */
   colno = 0;
   portcol = colno++;
   statecol = colno++;
   servicecol = colno++;
+  if(o.reason)
+	reasoncol = colno++;
   /*  if (o.identscan)
       ownercol = colno++; */
   if (o.servicescan || o.rpcscan)
     versioncol = colno++;
 
   numrows = plist->numports - numignoredports;
+
+#ifndef NOLUA
+  int scriptrows = 0;
+  if(plist->numscriptresults > 0)
+    scriptrows = plist->numscriptresults;
+  numrows += scriptrows;
+#endif 
 
   assert(numrows > 0);
   numrows++; // The header counts as a row
@@ -504,11 +554,12 @@ void printportoutput(Target *currenths, PortList *plist) {
   if (o.ipprotscan)
     Tbl->addItem(0, portcol, false, "PROTOCOL", 8);
   else Tbl->addItem(0, portcol, false, "PORT", 4);
-
   Tbl->addItem(0, statecol, false, "STATE", 5);
   Tbl->addItem(0, servicecol, false, "SERVICE", 7);
   if (versioncol > 0)
     Tbl->addItem(0, versioncol, false, "VERSION", 7);
+  if(reasoncol > 0)
+	Tbl->addItem(0, reasoncol, false, "REASON", 6);
   /*  if (ownercol > 0)
       Tbl->addItem(0, ownercol, false, "OWNER", 5); */
 
@@ -521,16 +572,24 @@ void printportoutput(Target *currenths, PortList *plist) {
       if (!plist->isIgnoredState(current->state)) {
 	if (!first) log_write(LOG_MACHINE,", ");
 	else first = 0;
+	if(o.reason) 
+		Tbl->addItem(rowno, reasoncol, true, port_reason_str(current->reason));
 	state = statenum2str(current->state);
 	proto = nmap_getprotbynum(htons(current->portno));
-	snprintf(portinfo, sizeof(portinfo), "%-24s",
+	Snprintf(portinfo, sizeof(portinfo), "%s",
 		 proto?proto->p_name: "unknown");
-	Tbl->addItemFormatted(rowno, portcol, "%d", current->portno);
+	Tbl->addItemFormatted(rowno, portcol, false, "%d", current->portno);
 	Tbl->addItem(rowno, statecol, true, state);
 	Tbl->addItem(rowno, servicecol, true, portinfo);
 	log_write(LOG_MACHINE,"%d/%s/%s/", current->portno, state, 
 		  (proto)? proto->p_name : "");
-	log_write(LOG_XML, "<port protocol=\"ip\" portid=\"%d\"><state state=\"%s\" />", current->portno, state);
+	log_write(LOG_XML, "<port protocol=\"ip\" portid=\"%d\"><state state=\"%s\" reason=\"%s\" reason_ttl=\"%d\"",
+       current->portno, state, reason_str(current->reason.reason_id, SINGULAR), current->reason.ttl);
+
+	if(current->reason.ip_addr.s_addr)
+		log_write(LOG_XML, " reason_ip=\"%s\"", inet_ntoa(current->reason.ip_addr));
+	log_write(LOG_XML, "/>");
+
 	if (proto && proto->p_name && *proto->p_name)
 	  log_write(LOG_XML, "\n<service name=\"%s\" conf=\"8\" method=\"table\" />", proto->p_name);
 	log_write(LOG_XML, "</port>\n");
@@ -544,7 +603,7 @@ void printportoutput(Target *currenths, PortList *plist) {
 	if (!first) log_write(LOG_MACHINE,", ");
 	else first = 0;
 	strcpy(protocol,(current->proto == IPPROTO_TCP)? "tcp": "udp");
-	snprintf(portinfo, sizeof(portinfo), "%d/%s", current->portno, protocol);
+	Snprintf(portinfo, sizeof(portinfo), "%d/%s", current->portno, protocol);
 	state = statenum2str(current->state);
 	current->getServiceDeductions(&sd);
 	if (sd.service_fp && saved_servicefps.size() <= 8)
@@ -566,21 +625,21 @@ void printportoutput(Target *currenths, PortList *plist) {
 	    break;
 	  case RPC_STATUS_GOOD_PROG:
 	    name = nmap_getrpcnamebynum(sd.rpc_program);
-	    snprintf(rpcmachineinfo, sizeof(rpcmachineinfo), "(%s:%li*%i-%i)", (name)? name : "", sd.rpc_program, sd.rpc_lowver, sd.rpc_highver);
+	    Snprintf(rpcmachineinfo, sizeof(rpcmachineinfo), "(%s:%li*%i-%i)", (name)? name : "", sd.rpc_program, sd.rpc_lowver, sd.rpc_highver);
 	    if (!name) {
-	      snprintf(rpcinfo, sizeof(rpcinfo), "(#%li (unknown) V%i-%i)", sd.rpc_program, sd.rpc_lowver, sd.rpc_highver);
+	      Snprintf(rpcinfo, sizeof(rpcinfo), "(#%li (unknown) V%i-%i)", sd.rpc_program, sd.rpc_lowver, sd.rpc_highver);
 	    } else {
 	      if (sd.rpc_lowver == sd.rpc_highver) {
-		snprintf(rpcinfo, sizeof(rpcinfo), "(%s V%i)", name, sd.rpc_lowver);
+		Snprintf(rpcinfo, sizeof(rpcinfo), "(%s V%i)", name, sd.rpc_lowver);
 	      } else 
-		snprintf(rpcinfo, sizeof(rpcinfo), "(%s V%i-%i)", name, sd.rpc_lowver, sd.rpc_highver);
+		Snprintf(rpcinfo, sizeof(rpcinfo), "(%s V%i-%i)", name, sd.rpc_lowver, sd.rpc_highver);
 	    }
 	    break;
 	  default:
 	    fatal("Unknown rpc_status %d", sd.rpc_status);
 	    break;
 	  }
-	  snprintf(serviceinfo, sizeof(serviceinfo), "%s%s%s", (sd.name)? sd.name : ((*rpcinfo)? "" : "unknown"), (sd.name)? " " : "",  rpcinfo);
+	  Snprintf(serviceinfo, sizeof(serviceinfo), "%s%s%s", (sd.name)? sd.name : ((*rpcinfo)? "" : "unknown"), (sd.name)? " " : "",  rpcinfo);
 	} else {
 	  getNmapServiceName(&sd, current->state, serviceinfo, sizeof(serviceinfo));
 	  rpcmachineinfo[0] = '\0';
@@ -588,6 +647,9 @@ void printportoutput(Target *currenths, PortList *plist) {
 	Tbl->addItem(rowno, portcol, true, portinfo);
 	Tbl->addItem(rowno, statecol, false, state);
 	Tbl->addItem(rowno, servicecol, true, serviceinfo);
+	if(o.reason) 
+		Tbl->addItem(rowno, reasoncol, true, port_reason_str(current->reason));
+
 	/*	if (current->owner)
 		Tbl->addItem(rowno, ownercol, true, current->owner); */
 	if (*sd.fullversion)
@@ -628,49 +690,133 @@ void printportoutput(Target *currenths, PortList *plist) {
 		  protocol, grepown, serviceinfo, rpcmachineinfo, grepvers);    
 	
 	log_write(LOG_XML, "<port protocol=\"%s\" portid=\"%d\">", protocol, current->portno);
-	log_write(LOG_XML, "<state state=\"%s\" />", state);
+	log_write(LOG_XML, "<state state=\"%s\" reason=\"%s\" reason_ttl=\"%d\"", state, 
+                       reason_str(current->reason.reason_id, SINGULAR), current->reason.ttl);
+	if(current->reason.ip_addr.s_addr)
+		log_write(LOG_XML, " reason_ip=\"%s\"", inet_ntoa(current->reason.ip_addr));
+	log_write(LOG_XML, "/>");
 	if (current->owner && *current->owner) {
 	  log_write(LOG_XML, "<owner name=\"%s\" />", current->owner);
 	}
 	if (getServiceXMLBuf(&sd, xmlbuf, sizeof(xmlbuf)) == 0)
 	  if (*xmlbuf)
 	    log_write(LOG_XML, "%s", xmlbuf);
-	log_write(LOG_XML, "</port>\n");
+
 	rowno++;
+#ifndef NOLUA	
+	if(o.script) {
+		ScriptResults::iterator ssr_iter;
+
+		for(	ssr_iter = current->scriptResults.begin(); 
+			ssr_iter != current->scriptResults.end(); 
+			ssr_iter++) {
+			char* xml_id= xml_convert((*ssr_iter).id);
+			char* xml_scriptoutput= xml_convert((*ssr_iter).output);
+			log_write(LOG_XML, "<script id=\"%s\" output=\"%s\" />", 
+					xml_id, xml_scriptoutput);
+			free(xml_id);
+			free(xml_scriptoutput);
+
+			char* script_output = formatScriptOutput((*ssr_iter));
+			Tbl->addItem(rowno, 0, true, true, script_output);
+			free(script_output);
+			rowno++;
+		}
+		
+	}
+#endif
+
+	log_write(LOG_XML, "</port>\n");
       }
     }
     
   }
-  /*  log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"\n"); */
+  /*  log_write(LOG_PLAIN,"\n"); */
   if (plist->getStateCounts(istate) > 0)
     log_write(LOG_MACHINE, "\tIgnored State: %s (%d)", statenum2str(istate), plist->getStateCounts(istate));
   log_write(LOG_XML, "</ports>\n");
 
   // Now we write the table for the user
-  log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "%s", Tbl->printableTable(NULL));
+  log_write(LOG_PLAIN, "%s", Tbl->printableTable(NULL));
   delete Tbl;
 
   // There may be service fingerprints I would like the user to submit
   if (saved_servicefps.size() > 0) {
     int numfps = saved_servicefps.size();
-log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "%d service%s unrecognized despite returning data. If you know the service/version, please submit the following fingerprint%s at http://www.insecure.org/cgi-bin/servicefp-submit.cgi :\n", numfps, (numfps > 1)? "s" : "", (numfps > 1)? "s" : "");
+log_write(LOG_PLAIN, "%d service%s unrecognized despite returning data. If you know the service/version, please submit the following fingerprint%s at http://www.insecure.org/cgi-bin/servicefp-submit.cgi :\n", numfps, (numfps > 1)? "s" : "", (numfps > 1)? "s" : "");
     for(i=0; i < numfps; i++) {
       if (numfps > 1)
-	log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "==============NEXT SERVICE FINGERPRINT (SUBMIT INDIVIDUALLY)==============\n");
-      log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "%s\n", saved_servicefps[i]);
+	log_write(LOG_PLAIN, "==============NEXT SERVICE FINGERPRINT (SUBMIT INDIVIDUALLY)==============\n");
+      log_write(LOG_PLAIN, "%s\n", saved_servicefps[i]);
     }
   }
   log_flush_all();
 }
 
+#ifndef NOLUA
+char* formatScriptOutput(struct script_scan_result ssr) {
+	char* c_result;
+	std::string result = std::string();
+	string::size_type pos;
+
+	int line = 0;
+#ifdef WIN32
+	const char* sep = "\r\n";
+#else
+	const char* sep = "\n";
+#endif
+	std::string line_prfx = "|  ";
+	
+	char* token = strtok(ssr.output, sep);
+
+	result += line_prfx + std::string(ssr.id) + ": ";
+
+	while(token != NULL) {
+		if(line > 0)
+			result += line_prfx;
+		result += std::string(token) + sep;
+		token = strtok(NULL, sep);
+		line++;
+	}
+
+	// fix the last line
+	pos = result.rfind(line_prfx);
+	result.replace(pos, 3, "|_ ");
+
+	// delete the unwanted trailing newline
+	pos = result.rfind(sep);
+	if(pos!=std::string::npos){
+		result.erase(pos, strlen(sep));
+	}
+	c_result = strdup(result.c_str());
+
+	return c_result;
+}
+#endif /* NOLUA */
+
+
+/* Note that this escapes newlines, which is generally needed in
+   attributes to avoid parser normalization, but might not be needed
+   or desirable in XML content outside of attributes.  So if we find
+   some cases where we don't want \r\n\t escaped, we'll have to add a
+   parameter to control this. */
 char* xml_convert (const char* str) {
   char *temp, ch=0, prevch = 0, *p;
   int strl = strlen(str);
-  temp = (char *) malloc(strl*6+1);
+  temp = (char *) safe_malloc(strl*6+1);
   char *end = temp + strl * 6 + 1;
   for (p = temp;(prevch = ch, ch = *str);str++) {
-    char *a;
+    const char *a;
     switch (ch) {
+    case '\t':
+      a = "&#x9;";
+      break;
+    case '\r':
+      a = "&#xd;";
+      break;
+    case '\n':
+      a = "&#xa;";
+      break;
     case '<':
       a = "&lt;";
       break;
@@ -699,8 +845,73 @@ char* xml_convert (const char* str) {
     Strncpy(p,a, end - p - 1); p += strlen(a); // SAFE
   }
   *p = 0;
-  temp = (char *) realloc(temp,strlen(temp)+1);
+  temp = (char *) safe_realloc(temp,strlen(temp)+1);
   return temp;
+}
+
+char *logfilename(const char *str, struct tm *tm)
+{
+	char *ret, *end, *p;
+	char tbuf[10];
+	int retlen = strlen(str) * 6 + 1;
+
+	ret = (char *) safe_malloc(retlen);
+	end = ret + retlen;
+
+	for (p = ret; *str; str++) {
+		if (*str == '%') {
+			str++;
+
+			if (!*str)
+				break;
+
+			switch (*str) {
+			case 'H':
+				strftime(tbuf, sizeof tbuf, "%H", tm);
+				break;
+			case 'M':
+				strftime(tbuf, sizeof tbuf, "%M", tm);
+				break;
+			case 'S':
+				strftime(tbuf, sizeof tbuf, "%S", tm);
+				break;
+			case 'T':
+				strftime(tbuf, sizeof tbuf, "%H%M%S", tm);
+				break;
+			case 'R':
+				strftime(tbuf, sizeof tbuf, "%H%M", tm);
+				break;
+			case 'm':
+				strftime(tbuf, sizeof tbuf, "%m", tm);
+				break;
+			case 'd': 
+				strftime(tbuf, sizeof tbuf, "%d", tm);
+				break;
+			case 'y': 
+				strftime(tbuf, sizeof tbuf, "%y", tm);
+				break;
+			case 'Y': 
+				strftime(tbuf, sizeof tbuf, "%Y", tm);
+				break;
+			case 'D': 
+				strftime(tbuf, sizeof tbuf, "%m%d%y", tm);
+				break;
+			default:
+				*p++ = *str;
+				continue;
+			}
+
+			assert(end - p > 1);
+			Strncpy(p, tbuf, end - p - 1);
+			p += strlen(tbuf);
+		} else {
+			*p++ = *str;
+		}
+	}
+
+	*p = 0;
+
+	return (char *) safe_realloc(ret, strlen(ret) + 1);
 }
 
 /* This is the workhorse of the logging functions.  Usually it is
@@ -752,38 +963,38 @@ void log_vwrite(int logt, const char *fmt, va_list ap) {
     while ((l&1)==0) { fileidx++; l>>=1; }
     assert(fileidx < LOG_NUM_FILES);
     if (o.logfd[fileidx]) {
-      len = vsnprintf(writebuf, writebuflen, fmt, ap);
+      len = Vsnprintf(writebuf, writebuflen, fmt, ap);
       if (len == 0) {
 	va_end(apcopy);
 	return;
-      } else if (len < 0) {
-	fprintf(stderr, "vnsprintf returned %d in %s -- bizarre. Quitting.\n", len, __FUNCTION__);
-	exit(1);
-      } else if (len >= writebuflen) {
+      } else if (len < 0 || len >= writebuflen) {
 	/* Didn't have enough space.  Expand writebuf and try again */
-	free(writebuf);
-	writebuflen = len + 1024;
-	writebuf = (char *) safe_malloc(writebuflen);
-	len = vsnprintf(writebuf, writebuflen, fmt, apcopy);
+	if (len >= writebuflen) {
+	  writebuflen = len + 1024;
+	} else {
+	  /* Windows seems to just give -1 rather than the amount of space we 
+	     would need.  So lets just gulp up a huge amount in the hope it
+	     will be enough */
+	  writebuflen *= 100;
+	}
+	writebuf = (char *) safe_realloc(writebuf, writebuflen);
+	len = Vsnprintf(writebuf, writebuflen, fmt, apcopy);
 	if (len <= 0 || len >= writebuflen) {
-	  fprintf(stderr, "%s: vnsprintf failed.  Even after increasing bufferlen to %d, vsnprintf returned %d (logt == %d).  Please email this message to fyodor@insecure.org.  Quitting.\n", __FUNCTION__, writebuflen, len, logt);
-	  exit(1);
+	  fatal("%s: vnsprintf failed.  Even after increasing bufferlen to %d, Vsnprintf returned %d (logt == %d).  Please email this message to fyodor@insecure.org.  Quitting.", __func__, writebuflen, len, logt);
 	}
       }
       if (logt == LOG_SKID && !skid_noxlate)
 	skid_output(writebuf);
       rc = fwrite(writebuf,len,1,o.logfd[fileidx]);
       if (rc != 1) {
-	fprintf(stderr, "Failed to write %d bytes of data to (logt==%d) stream. fwrite returned %d.  Quitting.\n", len, logt, rc);
-	exit(1);
+	fatal("Failed to write %d bytes of data to (logt==%d) stream. fwrite returned %d.  Quitting.", len, logt, rc);
       }
       va_end(apcopy);
     }
     break;
 
   default:
-    fprintf(stderr, "log_vwrite(): Passed unknown log type (%d).  Note that this function, unlike log_write, can only handle one log type at a time (no bitmasks)\n", logt);
-    exit(1);
+    fatal("%s(): Passed unknown log type (%d).  Note that this function, unlike log_write, can only handle one log type at a time (no bitmasks)", __func__, logt);
   }
 
   return;
@@ -832,7 +1043,7 @@ void log_flush(int logt) {
   }
 
   if (logt & LOG_SKID_NOXLT)
-    fatal("You are not allowed to log_flush() with LOG_SKID_NOXLT");
+    fatal("You are not allowed to %s() with LOG_SKID_NOXLT", __func__);
 
   if (logt<0 || logt>LOG_FILE_MASK) return;
 
@@ -935,7 +1146,7 @@ void output_ports_to_machine_parseable_output(struct scan_lists *ports,
 }
 
 /* Simple helper function for output_xml_scaninfo_records */
-static void doscaninfo(char *type, char *proto, unsigned short *ports, 
+static void doscaninfo(const char *type, const char *proto, unsigned short *ports, 
 		  int numports) {
   log_write(LOG_XML, "<scaninfo type=\"%s\" protocol=\"%s\" numservices=\"%d\" services=\"", type, proto, numports);
   output_rangelist_given_ports(LOG_XML, ports, numports);
@@ -980,11 +1191,11 @@ static void print_MAC_XML_Info(Target *currenths) {
 
   if (mac) {
     const char *macvendor = MACPrefix2Corp(mac);
-    snprintf(macascii, sizeof(macascii), "%02X:%02X:%02X:%02X:%02X:%02X",
+    Snprintf(macascii, sizeof(macascii), "%02X:%02X:%02X:%02X:%02X:%02X",
 	     mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     if (macvendor) {
       xml_mac = xml_convert(macvendor);
-      snprintf(vendorstr, sizeof(vendorstr), " vendor=\"%s\"", xml_mac);
+      Snprintf(vendorstr, sizeof(vendorstr), " vendor=\"%s\"", xml_mac);
       free(xml_mac);
     } else vendorstr[0] = '\0';
     log_write(LOG_XML, "<address addr=\"%s\" addrtype=\"mac\"%s />\n", macascii, vendorstr);
@@ -996,7 +1207,8 @@ static void print_MAC_XML_Info(Target *currenths) {
 static void write_xml_initial_hostinfo(Target *currenths,
 				  const char *status) {
   
-  log_write(LOG_XML, "<status state=\"%s\" />\n<address addr=\"%s\" addrtype=\"%s\" />\n", status,currenths->targetipstr(), (o.af() == AF_INET)? "ipv4" : "ipv6");
+  log_write(LOG_XML,"<status state=\"%s\" reason=\"%s\"/>\n", status, reason_str(currenths->reason.reason_id, SINGULAR));
+  log_write(LOG_XML,"<address addr=\"%s\" addrtype=\"%s\" />\n", currenths->targetipstr(), (o.af() == AF_INET)? "ipv4" : "ipv6");
   print_MAC_XML_Info(currenths);
   if (*currenths->HostName()) {
     log_write(LOG_XML, "<hostnames><hostname name=\"%s\" type=\"PTR\" /></hostnames>\n", currenths->HostName());
@@ -1012,10 +1224,11 @@ static void write_xml_initial_hostinfo(Target *currenths,
    for all hosts (even down ones) to be resolved */
 void write_host_status(Target *currenths, int resolve_all) {
   char hostname[1200];
+  char reasonbuf[512];
 
   if (o.listscan) {
     /* write "unknown" to stdout, machine, and xml */
-    log_write(LOG_STDOUT|LOG_NORMAL|LOG_SKID, "Host %s not scanned\n", currenths->NameIP(hostname, sizeof(hostname)));
+    log_write(LOG_PLAIN, "Host %s not scanned\n", currenths->NameIP(hostname, sizeof(hostname)));
     log_write(LOG_MACHINE, "Host: %s (%s)\tStatus: Unknown\n", currenths->targetipstr(), currenths->HostName());
     write_xml_initial_hostinfo(currenths, "unknown");
   } 
@@ -1029,10 +1242,10 @@ void write_host_status(Target *currenths, int resolve_all) {
     log_write(LOG_MACHINE,"Host: %s (%s)\tStatus: Smurf (%d responses)\n",  currenths->targetipstr(), currenths->HostName(), currenths->wierd_responses);
     
     if (o.pingscan)
-      log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Host %s seems to be a subnet broadcast address (returned %d extra pings).%s\n",  currenths->NameIP(hostname, sizeof(hostname)), currenths->wierd_responses, 
+      log_write(LOG_PLAIN,"Host %s seems to be a subnet broadcast address (returned %d extra pings).%s\n",  currenths->NameIP(hostname, sizeof(hostname)), currenths->wierd_responses, 
 		(currenths->flags & HOST_UP)? " Note -- the actual IP also responded." : "");
     else {
-      log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Host %s seems to be a subnet broadcast address (returned %d extra pings). %s.\n",  
+      log_write(LOG_PLAIN,"Host %s seems to be a subnet broadcast address (returned %d extra pings). %s.\n",  
 		currenths->NameIP(hostname, sizeof(hostname)),
 		currenths->wierd_responses,
 	       (currenths->flags & HOST_UP)? 
@@ -1042,14 +1255,20 @@ void write_host_status(Target *currenths, int resolve_all) {
   } 
 
   else if (o.pingscan) {
+
+	if(o.reason && currenths->flags & HOST_UP)
+		Snprintf(reasonbuf, 512, "%s.\n", target_reason_str(currenths));
+	else
+		Snprintf(reasonbuf, 512, ".\n");
+	
     write_xml_initial_hostinfo(currenths, 
 			       (currenths->flags & HOST_UP)? "up" : "down");
     if (currenths->flags & HOST_UP) {
-      log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Host %s appears to be up.\n", currenths->NameIP(hostname, sizeof(hostname)));
+      log_write(LOG_PLAIN,"Host %s appears to be up%s", currenths->NameIP(hostname, sizeof(hostname)), reasonbuf);
       log_write(LOG_MACHINE,"Host: %s (%s)\tStatus: Up\n", currenths->targetipstr(), currenths->HostName());
     } else if (o.verbose || resolve_all) {
       if (resolve_all)
-	log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Host %s appears to be down.\n", currenths->NameIP(hostname, sizeof(hostname)));
+	log_write(LOG_PLAIN,"Host %s appears to be down.\n", currenths->NameIP(hostname, sizeof(hostname)));
       else log_write(LOG_STDOUT,"Host %s appears to be down.\n", currenths->NameIP(hostname, sizeof(hostname)));
       log_write(LOG_MACHINE, "Host: %s (%s)\tStatus: Down\n", currenths->targetipstr(), currenths->HostName());
     }
@@ -1065,7 +1284,7 @@ void write_host_status(Target *currenths, int resolve_all) {
       } else {
 
 	if (resolve_all) {   
-	  log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Host %s appears to be down, skipping it.\n", currenths->NameIP(hostname, sizeof(hostname)));
+	  log_write(LOG_PLAIN,"Host %s appears to be down, skipping it.\n", currenths->NameIP(hostname, sizeof(hostname)));
 	}
 	else {
 	  log_write(LOG_STDOUT,"Host %s appears to be down, skipping it.\n", currenths->NameIP(hostname, sizeof(hostname)));
@@ -1123,7 +1342,7 @@ static void printosclassificationoutput(const struct OS_Classification_Results *
     for (classno=0; classno < OSR->OSC_num_matches; classno++) {
       // Because the OS_Generation filed is optional
       if (OSR->OSC[classno]->OS_Generation) {
-	snprintf(tmpbuf, sizeof(tmpbuf), " osgen=\"%s\"", OSR->OSC[classno]->OS_Generation);
+	Snprintf(tmpbuf, sizeof(tmpbuf), " osgen=\"%s\"", OSR->OSC[classno]->OS_Generation);
       } else tmpbuf[0] = '\0';
       {
 	char *xml_type, *xml_vendor, *xml_class;
@@ -1140,9 +1359,9 @@ static void printosclassificationoutput(const struct OS_Classification_Results *
     // Now to create the fodder for normal output
     for (classno=0; classno < OSR->OSC_num_matches; classno++) {
       /* We have processed enough if any of the following are true */
-      if (!guess && OSR->OSC_Accuracy[classno] < 1.0 ||
+      if ((!guess && OSR->OSC_Accuracy[classno] < 1.0) ||
 	  OSR->OSC_Accuracy[classno] <= OSR->OSC_Accuracy[0] - 0.1 ||
-	  OSR->OSC_Accuracy[classno] < 1.0 && classno > 9)
+	  (OSR->OSC_Accuracy[classno] < 1.0 && classno > 9))
 	break;
       if (addtochararrayifnew(types, &numtypes, MAX_OS_CLASSMEMBERS, OSR->OSC[classno]->Device_Type) == -1)
 	overflow = 1;
@@ -1150,7 +1369,7 @@ static void printosclassificationoutput(const struct OS_Classification_Results *
       // If family and vendor names are the same, no point being redundant
       if (strcmp(OSR->OSC[classno]->OS_Vendor, OSR->OSC[classno]->OS_Family) == 0)
 	Strncpy(tmpbuf, OSR->OSC[classno]->OS_Family, sizeof(tmpbuf));
-      else snprintf(tmpbuf, sizeof(tmpbuf), "%s %s", OSR->OSC[classno]->OS_Vendor, OSR->OSC[classno]->OS_Family);
+      else Snprintf(tmpbuf, sizeof(tmpbuf), "%s %s", OSR->OSC[classno]->OS_Vendor, OSR->OSC[classno]->OS_Family);
       
       
       // Let's see if it is already in the array
@@ -1190,17 +1409,17 @@ static void printosclassificationoutput(const struct OS_Classification_Results *
     }
     
     if (!overflow && numfamilies >= 1) {
-      log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "Device type: ");
+      log_write(LOG_PLAIN, "Device type: ");
       for(classno=0; classno < numtypes; classno++)
-	log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "%s%s", types[classno], (classno < numtypes - 1)? "|" : "");
-      log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "\nRunning%s: ", (familyaccuracy[0] < 1.0)? " (JUST GUESSING) " : "");
+	log_write(LOG_PLAIN, "%s%s", types[classno], (classno < numtypes - 1)? "|" : "");
+      log_write(LOG_PLAIN, "\nRunning%s: ", (familyaccuracy[0] < 1.0)? " (JUST GUESSING) " : "");
       for(familyno = 0; familyno < numfamilies; familyno++) {
-	if (familyno > 0) log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, ", ");
-	log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "%s", fullfamily[familyno]);
-	if (*familygenerations[familyno]) log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, " %s", familygenerations[familyno]);
-	if (familyaccuracy[familyno] < 1.0) log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, " (%d%%)", (int) (familyaccuracy[familyno] * 100));
+	if (familyno > 0) log_write(LOG_PLAIN, ", ");
+	log_write(LOG_PLAIN, "%s", fullfamily[familyno]);
+	if (*familygenerations[familyno]) log_write(LOG_PLAIN, " %s", familygenerations[familyno]);
+	if (familyaccuracy[familyno] < 1.0) log_write(LOG_PLAIN, " (%d%%)", (int) (familyaccuracy[familyno] * 100));
       }
-      log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "\n");
+      log_write(LOG_PLAIN, "\n");
     }
   }
   log_flush_all();
@@ -1218,8 +1437,8 @@ void printmacinfo(Target *currenths) {
 
   if (mac) {
     const char *macvendor = MACPrefix2Corp(mac);
-    snprintf(macascii, sizeof(macascii), "%02X:%02X:%02X:%02X:%02X:%02X",  mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "MAC Address: %s (%s)\n", macascii, macvendor? macvendor : "Unknown");
+    Snprintf(macascii, sizeof(macascii), "%02X:%02X:%02X:%02X:%02X:%02X",  mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    log_write(LOG_PLAIN, "MAC Address: %s (%s)\n", macascii, macvendor? macvendor : "Unknown");
   }
 }
 
@@ -1233,47 +1452,19 @@ void printosscanoutput(Target *currenths) {
   char numlst[512]; /* For creating lists of numbers */
   char *p; /* Used in manipulating numlst above */
   FingerPrintResults *FPR;
-  int osscanSys = 0;
   int distance = -1;
+  int osscan_flag;
   
-  if (!currenths->osscan_performed)
+  if (!(osscan_flag = currenths->osscanPerformed()))
     return;
-  
-  if (currenths->FPR == NULL && currenths->FPR1 == NULL) {
+   
+  if (currenths->FPR == NULL)
     return;
-  } else if (currenths->FPR != NULL && currenths->FPR1 == NULL) {
-    osscanSys = 2;
-    FPR = currenths->FPR;
-  } else if (currenths->FPR == NULL && currenths->FPR1 != NULL) {
-    osscanSys = 1;
-    FPR = currenths->FPR1;
-  }
-  else {
-    /* Neither is NULL. This happens when new OS scan system fails to
-       get a perfect match and falls back on the old OS scan
-       system. */
-    if (currenths->FPR->num_perfect_matches > 0) {
-      osscanSys = 2;
-      FPR = currenths->FPR; /* Just an ensurance. */
-    } else if (currenths->FPR1->num_perfect_matches > 0) {
-      osscanSys = 1;
-      FPR = currenths->FPR1;
-    } else if (currenths->FPR->overall_results == OSSCAN_SUCCESS) {
-      osscanSys = 2;
-      FPR = currenths->FPR;
-    } else if (currenths->FPR1->overall_results == OSSCAN_SUCCESS) {
-      osscanSys = 1;
-      FPR = currenths->FPR1;
-    } else {
-      /* Both fails. */
-      osscanSys = 2;
-      FPR = currenths->FPR;
-    }
-  }
-  
+  FPR = currenths->FPR;
+
   if (currenths->distance != -1)
-    distance = currenths->distance;
-  
+	distance = currenths->distance;
+
   log_write(LOG_XML, "<os>");
   if (FPR->osscan_opentcpport > 0) {
     log_write(LOG_XML, 
@@ -1290,7 +1481,12 @@ void printosscanoutput(Target *currenths) {
 	      "<portused state=\"closed\" proto=\"udp\" portid=\"%hu\" />\n",
 	      FPR->osscan_closedudpport);
   }
-  
+
+  if(osscan_flag == OS_PERF_UNREL && 
+     !(FPR->overall_results == OSSCAN_TOOMANYMATCHES ||
+     (FPR->num_perfect_matches > 8 && !o.debugging)))
+	log_write(LOG_PLAIN, "Warning: OSScan results may be unreliable because we could not find at least 1 open and 1 closed port\n");
+
   // If the FP can't be submitted anyway, might as well make a guess.
   const char *reason = FPR->OmitSubmissionFP();
   printosclassificationoutput(FPR->getOSClassification(), 
@@ -1315,17 +1511,17 @@ void printosscanoutput(Target *currenths) {
 	i++;
       }
       if (FPR->num_perfect_matches == 1)
-	log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,
+	log_write(LOG_PLAIN,
 		  "OS details: %s", 
 		  FPR->prints[0]->OS_name);
       
       else {
-	log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,
+	log_write(LOG_PLAIN,
 		  "OS details: %s", 
 		  FPR->prints[0]->OS_name);
 	i = 1;
 	while(FPR->accuracy[i] == 1) {
-	  log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,", %s", 
+	  log_write(LOG_PLAIN,", %s", 
 		    FPR->prints[i]->OS_name);
 	  i++;
 	}
@@ -1334,55 +1530,65 @@ void printosscanoutput(Target *currenths) {
       if ((o.verbose > 1 || o.debugging) && reason)
 	log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT,
 		  "OS fingerprint not ideal because: %s\n", reason);
+
       if ((o.osscan_guess || reason) && FPR->num_matches > 0) {
+	char *p;
 	/* Print the best guesses available */
-	log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Aggressive OS guesses: %s (%d%%)", FPR->prints[0]->OS_name, (int) (FPR->accuracy[0] * 100));
+	log_write(LOG_PLAIN,"Aggressive OS guesses: %s (%d%%)", FPR->prints[0]->OS_name, (int) (FPR->accuracy[0] * 100));
+	log_write(LOG_XML, "<osmatch name=\"%s\" accuracy=\"%d\" line=\"%d\"/>\n", 
+		  p = xml_convert(FPR->prints[0]->OS_name),  
+		  (int) (FPR->accuracy[0] * 100), 
+		  FPR->prints[0]->line);
+	free(p);
+
 	for(i=1; i < 10 && FPR->num_matches > i && FPR->accuracy[i] > FPR->accuracy[0] - 0.10; i++) {
-	  char *p;
-	  log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,", %s (%d%%)", FPR->prints[i]->OS_name, (int) (FPR->accuracy[i] * 100));
+
+	  log_write(LOG_PLAIN,", %s (%d%%)", FPR->prints[i]->OS_name, (int) (FPR->accuracy[i] * 100));
 	  log_write(LOG_XML, "<osmatch name=\"%s\" accuracy=\"%d\" line=\"%d\"/>\n", 
 		    p = xml_convert(FPR->prints[i]->OS_name),  
 		    (int) (FPR->accuracy[i] * 100), 
 		    FPR->prints[i]->line);
 	  free(p);
 	}
-	log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "\n");
+	log_write(LOG_PLAIN, "\n");
       }
-      if (osscanSys == 2 && !reason) {
-	log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT,"No exact OS matches for host (If you know what OS is running on it, see http://insecure.org/nmap/submit/ ).\nTCP/IP fingerprint:\n%s\n",
+      if (!reason) {
+	log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT,"No exact OS matches for host (If you know what OS is running on it, see http://nmap.org/submit/ ).\nTCP/IP fingerprint:\n%s\n",
 		  mergeFPs(FPR->FPs, FPR->numFPs, true,
 			   currenths->v4hostip(), distance, currenths->MACAddress(),
 			   FPR->osscan_opentcpport, FPR->osscan_closedtcpport, FPR->osscan_closedudpport,
 			   true));
 	
       } else {
+
 	  log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT,"No exact OS matches for host (test conditions non-ideal).");
 	  if (o.verbose > 1 || o.debugging)
 	    log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT, 
-		      "\nTCP/IP fingerprint by osscan system #%d:\n%s",
-		      osscanSys, mergeFPs(FPR->FPs, FPR->numFPs, false,
+		      "\nTCP/IP fingerprint:\n%s",
+		      mergeFPs(FPR->FPs, FPR->numFPs, false,
 					  currenths->v4hostip(), distance, currenths->MACAddress(),
 					  FPR->osscan_opentcpport, FPR->osscan_closedtcpport, FPR->osscan_closedudpport,
 					  false));
       }
     }
       
-    log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"\n");	  
+    log_write(LOG_PLAIN,"\n");	  
     if (FPR->goodFP >= 0 && (o.debugging || o.verbose > 1) && 
 	FPR->num_perfect_matches > 0 ) {
-      log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"OS Fingerprint:\n%s\n",
+      log_write(LOG_PLAIN,"OS Fingerprint:\n%s\n",
 		mergeFPs(FPR->FPs, FPR->numFPs, !reason,
 			 currenths->v4hostip(), distance, currenths->MACAddress(),
 			 FPR->osscan_opentcpport, FPR->osscan_closedtcpport, 
 			 FPR->osscan_closedudpport, true));
 
     }
+
   } else if (FPR->overall_results == OSSCAN_NOMATCHES) {
     const char *reason = FPR->OmitSubmissionFP();
     if ((o.verbose > 1 || o.debugging) && reason)
       log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT,"OS fingerprint not ideal because: %s\n", reason);
-    if (osscanSys == 2 && !reason) {
-      log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT,"No OS matches for host (If you know what OS is running on it, see http://insecure.org/nmap/submit/ ).\nTCP/IP fingerprint:\n%s\n",
+    if (!reason) {
+      log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT,"No OS matches for host (If you know what OS is running on it, see http://nmap.org/submit/ ).\nTCP/IP fingerprint:\n%s\n",
 		mergeFPs(FPR->FPs, FPR->numFPs, true,
 			 currenths->v4hostip(), distance, currenths->MACAddress(),
 			 FPR->osscan_opentcpport, FPR->osscan_closedtcpport, FPR->osscan_closedudpport,
@@ -1390,17 +1596,17 @@ void printosscanoutput(Target *currenths) {
     } else {
       log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT,"No OS matches for host\n");
       if (o.verbose > 1)
-	log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT, "\nTCP/IP fingerprint by osscan system #%d:\n%s",
-		  osscanSys, mergeFPs(FPR->FPs, FPR->numFPs, false,
+	log_write(LOG_NORMAL|LOG_SKID_NOXLT|LOG_STDOUT, "\nTCP/IP fingerprint:\n%s",
+		  mergeFPs(FPR->FPs, FPR->numFPs, false,
 				      currenths->v4hostip(), distance, currenths->MACAddress(),
 				      FPR->osscan_opentcpport, FPR->osscan_closedtcpport, FPR->osscan_closedudpport,
 				      false));
     }
   } else if (FPR->overall_results == OSSCAN_TOOMANYMATCHES || (FPR->num_perfect_matches > 8 && !o.debugging)) {
-    log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Too many fingerprints match this host to give specific OS details\n");
+    log_write(LOG_PLAIN,"Too many fingerprints match this host to give specific OS details\n");
     if (o.debugging || o.verbose > 1) {
-      log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"TCP/IP fingerprint by osscan system #%d:\n%s",
-		osscanSys, mergeFPs(FPR->FPs, FPR->numFPs, false,
+      log_write(LOG_PLAIN,"TCP/IP fingerprint:\n%s",
+		mergeFPs(FPR->FPs, FPR->numFPs, false,
 				    currenths->v4hostip(), distance, currenths->MACAddress(),
 				    FPR->osscan_opentcpport, FPR->osscan_closedtcpport, FPR->osscan_closedudpport,
 				    false));
@@ -1408,11 +1614,12 @@ void printosscanoutput(Target *currenths) {
   } else { assert(0); }
   
   if (o.debugging || o.verbose) {
-    log_write(LOG_XML,"<osfingerprint fingerprint=\"\n%s\" />\n", 
-	      mergeFPs(FPR->FPs, FPR->numFPs, false,
-		       currenths->v4hostip(), distance, currenths->MACAddress(),
-		       FPR->osscan_opentcpport, FPR->osscan_closedtcpport, FPR->osscan_closedudpport,
-		       false));
+    char *xml_osfp = xml_convert(mergeFPs(FPR->FPs, FPR->numFPs, !reason,
+				 currenths->v4hostip(), distance, currenths->MACAddress(),
+				 FPR->osscan_opentcpport, FPR->osscan_closedtcpport, FPR->osscan_closedudpport,
+				 !reason));
+    log_write(LOG_XML,"<osfingerprint fingerprint=\"%s\" />\n", xml_osfp);
+    free(xml_osfp);
   }
   
   log_write(LOG_XML, "</os>\n");
@@ -1423,12 +1630,12 @@ void printosscanoutput(Target *currenths) {
     gettimeofday(&tv, NULL);
     strncpy(tmbuf, ctime(&(currenths->seq.lastboot)), sizeof(tmbuf));
     chomp(tmbuf);
-    log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"Uptime: %.3f days (since %s)\n", (double) (tv.tv_sec - currenths->seq.lastboot) / 86400, tmbuf);
+    log_write(LOG_PLAIN,"Uptime: %.3f days (since %s)\n", (double) (tv.tv_sec - currenths->seq.lastboot) / 86400, tmbuf);
     log_write(LOG_XML, "<uptime seconds=\"%li\" lastboot=\"%s\" />\n", tv.tv_sec - currenths->seq.lastboot, tmbuf);
   }
   
   if (distance!=-1) {
-    log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "Network Distance: %d hop%s\n", distance, (distance == 1)? "" : "s");
+    log_write(LOG_PLAIN, "Network Distance: %d hop%s\n", distance, (distance == 1)? "" : "s");
     log_write(LOG_XML, "<distance value=\"%d\" />\n", distance);
   }
   
@@ -1442,13 +1649,9 @@ void printosscanoutput(Target *currenths) {
       while(*p) p++;
     }
     
-    log_write(LOG_XML, "<tcpsequence index=\"%li\" class=\"%s\" difficulty=\"%s\" values=\"%s\" />\n", (long) currenths->seq.index, seqclass2ascii(currenths->seq.seqclass), seqidx2difficultystr(currenths->seq.index), numlst); 
-    if (o.verbose) {
-      if (osscanSys == 1)
-	log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"%s", seqreport1(&(currenths->seq)));
-      else if(osscanSys == 2)
-	log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"%s", seqreport(&(currenths->seq)));
-    }
+    log_write(LOG_XML, "<tcpsequence index=\"%li\" difficulty=\"%s\" values=\"%s\" />\n", (long) currenths->seq.index, seqidx2difficultystr(currenths->seq.index), numlst); 
+    if (o.verbose)
+      log_write(LOG_PLAIN,"%s", seqreport(&(currenths->seq)));
     
     log_write(LOG_MACHINE,"\tSeq Index: %d", currenths->seq.index);
   }
@@ -1464,8 +1667,8 @@ void printosscanoutput(Target *currenths) {
     }
     log_write(LOG_XML, "<ipidsequence class=\"%s\" values=\"%s\" />\n", ipidclass2ascii(currenths->seq.ipid_seqclass), numlst);
     if (o.verbose)
-      log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT,"IPID Sequence Generation: %s\n", ipidclass2ascii(currenths->seq.ipid_seqclass));
-    log_write(LOG_MACHINE,"\tIPID Seq: %s", ipidclass2ascii(currenths->seq.ipid_seqclass));
+      log_write(LOG_PLAIN,"IP ID Sequence Generation: %s\n", ipidclass2ascii(currenths->seq.ipid_seqclass));
+    log_write(LOG_MACHINE,"\tIP ID Seq: %s", ipidclass2ascii(currenths->seq.ipid_seqclass));
     
     p=numlst;
     for(i=0; i < currenths->seq.responses; i++) {
@@ -1502,7 +1705,7 @@ void printserviceinfooutput(Target *currenths) {
   char hostname_tbl[MAX_SERVICE_INFO_FIELDS][MAXHOSTNAMELEN];
   char ostype_tbl[MAX_SERVICE_INFO_FIELDS][64];
   char devicetype_tbl[MAX_SERVICE_INFO_FIELDS][64];
-  char *delim;
+  const char *delim;
 
   for (i=0; i<MAX_SERVICE_INFO_FIELDS; i++)
     hostname_tbl[i][0] = ostype_tbl[i][0] = devicetype_tbl[i][0] = '\0';
@@ -1557,36 +1760,60 @@ void printserviceinfooutput(Target *currenths) {
 
   if (!numhostnames && !numostypes && !numdevicetypes) return;
 
-  log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "Service Info:");
+  log_write(LOG_PLAIN, "Service Info:");
 
   delim = " ";
   if (numhostnames) {
-    log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "%sHost%s: %s", delim, numhostnames==1? "" : "s", &hostname_tbl[0][0]);
+    log_write(LOG_PLAIN, "%sHost%s: %s", delim, numhostnames==1? "" : "s", &hostname_tbl[0][0]);
     for (i=1; i<MAX_SERVICE_INFO_FIELDS; i++)
       if (hostname_tbl[i][0])
-        log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, ", %s", &hostname_tbl[i][0]);
+        log_write(LOG_PLAIN, ", %s", &hostname_tbl[i][0]);
     delim="; ";
   }
 
   if (numostypes) {
-    log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "%sOS%s: %s", delim, numostypes==1? "" : "s", &ostype_tbl[0][0]);
+    log_write(LOG_PLAIN, "%sOS%s: %s", delim, numostypes==1? "" : "s", &ostype_tbl[0][0]);
     for (i=1; i<MAX_SERVICE_INFO_FIELDS; i++)
       if (ostype_tbl[i][0])
-        log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, ", %s", &ostype_tbl[i][0]);
+        log_write(LOG_PLAIN, ", %s", &ostype_tbl[i][0]);
     delim="; ";
   }
 
   if (numdevicetypes) {
-    log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "%sDevice%s: %s", delim, numdevicetypes==1? "" : "s", &devicetype_tbl[0][0]);
+    log_write(LOG_PLAIN, "%sDevice%s: %s", delim, numdevicetypes==1? "" : "s", &devicetype_tbl[0][0]);
     for (i=1; i<MAX_SERVICE_INFO_FIELDS; i++)
       if (devicetype_tbl[i][0])
-        log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, ", %s", &devicetype_tbl[i][0]);
+        log_write(LOG_PLAIN, ", %s", &devicetype_tbl[i][0]);
     delim="; ";
   }
 
-  log_write(LOG_NORMAL|LOG_SKID|LOG_STDOUT, "\n");
+  log_write(LOG_PLAIN, "\n");
   log_flush_all();
 }
+
+#ifndef NOLUA
+void printhostscriptresults(Target *currenths) {
+	ScriptResults::iterator iter;
+	char* script_output, *xml_id, *xml_scriptoutput; 
+	
+	if(currenths->scriptResults.size() > 0) {
+		log_write(LOG_XML, "<hostscript>");
+		log_write(LOG_PLAIN, "\nHost script results:\n");
+		for(iter = currenths->scriptResults.begin(); iter != currenths->scriptResults.end(); iter++) {
+			xml_id = xml_convert((*iter).id);
+			xml_scriptoutput= xml_convert((*iter).output);
+			log_write(LOG_XML, "<script id=\"%s\" output=\"%s\" />", 
+					xml_id, xml_scriptoutput);
+			script_output = formatScriptOutput((*iter));
+			log_write(LOG_PLAIN, "%s\n", script_output);
+			free(script_output);
+			free(xml_id);
+			free(xml_scriptoutput);
+		}
+		log_write(LOG_XML, "</hostscript>");
+	}
+}
+#endif
 
 /* Prints a status message while the program is running */
 void printStatusMessage() {
@@ -1597,7 +1824,7 @@ void printStatusMessage() {
   
   log_write(LOG_STDOUT, 
 	    "Stats: %d:%02d:%02d elapsed; %d hosts completed (%d up), %d undergoing %s\n", 
-	    time/60/24, time/60 % 24, time % 60, o.numhosts_scanned - o.numhosts_scanning, 
+	    time/60/60, time/60 % 60, time % 60, o.numhosts_scanned - o.numhosts_scanning, 
 	    o.numhosts_up, o.numhosts_scanning, scantype2str(o.current_scantype));
 }
 
@@ -1613,23 +1840,27 @@ void printfinaloutput() {
   gettimeofday(&tv, NULL);
   timep = time(NULL);
 
-  if (o.numhosts_scanned == 0)
-    fprintf(stderr, "WARNING: No targets were specified, so 0 hosts scanned.\n");
+  if (o.numhosts_scanned == 0
+#ifndef NOLUA
+      && o.scriptupdatedb == 0
+#endif
+     )
+    error("WARNING: No targets were specified, so 0 hosts scanned.");
   if (o.numhosts_scanned == 1 && o.numhosts_up == 0 && !o.listscan && 
       o.pingtype != PINGTYPE_NONE)
-    log_write(LOG_STDOUT, "Note: Host seems down. If it is really up, but blocking our ping probes, try -P0\n");
+    log_write(LOG_STDOUT, "Note: Host seems down. If it is really up, but blocking our ping probes, try -PN\n");
   else if (o.numhosts_up > 0) {
     if (o.osscan && o.servicescan)
-      log_write(LOG_STDOUT|LOG_NORMAL|LOG_SKID, "OS and Service detection performed. Please report any incorrect results at http://insecure.org/nmap/submit/ .\n");
+      log_write(LOG_PLAIN, "OS and Service detection performed. Please report any incorrect results at http://nmap.org/submit/ .\n");
     else if (o.osscan)
-      log_write(LOG_STDOUT|LOG_NORMAL|LOG_SKID, "OS detection performed. Please report any incorrect results at http://insecure.org/nmap/submit/ .\n");
+      log_write(LOG_PLAIN, "OS detection performed. Please report any incorrect results at http://nmap.org/submit/ .\n");
     else if (o.servicescan)
-      log_write(LOG_STDOUT|LOG_NORMAL|LOG_SKID, "Service detection performed. Please report any incorrect results at http://insecure.org/nmap/submit/ .\n");
+      log_write(LOG_PLAIN, "Service detection performed. Please report any incorrect results at http://nmap.org/submit/ .\n");
   }
 
-  log_write(LOG_STDOUT|LOG_SKID, "Nmap finished: %d %s (%d %s up) scanned in %.3f seconds\n", o.numhosts_scanned, (o.numhosts_scanned == 1)? "IP address" : "IP addresses", o.numhosts_up, (o.numhosts_up == 1)? "host" : "hosts",  o.TimeSinceStartMS(&tv) / 1000.0);
+  log_write(LOG_STDOUT|LOG_SKID, "Nmap done: %d %s (%d %s up) scanned in %.3f seconds\n", o.numhosts_scanned, (o.numhosts_scanned == 1)? "IP address" : "IP addresses", o.numhosts_up, (o.numhosts_up == 1)? "host" : "hosts",  o.TimeSinceStartMS(&tv) / 1000.0);
   if (o.verbose && o.isr00t && o.RawScan()) 
-    log_write(LOG_STDOUT|LOG_SKID, "               %s\n", 
+    log_write(LOG_STDOUT|LOG_SKID, "           %s\n", 
 	      getFinalPacketStats(statbuf, sizeof(statbuf)));
 
   Strncpy(mytime, ctime(&timep), sizeof(mytime));
@@ -1637,12 +1868,110 @@ void printfinaloutput() {
   
   log_write(LOG_XML, "<runstats><finished time=\"%lu\" timestr=\"%s\"/><hosts up=\"%d\" down=\"%d\" total=\"%d\" />\n", (unsigned long) timep, mytime, o.numhosts_up, o.numhosts_scanned - o.numhosts_up, o.numhosts_scanned);
 
-  log_write(LOG_XML, "<!-- Nmap run completed at %s; %d %s (%d %s up) scanned in %.3f seconds -->\n", mytime, o.numhosts_scanned, (o.numhosts_scanned == 1)? "IP address" : "IP addresses", o.numhosts_up, (o.numhosts_up == 1)? "host" : "hosts",  o.TimeSinceStartMS(&tv) / 1000.0 );
-  log_write(LOG_NORMAL|LOG_MACHINE, "# Nmap run completed at %s -- %d %s (%d %s up) scanned in %.3f seconds\n", mytime, o.numhosts_scanned, (o.numhosts_scanned == 1)? "IP address" : "IP addresses", o.numhosts_up, (o.numhosts_up == 1)? "host" : "hosts", o.TimeSinceStartMS(&tv) / 1000.0 );
+  log_write(LOG_XML, "<!-- Nmap done at %s; %d %s (%d %s up) scanned in %.3f seconds -->\n", mytime, o.numhosts_scanned, (o.numhosts_scanned == 1)? "IP address" : "IP addresses", o.numhosts_up, (o.numhosts_up == 1)? "host" : "hosts",  o.TimeSinceStartMS(&tv) / 1000.0 );
+  log_write(LOG_NORMAL|LOG_MACHINE, "# Nmap done at %s -- %d %s (%d %s up) scanned in %.3f seconds\n", mytime, o.numhosts_scanned, (o.numhosts_scanned == 1)? "IP address" : "IP addresses", o.numhosts_up, (o.numhosts_up == 1)? "host" : "hosts", o.TimeSinceStartMS(&tv) / 1000.0 );
 
   log_write(LOG_XML, "</runstats></nmaprun>\n");
   log_flush_all();
 }
 
+/* A record consisting of a data file name ("nmap-services", "nmap-os-db",
+   etc.), and the directory and file in which is was found. This is a
+   broken-down version of what is stored in o.loaded_data_files. It is used in
+   printdatafilepaths. */
+struct data_file_record {
+  std::string data_file;
+  std::string dir;
+  std::string file;
 
+  /* Compares this record to another. First compare the directory names, then
+     compare the file names. */
+  bool operator<(const struct data_file_record& other) {
+    int cmp;
 
+    cmp = dir.compare(other.dir);
+    if (cmp == 0)
+      cmp = file.compare(other.file);
+
+    return cmp < 0;
+  }
+};
+
+/* Prints the names of data files that were loaded and the paths at which they
+   were found. */
+void printdatafilepaths() {
+  std::list<struct data_file_record> df;
+  std::list<struct data_file_record>::iterator iter;
+  std::map<std::string, std::string>::iterator map_iter;
+  std::string dir;
+  unsigned int num_dirs;
+
+  /* Copy the elements of o.loaded_data_files (each a (data file, path) pair) to
+     a list of data_file_records to make them easier to manipulate. */
+  for (map_iter = o.loaded_data_files.begin(); map_iter != o.loaded_data_files.end(); map_iter++) {
+    struct data_file_record r;
+    char *s;
+
+    r.data_file = map_iter->first;
+    s = path_get_dirname(map_iter->second.c_str());
+    if (s == NULL)
+      fatal("%s: failed to allocate temporary memory", __func__);
+    r.dir = std::string(s);
+    free(s);
+    s = path_get_basename(map_iter->second.c_str());
+    if (s == NULL)
+      fatal("%s: failed to allocate temporary memory", __func__);
+    r.file = std::string(s);
+    free(s);
+
+    df.push_back(r);
+  }
+
+  /* Sort the list, first by directory name, then by file name. This ensures
+     that records with the same directory name are contiguous. */
+  df.sort();
+
+  /* Count the number of distinct directories. Normally we print something only
+     if files came from more than one directory. */
+  if (df.empty()) {
+    num_dirs = 0;
+  } else {
+    num_dirs = 1;
+    iter = df.begin();
+    dir = iter->dir;
+    for (iter++; iter != df.end(); iter++) {
+      if (iter->dir != dir) {
+        num_dirs++;
+        dir = iter->dir;
+      }
+    }
+  }
+
+  /* Decide what to print out based on the number of distinct directories and
+     the verbosity and debugging levels. */
+  if (num_dirs == 0) {
+    /* If no files were read, print a message only in debugging mode. */
+    if (o.debugging > 0)
+      log_write(LOG_PLAIN, "No data files read.\n");
+  } else if (num_dirs == 1 && o.verbose && !o.debugging) {
+    /* If all the files were from the same directory and we're in verbose mode,
+       print a brief message unless we are also in debugging mode. */
+    log_write(LOG_PLAIN, "Read data files from: %s\n", dir.c_str());
+  } else if ( (num_dirs == 1 && o.debugging) || num_dirs > 1) {
+    /* If files were read from more than one directory, or if they were read
+       from one directory and we are in debugging mode, display all the files
+       grouped by directory. */
+    iter = df.begin();
+    while (iter != df.end()) {
+      dir = iter->dir;
+      /* Write the directory name. */
+      log_write(LOG_PLAIN, "Read from %s:", dir.c_str());
+      /* Write files in that directory on the same line. */
+      while (iter != df.end() && iter->dir == dir) {
+        log_write(LOG_PLAIN, " %s", iter->file.c_str());
+        iter++;
+      }
+      log_write(LOG_PLAIN, ".\n");
+    }
+  }
+}

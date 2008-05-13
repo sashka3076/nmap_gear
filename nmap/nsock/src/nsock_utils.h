@@ -4,7 +4,7 @@
  *                                                                         *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
- * The nsock parallel socket event library is (C) 1999-2006 Insecure.Com   *
+ * The nsock parallel socket event library is (C) 1999-2008 Insecure.Com   *
  * LLC This library is free software; you may redistribute and/or          *
  * modify it under the terms of the GNU General Public License as          *
  * published by the Free Software Foundation; Version 2.  This guarantees  *
@@ -34,7 +34,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * insecure.org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -53,7 +53,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_utils.h 3870 2006-08-25 01:47:53Z fyodor $ */
+/* $Id: nsock_utils.h 6960 2008-03-21 16:44:09Z david $ */
 #ifndef UTILS_H
 #define UTILS_H
 
@@ -101,6 +101,6 @@
 /* Timeval subtract in seconds; truncate towards zero */
 #define TIMEVAL_SEC_SUBTRACT(a,b) ((a).tv_sec - (b).tv_sec + (((a).tv_usec < (b).tv_usec) ? - 1 : 0))
 /* assign one timeval to another timeval plus some msecs: a = b + msecs */
-#define TIMEVAL_MSEC_ADD(a, b, msecs) (a).tv_sec = (b).tv_sec + ((msecs) / 1000); (a).tv_usec = (b).tv_usec + ((msecs) % 1000) * 1000; (a).tv_sec += (a).tv_usec / 1000000; (a).tv_usec %= 1000000
+#define TIMEVAL_MSEC_ADD(a, b, msecs) { (a).tv_sec = (b).tv_sec + ((msecs) / 1000); (a).tv_usec = (b).tv_usec + ((msecs) % 1000) * 1000; (a).tv_sec += (a).tv_usec / 1000000; (a).tv_usec %= 1000000; }
 
 #endif

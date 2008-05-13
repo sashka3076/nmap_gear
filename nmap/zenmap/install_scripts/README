@@ -1,0 +1,25 @@
+Every script under this directory is supposed to be executed from the
+top of the source tree. Don't get into this directory, nor any other
+under this one to execute any of the scripts, or they're not going to
+work as expected.
+
+This is a description of the scripts in this directory and its
+subdirectories.
+
+unix/setup.sh:
+Just runs utils/create_os_list.py and utils/create_services_dump.py.
+
+utils/create_os_list.py:
+Builds the os_db.dmp database from ../nmap-os-db.
+
+utils/create_services_dump.py:
+Builds the services.dmp database from ../nmap-services.
+
+utils/linux_check.sh:
+Checks for dependencies on Linux.
+
+utils/version_update.py:
+Updates the Zenmap version number everywhere it needs to be.
+
+windows/copy_and_compile.bat:
+Builds a Windows executable using py2exe.

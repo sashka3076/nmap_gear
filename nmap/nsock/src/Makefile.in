@@ -1,17 +1,18 @@
-NSOCK_VERSION = 0.01
+NSOCK_VERSION = 0.02
 prefix = @prefix@
 exec_prefix = @exec_prefix@
 bindir = @bindir@
 sbindir = @sbindir@
 mandir = @mandir@
 srcdir = @srcdir@
+datarootdir = @datarootdir@
 
 CC = @CC@
 AR = ar
 RANLIB = @RANLIB@
 CCOPT = 
 DEFS = @DEFS@ -DNSOCK_VERSION=\"$(NSOCK_VERSION)\" 
-INCLS = -I../include
+INCLS = -I../include -I../../libpcap
 CFLAGS = @CFLAGS@ $(CCOPT) $(DEFS) $(INCLS)
 # CFLAGS = -g -Wall $(DEFS) $(INCLS)
 CPPFLAGS = @CPPFLAGS@
@@ -28,11 +29,11 @@ NBASEDIR=@NBASEDIR@
 
 TARGET = libnsock.a
 
-SRCS = error.c filespace.c gh_list.c nsock_connect.c nsock_core.c nsock_iod.c nsock_read.c nsock_timers.c nsock_write.c nsock_ssl.c nsock_utils.c nsock_event.c nsock_pool.c netutils.c @COMPAT_SRCS@
+SRCS = error.c filespace.c gh_list.c nsock_connect.c nsock_core.c nsock_iod.c nsock_read.c nsock_timers.c nsock_write.c nsock_ssl.c nsock_utils.c nsock_event.c nsock_pool.c netutils.c nsock_pcap.c @COMPAT_SRCS@
 
-OBJS = error.o filespace.o gh_list.o nsock_connect.o nsock_core.o nsock_iod.o nsock_read.o nsock_timers.o nsock_write.o nsock_ssl.o nsock_utils.o nsock_event.o nsock_pool.o netutils.o @COMPAT_OBJS@
+OBJS = error.o filespace.o gh_list.o nsock_connect.o nsock_core.o nsock_iod.o nsock_read.o nsock_timers.o nsock_write.o nsock_ssl.o nsock_utils.o nsock_event.o nsock_pool.o netutils.o nsock_pcap.o @COMPAT_OBJS@
 
-DEPS = error.h filespace.h gh_list.h nsock_internal.h nsock_utils.h netutils.h ../include/nsock.h $(NBASEDIR)/libnbase.a
+DEPS = error.h filespace.h gh_list.h nsock_internal.h nsock_utils.h netutils.h nsock_pcap.h ../include/nsock.h $(NBASEDIR)/libnbase.a
 
 .c.o:
 	$(CC) -c $(CPPFLAGS) $(CFLAGS) $< -o $@

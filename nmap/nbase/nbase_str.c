@@ -5,7 +5,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -38,7 +38,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -77,7 +77,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -97,10 +97,12 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_str.c 3899 2006-08-29 05:42:35Z fyodor $ */
+/* $Id: nbase_str.c 6860 2008-02-28 18:52:22Z fyodor $ */
 
 #include "nbase.h"
 #include <string.h>
+#include <stdarg.h>
+#include <stdio.h>
 
 #ifndef HAVE_STRCASESTR
 char *strcasestr(const char *haystack, const char *pneedle) {
@@ -145,6 +147,30 @@ int Strncpy(char *dest, const char *src, size_t n) {
   return -1;
 }
 
+int Vsnprintf(char *s, size_t n, const char *fmt, va_list ap)
+{
+	int ret;
+
+	ret = vsnprintf(s, n, fmt, ap);
+
+	if (ret < 0 || (unsigned) ret >= n)
+		s[n - 1] = '\0';
+
+	return ret;
+}
+
+int Snprintf(char *s, size_t n, const char *fmt, ...)
+{
+	va_list ap;
+	int ret;
+
+	va_start(ap, fmt);
+	ret = Vsnprintf(s, n, fmt, ap);
+	va_end(ap);
+
+	return ret;
+}
+
 /* Trivial function that returns nonzero if all characters in str of length strlength are
    printable (as defined by isprint()) */
 int stringisprintable(const char *str, int strlength) {
@@ -164,4 +190,57 @@ void replacenonprintable(char *str, int strlength, char replchar) {
       str[i] = replchar;
 
   return;
+}
+
+/* Returns the position of the last directory separator (slash, also backslash
+   on Win32) in a path. Returns -1 if none was found. */
+static int find_last_path_separator(const char *path) {
+#ifndef WIN32
+  const char *PATH_SEPARATORS = "/";
+#else
+  const char *PATH_SEPARATORS = "\\/";
+#endif
+  const char *p;
+
+  p = path + strlen(path) - 1;
+  while (p >= path) {
+    if (strchr(PATH_SEPARATORS, *p) != NULL)
+      return p - path;
+    p--;
+  }
+
+  return -1;
+}
+
+/* Returns the directory name part of a path (everything up to the last
+   directory separator). If there is no separator, returns ".". If there is only
+   one separator and it is the first character, returns "/". Returns NULL on
+   error. The returned string must be freed. */
+char *path_get_dirname(const char *path) {
+  char *result;
+  int i;
+
+  i = find_last_path_separator(path);
+  if (i == -1)
+    return strdup(".");
+  if (i == 0)
+    return strdup("/");
+
+  result = (char *) malloc(i + 1);
+  if (result == NULL)
+    return NULL;
+  strncpy(result, path, i);
+  result[i] = '\0';
+
+  return result;
+}
+
+/* Returns the file name part of a path (everything after the last directory
+   separator). Returns NULL on error. The returned string must be freed. */
+char *path_get_basename(const char *path) {
+  int i;
+
+  i = find_last_path_separator(path);
+
+  return strdup(path + i + 1);
 }

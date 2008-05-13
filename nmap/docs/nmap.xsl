@@ -1,4 +1,3 @@
-<?xml version="1.0" encoding="UTF-8"?>
 <!-- =========================================================================
             nmap.xsl stylesheet version 0.9b
             last change: 2006-03-04
@@ -373,7 +372,7 @@
     <i><xsl:value-of select="@args" /></i><br/>
     The process stopped at <xsl:value-of select="$end" />.
 	<xsl:choose>
-        <xsl:when test="debugging/@level = '0'">Debuging was disabled, </xsl:when>
+        <xsl:when test="debugging/@level = '0'">Debugging was disabled, </xsl:when>
         <xsl:otherwise>Debugging was enabled, </xsl:otherwise>
     </xsl:choose>
     the verbosity level was <xsl:value-of select="verbose/@level" />.
@@ -460,11 +459,19 @@
         </xsl:otherwise>
     </xsl:choose>
 
+	<h3>ping results</h3>
+	<ul><li><xsl:value-of select="status/@reason"/>
+    <xsl:if test="status/@reasonsrc">
+    	<xsl:text> from </xsl:text>
+    	<xsl:value-of select="status/@reasonsrc"/>
+    </xsl:if></li></ul>
+
     <xsl:if test="count(address) > 0">    
         <h3>address</h3>
         <ul>
             <xsl:for-each select="address">
                 <li><xsl:value-of select="@addr"/> (<xsl:value-of select="@addrtype"/>)</li>                
+				
             </xsl:for-each>
         </ul>
     </xsl:if>
@@ -498,6 +505,14 @@
     <xsl:if test="@count > 0">
 	    <p>The <xsl:value-of select="@count" /> ports scanned but not shown below are in state: <b><xsl:value-of select="@state" /></b></p>
     </xsl:if>
+
+    <ul>
+    <xsl:for-each select="extrareasons">
+        <xsl:if test="@count > 0">
+            <li><p><xsl:value-of select="@count" /> ports replied with: <b><xsl:value-of select="@reason" /></b></p></li>
+        </xsl:if>
+    </xsl:for-each>
+    </ul>
 </xsl:for-each>
 
 <xsl:if test="count(port) > 0">
@@ -506,6 +521,7 @@
         <td colspan="2">Port</td>
         <td>State</td>
         <td>Service</td>
+        <td>Reason</td>
         <td>Product</td>
         <td>Version</td>
         <td>Extra info</td>
@@ -526,10 +542,29 @@
                 <td><xsl:value-of select="@protocol" /></td>
                 <td><xsl:value-of select="state/@state" /></td>
                 <td><xsl:value-of select="service/@name" /><xsl:text>&#xA0;</xsl:text></td>
+				<td><xsl:value-of select="state/@reason"/>
+ 				    <xsl:if test="state/@reason_ip">
+                      <xsl:text> from </xsl:text>
+                      <xsl:value-of select="state/@reason_ip"/>
+                   </xsl:if>
+				</td>
                 <td><xsl:value-of select="service/@product" /><xsl:text>&#xA0;</xsl:text></td>
                 <td><xsl:value-of select="service/@version" /><xsl:text>&#xA0;</xsl:text></td>
                 <td><xsl:value-of select="service/@extrainfo" /><xsl:text>&#xA0;</xsl:text></td>
             </tr>
+	    <xsl:for-each select="script">
+		    <tr class="open">
+			    <td></td>
+			    <td>
+				    <xsl:value-of select="@id"/> <xsl:text>&#xA0;</xsl:text>
+			    </td>
+			    <td colspan="5">
+				    <xsl:value-of select="@output"/> <xsl:text>&#xA0;</xsl:text>
+			    </td>
+			    </tr>
+
+		    </xsl:for-each>
+
 		</xsl:when>
 		<xsl:when test="state/@state = 'filtered'">
             <tr class="filtered">
@@ -537,6 +572,12 @@
                 <td><xsl:value-of select="@protocol" /></td>
                 <td><xsl:value-of select="state/@state" /></td>
                 <td><xsl:value-of select="service/@name" /><xsl:text>&#xA0;</xsl:text></td>
+				<td><xsl:value-of select="state/@reason"/>
+ 				    <xsl:if test="state/@reason_ip">
+                      <xsl:text> from </xsl:text>
+                      <xsl:value-of select="state/@reason_ip"/>
+                   </xsl:if>
+				</td>
                 <td><xsl:value-of select="service/@product" /><xsl:text>&#xA0;</xsl:text></td>
                 <td><xsl:value-of select="service/@version" /><xsl:text>&#xA0;</xsl:text></td>
                 <td><xsl:value-of select="service/@extrainfo" /><xsl:text>&#xA0;</xsl:text></td>
@@ -548,6 +589,12 @@
                 <td><xsl:value-of select="@protocol" /></td>
                 <td><xsl:value-of select="state/@state" /></td>
                 <td><xsl:value-of select="service/@name" /><xsl:text>&#xA0;</xsl:text></td>
+				<td><xsl:value-of select="state/@reason"/>
+ 				    <xsl:if test="state/@reason_ip">
+                      <xsl:text> from </xsl:text>
+                      <xsl:value-of select="state/@reason_ip"/>
+                   </xsl:if>
+				</td>
                 <td><xsl:value-of select="service/@product" /><xsl:text>&#xA0;</xsl:text></td>
                 <td><xsl:value-of select="service/@version" /><xsl:text>&#xA0;</xsl:text></td>
                 <td><xsl:value-of select="service/@extrainfo" /><xsl:text>&#xA0;</xsl:text></td>
@@ -559,6 +606,12 @@
                 <td><xsl:value-of select="@protocol" /></td>
                 <td><xsl:value-of select="state/@state" /></td>
                 <td><xsl:value-of select="service/@name" /><xsl:text>&#xA0;</xsl:text></td>
+                <td><xsl:value-of select="state/@reason"/>
+ 				    <xsl:if test="state/@reason_ip">
+                      <xsl:text> from </xsl:text>
+                      <xsl:value-of select="state/@reason_ip"/>
+                   </xsl:if>
+				</td>
                 <td><xsl:value-of select="service/@product" /><xsl:text>&#xA0;</xsl:text></td>
                 <td><xsl:value-of select="service/@version" /><xsl:text>&#xA0;</xsl:text></td>
                 <td><xsl:value-of select="service/@extrainfo" /><xsl:text>&#xA0;</xsl:text></td>
@@ -571,10 +624,13 @@
 <!-- os -->
 <!-- ............................................................ -->
 <xsl:template match="os">
-<xsl:if test="osmatch/@name != ''"><h3>remote operating system guess</h3></xsl:if>
-<ul>
-	<xsl:apply-templates/>
-</ul>
+	<h3>remote operating system guess</h3>
+		
+	<xsl:if test="count(osmatch) = 0"><p>Unable to identify operating system.</p></xsl:if>	
+
+	<ul>
+		<xsl:apply-templates/>
+	</ul>
 </xsl:template>
 <!-- ............................................................ -->
 
@@ -594,34 +650,72 @@
 </xsl:template>
 <!-- ............................................................ -->
 
+<!-- osfingerprint -->
+<!-- ............................................................ -->
+<xsl:template match="osfingerprint">
+	<br /><br />
+	<li>Cannot determine exact operating system.  Fingerprint provided below.</li>
+	<table cellspacing="1">
+		<tr class="head">
+    		<td>Operating System fingerprint</td>
+		</tr>
+		<tr>
+			<td><xsl:value-of select="@fingerprint" /></td>
+		</tr>
+	</table>
+</xsl:template>
+<!-- ............................................................ -->
+
+<!-- Host Script Scan -->
+<!-- ............................................................ -->
+<xsl:template match="hostscript">
+	<table>
+	<xsl:for-each select="script">
+		<tr class="open">
+			<td>
+				<xsl:value-of select="@id"/> <xsl:text>&#xA0;</xsl:text>
+			</td>
+			<td>
+				<xsl:value-of select="@output"/> <xsl:text>&#xA0;</xsl:text>
+			</td>
+		</tr>
+
+	</xsl:for-each>
+	</table>
+</xsl:template>
+<!-- ............................................................ -->
+
 <!-- uptime -->
 <!-- ............................................................ -->
 <xsl:template match="uptime">
-<xsl:if test="@seconds != ''"><h3>system uptime</h3></xsl:if>
+<xsl:if test="@seconds != ''"><h3>system uptime</h3>
 <ul>
 <li>uptime: <xsl:value-of select="@seconds" /> sec</li>
 <li>last reboot: <xsl:value-of select="@lastboot" /></li>
 </ul>
+</xsl:if>
 </xsl:template>
 <!-- ............................................................ -->
 
 <!-- distance -->
 <!-- ............................................................ -->
 <xsl:template match="distance">
-<xsl:if test="@value != ''"><h3>network distance</h3></xsl:if>
+<xsl:if test="@value != ''"><h3>network distance</h3>
 <ul>
 	<li>distance: <xsl:value-of select="@value" /> hops</li>
 </ul>
+</xsl:if>
 </xsl:template>
 <!-- ............................................................ -->
 
 <!-- smurf -->
 <!-- ............................................................ -->
 <xsl:template match="smurf">
-<xsl:if test="@responses != ''"><h3>smurf responses</h3></xsl:if>
+<xsl:if test="@responses != ''"><h3>smurf responses</h3>
 <ul>
 <li><xsl:value-of select="@responses" /> responses counted</li>
 </ul>
+</xsl:if>
 </xsl:template>
 <!-- ............................................................ -->
 
@@ -632,13 +726,67 @@
     <h3>tcpsequence</h3>
     <ul>
         <li>index: <xsl:value-of select="@index" /></li>
-        <li>class: <xsl:value-of select="@class" /></li>
         <li>difficulty: <xsl:value-of select="@difficulty" /></li>
         <li>values: <xsl:value-of select="@values" /></li>
     </ul>
 </xsl:if>
 </xsl:template>
 <!-- ............................................................ -->
+
+<!-- traceroute -->
+<!-- ............................................................ -->
+
+<xsl:template match="trace">
+  <h3>traceroute</h3>
+  <ul>
+      <xsl:choose>
+        <xsl:when test="@port">
+          <li>port: <xsl:value-of select="@port" /></li>
+        </xsl:when>
+      </xsl:choose>
+      <li>proto: <xsl:value-of select="@proto" /></li>
+       <xsl:for-each select="error">
+        <li>error: <xsl:value-of select="@errorstr"/></li>
+       </xsl:for-each>
+  </ul>
+  <table cellspacing="1">
+    <tr class="head">
+      <td>Hop</td>
+      <td>Rtt</td>
+      <td>IP</td>
+      <td>Host</td>
+    </tr>
+  <xsl:for-each select="hop">
+      <xsl:choose>
+          <xsl:when test="@rtt = '--'">
+      <tr class="filtered">
+          <td><xsl:value-of select="@ttl" /></td>
+          <td>--</td>
+          <td><xsl:value-of select="@ipaddr" /></td>
+          <td><xsl:value-of select="@host" /></td>
+        </tr>
+      </xsl:when>
+          <xsl:when test="@rtt > 0">
+        <tr class="open">
+          <td><xsl:value-of select="@ttl" /></td>
+          <td><xsl:value-of select="@rtt" /></td>
+          <td><xsl:value-of select="@ipaddr" /></td>
+          <td><xsl:value-of select="@host" /></td>
+        </tr>
+      </xsl:when>
+      <xsl:otherwise>
+        <tr class="closed">
+          <td><xsl:value-of select="@ttl" /></td>
+          <td></td><td></td><td></td>
+        </tr>
+      </xsl:otherwise>
+    </xsl:choose>
+  </xsl:for-each>
+  </table>
+</xsl:template>
+<!-- ............................................................ -->
+
+
 
 <!-- ipidsequence -->
 <!-- ............................................................ -->

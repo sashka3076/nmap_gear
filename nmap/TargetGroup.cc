@@ -7,7 +7,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -40,7 +40,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -79,7 +79,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -99,10 +99,11 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: TargetGroup.cc 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: TargetGroup.cc 6858 2008-02-28 18:52:06Z fyodor $ */
 
 #include "TargetGroup.h"
 #include "NmapOps.h"
+#include "nmap_error.h"
 
 extern NmapOps o;
 
@@ -119,7 +120,7 @@ void TargetGroup::Initialize() {
   ipsleft = 0;
 }
 
-/* take the object back to the begining without  (mdmcl)
+/* take the object back to the beginning without  (mdmcl)
  * reinitalizing the data structures */  
 int  TargetGroup::rewind() {
 
@@ -132,7 +133,7 @@ int  TargetGroup::rewind() {
 	return 0; 
       }
       else
-        assert(FALSE);
+        assert(0);
   }
   /* For ranges, we easily set current to zero and calculate
    * the ips by the number of values in the columns */
@@ -167,7 +168,7 @@ int TargetGroup::parse_expr(const char * const target_expr, int af) {
   char *hostexp = strdup(target_expr);
   struct hostent *target;
   unsigned long longtmp;
-  int namedhost = 0;
+  namedhost = 0;
 
   if (targets_type != TYPE_NONE)
     Initialize();
@@ -188,7 +189,7 @@ int TargetGroup::parse_expr(const char * const target_expr, int af) {
     s = strtok(NULL, "");    /* find the end of the token from hostexp */
     netmask  = ( s ) ? atoi(s) : 32;
     if ((int) netmask <= 0 || netmask > 32) {
-      fprintf(stderr, "Illegal netmask value (%d), must be /1 - /32 .  Assuming /32 (one host)\n", netmask);
+      error("Illegal netmask value (%d), must be /1 - /32 .  Assuming /32 (one host)", netmask);
       netmask = 32;
     }
     for(i=0; *(hostexp + i); i++) 
@@ -209,7 +210,7 @@ int TargetGroup::parse_expr(const char * const target_expr, int af) {
           if (count > 1)
              error("Warning: Hostname %s resolves to %d IPs. Using %s.", target_net, count, inet_ntoa(*((struct in_addr *)target->h_addr_list[0])));
 	} else {
-	  fprintf(stderr, "Failed to resolve given hostname/IP: %s.  Note that you can't use '/mask' AND '1-4,7,100-' style IP ranges\n", target_net);
+	  error("Failed to resolve given hostname/IP: %s.  Note that you can't use '/mask' AND '1-4,7,100-' style IP ranges", target_net);
 	  free(hostexp);
 	  return 1;
 	}
@@ -249,7 +250,7 @@ int TargetGroup::parse_expr(const char * const target_expr, int af) {
 	  if (*addy[i] == '*') { start = 0; end = 255; } 
 	  else if (*addy[i] == '-') {
 	    start = 0;
-	    if (!addy[i] + 1) end = 255;
+	    if (!(addy[i] + 1)) end = 255;
 	    else end = atoi(addy[i]+ 1);
 	  }
 	  else {
@@ -288,7 +289,7 @@ int TargetGroup::parse_expr(const char * const target_expr, int af) {
     hints.ai_family = PF_INET6;
     rc = getaddrinfo(hostexp, NULL, &hints, &result);
     if (rc != 0) {
-      fprintf(stderr, "Failed to resolve given IPv6 hostname/IP: %s.  Note that you can't use '/mask' or '[1-4,7,100-]' style ranges for IPv6.  Error code %d: %s\n", hostexp, rc, gai_strerror(rc));
+      error("Failed to resolve given IPv6 hostname/IP: %s.  Note that you can't use '/mask' or '[1-4,7,100-]' style ranges for IPv6.  Error code %d: %s", hostexp, rc, gai_strerror(rc));
       free(hostexp);
       if (result) freeaddrinfo(result);
       return 1;
@@ -354,14 +355,14 @@ int TargetGroup::skip_range(_octet_nums octet) {
     current[i] = 0;
   }
 
-  /* we actauly don't skip the current, it was accounted for 
+  /* we actually don't skip the current, it was accounted for 
    * by get_next_host */
   ipsleft -= hosts_skipped - 1;
  
   return hosts_skipped;
 }
 
- /* Grab the next host from this expression (if any) and uptdates its internal
+ /* Grab the next host from this expression (if any) and updates its internal
     state to reflect that the IP was given out.  Returns 0 and
     fills in ss if successful.  ss must point to a pre-allocated
     sockaddr_storage structure */
@@ -390,7 +391,7 @@ int TargetGroup::get_next_host(struct sockaddr_storage *ss, size_t *sslen) {
     if (currentaddr.s_addr <= endaddr.s_addr) {
       sin->sin_addr.s_addr = htonl(currentaddr.s_addr++);
     } else {
-      error("Bogus target structure passed to TargetGroup::get_next_host");
+      error("Bogus target structure passed to %s", __func__);
       ipsleft = 0;
       return -1;
     }

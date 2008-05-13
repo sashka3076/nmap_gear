@@ -7,7 +7,7 @@
  *                                                                         *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
- * The nsock parallel socket event library is (C) 1999-2006 Insecure.Com   *
+ * The nsock parallel socket event library is (C) 1999-2008 Insecure.Com   *
  * LLC This library is free software; you may redistribute and/or          *
  * modify it under the terms of the GNU General Public License as          *
  * published by the Free Software Foundation; Version 2.  This guarantees  *
@@ -37,7 +37,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * insecure.org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -56,12 +56,16 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_iod.c 3870 2006-08-25 01:47:53Z fyodor $ */
+/* $Id: nsock_iod.c 6859 2008-02-28 18:52:17Z fyodor $ */
 
 #include "nsock.h"
 #include "nsock_internal.h"
 #include "gh_list.h"
 #include "netutils.h"
+
+#if HAVE_PCAP
+#include "nsock_pcap.h"
+#endif
 
 #include <string.h>
 
@@ -162,8 +166,8 @@ void nsi_delete(nsock_iod nsockiod, int pending_response) {
 	currev = (msevent *) GH_LIST_ELEM_DATA(currev_elem);
 	next_elem = GH_LIST_ELEM_NEXT(currev_elem);
 	if (currev->iod == nsi) {
-	  // OK - we found an event pending on this IOD.  Kill it.
-	  // printf("Found an outstanding event (out of %d), removing\n", nsi->events_pending);
+	  /* OK - we found an event pending on this IOD.  Kill it. */
+	  /* printf("Found an outstanding event (out of %d), removing\n", nsi->events_pending); */
 	  msevent_cancel(nsi->nsp, currev, elist_ar[elist], currev_elem, pending_response == NSOCK_PENDING_NOTIFY);
 	}
 	if (nsi->events_pending == 0)
@@ -206,6 +210,26 @@ void nsi_delete(nsock_iod nsockiod, int pending_response) {
 
   nsi->state = NSIOD_STATE_DELETED;
   nsi->userdata = NULL;
+
+#if HAVE_PCAP
+  if(nsi->pcap){
+    mspcap *mp = (mspcap *) nsi->pcap;
+    if(mp->pt){
+      pcap_close(mp->pt);
+      mp->pt=NULL;
+    }
+    if(mp->pcap_desc){
+      // Should I close pcap_desc or pcap_close does this for me?
+      mp->pcap_desc = -1;
+    }
+    if(mp->pcap_device){
+    	free(mp->pcap_device);
+    	mp->pcap_device = NULL;
+    }
+    free(mp);
+    nsi->pcap = NULL;
+  }
+#endif
 
   gh_list_remove_elem(&nsi->nsp->active_iods, nsi->entry_in_nsp_active_iods);
   gh_list_prepend(&nsi->nsp->free_iods, nsi);

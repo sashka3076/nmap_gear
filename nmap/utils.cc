@@ -5,7 +5,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -38,7 +38,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -77,7 +77,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: utils.cc 4204 2006-11-20 03:48:57Z fyodor $ */
+/* $Id: utils.cc 7099 2008-04-09 02:11:20Z fyodor $ */
 
 #include "nmap.h"
 #include "utils.h"
@@ -105,21 +105,64 @@
 
 extern NmapOps o;
 
+
+
+/* Test a wildcard mask against a test string. Wildcard mask
+ * can include '*' and '?' which work the same as they do
+ * in /bin/sh (except it's case insensitive)
+ * Return val of 1 means it DID match. 0 means it DIDN'T
+ * - Doug Hoyte, 2005
+ */
+
+int wildtest(char *wild, char *test) {
+
+  int i;
+
+  while(*wild != '\0'  ||  *test != '\0') {
+    if (*wild == '*') {
+
+      /* --- Deal with multiple asterisks. --- */
+      while (wild[1] == '*') wild++;
+
+      /* --- Deal with terminating asterisks. --- */
+      if (wild[1] == '\0') return 1;
+
+      for(i=0; test[i]!='\0'; i++)
+        if ((tolower((int)wild[1]) == tolower((int)test[i]) || wild[1] == '?')
+            &&  wildtest(wild+1, test+i) == 1) return 1;
+
+      return 0;
+    }
+
+    /* --- '?' can't match '\0'. --- */
+    if (*wild == '?' && *test == '\0') return 0;
+
+    if (*wild != '?' && tolower((int)*wild) != tolower((int)*test)) return 0;
+    wild++; test++;
+  }
+
+  if (tolower((int)*wild) == tolower((int)*test)) return 1;
+  return 0;
+
+}
+
+
+
 /* Hex dump */
 void hdump(unsigned char *packet, unsigned int len) {
 unsigned int i=0, j=0;
 
-printf("Here it is:\n");
+log_write(LOG_PLAIN, "Here it is:\n");
 
 for(i=0; i < len; i++){
   j = (unsigned) (packet[i]);
-  printf("%-2X ", j);
+  log_write(LOG_PLAIN, "%-2X ", j);
   if (!((i+1)%16))
-    printf("\n");
+    log_write(LOG_PLAIN, "\n");
   else if (!((i+1)%4))
-    printf("  ");
+    log_write(LOG_PLAIN, "  ");
 }
-printf("\n");
+log_write(LOG_PLAIN, "\n");
 }
 
 /* A better version of hdump, from Lamont Granquist.  Modified slightly
@@ -137,7 +180,7 @@ void lamont_hdump(char *cp, unsigned int length) {
   int nshorts, nshorts2;
   int padding;
   
-  printf("\n\t");
+  log_write(LOG_PLAIN, "\n\t");
   padding = 0;
   sp = (u_short *)bp;
   ap = (u_char *)bp;
@@ -147,44 +190,44 @@ void lamont_hdump(char *cp, unsigned int length) {
   j = 0;
   while(1) {
     while (--nshorts >= 0) {
-      printf(" %04x", ntohs(*sp));
+      log_write(LOG_PLAIN, " %04x", ntohs(*sp));
       sp++;
       if ((++i % 8) == 0)
         break;
     }
     if (nshorts < 0) {
       if ((length & 1) && (((i-1) % 8) != 0)) {
-        printf(" %02x  ", *(u_char *)sp);
+        log_write(LOG_PLAIN, " %02x  ", *(u_char *)sp);
         padding++;
       }
       nshorts = (8 - (nshorts2 - nshorts));
       while(--nshorts >= 0) {
-        printf("     ");
+        log_write(LOG_PLAIN, "     ");
       }
-      if (!padding) printf("     ");
+      if (!padding) log_write(LOG_PLAIN, "     ");
     }
-    printf("  ");
+    log_write(LOG_PLAIN, "  ");
 
     while (--nshorts2 >= 0) {
-      printf("%c%c", asciify[*ap], asciify[*(ap+1)]);
+      log_write(LOG_PLAIN, "%c%c", asciify[*ap], asciify[*(ap+1)]);
       ap += 2;
       if ((++j % 8) == 0) {
-        printf("\n\t");
+        log_write(LOG_PLAIN, "\n\t");
         break;
       }
     }
     if (nshorts2 < 0) {
       if ((length & 1) && (((j-1) % 8) != 0)) {
-        printf("%c", asciify[*ap]);
+        log_write(LOG_PLAIN, "%c", asciify[*ap]);
       }
       break;
     }
   }
   if ((length & 1) && (((i-1) % 8) == 0)) {
-    printf(" %02x", *(u_char *)sp);
-    printf("                                       %c", asciify[*ap]);
+    log_write(LOG_PLAIN, " %02x", *(u_char *)sp);
+    log_write(LOG_PLAIN, "                                       %c", asciify[*ap]);
   }
-  printf("\n");
+  log_write(LOG_PLAIN, "\n");
 }
 
 #ifndef HAVE_STRERROR
@@ -227,62 +270,6 @@ int optcmp(const char *a, const char *b) {
   return 0;
 }
 
-/* Convert a comma-separated list of ASCII u16-sized numbers into the
-   given 'dest' array, which is of total size (meaning sizeof() as
-   opposed to numelements) of destsize.  If min_elem and max_elem are
-   provided, each number must be within (or equal to) those
-   constraints.  The number of numbers stored in 'dest' is returned,
-   except that -1 is returned in the case of an error. If -1 is
-   returned and errorstr is non-null, *errorstr is filled with a ptr to a
-   static string literal describing the error. */
-
-int numberlist2array(char *expr, u16 *dest, int destsize, char **errorstr, u16 min_elem, u16 max_elem) {
-  char *current_range;
-  char *endptr;
-  char *errbogus;
-  long val;
-  int max_vals = destsize / 2;
-  int num_vals_saved = 0;
-  current_range = expr;
-
-  if (!errorstr)
-    errorstr = &errbogus;
-
-  if (destsize % 2 != 0) {
-    *errorstr = "Bogus call to numerlist2array() -- destsize must be a multiple of 2";
-    return -1;
-  }
-
-  if (!expr || !*expr)
-    return 0;
-
-  do {
-    if (num_vals_saved == max_vals) {
-      *errorstr = "Buffer would overflow -- too many numbers in provided list";
-      return -1;
-    }
-    if( !isdigit((int) *current_range) ) {
-      *errorstr = "Alleged number begins with nondigit!  Example of proper form: \"20,80,65532\"";
-      return -1;
-    }
-    val = strtol(current_range, &endptr, 10);
-    if( val < min_elem || val > max_elem ) {
-      *errorstr = "Number given in list is outside given legal range";
-      return -1;
-    }
-    dest[num_vals_saved++] = (u16) val;
-    current_range = endptr;
-    while (*current_range == ',' || isspace(*current_range))
-      current_range++;
-    if (*current_range && !isdigit(*current_range)) {
-      *errorstr = "Bogus character in supposed number-list string. Example of proper form: \"20,80,65532\"";
-      return -1;
-    }
-  } while( current_range && *current_range);
-
-  return num_vals_saved;
-}
-
 /* Scramble the contents of an array*/
 void genfry(unsigned char *arr, int elem_sz, int num_elem) {
 int i;
@@ -295,7 +282,7 @@ unsigned char *tmp;
 int bpe;
 
 if (sizeof(unsigned char) != 1)
-  fatal("genfry() requires 1 byte chars");
+  fatal("%s() requires 1 byte chars", __func__);
 
 if (num_elem < 2)
   return;
@@ -312,8 +299,8 @@ else if (num_elem < 65536)
   bpe = sizeof(unsigned short);
 else bpe = sizeof(unsigned int);
 
-bytes = (unsigned char *) malloc(bpe * num_elem);
-tmp = (unsigned char *) malloc(elem_sz);
+bytes = (unsigned char *) safe_malloc(bpe * num_elem);
+tmp = (unsigned char *) safe_malloc(elem_sz);
 
 get_random_bytes(bytes, bpe * num_elem);
 cptr = bytes;
@@ -406,7 +393,7 @@ int arg_parse(const char *command, char ***argv) {
   if (Strncpy(mycommand, command, 4096) == -1) {      
     return -1;
   }
-  myargv = (char **) malloc((MAX_PARSE_ARGS + 2) * sizeof(char *));
+  myargv = (char **) safe_malloc((MAX_PARSE_ARGS + 2) * sizeof(char *));
   memset(myargv, 0, (MAX_PARSE_ARGS+2) * sizeof(char *));
   myargv[0] = (char *) 0x123456; /* Integrity checker */
   myargv++;
@@ -702,22 +689,22 @@ void bintohexstr(char *buf, int buflen, char *src, int srclen){
     int bp=0;
     int i;
     for(i=0; i<srclen; i++){
-      bp += snprintf(buf+bp, buflen-bp, "\\x%02hhx",src[i]);
+      bp += Snprintf(buf+bp, buflen-bp, "\\x%02hhx",src[i]);
       if(bp >= buflen)break;
       if(i%16==7){
-        bp += snprintf(buf+bp, buflen-bp," ");
+        bp += Snprintf(buf+bp, buflen-bp," ");
         if(bp >= buflen)break;
       }
       if(i%16==15){
-        bp += snprintf(buf+bp, buflen-bp,"\n");
+        bp += Snprintf(buf+bp, buflen-bp,"\n");
         if(bp >= buflen)break;
       }
     }
     if(i%16!=0 && bp < buflen)
-      bp += snprintf(buf+bp, buflen-bp,"\n");
+      bp += Snprintf(buf+bp, buflen-bp,"\n");
 }
 
-static inline char* STRAPP(char *fmt, ...) {
+static inline char* STRAPP(const char *fmt, ...) {
   static char buf[256];
   static int bp;
   int left = (int)sizeof(buf)-bp;
@@ -729,7 +716,7 @@ static inline char* STRAPP(char *fmt, ...) {
     return buf;
   va_list ap;
   va_start(ap, fmt);
-  bp += vsnprintf (buf+bp, left, fmt, ap);
+  bp += Vsnprintf (buf+bp, left, fmt, ap);
   va_end(ap);
 
   return(buf);
@@ -987,7 +974,7 @@ char *mmapfile(char *fname, int *length, int openflags)
   }
  else {
   oflags = GENERIC_READ | GENERIC_WRITE;
-  mflags = PAGE_READONLY | PAGE_READWRITE;
+  mflags = PAGE_READWRITE;
  }
 
  fd = CreateFile (
@@ -1016,8 +1003,8 @@ char *mmapfile(char *fname, int *length, int openflags)
  CloseHandle (fd);
 
  if (o.debugging > 2)
-  printf ("mmapfile(): fd %08lX, gmap %08lX, fileptr %08lX, length %d\n",
-    (DWORD)fd, (DWORD)gmap, (DWORD)fileptr, *length);
+  log_write(LOG_PLAIN, "%s(): fd %08lX, gmap %08lX, fileptr %08lX, length %d\n",
+    __func__, (DWORD)fd, (DWORD)gmap, (DWORD)fileptr, *length);
 
 	return fileptr;
 }
@@ -1028,7 +1015,7 @@ char *mmapfile(char *fname, int *length, int openflags)
 int win32_munmap(char *filestr, int filelen)
 {
   if (gmap == 0)
-    fatal("win32_munmap: no current mapping !\n");
+    fatal("%s: no current mapping !\n", __func__);
 
   FlushViewOfFile(filestr, filelen);
   UnmapViewOfFile(filestr);

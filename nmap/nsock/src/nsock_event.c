@@ -7,7 +7,7 @@
  *                                                                         *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
- * The nsock parallel socket event library is (C) 1999-2006 Insecure.Com   *
+ * The nsock parallel socket event library is (C) 1999-2008 Insecure.Com   *
  * LLC This library is free software; you may redistribute and/or          *
  * modify it under the terms of the GNU General Public License as          *
  * published by the Free Software Foundation; Version 2.  This guarantees  *
@@ -37,7 +37,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * insecure.org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -56,10 +56,14 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_event.c 3870 2006-08-25 01:47:53Z fyodor $ */
+/* $Id: nsock_event.c 6859 2008-02-28 18:52:17Z fyodor $ */
 
 #include "nsock_internal.h"
 #include "gh_list.h"
+
+#if HAVE_PCAP
+#include "nsock_pcap.h"
+#endif 
 
 #include <string.h>
 
@@ -125,6 +129,7 @@ int nsock_event_cancel(nsock_pool ms_pool, nsock_event_id id, int notify ) {
   mspool *nsp = (mspool *) ms_pool;
   enum nse_type type = get_event_id_type(id);
   gh_list *event_list = NULL;
+  gh_list *event_list2 = NULL;
   gh_list_elem *current, *next;
   msevent *nse = NULL;
 
@@ -148,6 +153,12 @@ int nsock_event_cancel(nsock_pool ms_pool, nsock_event_id id, int notify ) {
   case NSE_TYPE_TIMER:
     event_list = &nsp->evl.timer_events;
     break;
+#if HAVE_PCAP
+  case NSE_TYPE_PCAP_READ: 
+    event_list  = &nsp->evl.read_events;
+    event_list2 = &nsp->evl.pcap_read_events;
+    break;
+#endif
   default:
     fatal("Bogus event type in nsock_event_cancel"); break;
   }
@@ -161,6 +172,16 @@ int nsock_event_cancel(nsock_pool ms_pool, nsock_event_id id, int notify ) {
       break;
   }
 
+  if (current == NULL && event_list2){
+    event_list = event_list2;
+    for(current = GH_LIST_FIRST_ELEM(event_list); current != NULL; 
+         current = next) {
+      next = GH_LIST_ELEM_NEXT(current);
+      nse = (msevent *) GH_LIST_ELEM_DATA(current);
+      if (nse->id == id)
+        break;
+    }
+  }
   if (current == NULL)
     return 0;
 
@@ -201,10 +222,51 @@ int msevent_cancel(mspool *nsp, msevent *nse, gh_list *event_list, gh_list_elem 
   case NSE_TYPE_TIMER:
     handle_timer_result(nsp, nse, NSE_STATUS_CANCELLED);  
     break;
+#if HAVE_PCAP
+  case NSE_TYPE_PCAP_READ:
+    handle_pcap_read_result(nsp, nse, NSE_STATUS_CANCELLED);
+    break;
+#endif
+  default:
+    assert(0);
   }
 
   assert(nse->event_done);
   gh_list_remove_elem(event_list, elem);
+  if (nsp->tracelevel > 8)
+    nsock_trace(nsp, "NSE #%lu: Removing event from some event_list", nse->id);
+
+#if HAVE_PCAP
+#if PCAP_BSD_SELECT_HACK
+  if(nse->type==NSE_TYPE_PCAP_READ){
+    if (nsp->tracelevel > 8)
+      nsock_trace(nsp, "PCAP NSE #%lu: CANCELL TEST el.pcap=%x el.read=%x el.curr=%x sd=%i", 
+	    nse->id, &nsp->evl.pcap_read_events, &nsp->evl.read_events, event_list,((mspcap *) nse->iod->pcap)->pcap_desc );
+  /* If event occured, and we're in BSD_HACK mode, than this event was added
+   * to two queues. evl.read_event and evl.pcap_read_event 
+   * Of coure we should destroy it only once. 
+   * I assume we're now in evl.read_event, co just unlink this event from
+   * evl.pcap_read_event */
+
+  if(((mspcap *) nse->iod->pcap)->pcap_desc >= 0 &&
+  	event_list == &nsp->evl.read_events){
+    /* event is done, list is read_events and we're in BSD_HACK mode. 
+     * So unlink event from pcap_read_events */
+    gh_list_remove(&nsp->evl.pcap_read_events, nse); 
+    if (nsp->tracelevel > 8)
+      nsock_trace(nsp, "PCAP NSE #%lu: Removing event from PCAP_READ_EVENTS", nse->id);
+  }
+  if(((mspcap *) nse->iod->pcap)->pcap_desc >= 0 &&
+  	event_list == &nsp->evl.pcap_read_events){
+    /* event is done, list is read_events and we're in BSD_HACK mode. 
+     * So unlink event from pcap_read_events */
+    gh_list_remove(&nsp->evl.read_events, nse); 
+    if (nsp->tracelevel > 8)
+      nsock_trace(nsp, "PCAP NSE #%lu: Removing event from READ_EVENTS", nse->id);
+  }
+  }
+#endif
+#endif
 
   msevent_dispatch_and_delete(nsp, nse, notify);
 
@@ -252,7 +314,7 @@ nsock_event_id get_new_event_id(mspool *ms, enum nse_type type) {
   unsigned long serial = ms->next_event_serial++;
   unsigned long max_serial_allowed;
   int shiftbits;
-  assert(type <= 4);
+  assert(type < NSE_TYPE_MAX);
  
   shiftbits = sizeof(nsock_event_id) * 8 - TYPE_CODE_NUM_BITS;
   max_serial_allowed = ( 1 << shiftbits ) - 1;
@@ -299,6 +361,15 @@ msevent *msevent_new(mspool *nsp, enum nse_type type, msiod *msiod,
   if (type == NSE_TYPE_READ || type ==  NSE_TYPE_WRITE) {  
     filespace_init(&(nse->iobuf), 1024);
   }
+#if HAVE_SSL
+  if (type == NSE_TYPE_PCAP_READ) {
+    mspcap *mp = (mspcap *) nsi->pcap;
+    assert(mp);
+    int sz = mp->snaplen+1 + sizeof(nsock_pcap);
+    filespace_init(&(nse->iobuf), sz);
+  }
+#endif
+
   if (timeout_msecs != -1) {
     assert(timeout_msecs >= 0);
     TIMEVAL_MSEC_ADD(nse->timeout, nsock_tod, timeout_msecs);
@@ -307,6 +378,18 @@ msevent *msevent_new(mspool *nsp, enum nse_type type, msiod *msiod,
   nse->handler = handler;
   nse->userdata = userdata;
   nse->time_created = nsock_tod;
+
+  if (nsp->tracelevel > 3) {
+    if(nse->iod == NULL) {
+	  nsock_trace(nsp, "msevent_new (IOD #NULL) (EID #%li)",
+  	    nse->id);
+    } else {
+	  nsock_trace(nsp, "msevent_new (IOD #%li) (EID #%li)",
+	    nse->iod->id, 
+	    nse->id);
+    }
+  }
+
   return nse;
 }
 
@@ -317,10 +400,28 @@ msevent *msevent_new(mspool *nsp, enum nse_type type, msiod *msiod,
    remember to do this if you call msevent_delete() directly */
 void msevent_delete(mspool *nsp, msevent *nse) {
 
+  if (nsp->tracelevel > 3) {
+    if(nse->iod == NULL) {
+	  nsock_trace(nsp, "msevent_delete (IOD #NULL) (EID #%li)",
+	    nse->id);
+    } else {
+	  nsock_trace(nsp, "msevent_delete (IOD #%li) (EID #%li)",
+	    nse->iod->id, 
+	    nse->id);
+    }
+  }
+
   /* First free the IOBuf inside it if neccessary */
   if (nse->type == NSE_TYPE_READ || nse->type ==  NSE_TYPE_WRITE) {  
     fs_free(&nse->iobuf);
   }
+  #if HAVE_PCAP
+  if (nse->type == NSE_TYPE_PCAP_READ) {  
+    fs_free(&nse->iobuf);
+    if (nsp->tracelevel > 5)
+	nsock_trace(nsp, "PCAP removed %lu\n",nse->id);
+  }
+  #endif 
 
   /* Now we add the event back into the free pool */
   gh_list_prepend(&nsp->evl.free_events, nse);
@@ -337,6 +438,7 @@ const char *nse_type2str(enum nse_type type) {
   case NSE_TYPE_READ: return "READ";
   case NSE_TYPE_WRITE: return "WRITE";
   case NSE_TYPE_TIMER: return "TIMER";
+  case NSE_TYPE_PCAP_READ: return "READ-PCAP";
   default:
     return "UNKNOWN!";
   }

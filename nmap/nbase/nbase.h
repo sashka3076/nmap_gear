@@ -5,11 +5,11 @@
  * using libnbase can guarantee the availability of functions like         *
  * (v)snprintf and inet_pton.  This library also provides consistency and  *
  * extended features for some functions.  It was originally written for    *
- * use in the Nmap Security Scanner ( http://www.insecure.org/nmap/ ).     *
+ * use in the Nmap Security Scanner ( http://nmap.org ).                   *
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -42,7 +42,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -81,7 +81,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -101,7 +101,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase.h 3899 2006-08-29 05:42:35Z fyodor $ */
+/* $Id: nbase.h 6860 2008-02-28 18:52:22Z fyodor $ */
 
 #ifndef NBASE_H
 #define NBASE_H
@@ -122,7 +122,7 @@
  *   will generally be one of the following: LINUX, FREEBSD, NETBSD,
  *   OPENBSD, SOLARIS, SUNOS, BSDI, IRIX, NETBSD
  *
- * * Insures that GNU getopt_* functions exist (such as getopt_long_only
+ * * Insures that getopt_* functions exist (such as getopt_long_only)
  *
  * * Various string functions such as Strncpy() and strcasestr() see protos 
  *   for more info.
@@ -270,17 +270,12 @@ extern "C" int snprintf (char *, size_t, const char *, ...);
 extern "C" int vsnprintf (char *, size_t, const char *, va_list);
 #endif
 
-/* GNU getopt replacements ... Anyone have a BSD licensed version of these? */
 #ifdef HAVE_GETOPT_H
 #include <getopt.h>
 #else
-/* The next half-dozen lines are from gcc-2.95 ... -Fyodor */
-/* Include getopt.h for the sake of getopt_long.
-   We don't need the declaration of getopt, and it could conflict
-   with something from a system header file, so effectively nullify that.  */
-#define getopt getopt_loser
+#ifndef HAVE_GETOPT_LONG_ONLY
 #include "getopt.h"
-#undef getopt
+#endif
 #endif /* HAVE_GETOPT_H */
 
 /* More Windows-specific stuff */
@@ -293,6 +288,18 @@ extern "C" int vsnprintf (char *, size_t, const char *, va_list);
 #define S_ISDIR(m)      (((m) & _S_IFMT) == _S_IFDIR)
 #endif
 
+/* Windows doesn't have the access() defines */
+#ifndef F_OK
+#define F_OK 00
+#endif
+#ifndef W_OK
+#define W_OK 02
+#endif
+#ifndef R_OK
+#define R_OK 04
+#endif
+
+#define access _access
 #define stat _stat /* wtf was ms thinking? */
 #define execve _execve
 #define getpid _getpid
@@ -373,6 +380,10 @@ unsigned int sleep(unsigned int seconds);
    it must truncate */
 int Strncpy(char *dest, const char *src, size_t n);
 
+int Vsnprintf(char *, size_t, const char *, va_list)
+     __attribute__ ((format (printf, 3, 0)));
+int Snprintf(char *, size_t, const char *, ...)
+     __attribute__ ((format (printf, 3, 4)));
 
 /* Trivial function that returns nonzero if all characters in str of
    length strlength are printable (as defined by isprint()) */
@@ -380,6 +391,10 @@ int stringisprintable(const char *str, int strlength);
 
 /* Convert non-printable characters to replchar in the string */
 void replacenonprintable(char *str, int strlength, char replchar);
+
+/* Portable, incompatible replacements for dirname and basename. */
+char *path_get_dirname(const char *path);
+char *path_get_basename(const char *path);
 
 /* A few simple wrappers for the most common memory allocation routines which will exit() if the
 	allocation fails, so you don't always have to check -- see nbase_memalloc.c */

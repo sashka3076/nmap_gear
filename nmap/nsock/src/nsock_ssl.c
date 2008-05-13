@@ -7,7 +7,7 @@
  *                                                                         *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
- * The nsock parallel socket event library is (C) 1999-2006 Insecure.Com   *
+ * The nsock parallel socket event library is (C) 1999-2008 Insecure.Com   *
  * LLC This library is free software; you may redistribute and/or          *
  * modify it under the terms of the GNU General Public License as          *
  * published by the Free Software Foundation; Version 2.  This guarantees  *
@@ -37,7 +37,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * insecure.org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -56,7 +56,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_ssl.c 3870 2006-08-25 01:47:53Z fyodor $ */
+/* $Id: nsock_ssl.c 6859 2008-02-28 18:52:17Z fyodor $ */
 
 
 #include "nsock.h"
@@ -123,7 +123,7 @@ void Nsock_SSL_Init() {
   SSL_CTX_set_session_cache_mode(
      sslnfo->ctx,  SSL_SESS_CACHE_OFF | SSL_SESS_CACHE_NO_AUTO_CLEAR );
   SSL_CTX_sess_set_cache_size( sslnfo->ctx, 1 ); 
-  SSL_CTX_set_timeout( sslnfo->ctx, 3600); // pretty unnecessary
+  SSL_CTX_set_timeout( sslnfo->ctx, 3600); /* pretty unnecessary */
 
 }
 

@@ -6,7 +6,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -39,7 +39,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -78,7 +78,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.h 4018 2006-09-30 21:08:04Z fyodor $ */
+/* $Id: nmap.h 7301 2008-05-03 08:22:18Z fyodor $ */
 
 #ifndef NMAP_H
 #define NMAP_H
@@ -110,7 +110,7 @@
 #endif
 
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+#include "nmap_config.h"
 #else
 #ifdef WIN32
 #include "nmap_winconfig.h"
@@ -159,16 +159,15 @@ void *realloc();
 #include <sys/param.h> /* Defines MAXHOSTNAMELEN on BSD*/
 #endif
 
-/* Linux uses these defines in netinet/ip.h and netinet/tcp.h to
-   use the correct struct ip and struct tcphdr */
+/* Linux uses these defines in netinet/ip.h to use the correct struct ip */
 #ifndef __FAVOR_BSD
 #define __FAVOR_BSD
 #endif
 #ifndef __USE_BSD
 #define __USE_BSD
 #endif
-#ifndef __BSD_SOURCE
-#define __BSD_SOURCE
+#ifndef _BSD_SOURCE
+#define _BSD_SOURCE
 #endif
 
 /* BSDI needs this to insure the correct struct ip */
@@ -230,13 +229,6 @@ void *realloc();
 
 #include <math.h>
 #include <assert.h>
-#ifndef __FAVOR_BSD
-#define __FAVOR_BSD
-#endif
-#ifndef NETINET_TCP_H  /* why does OpenBSD not do this? */
-#include <netinet/tcp.h>          /*#include <netinet/ip_tcp.h>*/
-#define NETINET_TCP_H
-#endif
 
 #if HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>
@@ -258,21 +250,18 @@ void *realloc();
 
 /*******  DEFINES  ************/
 
+#ifndef NMAP_VERSION
+/* Edit this definition only within the quotes, because it is read from this
+   file by the makefiles. */
+#define NMAP_VERSION "4.62"
+#define NMAP_NUM_VERSION "4.62.0.0"
+#endif
+
 /* User configurable #defines: */
-#ifndef VERSION
-#define VERSION "1.60-Beta"
-#endif
-#ifndef DEBUGGING
-#define DEBUGGING 0
-#endif
 #define MAX_PROBE_PORTS 10     /* How many TCP probe ports are allowed ? */
 /* Default number of ports in parallel.  Doesn't always involve actual 
    sockets.  Can also adjust with the -M command line option.  */
 #define MAX_SOCKETS 36 
-/* How many hosts do we ping in parallel to see if they are up? Note that this is
-   divided by the num probes per host */
-#define LOOKAHEAD 30
- /*How many seconds before we give up on a host being alive? */
 
 #define FAKE_ARGV "pine" /* What ps and w should show if you use -q */
 /* How do we want to log into ftp sites for */ 
@@ -283,11 +272,14 @@ void *realloc();
 #define MAX_TIMEOUTS MAX_SOCKETS   /* How many timed out connection attempts 
 				      in a row before we decide the host is 
 				      dead? */
-#define DEFAULT_TCP_PROBE_PORT 80 /* The port TCP probes go to if unspecified
-				      by user -- uber hackers change this
-				      to 113 */
-#define DEFAULT_UDP_PROBE_PORT 31338 /* The port UDP probes (esp. "ping" probes) go to if unspecified
-				     by user */
+#define DEFAULT_TCP_PROBE_PORT_SPEC "80" /* The ports TCP probes go to if
+                                            unspecified by user -- uber hackers
+                                            change this to 113 */
+#define DEFAULT_UDP_PROBE_PORT_SPEC "31338" /* The port UDP probes (esp. "ping"
+                                               probes) go to if unspecified by
+                                               user */
+#define DEFAULT_PROTO_PROBE_PORT_SPEC "1,2,4" /* The IPProto ping probes to use
+                                                 if unspecified by user */
 
 #define MAX_DECOYS 128 /* How many decoys are allowed? */
 
@@ -325,18 +317,16 @@ void *realloc();
 #define MAX_RETRANSMISSIONS 10    /* 11 probes to port at maximum */
 #endif
 
-/* If nmap is called with one of the names below, it will start up in interactive mode -- alternatively, you can rename Nmap any of the following names to have it start up interactivey by default.  */
-#define INTERACTIVE_NAMES { "BitchX", "Calendar", "X", "awk", "bash", "bash2", "calendar", "cat", "csh", "elm", "emacs", "ftp", "fvwm", "g++", "gcc", "gimp", "httpd", "irc", "man", "mutt", "nc", "ncftp", "netscape", "perl", "pine", "ping", "sleep", "slirp", "ssh", "sshd", "startx", "tcsh", "telnet", "telnetd", "tia", "top", "vi", "vim", "xdvi", "xemacs", "xterm", "xv" }
-
 /* Number of hosts we pre-ping and then scan.  We do a lot more if
    randomize_hosts is set.  Every one you add to this leads to ~1K of
    extra always-resident memory in nmap */
-#define PING_GROUP_SZ 2048
+#define PING_GROUP_SZ 4096
 
 /* DO NOT change stuff after this point */
 #define UC(b)   (((int)b)&0xff)
 #define SA    struct sockaddr  /*Ubertechnique from R. Stevens */
 
+#define HOST_UNKNOWN 0
 #define HOST_UP 1
 #define HOST_DOWN 2 
 #define HOST_FIREWALLED 4 
@@ -350,17 +340,16 @@ void *realloc();
 #define PINGTYPE_TCP  16
 #define PINGTYPE_TCP_USE_ACK 32
 #define PINGTYPE_TCP_USE_SYN 64
-#define PINGTYPE_RAWTCP 128
+/* # define PINGTYPE_RAWTCP 128 used to be here, but was never used. */
 #define PINGTYPE_CONNECTTCP 256
 #define PINGTYPE_UDP  512
 #define PINGTYPE_ARP 1024
+#define PINGTYPE_PROTO 2048
 
 #define DEFAULT_PING_TYPES PINGTYPE_TCP|PINGTYPE_TCP_USE_ACK|PINGTYPE_ICMP_PING
 
 /* OS scan */
 #define OS_SCAN_DEFAULT 9
-#define OS_SCAN_SYS_1_ONLY 1
-#define OS_SCAN_SYS_2_ONLY 2
 
 /* How many syn packets do we send to TCP sequence a host? */
 #define NUM_SEQ_SAMPLES 6
@@ -368,15 +357,6 @@ void *realloc();
 /* The max length of each line of the subject fingerprint when
    wrapped. */
 #define FP_RESULT_WRAP_LINE_LEN 74
-
-/* TCP/IP ISN sequence prediction classes */
-#define SEQ_UNKNOWN 0
-#define SEQ_64K 1
-#define SEQ_TD 2
-#define SEQ_RI 4
-#define SEQ_TR 8
-#define SEQ_i800 16
-#define SEQ_CONSTANT 32
 
 /* TCP Timestamp Sequence */
 #define TS_SEQ_UNKNOWN 0
@@ -407,19 +387,7 @@ void *realloc();
 
 /********************** LOCAL INCLUDES *****************************/
 
-#include "output.h"
-#include "portlist.h"
-#include "tcpip.h"
 #include "global_structures.h"
-#include "nmap_error.h"
-#include "utils.h"
-#include "services.h"
-#include "protocols.h"
-#include "nmap_rpc.h"
-#include "targets.h"
-#include "Target.h"
-#include "TargetGroup.h"
-#include "service_scan.h"
 
 /***********************STRUCTURES**********************************/
 
@@ -433,7 +401,9 @@ void printinteractiveusage();
 int ftp_anon_connect(struct ftpinfo *ftp);
 
 /* port manipulators */
-struct scan_lists *getpts(char *expr); /* someone stole the name getports()! */
+struct scan_lists *getpts(const char *expr); /* someone stole the name getports()! */
+void getpts_simple(const char *origexpr, int range_type,
+                   unsigned short **list, int *count);
 void free_scan_lists(struct scan_lists *ports);
 
 /* socket manipulation functions */
@@ -446,21 +416,22 @@ void nmap_free_mem();
 
 /* general helper functions */
 int parse_targets(struct targets *targets, char *h);
-char *statenum2str(int state);
-char *scantype2str(stype scantype);
+const char *statenum2str(int state);
+const char *scantype2str(stype scantype);
 void sigdie(int signo);
 void reaper(int signo);
 char *seqreport(struct seq_info *seq);
 char *seqreport1(struct seq_info *seq);
-char *seqclass2ascii(int clas);
-char *ipidclass2ascii(int seqclass);
-char *tsseqclass2ascii(int seqclass);
+const char *seqclass2ascii(int clas);
+const char *ipidclass2ascii(int seqclass);
+const char *tsseqclass2ascii(int seqclass);
 
 /* Convert a TCP sequence prediction difficulty index like 1264386
    into a difficulty string like "Worthy Challenge */
 const char *seqidx2difficultystr(unsigned long idx);
 const char *seqidx2difficultystr1(unsigned long idx);
-int nmap_fetchfile(char *filename_returned, int bufferlen, char *file);
+int nmap_fetchfile(char *filename_returned, int bufferlen, const char *file);
+int nmap_fileexistsandisreadable(char* pathname);
 int gather_logfile_resumption_state(char *fname, int *myargc, char ***myargv);
 
 #endif /* NMAP_H */

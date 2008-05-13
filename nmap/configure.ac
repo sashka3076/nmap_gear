@@ -5,7 +5,7 @@ dnl Process this file with autoconf to produce a configure script.
 AC_INIT(nmap.cc)
 
 AC_ARG_WITH(localdirs,
-  [  --with-localdirs        Explicitly ask compiler to use /usr/local/{include,libs} if they exist ],
+AC_HELP_STRING([--with-localdirs], [Explicitly ask compiler to use /usr/local/{include,libs} if they exist ]),
   [ case "$with_localdirs" in
       yes)
         user_localdirs=1
@@ -33,8 +33,12 @@ AC_SUBST(libpcapdir)
 pcredir=libpcre
 AC_SUBST(pcredir)
 
-dnl use config.h instead of -D macros
-AC_CONFIG_HEADER(config.h)
+dnl use nmap_config.h instead of -D macros
+AC_CONFIG_HEADER(nmap_config.h)
+
+dnl Host specific hacks
+AC_CANONICAL_HOST
+AC_C_INLINE
 
 dnl Checks for programs.
 AC_PROG_CC
@@ -44,10 +48,9 @@ AC_PROG_CXX
  fi
 AC_CHECK_PROG(CXXPROG, "$CXX", "AVAILABLE", "MISSING", "$PATH":/)
 if test $CXXPROG = "MISSING"; then
-  AC_MSG_ERROR([Could not locate a C++ compiler. If it exists, add it to your PATH or give configure the CXX=path_to_compiler argument.  Otherwise, install a C++ compiler such as g++ or install a binary package of Nmap (see http://www.insecure.org/nmap/nmap_download.html ))])
+  AC_MSG_ERROR([Could not locate a C++ compiler. If it exists, add it to your PATH or give configure the CXX=path_to_compiler argument.  Otherwise, install a C++ compiler such as g++ or install a binary package of Nmap (see http://nmap.org/download.html ))])
 fi
 
-nmap_gcc_major_version=0
 AC_MSG_CHECKING([whether the compiler is gcc 4 or greater])
 if test x"$GXX" = xno; then
   AC_MSG_RESULT([no])
@@ -58,63 +61,53 @@ else
   else
     our_gcc="$ac_cv_prog_CC"
   fi
-  # new major versions must be added here
+
+  nmap_gcc_major_version=0
   case `$our_gcc --version | sed -e 's,\..*,.,' -e q` in
     *4.)
       nmap_gcc_major_version=4
       ;;
-    *3.)
-      nmap_gcc_major_version=3
-      ;;
-    *2.)
-      nmap_gcc_major_version=2
-      ;;
-    *1.)
-      nmap_gcc_major_version=1
-      ;;
   esac
-  if test "$nmap_gcc_major_version" -ge 4; then
+
+  if test 4 -ge $nmap_gcc_major_version; then
     AC_MSG_RESULT([yes])
+    CXXFLAGS="$CXXFLAGS -fno-strict-aliasing"
   else
     AC_MSG_RESULT([no])
   fi
 fi
 
 # Remember that all following tests will run with this CXXFLAGS by default
-if test "$nmap_gcc_major_version" -ge 4; then
-  CXXFLAGS="$CXXFLAGS -fno-strict-aliasing"
-fi
-
-dnl AC_PROG_INSTALL
-dnl AC_PATH_PROG(MAKEDEPEND, makedepend)
-
-dnl Checks for typedefs, structures, and compiler characteristics.
-
-dnl check for void should be put in
-dnl AC_MSG_CHECKING(for void)
-dnl AC_TRY_COMPILE(, [void *foo = 0;], 
-dnl [AC_MSG_RESULT(yes); AC_DEFINE(HAVE_VOID)], [AC_MSG_RESULT(no)])
-
-dnl so should check for 'const'
-dnl AC_MSG_CHECKING(for const)
-dnl AC_TRY_COMPILE(, [const int foo = 0;], 
-dnl [AC_MSG_RESULT(yes); AC_DEFINE(HAVE_CONST)], [AC_MSG_RESULT(no)])
-
-dnl equiv to '#define inline' to 'inline', '__inline__', '__inline' or ''
-AC_C_INLINE
-if test -n "$sgi_cc"; then
-   AC_DEFINE(inline, )
+AC_MSG_CHECKING(for __func__)
+AC_TRY_COMPILE([
+#include <stdio.h>
+],[printf ("%s", __func__);],
+have_func=yes, have_func=no)
+if test "x$have_func" = "xyes"; then
+   AC_MSG_RESULT(yes)
+else
+   AC_MSG_RESULT(no)
+   AC_MSG_CHECKING(for __FUNCTION__)
+   AC_TRY_COMPILE([
+#include <stdio.h>
+],[printf ("%s", __FUNCTION__);],
+have_function=yes, have_function=no)
+   if test "x$have_function" = "xyes"; then
+      AC_MSG_RESULT(yes)
+      AC_DEFINE(__func__, __FUNCTION__)
+   else
+      AC_MSG_RESULT(no)
+      AC_DEFINE(__func__, __FILE__)
+   fi
 fi
 
 AC_SUBST(COMPAT_OBJS)
 AC_SUBST(COMPAT_SRCS)
 
-dnl Host specific hacks
-AC_CANONICAL_HOST
+AC_PATH_TOOL([STRIP], [strip], [/bin/true])
 
-linux=no
-macosx=no
 needs_cpp_precomp=no
+LUAFLAGS="MYCFLAGS=\"$CFLAGS -DLUA_USE_POSIX -DLUA_USE_DLOPEN\""
 
 case "$host" in
   *alpha-dec-osf*)
@@ -122,21 +115,22 @@ case "$host" in
     ;;
   *-netbsd* | *-knetbsd*-gnu)
     AC_DEFINE(NETBSD)
+    LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
     ;;
   *-openbsd*)
     AC_DEFINE(OPENBSD)
+    LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
     ;;
-  *-sgi-irix5*)
-    AC_DEFINE(IRIX)
-    if test -z "$GCC"; then
-      sgi_cc=yes
-    fi
+  *-freebsd* | *-kfreebsd*-gnu | *-dragonfly*)
+    AC_DEFINE(FREEBSD)
+    LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
     ;;
-  *-sgi-irix6*)
+  *-bsdi*)
+    AC_DEFINE(BSDI)
+    LUAFLAVOR=bsd
+    ;;
+  *-sgi-irix5* | *-sgi-irix6*)
     AC_DEFINE(IRIX)
-    if test -z "$GCC"; then
-      sgi_cc=yes
-    fi
     ;;
   *-hpux*)
     AC_DEFINE(HPUX)
@@ -144,30 +138,7 @@ case "$host" in
     # on HP-UX 11.11 (other versions?) Mikhail Zakharov (zmey20000@yahoo.com)
     AC_CHECK_LIB(nm, open_mib)
     ;;
-  *-solaris2.0*)  
-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
-    AC_DEFINE(SOLARIS)
-    ;;
-  *-solaris2.[[1-9]][[0-9]]*)
-    AC_DEFINE(SOLARIS)
-    ;;
-  *-solaris2.1*)
-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
-    AC_DEFINE(SOLARIS)
-    ;;
-  *-solaris2.2*)
-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
-    AC_DEFINE(SOLARIS)
-    ;;
-  *-solaris2.3*)
-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
-    AC_DEFINE(SOLARIS)
-    ;;
-  *-solaris2.4*)
-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
-    AC_DEFINE(SOLARIS)
-    ;;
-  *-solaris2.5.1)
+  *-solaris2.0* | *-solaris2.1* | *-solaris2.2* | *-solaris2.3* | *-solaris2.4* | *-solaris2.5.1 )  
     AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
     AC_DEFINE(SOLARIS)
     ;;
@@ -179,91 +150,63 @@ case "$host" in
     AC_DEFINE(SPRINTF_RETURNS_STRING)
     ;;
   *-linux*)
-    linux=yes
     AC_DEFINE(LINUX)
-    AC_DEFINE(PCAP_TIMEOUT_IGNORED)  # libpcap doesn't even LOOK at
-                                     # the timeout you give it under Linux
-    ;;
-  *-freebsd* | *-kfreebsd*-gnu | *-dragonfly*)
-    AC_DEFINE(FREEBSD)
-    ;;
-  *-bsdi*)
-    AC_DEFINE(BSDI)
+    AC_DEFINE(PCAP_TIMEOUT_IGNORED)  # libpcap doesn't even LOOK at the timeout you give it under Linux
+    LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
     ;;
   *-apple-darwin*)
-    macosx=yes
     AC_DEFINE(MACOSX)
+    dnl on Mac OSX the math library seems to contain unwanted getopt cruft
+    AC_CHECK_LIB(m, main)
+    LUAFLAGS="MYCFLAGS=\"$CFLAGS -DLUA_USE_MACOSX\""
     needs_cpp_precomp=yes
     ;;
+  *)
+   LUAFLAGS="MYCFLAGS=\"$CFLAGS -DLUA_USE_POSIX -DLUA_USE_DLOPEN\""
 esac
 
-dnl Checks for header files.
-AC_HEADER_STDC
-AC_CHECK_HEADERS(string.h getopt.h strings.h memory.h sys/param.h sys/sockio.h bstring.h sys/time.h sys/stat.h fcntl.h termios.h pwd.h unistd.h )
-AC_CHECK_HEADERS(netinet/in.h)
-AC_CHECK_HEADERS(sys/socket.h)
-AC_CHECK_HEADERS([net/if.h],[],[],
-[#if HAVE_SYS_TYPES_H
-# include <sys/types.h>
-# endif
-#if HAVE_NETINET_IN_H
-# include <netinet/in.h>
-# endif
-#if HAVE_SYS_SOCKET_H
-# include <sys/socket.h>
-# endif
-])
-AC_CHECK_HEADERS([netinet/if_ether.h],[],[],
-[#if HAVE_SYS_TYPES_H
-# include <sys/types.h>
-# endif
-#if HAVE_NETINET_IN_H
-# include <netinet/in.h>
-# endif
-# if HAVE_SYS_SOCKET_H
-# include <sys/socket.h>
-# endif
-# if HAVE_NET_IF_H
-# include <net/if.h>
-# endif
-])
-AC_HEADER_TIME
+AC_SUBST(LUAFLAGS)
 
-dnl Checks for libraries.
-dnl AC_CHECK_LIB(m, pow)
-dnl on Mac OSX the math library seems to contain unwanted getopt cruft
-if test $macosx = no; then
-  AC_CHECK_LIB(m, main)
-fi
+dnl Checks for header files.
+AC_CHECK_HEADERS(pwd.h termios.h sys/sockio.h)
 
 dnl If any socket libraries needed
-AC_SEARCH_LIBS(gethostent, nsl)
 AC_SEARCH_LIBS(setsockopt, socket)
+AC_SEARCH_LIBS(gethostbyname, nsl)
 
-dnl need posix4/nanosleep for solaris 2.4
-AC_SEARCH_LIBS(nanosleep, posix4)
+# Do they want Zenmap?
+AC_ARG_WITH(zenmap, AC_HELP_STRING([--without-zenmap], [Skip installation of the Zenmap graphical frontend]), [], [with_zenmap=check])
 
-# By default, try to build nmapfe if possible
-test "${with_nmapfe+set}" != "set" && with_nmapfe=yes
- 
-TARGETNMAPFE=nmapfe/nmapfe
-INSTALLNMAPFE=install-nmapfe
-AC_ARG_WITH(nmapfe, [  --without-nmapfe    skip nmapfe X-window GUI],
- [  case "$with_nmapfe" in
-  no)
-    TARGETNMAPFE=""; INSTALLNMAPFE=""
-    ;;
-  esac]
-)
-AC_SUBST(TARGETNMAPFE)
-AC_SUBST(INSTALLNMAPFE)
+if test "$with_zenmap" != "no"; then
+  AM_PATH_PYTHON([2.4], [],
+  [if test "$with_zenmap" = "check"; then
+     AC_MSG_WARN([Not building Zenmap because Python 2.4 or later was not found])
+   else
+     AC_MSG_FAILURE([--with-zenmap requires Python 2.4 or later])
+   fi
+   with_zenmap=no])
+fi
+if test "$with_zenmap" = "no"; then
+  BUILDZENMAP=""
+  INSTALLZENMAP=""
+  ZENMAP_CLEAN=""
+  ZENMAP_DIST_CLEAN=""
+else
+  BUILDZENMAP=build-zenmap
+  INSTALLZENMAP=install-zenmap
+  ZENMAP_CLEAN=zenmap_clean
+  ZENMAP_DIST_CLEAN=zenmap_dist_clean
+fi
+AC_SUBST(BUILDZENMAP)
+AC_SUBST(INSTALLZENMAP)
+AC_SUBST(ZENMAP_CLEAN)
+AC_SUBST(ZENMAP_DIST_CLEAN)
 
-# First we test whether they specified openssl desires explicitly
+# We test whether they specified openssl desires explicitly
 use_openssl="yes"
 specialssldir=""
-
 AC_ARG_WITH(openssl,
-[  --with-openssl=DIR    Use optional openssl libs and includes from [DIR]/lib/ and [DIR]/include/openssl/)],
+AC_HELP_STRING([--with-openssl=DIR],[Use optional openssl libs and includes from [DIR]/lib/ and [DIR]/include/openssl/)]),
 [  case "$with_openssl" in
   yes)
     ;;
@@ -272,7 +215,7 @@ AC_ARG_WITH(openssl,
     ;;
   *)
     specialssldir="$with_openssl"
-    CXXFLAGS="$CXXFLAGS -I$with_openssl/include"
+    CPPFLAGS="$CPPFLAGS -I$with_openssl/include"
     LDFLAGS="$LDFLAGS -L$with_openssl/lib"
     ;;
   esac]
@@ -283,18 +226,6 @@ if test "$use_openssl" = "yes" -a -z "$specialssldir"; then
   AC_CHECK_HEADER(openssl/ssl.h,,
   [ use_openssl="no"
     AC_MSG_WARN([Failed to find openssl/ssl.h so OpenSSL will not be used. If it is installed you can try the --with-openssl=DIR argument]) ])
-
- if test "$use_openssl" = "yes"; then
-   AC_CHECK_HEADER(openssl/err.h,,
-    [ use_openssl="no"
-    AC_MSG_WARN([Failed to find openssl/err.h so OpenSSL will not be used. If it is installed you can try the --with-openssl=DIR argument]) ])
- fi
-
- if test "$use_openssl" = "yes"; then
-   AC_CHECK_HEADER(openssl/rand.h,,
-    [ use_openssl="no"
-    AC_MSG_WARN([Failed to find openssl/rand.h so OpenSSL will not be used. If it is installed you can try the --with-openssl=DIR argument]) ])
- fi
 
 # use_openssl="yes" given explicitly in next 2 rules to avoid adding lib to $LIBS
  if test "$use_openssl" = "yes"; then
@@ -308,7 +239,8 @@ if test "$use_openssl" = "yes" -a -z "$specialssldir"; then
    AC_CHECK_LIB(ssl, SSL_new,
     [ use_openssl="yes" ],
     [ use_openssl="no"
-    AC_MSG_WARN([Failed to find libssl so OpenSSL will not be used. If it is installed you can try the --with-openssl=DIR argument]) ])
+    AC_MSG_WARN([Failed to find libssl so OpenSSL will not be used. If it is installed you can try the --with-openssl=DIR argument]) ],
+    [ -lcrypto ])
  fi
 fi
 
@@ -327,7 +259,8 @@ have_libpcap=no
 test "${with_libpcap+set}" != "set" && with_libpcap=yes
 
 AC_ARG_WITH(libpcap,
-[  --with-libpcap[=DIR]    Look for pcap in DIR/include and DIR/libs. Specify --with-libpcap=included to always use version included with Nmap],
+AC_HELP_STRING([--with-libpcap=DIR], [Look for pcap in DIR/include and DIR/libs.])
+AC_HELP_STRING([--with-libpcap=included], [Always use version included with Nmap]),
 [  case "$with_libpcap" in
   yes)
     AC_CHECK_HEADER(pcap.h,[
@@ -341,7 +274,7 @@ AC_ARG_WITH(libpcap,
     _cppflags=$CXXFLAGS
     _ldflags=$LDFLAGS
 
-    CXXFLAGS="-I$with_libpcap/include $CXXFLAGS"
+    CPPFLAGS="-I$with_libpcap/include $CPPFLAGS"
     LDFLAGS="-L$with_libpcap/lib $LDFLAGS"
 
     AC_CHECK_HEADER(pcap.h,[
@@ -356,10 +289,6 @@ AC_ARG_WITH(libpcap,
   esac]
 )
 
-#if test $linux = yes; then
-#  have_libpcap=no
-#fi
-
 if test $needs_cpp_precomp = yes; then
   CXXFLAGS="-no-cpp-precomp $CXXFLAGS"
 fi
@@ -369,7 +298,7 @@ if test $have_libpcap = yes; then
     _cflags=$CXXFLAGS
     _ldflags=$LDFLAGS
 
-    CXXFLAGS="-I$LIBPCAP_INC $CXXFLAGS"
+    CPPFLAGS="-I$LIBPCAP_INC $CPPFLAGS"
     LDFLAGS="-L$LIBPCAP_LIB $LDFLAGS"
   fi
 
@@ -392,35 +321,40 @@ int main() {
   exit(0);
 }],
 [AC_MSG_RESULT(yes); have_libpcap=yes],
-[AC_MSG_RESULT(no); have_libpcap=no],
 [AC_MSG_RESULT(no); have_libpcap=no])
 LIBS="$LIBS_OLD"
 fi
 
-
 LIBPCAP_LIBS="-lpcap"
 if test $have_libpcap = yes; then
   PCAP_DEPENDS=""
+  PCAP_BUILD=""
   PCAP_CLEAN=""
   PCAP_DIST_CLEAN=""
   AC_DEFINE(HAVE_LIBPCAP)
 else
   if test "${LIBPCAP_INC+set}" = "set"; then
     LDFLAGS="-L$libpcapdir $_ldflags"
-    CXXFLAGS="$_cflags -I$LIBPCAP_INC"
+    CPPFLAGS="$CPPFLAGS -I$LIBPCAP_INC"
   else
     LDFLAGS="-L$libpcapdir $LDFLAGS"
-    CXXFLAGS="$CXXFLAGS -I$libpcapdir"
+    CPPFLAGS="$CPPFLAGS -I$libpcapdir"
   fi
   PCAP_DEPENDS='$(LIBPCAPDIR)/libpcap.a'
+  PCAP_BUILD="pcap_build"
   PCAP_CLEAN="pcap_clean"
   PCAP_DIST_CLEAN="pcap_dist_clean"
 fi
 
 AC_SUBST(PCAP_DEPENDS)
+AC_SUBST(PCAP_BUILD)
 AC_SUBST(PCAP_CLEAN)
 AC_SUBST(PCAP_DIST_CLEAN)
 AC_SUBST(LIBPCAP_LIBS)
+
+if test $have_libpcap != yes ; then
+        AC_CONFIG_SUBDIRS(libpcap)
+fi
 
 have_pcre=no
 requested_included_pcre=no
@@ -428,7 +362,8 @@ LIBPCREDIR=libpcre
 
 # First we test whether they specified libpcre explicitly
 AC_ARG_WITH(libpcre,
-[  --with-libpcre=DIR    Use an existing (compiled) pcre lib from DIR/include and DIR/lib.  Specify --with-libpcre=included to always use the version included with Nmap],
+AC_HELP_STRING([--with-libpcre=DIR], [Use an existing (compiled) pcre lib from DIR/include and DIR/lib.])
+AC_HELP_STRING([--with-libpcre=included], [Always use the version included with Nmap]),
 [  case "$with_libpcre" in
   yes)
     ;;
@@ -436,7 +371,7 @@ AC_ARG_WITH(libpcre,
     requested_included_pcre=yes
     ;;
   *)
-    CXXFLAGS="-I$with_libpcre/include $CXXFLAGS"
+    CPPFLAGS="-I$with_libpcre/include $CPPFLAGS"
     LDFLAGS="-L$with_libpcre/lib $LDFLAGS"
     have_pcre=yes
     ;;
@@ -447,7 +382,7 @@ AC_ARG_WITH(libpcre,
 if test $have_pcre != yes -a $requested_included_pcre != yes ; then
   AC_CHECK_HEADER(pcre.h,
     AC_CHECK_LIB(pcre, pcre_version, [have_pcre=yes ]),
-    [AC_CHECK_HEADERS(pcre/pcre.h, 
+    [AC_CHECK_HEADER(pcre/pcre.h, 
       [AC_CHECK_LIB(pcre, pcre_version, [have_pcre=yes])]
     )]
   )
@@ -456,14 +391,18 @@ fi
 # If we still don't have it, we use our own
 if test $have_pcre != yes ; then
   AC_CONFIG_SUBDIRS( libpcre )
-  CXXFLAGS="-I$LIBPCREDIR $CXXFLAGS"
+  CPPFLAGS="-I$LIBPCREDIR $CPPFLAGS"
   LIBPCRE_LIBS="$LIBPCREDIR/libpcre.a"
   PCRE_DEPENDS="$LIBPCREDIR/libpcre.a"
+  PCRE_BUILD="pcre_build"
   PCRE_CLEAN="pcre_clean"
   PCRE_DIST_CLEAN="pcre_dist_clean"
 else
+# We only need to check for and use this if we are NOT using included pcre
+  AC_CHECK_HEADERS(pcre/pcre.h)
   LIBPCRE_LIBS="-lpcre"
   PCRE_DEPENDS=""
+  PCRE_BUILD=""
   PCRE_CLEAN=""
   PCRE_DIST_CLEAN=""
 fi
@@ -471,6 +410,7 @@ fi
 AC_SUBST(LIBPCRE_LIBS)
 AC_SUBST(LIBPCREDIR)
 AC_SUBST(PCRE_DEPENDS)
+AC_SUBST(PCRE_BUILD)
 AC_SUBST(PCRE_CLEAN)
 AC_SUBST(PCRE_DIST_CLEAN)
 
@@ -478,16 +418,21 @@ have_dnet=no
 requested_included_dnet=no
 LIBDNETDIR=libdnet-stripped
 
-# First we test whether they specified libdnet explicitly
+# First we test whether they specified libdnet explicitly.
+# Unlike the other included libraries (pcap, pcre, lua), we prefer our local
+# copy of libdnet. That is, with the other libraries we check for a system
+# version by default, whereas with dnet we use the local version unless
+# specifically asked to use a system version.
 AC_ARG_WITH(libdnet,
-[  --with-libdnet=DIR    Use an existing (compiled) dnet lib from DIR/include and DIR/lib.],
+AC_HELP_STRING([--with-libdnet=DIR], [Use an existing (compiled) dnet lib from DIR/include and DIR/lib.])
+AC_HELP_STRING([--with-libdnet=included], [Use the libdnet version included with Nmap (default)]),
 [  case "$with_libdnet" in
   yes)
     ;;
   included)
     ;;
   *)
-    CXXFLAGS="-I$with_libdnet/include $CXXFLAGS"
+    CPPFLAGS="-I$with_libdnet/include $CPPFLAGS"
     LDFLAGS="-L$with_libdnet/lib $LDFLAGS"
     have_dnet=yes
     ;;
@@ -497,14 +442,16 @@ AC_ARG_WITH(libdnet,
 # If they didn't provide location, we use the included one
 if test $have_dnet != yes ; then
   AC_CONFIG_SUBDIRS( libdnet-stripped )
-  CXXFLAGS="-I$LIBDNETDIR/include $CXXFLAGS"
+  CPPFLAGS="-I$LIBDNETDIR/include $CPPFLAGS"
   LIBDNET_LIBS="$LIBDNETDIR/src/.libs/libdnet.a"
   DNET_DEPENDS="$LIBDNETDIR/src/.libs/libdnet.a"
+  DNET_BUILD="dnet_build"
   DNET_CLEAN="dnet_clean"
   DNET_DIST_CLEAN="dnet_dist_clean"
 else
   LIBDNET_LIBS="-ldnet"
   DNET_DEPENDS=""
+  DNET_BUILD=""
   DNET_CLEAN=""
   DNET_DIST_CLEAN=""
 fi
@@ -512,54 +459,110 @@ fi
 AC_SUBST(LIBDNET_LIBS)
 AC_SUBST(LIBDNETDIR)
 AC_SUBST(DNET_DEPENDS)
+AC_SUBST(DNET_BUILD)
 AC_SUBST(DNET_CLEAN)
 AC_SUBST(DNET_DIST_CLEAN)
 
-dnl AC_HEADER_TIME
+LIBLUADIR=liblua
 
-AC_MSG_CHECKING([struct ip])
-AC_TRY_COMPILE([#include <sys/types.h>
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>],
-               [struct ip ip;],
-               [AC_MSG_RESULT(yes); bsd_networking=yes],
-               [AC_MSG_RESULT(no); bsd_networking=no]);
-if test $bsd_networking = yes; then
+have_lua=no
+requested_included_lua=no
+no_lua=no
 
-  AC_DEFINE(BSD_NETWORKING)
-  AC_MSG_CHECKING([ip_v in struct ip])
-  AC_TRY_COMPILE([#include <sys/types.h>
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>],
-                 [struct ip ip; ip.ip_v;],
-                 [AC_MSG_RESULT(yes); has_bitfields=yes],
-                 [AC_MSG_RESULT(no); has_bitfields=no])
+# First we test whether they specified liblua explicitly
+AC_ARG_WITH(liblua, 
+AC_HELP_STRING([--with-liblua=DIR], [Use an existing (compiled) lua lib from DIR/include and DIR/lib.])
+AC_HELP_STRING([--with-liblua=included], [Use the liblua version included with Nmap])
+AC_HELP_STRING([--without-liblua], [Compile without lua (this will exclude all of NSE from compilation)]),
+[  case "$with_liblua" in
+  yes)
+  ;;
+  included)
+    CPPFLAGS="-I$LIBLUADIR $CPPFLAGS"
+    LIBLUA_LIBS="$LIBLUADIR/liblua.a"
+    LUA_DEPENDS="$LIBLUADIR/liblua.a"
+    LUA_BUILD="lua_build"
+    LUA_CLEAN="lua_clean"
+    LUA_DIST_CLEAN="lua_dist_clean"
+	have_lua="yes"
+	
+  ;;
+  no)
+    no_lua="yes"
+  ;;
+  *)
+    CPPFLAGS="-I$with_liblua/include $CPPFLAGS"
+    LDFLAGS="-L$with_liblua/lib $LDFLAGS"
+    have_lua=yes
+  ;;
+  esac]
+)
 
-  if test $has_bitfields = no; then
-    SAVE_CXXFLAGS="$CXXFLAGS"
-    CXXFLAGS="-D__STDC__=2"
+# They don't want lua
+if test $no_lua == yes; then
+  CXXFLAGS="-DNOLUA $CXXFLAGS"
+  LIBLUA_LIBS=""
+  LUA_DEPENDS=""
+  LUA_BUILD=""
+  LUA_CLEAN=""
+  LUA_DIST_CLEAN=""
+  INSTALLNSE=""
 
-    AC_MSG_CHECKING([if setting __STDC__=2 gives ip_v])
-    AC_TRY_COMPILE([#include <sys/types.h>
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>],
-                   [struct ip ip; ip.ip_v;],
-                   [AC_MSG_RESULT(yes); setting_stdc_helps=yes],
-                  [AC_MSG_RESULT(no); setting_stdc_helps=no])
+else 
+  # NSE C modules are loaded with dlopen.
+  AC_SEARCH_LIBS(dlopen, dl)
 
-    CXXFLAGS="$SAVE_CXXFLAGS"
-    if test $setting_stdc_helps = yes; then
-      CXXFLAGS="$CXXFLAGS -D__STDC__=2"
-    else
-      AC_MSG_RESULT(Can't figure out how to get bitfields - configure failed)
-      exit 1
-    fi
+  # If they didn't specify it, we try to find it
+  if test $have_lua != yes; then
+    AC_CHECK_HEADERS(lua.h lua/lua.h,
+      AC_CHECK_LIB(lua, lua_call, [have_lua=yes; break],, [-lm]))
+
+    AC_LANG_PUSH(C++)
+    AC_MSG_CHECKING([for lua version >= 501])
+    AC_RUN_IFELSE([ AC_LANG_PROGRAM(
+    	[[#include <lua.h>]], 
+    	[[if(LUA_VERSION_NUM < 501) return 1;]])], 
+    	have_lua=yes, have_lua=no)
+    AC_LANG_POP(C++)
+  
+    LIBLUA_LIBS="-llua"
+    LUA_DEPENDS=""
+    LUA_BUILD=""
+    LUA_CLEAN=""
+    LUA_DIST_CLEAN=""
   fi
+
+  # if we didn't find we use our own
+  if test $have_lua != yes; then
+    AC_MSG_RESULT(no) 
+    CPPFLAGS="-I$LIBLUADIR $CPPFLAGS"
+    LIBLUA_LIBS="$LIBLUADIR/liblua.a"
+    LUA_DEPENDS="$LIBLUADIR/liblua.a"
+    LUA_BUILD="lua_build"
+    LUA_CLEAN="lua_clean"
+    LUA_DIST_CLEAN="lua_dist_clean"
+  else
+    AC_MSG_RESULT(yes) 
+  fi
+
+  INSTALLNSE="install-nse"
 fi
 
+if test $no_lua != yes; then
+	AC_CONFIG_SUBDIRS( nselib-bin )
+	NSELIB_CLEAN=nselib_clean
+	NSELIB_DIST_CLEAN=nselib_dist_clean
+fi
+
+AC_SUBST(LIBLUA_LIBS)
+AC_SUBST(LIBLUADIR)
+AC_SUBST(LUA_DEPENDS)
+AC_SUBST(LUA_BUILD)
+AC_SUBST(LUA_CLEAN)
+AC_SUBST(LUA_DIST_CLEAN)
+AC_SUBST(INSTALLNSE)
+AC_SUBST(NSELIB_CLEAN)
+AC_SUBST(NSELIB_DIST_CLEAN)
 AC_SUBST(CXXFLAGS)
 
 dnl This test is from the configure.in of Unix Network Programming second
@@ -569,8 +572,8 @@ dnl Check if sockaddr{} has sa_len member.
 dnl
 AC_CACHE_CHECK(if sockaddr{} has sa_len member, ac_cv_sockaddr_has_sa_len,
         AC_TRY_COMPILE([
-#               include <sys/types.h>
-#               include <sys/socket.h>],
+               #include <sys/types.h>
+               #include <sys/socket.h>],
                 [unsigned int i = sizeof(((struct sockaddr *)0)->sa_len)],
         ac_cv_sockaddr_has_sa_len=yes,
         ac_cv_sockaddr_has_sa_len=no))
@@ -578,15 +581,15 @@ if test $ac_cv_sockaddr_has_sa_len = yes ; then
         AC_DEFINE(HAVE_SOCKADDR_SA_LEN)
 fi
 
-dnl check endedness
+#dnl check endedness
 AC_C_BIGENDIAN
 
 AC_MSG_CHECKING([if struct in_addr is a wacky huge structure (some Sun boxes)])
 
 AC_TRY_COMPILE([#include <netinet/in.h>], struct in_addr i; i._S_un._S_addr;, \
-              AC_DEFINE(IN_ADDR_DEEPSTRUCT) \
-              AC_MSG_RESULT(yes) , \
-              AC_TRY_COMPILE([#include <sys/types.h>
+             AC_DEFINE(IN_ADDR_DEEPSTRUCT) \
+             AC_MSG_RESULT(yes) , \
+             AC_TRY_COMPILE([#include <sys/types.h>
 #include <netinet/in.h>], struct in_addr i; i.S_un.S_addr;, \
                              AC_DEFINE(IN_ADDR_DEEPSTRUCT) \
                              AC_MSG_RESULT(yes) , \
@@ -594,15 +597,15 @@ AC_TRY_COMPILE([#include <netinet/in.h>], struct in_addr i; i._S_un._S_addr;, \
 
 AC_CACHE_CHECK(if struct icmp exists, ac_cv_struct_icmp_exists,
         AC_TRY_COMPILE([
-#               include <sys/types.h>
-#               include <sys/param.h>
-#               include <netinet/in_systm.h>
-#               include <netinet/in.h>               
-#               define __USE_BSD
-#               define __FAVOR_BSD
-#               define __BSD_SOURCE
-#               include <netinet/ip.h>
-#               include <netinet/ip_icmp.h>],
+               #include <sys/types.h>
+               #include <sys/param.h>
+               #include <netinet/in_systm.h>
+               #include <netinet/in.h>               
+               #define __USE_BSD
+               #define __FAVOR_BSD
+               #define _BSD_SOURCE
+               #include <netinet/ip.h>
+               #include <netinet/ip_icmp.h>],
                 [unsigned int i = sizeof(struct icmp)],
         ac_cv_struct_icmp_exists=yes,
         ac_cv_struct_icmp_exists=no))
@@ -612,14 +615,14 @@ fi
 
 AC_CACHE_CHECK(if struct ip exists, ac_cv_struct_ip_exists,
         AC_TRY_COMPILE([
-#               include <sys/types.h>
-#               include <sys/param.h>
-#               include <netinet/in_systm.h>
-#               include <netinet/in.h>               
-#               define __USE_BSD
-#               define __FAVOR_BSD
-#               define __BSD_SOURCE
-#               include <netinet/ip.h>],
+               #include <sys/types.h>
+               #include <sys/param.h>
+               #include <netinet/in_systm.h>
+               #include <netinet/in.h>               
+               #define __USE_BSD
+               #define __FAVOR_BSD
+               #define _BSD_SOURCE
+               #include <netinet/ip.h>],
                 [unsigned int i = sizeof(struct ip)],
         ac_cv_struct_ip_exists=yes,
         ac_cv_struct_ip_exists=no))
@@ -629,15 +632,15 @@ fi
 
 AC_CACHE_CHECK(if struct ip has ip_sum member, ac_cv_ip_has_ip_sum,
         AC_TRY_COMPILE([
-#               include <sys/types.h>
-#               include <sys/param.h>
-#               include <netinet/in_systm.h>
-#               include <netinet/in.h>
-#               define __USE_BSD
-#               define __FAVOR_BSD
-#               define __BSD_SOURCE
-#               include <netinet/ip.h>
-#               include <netinet/ip_icmp.h>],
+               #include <sys/types.h>
+               #include <sys/param.h>
+               #include <netinet/in_systm.h>
+               #include <netinet/in.h>
+               #define __USE_BSD
+               #define __FAVOR_BSD
+               #define _BSD_SOURCE
+               #include <netinet/ip.h>
+               #include <netinet/ip_icmp.h>],
                 [unsigned int i = sizeof(((struct ip *)0)->ip_sum)],
         ac_cv_ip_has_ip_sum=yes,
         ac_cv_ip_has_ip_sum=no))
@@ -645,147 +648,57 @@ if test $ac_cv_ip_has_ip_sum = yes ; then
         AC_DEFINE(HAVE_IP_IP_SUM)
 fi
 
-
 dnl Checks for library functions.
-dnl AC_TYPE_SIGNAL
-AC_CHECK_FUNCS(bzero memcpy nanosleep strerror \
-strcasestr getopt_long_only)
-
-AC_LANG_PUSH(C++)
-AC_MSG_CHECKING([for usleep])
-AC_TRY_LINK([#include <unistd.h>],[usleep (200);],[
-  AC_MSG_RESULT(yes)],[
-  AC_MSG_RESULT(no)
-  AC_MSG_CHECKING([if usleep needs custom prototype])
-  AC_TRY_LINK([
-#include <unistd.h>
-
-extern "C" int usleep (unsigned int);],[
-usleep (200);],[
-  AC_MSG_RESULT(yes)
-  AC_DEFINE(NEED_USLEEP_PROTO)],
-  AC_MSG_RESULT(not found))])
-AC_LANG_POP(C++)
-
-AC_LANG_PUSH(C++)
-AC_TRY_LINK([#include <stdlib.h>
-#include <unistd.h>],[
-char buffer[200];
-gethostname (buffer, 200);], ,[
-  AC_MSG_CHECKING([if gethostname needs custom prototype])
-  AC_TRY_LINK([
-#include <stdlib.h>
-#include <unistd.h>
-
-extern "C" int gethostname (char *, unsigned int);],[
-char buffer[200];
-gethostname (buffer, 200);],[
-  AC_MSG_RESULT(yes)
-  AC_DEFINE(NEED_GETHOSTNAME_PROTO)],
-  AC_MSG_RESULT(not found))])
-AC_LANG_POP(C++)
-
+AC_CHECK_FUNCS(strerror)
 RECVFROM_ARG6_TYPE
 
-dnl AC_CHECK_FUNCS(gethostname gettimeofday select socket strdup strstr )
-
 AC_ARG_WITH(libnbase,
-[  --with-libnbase=DIR     Look for nbase include/libs in DIR],
+AC_HELP_STRING([--with-libnbase=DIR], [Look for nbase include/libs in DIR]),
 [  case "$with_libnbase" in
   yes)
     ;;
   *)
     NBASEDIR="$with_libnbase"
+    NBASE_BUILD=""
     ;;
   esac],
+NBASE_BUILD="nbase_build"
 NBASEDIR="nbase"
 )
 
 LDFLAGS="$LDFLAGS -L$NBASEDIR"
-CXXFLAGS="$CXXFLAGS -I$NBASEDIR"
+CPPFLAGS="$CPPFLAGS -I$NBASEDIR"
 LIBNBASE_LIBS="-lnbase"
 
 AC_SUBST(NBASEDIR)
+AC_SUBST(NBASE_BUILD)
 AC_SUBST(LIBNBASE_LIBS)
 
+AC_CONFIG_SUBDIRS(nbase)
+
 NSOCKDIR="nsock"
+NSOCK_BUILD="nsock_build"
 AC_ARG_WITH(libnsock,
-[  --with-libnsock=DIR     Compile and link to libnsock in DIR],
-[  case "$with_nsock" in
+AC_HELP_STRING([--with-libnsock=DIR], [Compile and link to libnsock in DIR]),
+[  case "$with_libnsock" in
   yes)
     ;;
   *)
-    NSOCKDIR="$with_nsock"
+    NSOCKDIR="$with_libnsock"
+    NSOCK_BUILD=""
     ;;
   esac]
 )
 
 LDFLAGS="$LDFLAGS -L$NSOCKDIR/src/"
-CXXFLAGS="$CXXFLAGS -I$NSOCKDIR/include"
+CPPFLAGS="$CPPFLAGS -I$NSOCKDIR/include"
 LIBNSOCK_LIBS="-lnsock"
 
 AC_SUBST(NSOCKDIR)
+AC_SUBST(NSOCK_BUILD)
 AC_SUBST(LIBNSOCK_LIBS)
 
-nmap_cfg_subdirs="$nmap_cfg_subdirs $NSOCKDIR/src"
-
-dnl I need to configure nmapfe and libpcap here since the user might
-dnl have specified special options (such as --prefix )
-dnl
-dnl But I only have to configure libpcap if I am going to use it
-
-if test $have_libpcap = yes ; then
-        nmap_cfg_subdirs="$NBASEDIR $nmap_cfg_subdirs"
-else
-        nmap_cfg_subdirs="$NBASEDIR $libpcapdir $nmap_cfg_subdirs"
-fi
-
-
-if test "${with_nmapfe}" = "yes"; then
-dnl Check for GTK+
-AC_PATH_PROG(GTK_CONFIG, pkg-config, no)
-AC_MSG_CHECKING(If you have GTK+ installed)
-if test "$GTK_CONFIG" = "no" ; then
-  AC_MSG_RESULT([no])
-  AC_MSG_WARN([Gtk+ has not been installed -> nmapfe will not be made])
-else
-  GTK_NEEDED_MAJOR=2
-  GTK_NEEDED_MINOR=4
-  GTK_NEEDED_MICRO=0
-  GTK_MINVERSION=$GTK_NEEDED_MAJOR.$GTK_NEEDED_MINOR.$GTK_NEEDED_MICRO
-  ver=`pkg-config --modversion gtk+-2.0`
-  dnl Extract the information.
-  major=`echo $ver|sed 's/\([[0-9]]*\).\([[0-9]]*\).\([[0-9]]*\)/\1/'`
-  minor=`echo $ver|sed 's/\([[0-9]]*\).\([[0-9]]*\).\([[0-9]]*\)/\2/'`
-  micro=`echo $ver|sed 's/\([[0-9]]*\).\([[0-9]]*\).\([[0-9]]*\)/\3/'`
-  AC_MSG_RESULT($ver)
-  if test $major -lt $GTK_NEEDED_MAJOR -o $major -eq $GTK_NEEDED_MAJOR \
-    -a $minor -lt $GTK_NEEDED_MINOR -o $minor -eq $GTK_NEEDED_MINOR \
-    -a $micro -lt $GTK_NEEDED_MICRO; then
-    AC_MSG_WARN([An old version of GTK+ ($major.$minor.$micro) was found.\n \
-                 You need at least version $GTK_MINVERSION.\n Subdir X-windows \
-                 will not be made])
-  else
-    nmap_cfg_subdirs="$nmap_cfg_subdirs nmapfe"
-    dnl Maybe also define the flags to compile and link GTK+
-    dnl GTK_CXXFLAGS=`gtk-config --cflags`
-    dnl GTK_LIBS=`gtk-config --libs`
-    dnl AC_SUBST(GTK_CXXFLAGS)
-    dnl AC_SUBST(GTK_LIBS)
-  fi
-fi
-fi
-
-dnl all hell broke loose when the variable was named $subdirs
-AC_CONFIG_SUBDIRS( $nmap_cfg_subdirs )
-
-dnl Configure libpcap if we need to since a lot of lamers don't
-dnl already have it installed ...
-dnl if test $have_libpcap = nsadf ; then
-dnl    echo "Have libpcap is set to $have_libpcap ";
-dnl    asdfasdf sdsdf sfd sdfsd
-dnl    AC_CONFIG_SUBDIRS( $libpcapdir )
-dnl fi
+AC_CONFIG_SUBDIRS(nsock/src)
 
 AC_OUTPUT(Makefile)
 # Krad ASCII ART#!#@$!@#$

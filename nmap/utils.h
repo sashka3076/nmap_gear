@@ -5,7 +5,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -38,7 +38,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -77,7 +77,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: utils.h 3994 2006-09-16 02:25:20Z fyodor $ */
+/* $Id: utils.h 7220 2008-04-28 17:53:32Z kris $ */
 
 #ifndef UTILS_H
 #define UTILS_H
@@ -119,7 +119,7 @@
 
 #include <assert.h>
 #include <sys/mman.h>
-#include "config.h"
+#include "nmap_config.h"
 #endif
 
 #if HAVE_UNISTD_H
@@ -136,6 +136,8 @@
 #  include <time.h>
 # endif
 #endif
+
+#include "nbase.h"
 
 #include "nmap_error.h"
 #include "nmap.h"
@@ -173,8 +175,14 @@
 #define TIMEVAL_SEC_SUBTRACT(a,b) ((a).tv_sec - (b).tv_sec + (((a).tv_usec < (b).tv_usec) ? - 1 : 0))
 
 /* assign one timeval to another timeval plus some msecs: a = b + msecs */
-#define TIMEVAL_MSEC_ADD(a, b, msecs) (a).tv_sec = (b).tv_sec + ((msecs) / 1000); (a).tv_usec = (b).tv_usec + ((msecs) % 1000) * 1000; (a).tv_sec += (a).tv_usec / 1000000; (a).tv_usec %= 1000000
-#define TIMEVAL_ADD(a, b, usecs) (a).tv_sec = (b).tv_sec + ((usecs) / 1000000); (a).tv_usec = (b).tv_usec + ((usecs) % 1000000); (a).tv_sec += (a).tv_usec / 1000000; (a).tv_usec %= 1000000
+#define TIMEVAL_MSEC_ADD(a, b, msecs) { (a).tv_sec = (b).tv_sec + ((msecs) / 1000); (a).tv_usec = (b).tv_usec + ((msecs) % 1000) * 1000; (a).tv_sec += (a).tv_usec / 1000000; (a).tv_usec %= 1000000; }
+#define TIMEVAL_ADD(a, b, usecs) { (a).tv_sec = (b).tv_sec + ((usecs) / 1000000); (a).tv_usec = (b).tv_usec + ((usecs) % 1000000); (a).tv_sec += (a).tv_usec / 1000000; (a).tv_usec %= 1000000; }
+
+/* Find our if one timeval is before or after another, avoiding the integer
+   overflow that can result when doing a TIMEVAL_SUBTRACT on two widely spaced
+   timevals. */
+#define TIMEVAL_BEFORE(a, b) (((a).tv_sec < (b).tv_sec) || ((a).tv_sec == (b).tv_sec && (a).tv_usec < (b).tv_usec))
+#define TIMEVAL_AFTER(a, b) (((a).tv_sec > (b).tv_sec) || ((a).tv_sec == (b).tv_sec && (a).tv_usec > (b).tv_usec))
 
 /* Return num if it is between min and max.  Otherwise return min or
    max (whichever is closest to num), */
@@ -188,6 +196,8 @@ template<class T> T box(T bmin, T bmax, T bnum) {
     return bmin;
   return bnum;
 }
+
+int wildtest(char *wild, char *test);
 
 void hdump(unsigned char *packet, unsigned int len);
 void lamont_hdump(char *cp, unsigned int length);
@@ -250,17 +260,6 @@ char* print_ip_options(u8* ipopt, int ipoptlen);
 #ifndef HAVE_STRERROR
 char *strerror(int errnum);
 #endif
-
-/* Convert a comma-separated list of ASCII u16-sized numbers into the
-   given 'dest' array, which is of total size (meaning sizeof() as
-   opposed to numelements) of destsize.  If min_elem and max_elem are
-   provided, each number must be within (or equal to) those
-   constraints.  The number of numbers stored in 'dest' is returned,
-   except that -1 is returned in the case of an error. If -1 is
-   returned and errorstr is non-null, *errorstr is filled with a ptr to a
-   static string literal describing the error. */
-int numberlist2array(char *expr, u16 *dest, int destsize, char **errorstr, 
-		     u16 min_elem=0, u16 max_elem=65535);
 
 /* mmap() an entire file into the address space.  Returns a pointer
    to the beginning of the file.  The mmap'ed length is returned

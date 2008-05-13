@@ -4,7 +4,7 @@
  *                                                                         *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
- * The nsock parallel socket event library is (C) 1999-2006 Insecure.Com   *
+ * The nsock parallel socket event library is (C) 1999-2008 Insecure.Com   *
  * LLC This library is free software; you may redistribute and/or          *
  * modify it under the terms of the GNU General Public License as          *
  * published by the Free Software Foundation; Version 2.  This guarantees  *
@@ -34,7 +34,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * insecure.org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -53,7 +53,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_core.c 3870 2006-08-25 01:47:53Z fyodor $ */
+/* $Id: nsock_core.c 6859 2008-02-28 18:52:17Z fyodor $ */
 
 #include "nsock_internal.h"
 #include "gh_list.h"
@@ -81,6 +81,11 @@
 
 #include "netutils.h"
 
+#if HAVE_PCAP
+#include "nsock_pcap.h"
+static int pcap_read_on_nonselect(mspool *nsp);
+#endif
+
 /* Msock time of day -- we update this at least once per
    nsock_loop round (and after most calls that are likely to block).  
    Other nsock files should grab this 
@@ -104,7 +109,10 @@ static int wait_for_events(mspool *ms, int msec_timeout) {
   if (ms->evl.events_pending == 0)
     return 0; /* No need to wait on 0 events ... */
 
-  do {  
+  do {
+    if (ms->tracelevel > 3)
+        nsock_trace(ms, "wait_for_events");
+        
     if (ms->evl.next_ev.tv_sec == 0) {
       event_msecs = -1; /* None of the events specified a timeout */
     } else {
@@ -115,7 +123,7 @@ static int wait_for_events(mspool *ms, int msec_timeout) {
        no timeout) */
     combined_msecs = MIN((unsigned) event_msecs, (unsigned) msec_timeout);
     
-    // printf("wait_for_events: starting wait -- combined_msecs=%d\n", combined_msecs);
+    /* printf("wait_for_events: starting wait -- combined_msecs=%d\n", combined_msecs); */
     /* Set up the timeval pointer we will give to select() */
     memset(&select_tv, 0, sizeof(select_tv));
     if (combined_msecs > 0) {
@@ -131,6 +139,7 @@ static int wait_for_events(mspool *ms, int msec_timeout) {
       select_tv_p = NULL;
     }
     
+    
     /* Figure out whether there are any FDs in the sets, as @$@!$#
        Windows returns WSAINVAL (10022) if you call a select() with no
        FDs, even though the Linux man page says that doing so is a
@@ -144,24 +153,31 @@ static int wait_for_events(mspool *ms, int msec_timeout) {
       else ms->mioi.max_sd--;
     }
 
-    if (ms->mioi.max_sd < 0) {
-      ms->mioi.results_left = 0;
-      if (combined_msecs > 0)
-	usleep(combined_msecs * 1000);
-    } else {
+#if HAVE_PCAP
+    /* do non-blocking read on pcap devices that doesn't support select() 
+     * If there is anything read, don't do usleep() or select(), just leave this loop */
+    if (pcap_read_on_nonselect(ms)) {
+    	/* okay, something was read. */
+    } else 
+#endif
+      if (ms->mioi.max_sd < 0) {
+        ms->mioi.results_left = 0;
+        if (combined_msecs > 0)
+	  usleep(combined_msecs * 1000);
+      } else {
 
-      /* Set up the descriptors for select */
-      ms->mioi.fds_results_r = ms->mioi.fds_master_r;
-      ms->mioi.fds_results_w = ms->mioi.fds_master_w;
-      ms->mioi.fds_results_x = ms->mioi.fds_master_x;
+        /* Set up the descriptors for select */
+        ms->mioi.fds_results_r = ms->mioi.fds_master_r;
+        ms->mioi.fds_results_w = ms->mioi.fds_master_w;
+        ms->mioi.fds_results_x = ms->mioi.fds_master_x;
       
-      ms->mioi.results_left = select(ms->mioi.max_sd + 1, &ms->mioi.fds_results_r, &ms->mioi.fds_results_w, &ms->mioi.fds_results_x, select_tv_p);
-      if (ms->mioi.results_left == -1)
-	sock_err = socket_errno();
-    }
+        ms->mioi.results_left = select(ms->mioi.max_sd + 1, &ms->mioi.fds_results_r, &ms->mioi.fds_results_w, &ms->mioi.fds_results_x, select_tv_p);
+        if (ms->mioi.results_left == -1)
+  	  sock_err = socket_errno();
+      }
 
     gettimeofday(&nsock_tod, NULL); /* Due to usleep or select delay */
-  } while (ms->mioi.results_left == -1 && sock_err == EINTR);
+  } while (ms->mioi.results_left == -1 && sock_err == EINTR);// repeat only if signal occured
   
   if (ms->mioi.results_left == -1 && sock_err != EINTR) {
     ms->errnum = sock_err;
@@ -269,7 +285,7 @@ void handle_connect_result(mspool *ms, msevent *nse,
       nse->errnum = optval;
       break;
     default:
-      snprintf(buf, sizeof(buf), "Strange connect error from %s (%d)", inet_ntop_ez(&iod->peer, iod->peerlen), optval);
+      Snprintf(buf, sizeof(buf), "Strange connect error from %s (%d)", inet_ntop_ez(&iod->peer, iod->peerlen), optval);
       perror(buf);
       assert(0); /* I'd like for someone to report it */
       break;
@@ -468,15 +484,17 @@ static int do_actual_read(mspool *ms, msevent *nse) {
 	  return -1;
 	}
 
-	// Sometimes a service just spews and spews data.  So we return
-	// after a somewhat large amount to avoid monopolizing resources
-	// and avoid DOS attacks.
+	/* Sometimes a service just spews and spews data.  So we return
+	 * after a somewhat large amount to avoid monopolizing resources
+	 * and avoid DOS attacks.
+	 */
 	if (FILESPACE_LENGTH(&nse->iobuf) > max_chunk)
 	  return FILESPACE_LENGTH(&nse->iobuf) - startlen;
 	
-	// No good reason to read again if we we were successful in the read but
-	// didn't fill up the buffer.  I'll insist on it being TCP too, because I
-	// think UDP might only give me one packet worth at a time (I dunno ...).
+	/* No good reason to read again if we we were successful in the read but
+	 * didn't fill up the buffer.  I'll insist on it being TCP too, because I
+	 * think UDP might only give me one packet worth at a time (I dunno ...).
+	 */
 	if (buflen > 0 && buflen < sizeof(buf) && iod->lastproto == IPPROTO_TCP)
 	  return FILESPACE_LENGTH(&nse->iobuf) - startlen;
       }
@@ -502,9 +520,10 @@ static int do_actual_read(mspool *ms, msevent *nse) {
 	return -1;
       }
       
-      // Sometimes a service just spews and spews data.  So we return
-      // after a somewhat large amount to avoid monopolizing resources
-      // and avoid DOS attacks.
+      /* Sometimes a service just spews and spews data.  So we return
+       * after a somewhat large amount to avoid monopolizing resources
+       * and avoid DOS attacks.
+       */
       if (FILESPACE_LENGTH(&nse->iobuf) > NSOCK_READ_CHUNK_SIZE)
 	return FILESPACE_LENGTH(&nse->iobuf) - startlen;
     }
@@ -622,8 +641,9 @@ void handle_read_result(mspool *ms, msevent *nse,
       FD_CLR(iod->sd, &ms->mioi.fds_results_w);
     }
 
-    // Note -- I only want to decrement IOD if there are no other events hinging on it. 
-    // For example, there could be a READ and WRITE outstanding at once
+    /* Note -- I only want to decrement IOD if there are no other events hinging on it. 
+     * For example, there could be a READ and WRITE outstanding at once
+     */
     if (iod->events_pending <= 1 && ms->mioi.max_sd == iod->sd)
       ms->mioi.max_sd--;
   }
@@ -646,6 +666,73 @@ void handle_read_result(mspool *ms, msevent *nse,
   return;
 }
 
+#if HAVE_PCAP
+void handle_pcap_read_result(mspool *ms, msevent *nse, 
+			       enum nse_status status)  
+{
+  msiod *iod = nse->iod;
+  mspcap *mp = (mspcap *) iod->pcap;
+  
+
+  if (status == NSE_STATUS_TIMEOUT) {
+    nse->status = NSE_STATUS_TIMEOUT;
+    nse->event_done = 1;
+  } else if (status == NSE_STATUS_CANCELLED) {
+    nse->status = NSE_STATUS_CANCELLED;
+    nse->event_done = 1;
+  } else if (status == NSE_STATUS_SUCCESS) {
+    /* check if we already have something read */
+    if(FILESPACE_LENGTH(&(nse->iobuf)) == 0){
+	nse->status = NSE_STATUS_TIMEOUT;
+        nse->event_done = 0;
+    }else{
+    	nse->status = NSE_STATUS_SUCCESS;/* we have full buffer */
+    	nse->event_done = 1;
+    }
+  } else {
+    assert(0); /* Currently we only know about TIMEOUT, CANCELLED, and SUCCESS callbacks */
+  }
+  
+  /* If we asked for an event dispatch, we are done reading on the socket so 
+     we can take it off the descriptor list ... */
+  if (nse->event_done && mp->pcap_desc >= 0) {
+      FD_CLR(mp->pcap_desc, &ms->mioi.fds_master_r);
+      FD_CLR(mp->pcap_desc, &ms->mioi.fds_results_r);
+  }
+  return;
+}
+
+/*
+ * returns number of descriptors on which data was read
+ * */
+static int pcap_read_on_nonselect(mspool *nsp)
+{
+	gh_list *event_list = &nsp->evl.pcap_read_events;
+	gh_list_elem *current, *next;
+	msevent *nse;
+	int rc;
+	int ret = 0;
+	
+	
+	for(current = GH_LIST_FIRST_ELEM(event_list);
+		current != NULL; current = next) {
+		
+		nse = (msevent *) GH_LIST_ELEM_DATA(current);
+		rc = do_actual_pcap_read(nse);
+		if(rc==1){ /* something received */
+		  ret++;
+		  break;
+	        }
+		next = GH_LIST_ELEM_NEXT(current);
+	}
+
+	return(ret);
+}
+#endif // HAVE_PCAP
+
+
+
+
   /* Iterate through all the event lists (such as 
      connect_events, read_events, timer_events, etc) and take action
      for those that have completed (due to timeout, i/o, etc) */
@@ -661,6 +748,9 @@ static void iterate_through_event_lists(mspool *nsp) {
                                &nsp->evl.read_events,
                                &nsp->evl.write_events,
                                &nsp->evl.timer_events,
+			       #if HAVE_PCAP
+			       &nsp->evl.pcap_read_events,
+			       #endif                               
                                0
                              };
     int current_list_idx;
@@ -678,14 +768,27 @@ static void iterate_through_event_lists(mspool *nsp) {
   */
 
     /* foreach list */
+    if (nsp->tracelevel > 7){
+      for(current_list_idx = 0; event_lists[current_list_idx] != NULL;
+	current_list_idx++) {
+        nsock_trace(nsp, "before iterating, list %i", current_list_idx);
+        for(current = GH_LIST_FIRST_ELEM(event_lists[current_list_idx]);
+	    current != NULL; current = GH_LIST_ELEM_NEXT(current)) {
+	  nse = (msevent *) GH_LIST_ELEM_DATA(current);
+	  nsock_trace(nsp, "before iterating %lu",nse->id);
+        }
+      }
+    }
+    /* foreach list */
     for(current_list_idx = 0; event_lists[current_list_idx] != NULL;
 	current_list_idx++) {
-
     /* foreach element in the list */
       for(current = GH_LIST_FIRST_ELEM(event_lists[current_list_idx]);
 	  current != NULL; current = next) {
-
 	nse = (msevent *) GH_LIST_ELEM_DATA(current);
+        if (nsp->tracelevel > 7)
+	  nsock_trace(nsp, "list %i, iterating %lu",current_list_idx, nse->id);
+
 	if ( ! nse->event_done) {	
 	  switch(nse->type) {
 	  case NSE_TYPE_CONNECT:
@@ -694,7 +797,7 @@ static void iterate_through_event_lists(mspool *nsp) {
 		FD_ISSET(nse->iod->sd, &nsp->mioi.fds_results_w) ||
 		FD_ISSET(nse->iod->sd, &nsp->mioi.fds_results_x)) {
 	      handle_connect_result(nsp, nse, NSE_STATUS_SUCCESS);
-	    } 
+	    }
 	    if (!nse->event_done && nse->timeout.tv_sec &&
 		TIMEVAL_MSEC_SUBTRACT(nse->timeout, nsock_tod) <= 0) {
 	      handle_connect_result(nsp, nse, NSE_STATUS_TIMEOUT);
@@ -746,7 +849,50 @@ static void iterate_through_event_lists(mspool *nsp) {
 	      handle_timer_result(nsp, nse, NSE_STATUS_SUCCESS);
 	    }
 	    break;
+
+#if HAVE_PCAP
+	  case NSE_TYPE_PCAP_READ:{
+	    if (nsp->tracelevel > 5)
+		    nsock_trace(nsp, "PCAP iterating %lu",nse->id);
+
+	    /* buffer empty? check it! */
+	    if ( FILESPACE_LENGTH(&(nse->iobuf))==0 ) 
+		do_actual_pcap_read(nse);
+
+	    /* if already received smth */
+	    if ( FILESPACE_LENGTH(&(nse->iobuf))>0 )
+	      handle_pcap_read_result(nsp, nse, NSE_STATUS_SUCCESS);
 	    
+	    if (!nse->event_done && nse->timeout.tv_sec &&
+		TIMEVAL_MSEC_SUBTRACT(nse->timeout, nsock_tod) <= 0)
+	      handle_pcap_read_result(nsp, nse, NSE_STATUS_TIMEOUT);
+	    
+	    #if PCAP_BSD_SELECT_HACK
+	    /* If event occured, and we're in BSD_HACK mode, than this event was added
+	     * to two queues. evl.read_event and evl.pcap_read_event 
+	     * Of coure we should destroy it only once. 
+	     * I assume we're now in evl.read_event, co just unlink this event from
+	     * evl.pcap_read_event */
+	    if(((mspcap *) nse->iod->pcap)->pcap_desc >= 0 &&
+	       nse->event_done &&
+	       event_lists[current_list_idx] == &nsp->evl.read_events){
+	      /* event is done, list is read_events and we're in BSD_HACK mode. 
+	       * So unlink event from pcap_read_events */
+	      gh_list_remove(&nsp->evl.pcap_read_events, nse); 
+              if (nsp->tracelevel > 8)
+                  nsock_trace(nsp, "PCAP NSE #%lu: Removing event from PCAP_READ_EVENTS", nse->id);
+	    }
+	    if(((mspcap *) nse->iod->pcap)->pcap_desc >= 0 &&
+	       nse->event_done &&
+	       event_lists[current_list_idx] == &nsp->evl.pcap_read_events){
+ 	      gh_list_remove(&nsp->evl.read_events, nse); 
+              if (nsp->tracelevel > 8)
+                  nsock_trace(nsp, "PCAP NSE #%lu: Removing event from READ_EVENTS", nse->id);
+	    }
+	    #endif
+	    break;
+	  }
+#endif
 	  default:
 	    fatal("Event has unknown type (%d)", nse->type);
 	    break; /* unreached */
@@ -754,6 +900,9 @@ static void iterate_through_event_lists(mspool *nsp) {
 	}
 
 	if (nse->event_done) {
+          if (nsp->tracelevel > 8)
+            nsock_trace(nsp, "NSE #%lu: Removing event from event_lists[%i]", nse->id, current_list_idx);
+
 	  /* WooHoo!  The event is ready to be sent */
 	  msevent_dispatch_and_delete(nsp, nse, 1);
 	  next = GH_LIST_ELEM_NEXT(current);
@@ -858,6 +1007,8 @@ const struct timeval *nsock_gettimeofday() {
    such as adjusting the descriptor select/poll lists, registering the
    timeout value, etc. */
 void nsp_add_event(mspool *nsp, msevent *nse) {
+  if (nsp->tracelevel > 5)
+      nsock_trace(nsp, "NSE #%lu: Adding event", nse->id);
 
   /* First lets do the event-type independant stuff -- starting with
      timeouts */
@@ -880,6 +1031,7 @@ void nsp_add_event(mspool *nsp, msevent *nse) {
   case NSE_TYPE_CONNECT:
   case NSE_TYPE_CONNECT_SSL:
     if (!nse->event_done) {
+      assert(nse->iod->sd >= 0);
       FD_SET( nse->iod->sd, &nsp->mioi.fds_master_r);
       FD_SET( nse->iod->sd, &nsp->mioi.fds_master_w);
       FD_SET( nse->iod->sd, &nsp->mioi.fds_master_x);
@@ -890,6 +1042,7 @@ void nsp_add_event(mspool *nsp, msevent *nse) {
 
   case NSE_TYPE_READ:
     if (!nse->event_done) {
+      assert(nse->iod->sd >= 0);
       FD_SET( nse->iod->sd, &nsp->mioi.fds_master_r);
       nsp->mioi.max_sd = MAX(nsp->mioi.max_sd, nse->iod->sd);
 #if HAVE_OPENSSL
@@ -901,6 +1054,7 @@ void nsp_add_event(mspool *nsp, msevent *nse) {
 
   case NSE_TYPE_WRITE:
     if (!nse->event_done) {
+      assert(nse->iod->sd >= 0);
       FD_SET( nse->iod->sd, &nsp->mioi.fds_master_w);
       nsp->mioi.max_sd = MAX(nsp->mioi.max_sd, nse->iod->sd);
 #if HAVE_OPENSSL
@@ -913,6 +1067,36 @@ void nsp_add_event(mspool *nsp, msevent *nse) {
   case NSE_TYPE_TIMER:
     gh_list_prepend(&nsp->evl.timer_events, nse);
     break;
+
+#if HAVE_PCAP
+  case NSE_TYPE_PCAP_READ:{
+    mspcap *mp = (mspcap *) nse->iod->pcap;
+    assert(mp);
+    if(mp->pcap_desc >= 0){ /* pcap descriptor present */
+      if(!nse->event_done){
+        FD_SET(mp->pcap_desc, &nsp->mioi.fds_master_r);
+        nsp->mioi.max_sd = MAX(nsp->mioi.max_sd, mp->pcap_desc);
+      }
+      if (nsp->tracelevel > 8)
+          nsock_trace(nsp, "PCAP NSE #%lu: Adding event to READ_EVENTS", nse->id);
+      gh_list_prepend(&nsp->evl.read_events, nse);
+      
+      #if PCAP_BSD_SELECT_HACK
+      /* when using BSD hack we must do pcap_next() after select(). 
+       * Let's insert this pcap to bot queues, to selectable and nonselectable.
+       * This will result in doing pcap_next_ex() just before select() */
+      if (nsp->tracelevel > 8)
+          nsock_trace(nsp, "PCAP NSE #%lu: Adding event to PCAP_READ_EVENTS", nse->id);
+      gh_list_prepend(&nsp->evl.pcap_read_events, nse);
+      #endif
+    }else{ /* pcap isn't selectable. Add it to pcap-specific queue. */
+      if (nsp->tracelevel > 8)
+          nsock_trace(nsp, "PCAP NSE #%lu: Adding event to PCAP_READ_EVENTS", nse->id);
+      gh_list_prepend(&nsp->evl.pcap_read_events, nse);
+    }
+    break;
+  }
+#endif    
 
   default:
     assert(0);
@@ -951,10 +1135,10 @@ void nsock_trace_handler_callback(mspool *ms, msevent *nse) {
   nsi = nse->iod;
 
   if (nse->status == NSE_STATUS_ERROR) {
-    snprintf(errstr, sizeof(errstr), "[%s (%d)] ", strerror(nse->errnum), nse->errnum);
+    Snprintf(errstr, sizeof(errstr), "[%s (%d)] ", strerror(nse->errnum), nse->errnum);
   } else errstr[0] = '\0';
 
-  // Some types have special tracing treatment
+  /* Some types have special tracing treatment */
   switch(nse->type) {
   case NSE_TYPE_CONNECT:
   case NSE_TYPE_CONNECT_SSL:
@@ -1006,6 +1190,17 @@ void nsock_trace_handler_callback(mspool *ms, msevent *nse) {
     nsock_trace(ms, "Callback: %s %s %sfor EID %li", 
 		nse_type2str(nse->type), nse_status2str(nse->status), errstr, 
 		nse->id);
+	
+    break;	
+#if HAVE_PCAP
+  case NSE_TYPE_PCAP_READ:
+	 nsock_trace(ms, "Callback: %s %s %sfor EID %li ",
+		     nse_type2str(nse->type), nse_status2str(nse->status),
+		     errstr, nse->id);
+    break;
+#endif
+   default:
+   assert(0);
     break;
   }
 

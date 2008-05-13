@@ -7,7 +7,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -40,7 +40,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -79,7 +79,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -99,17 +99,19 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap_winconfig.h 4228 2006-12-08 03:01:08Z fyodor $ */
+/* $Id: nmap_winconfig.h 6942 2008-03-17 17:44:40Z david $ */
 
 #ifndef NMAP_WINCONFIG_H
 #define NMAP_WINCONFIG_H
 /* Without this, Windows will give us all sorts of crap about using functions
    like strcpy() even if they are done safely */
 #define _CRT_SECURE_NO_DEPRECATE 1
-#define NMAP_VERSION "4.20"
 #define NMAP_NAME "Nmap"
-#define NMAP_URL "http://insecure.org"
+#define NMAP_URL "http://nmap.org"
 #define NMAP_PLATFORM "i686-pc-windows-windows"
 #define NMAPDATADIR "c:\\nmap" /* FIXME: I really need to make this dynamic */
+
+/* Apparently __func__ isn't yet supported */
+#define __func__ __FUNCTION__
 
 #endif /* NMAP_WINCONFIG_H */

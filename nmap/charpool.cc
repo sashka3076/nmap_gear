@@ -5,7 +5,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -38,7 +38,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -77,7 +77,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -97,18 +97,25 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: charpool.cc 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: charpool.cc 6858 2008-02-28 18:52:06Z fyodor $ */
 
+#include <stddef.h>
+
+#include "nbase.h"
 
 /* Character pool memory allocation */
 #include "charpool.h"
+#include "nmap_error.h"
 
 static char *charpool[16];
 static int currentcharpool;
 static int currentcharpoolsz;
 static char *nextchar;
 
-#define ALIGN_ON sizeof(char *)
+/* Allocated blocks are allocated to multiples of ALIGN_ON. This is the
+   definition used by the malloc in Glibc 2.7, which says that it "suffices for
+   nearly all current machines and C compilers." */
+#define ALIGN_ON (2 * sizeof(size_t))
 
 static int cp_init(void) {
   static int charpool_initialized = 0;

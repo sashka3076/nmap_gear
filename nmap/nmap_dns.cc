@@ -4,7 +4,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -37,7 +37,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -76,7 +76,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -142,6 +142,9 @@
 // doug at hcsw.org
 // http://www.hcsw.org
 
+/*
+ * DNS Caching and ageing added by Eddie Bell ejlbell@gmail.com 2007
+ */
 
 // TODO:
 //
@@ -158,6 +161,7 @@
 #include <limits.h>
 #include <list>
 #include <vector>
+#include <algorithm>
 
 #include "nmap.h"
 #include "NmapOps.h"
@@ -165,6 +169,8 @@
 #include "nsock.h"
 #include "utils.h"
 #include "nmap_tty.h"
+#include "timing.h"
+#include "Target.h"
 
 extern NmapOps o;
 
@@ -267,6 +273,7 @@ struct request_s {
 struct host_elem_s {
   char *name;
   u32 addr;
+  u8 cache_hits;
 };
 
 
@@ -278,6 +285,7 @@ static std::list<request *> cname_reqs;
 static int total_reqs;
 static nsock_pool dnspool=NULL;
 
+/* The DNS cache, not just for entries from /etc/hosts. */
 static std::list<host_elem *> etchosts[HASH_TABLE_SIZE];
 
 static int stat_actual, stat_ok, stat_nx, stat_sf, stat_trans, stat_dropped, stat_cname;
@@ -292,12 +300,12 @@ static ScanProgressMeter *SPM;
 //------------------- Prototypes and macros ---------------------
 
 static void put_dns_packet_on_wire(request *req);
+static char *lookup_etchosts(u32 ip);
+static void addto_etchosts(u32 ip, const char *hname);
 
 #define ACTION_FINISHED 0
 #define ACTION_CNAME_LIST 1
 #define ACTION_TIMEOUT 2
-
-
 
 //------------------- Misc code --------------------- 
 
@@ -370,7 +378,8 @@ static void do_possible_writes() {
       }
 
       if (tpreq) {
-        if (o.debugging >= TRACE_DEBUG_LEVEL) log_write(LOG_STDOUT, "mass_rdns: TRANSMITTING for <%s> (server <%s>)\n", tpreq->targ->targetipstr() , tpserv->hostname);
+        if (o.debugging >= TRACE_DEBUG_LEVEL)
+	   log_write(LOG_STDOUT, "mass_rdns: TRANSMITTING for <%s> (server <%s>)\n", tpreq->targ->targetipstr() , tpserv->hostname);
         stat_trans++;
         put_dns_packet_on_wire(tpreq);
       }
@@ -398,7 +407,6 @@ static void put_dns_packet_on_wire(request *req) {
   struct timeval now, timeout;
 
   ip = (u32) ntohl(req->targ->v4host().s_addr);
-
   packet[0] = (req->id >> 8) & 0xFF;
   packet[1] = req->id & 0xFF;
   plen += 2;
@@ -527,13 +535,18 @@ static int process_result(u32 ia, char *result, int action, u16 id) {
 
       if (id == tpreq->id) {
 
-        if (ia != 0 && (u32) (tpreq->targ->v4host().s_addr) != ia) continue;
+        if (ia != 0 && tpreq->targ->v4host().s_addr != ia)
+          continue;
 
         if (action == ACTION_CNAME_LIST || action == ACTION_FINISHED) {
         tpserv->capacity += CAPACITY_UP_STEP;
         check_capacities(tpserv);
 
-        if (result) tpreq->targ->setHostName(result);
+        if (result) {
+          tpreq->targ->setHostName(result);
+          addto_etchosts(tpreq->targ->v4hostip()->s_addr, result);
+        }
+
         tpserv->in_process.remove(tpreq);
         tpserv->reqs_on_wire--;
 
@@ -657,9 +670,9 @@ static void read_evt_handler(nsock_pool nsp, nsock_event evt, void *nothing) {
 
   if (nse_type(evt) != NSE_TYPE_READ || nse_status(evt) != NSE_STATUS_SUCCESS) {
     if (o.debugging)
-      log_write(LOG_STDOUT, "mass_dns: warning: got a %s:%s in read_evt_handler()\n",
+      log_write(LOG_STDOUT, "mass_dns: warning: got a %s:%s in %s()\n",
         nse_type2str(nse_type(evt)),
-        nse_status2str(nse_status(evt)));
+        nse_status2str(nse_status(evt)), __func__);
     return;
   }
 
@@ -862,7 +875,7 @@ void win32_read_registry(char *controlset) {
   char buf[2048], keyname[2048], *p;
   DWORD sz, i;
 
-  snprintf(keybasebuf, sizeof(keybasebuf), "SYSTEM\\%s\\Services\\Tcpip\\Parameters", controlset);
+  Snprintf(keybasebuf, sizeof(keybasebuf), "SYSTEM\\%s\\Services\\Tcpip\\Parameters", controlset);
   if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, keybasebuf,
                     0, KEY_READ, &hKey) != ERROR_SUCCESS) {
     if (firstrun) error("mass_dns: warning: Error opening registry to read DNS servers. Try using --system-dns or specify valid servers with --dns-servers");
@@ -879,14 +892,14 @@ void win32_read_registry(char *controlset) {
 
   RegCloseKey(hKey);
 
-  snprintf(keybasebuf, sizeof(keybasebuf), "SYSTEM\\%s\\Services\\Tcpip\\Parameters\\Interfaces", controlset);
+  Snprintf(keybasebuf, sizeof(keybasebuf), "SYSTEM\\%s\\Services\\Tcpip\\Parameters\\Interfaces", controlset);
   if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, keybasebuf,
                     0, KEY_ENUMERATE_SUB_KEYS, &hKey) == ERROR_SUCCESS) {
 
     sz = sizeof(buf);
     for (i=0; RegEnumKeyEx(hKey, i, buf, &sz, NULL, NULL, NULL, NULL) != ERROR_NO_MORE_ITEMS; i++) {
 
-      snprintf(keyname, sizeof(keyname), "SYSTEM\\%s\\Services\\Tcpip\\Parameters\\Interfaces\\%s", controlset, buf);
+      Snprintf(keyname, sizeof(keyname), "SYSTEM\\%s\\Services\\Tcpip\\Parameters\\Interfaces\\%s", controlset, buf);
 
       if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, keyname,
                         0, KEY_READ, &hKey2) == ERROR_SUCCESS) {
@@ -952,11 +965,10 @@ static void parse_resolvdotconf() {
 }
 
 
-static void parse_etchosts(char *fname) {
+static void parse_etchosts(const char *fname) {
   FILE *fp;
   char buf[2048], hname[256], ipaddrstr[16], *tp;
   struct in_addr ia;
-  host_elem *he;
 
   fp = fopen(fname, "r");
   if (fp == NULL) return; // silently is OK
@@ -973,12 +985,8 @@ static void parse_etchosts(char *fname) {
     while (*tp == ' ' || *tp == '\t') tp++;
 
     if (sscanf(tp, "%15s %255s", ipaddrstr, hname) == 2) {
-      if (inet_pton(AF_INET, ipaddrstr, &ia)) {
-        he = new host_elem;
-        he->name = strdup(hname);
-        he->addr = (u32) ia.s_addr;
-        etchosts[he->addr % HASH_TABLE_SIZE].push_front(he);
-      }
+      if (inet_pton(AF_INET, ipaddrstr, &ia))
+        addto_etchosts(ia.s_addr, hname);
     }
   }
 
@@ -1002,19 +1010,69 @@ void free_etchosts() {
   }
 }
 
+/* Executed when the DNS cache is full, ages entries
+ * and removes any with a cache hit of 0 (the least used) */
+bool remove_and_age(host_elem *host) {
+  if(host->cache_hits) {
+     host->cache_hits /=2;
+     return false;
+  } else
+     return true;
+}
 
+/* Add to the dns cache. If there are too many entries
+ * we age and remove the least frequently used ones to
+ * make more space. */
+static void addto_etchosts(u32 ip, const char *hname) {
+  static u16 total_size = 0;
+  std::list<host_elem*>::iterator it;
+  host_elem *he;
+  int i;
+
+  if(lookup_etchosts(ip) != NULL) 
+    return;
+
+  while(total_size >= HASH_TABLE_SIZE) {
+    for(i = 0; i < HASH_TABLE_SIZE; i++) {
+      while((it = find_if(etchosts[i].begin(), etchosts[i].end(), remove_and_age)) != etchosts[i].end()) {
+        etchosts[i].erase(it);
+        /* We don't want total_size to become out of sync with the actual number
+           of entries. */
+        assert(total_size > 0);
+        total_size--;
+      }
+    }
+  }
+  he = new host_elem;
+  he->name = strdup(hname);
+  he->addr = ip;
+  he->cache_hits = 0;
+  etchosts[ip % HASH_TABLE_SIZE].push_back(he);
+  total_size++;
+}
+
+/* Search for a hostname in the cache and increment
+ * its cache hit counter if found */
 static char *lookup_etchosts(u32 ip) {
   std::list<host_elem *>::iterator hostI;
   host_elem *tpelem;
 
   for(hostI = etchosts[ip % HASH_TABLE_SIZE].begin(); hostI != etchosts[ip % HASH_TABLE_SIZE].end(); hostI++) {
     tpelem = *hostI;
-    if (tpelem->addr == ip) return tpelem->name;
+    if (tpelem->addr == ip) {
+      if(tpelem->cache_hits < UCHAR_MAX)
+        tpelem->cache_hits++;
+      return tpelem->name;
+    }
   }
-
   return NULL;
 }
 
+/* External interface to dns cache */
+const char *lookup_cached_host(u32 ip) {
+  const char *tmp = lookup_etchosts(ip);
+  return tmp;
+}
 
 static void etchosts_init(void) {
   static int initialized = 0;
@@ -1033,11 +1091,11 @@ static void etchosts_init(void) {
   has_backslash = (windows_dir[strlen(windows_dir)-1] == '\\');
 
   // Windows 95/98/Me:
-  snprintf(tpbuf, sizeof(tpbuf), "%s%shosts", windows_dir, has_backslash ? "" : "\\");
+  Snprintf(tpbuf, sizeof(tpbuf), "%s%shosts", windows_dir, has_backslash ? "" : "\\");
   parse_etchosts(tpbuf);
 
   // Windows NT/2000/XP/2K3:
-  snprintf(tpbuf, sizeof(tpbuf), "%s%ssystem32\\drivers\\etc\\hosts", windows_dir, has_backslash ? "" : "\\");
+  Snprintf(tpbuf, sizeof(tpbuf), "%s%ssystem32\\drivers\\etc\\hosts", windows_dir, has_backslash ? "" : "\\");
   parse_etchosts(tpbuf);
 
 #else
@@ -1073,7 +1131,7 @@ static void nmap_mass_rdns_core(Target **targets, int num_targets) {
       if (((currenths->flags & HOST_UP) || o.resolve_all) && !o.noresolve) stat_actual++;
     }
 
-    snprintf(spmobuf, sizeof(spmobuf), "System DNS resolution of %d host%s.", num_targets, num_targets-1 ? "s" : "");
+    Snprintf(spmobuf, sizeof(spmobuf), "System DNS resolution of %d host%s.", num_targets, num_targets-1 ? "s" : "");
     SPM = new ScanProgressMeter(spmobuf);
 
     for(i=0, hostI = targets; hostI < targets+num_targets; hostI++, i++) {
@@ -1119,7 +1177,7 @@ static void nmap_mass_rdns_core(Target **targets, int num_targets) {
   for(hostI = targets; hostI < targets+num_targets; hostI++) {
     if (!((*hostI)->flags & HOST_UP) && !o.resolve_all) continue;
 
-    // See if it's in /etc/hosts
+    // See if it's in /etc/hosts or cached
     tpname = lookup_etchosts((u32) (*hostI)->v4hostip()->s_addr);
     if (tpname) {
       (*hostI)->setHostName(tpname);
@@ -1143,7 +1201,7 @@ static void nmap_mass_rdns_core(Target **targets, int num_targets) {
   // And finally, do it!
 
   if ((dnspool = nsp_new(NULL)) == NULL)
-    fatal("Unable to create nsock pool in nmap_mass_rdns_core()");
+    fatal("Unable to create nsock pool in %s()", __func__);
 
   if ((lasttrace = o.packetTrace()))
     nsp_settrace(dnspool, 5, o.getStartTime());
@@ -1154,7 +1212,7 @@ static void nmap_mass_rdns_core(Target **targets, int num_targets) {
 
   read_timeout_index = MIN(sizeof(read_timeouts)/sizeof(read_timeouts[0]), servs.size()) - 1;
 
-  snprintf(spmobuf, sizeof(spmobuf), "Parallel DNS resolution of %d host%s.", num_targets, num_targets-1 ? "s" : "");
+  Snprintf(spmobuf, sizeof(spmobuf), "Parallel DNS resolution of %d host%s.", num_targets, num_targets-1 ? "s" : "");
   SPM = new ScanProgressMeter(spmobuf);
 
   while (total_reqs > 0) {
@@ -1185,7 +1243,7 @@ static void nmap_mass_rdns_core(Target **targets, int num_targets) {
     log_write(LOG_STDOUT, "Performing system-dns for %d domain names that use CNAMEs\n", (int) cname_reqs.size());
 
   if (cname_reqs.size()) {
-    snprintf(spmobuf, sizeof(spmobuf), "System CNAME DNS resolution of %u host%s.", (unsigned) cname_reqs.size(), cname_reqs.size()-1 ? "s" : "");
+    Snprintf(spmobuf, sizeof(spmobuf), "System CNAME DNS resolution of %u host%s.", (unsigned) cname_reqs.size(), cname_reqs.size()-1 ? "s" : "");
     SPM = new ScanProgressMeter(spmobuf);
 
     for(i=0, reqI = cname_reqs.begin(); reqI != cname_reqs.end(); reqI++, i++) {

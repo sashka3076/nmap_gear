@@ -6,7 +6,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -39,7 +39,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -78,7 +78,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -98,13 +98,29 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: Target.h 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: Target.h 7145 2008-04-11 03:54:44Z david $ */
 
 #ifndef TARGET_H
 #define TARGET_H
 
 #include "nmap.h"
 #include "FingerPrintResults.h"
+
+#ifndef NOLUA
+#include "nse_main.h"
+#endif
+
+#include "portreasons.h"
+#include "portlist.h"
+#include "tcpip.h"
+
+#ifndef INET6_ADDRSTRLEN
+#define INET6_ADDRSTRLEN 46
+#endif
+
+enum osscan_flags {
+	OS_NOTPERF=0, OS_PERF, OS_PERF_UNREL
+};
 
 struct host_timeout_nfo {
   unsigned long msecs_used; /* How many msecs has this Target used? */
@@ -160,11 +176,22 @@ class Target {
   /* This next version returns a STATIC buffer -- so no concurrency */
   const char *NameIP();
 
+  /* Give the name from the last setTargetName() call, which is the 
+   name of the target given on the command line if it's a named
+   host. */
+  const char *TargetName() { return targetname; }
+  /* You can set to NULL to erase a name.  The targetname is blown
+     away when you setTargetSockAddr(), so make sure you do these in proper
+     order
+  */
+  void setTargetName(char *name);
+
   /* If the host is directly connected on a network, set and retrieve
      that information here.  directlyConnected() will abort if it hasn't
      been set yet.  */
   void setDirectlyConnected(bool connected);
   bool directlyConnected();
+  int directlyConnectedOrUnset(); /* 1-directly connected, 0-no, -1-we don't know*/
 
   /* If the host is NOT directly connected, you can set the next hop
      value here. It is OK to pass in a sockaddr_in or sockaddr_in6
@@ -211,25 +238,32 @@ class Target {
    qualifier, while the full name may include it (e.g. "eth1:1").  If
    these are non-null, they will overwrite the stored version */
   void setDeviceNames(const char *name, const char *fullname);
-  const char *deviceName() { return *devname? devname : NULL; }
-  const char *deviceFullName() { return *devfullname? devfullname : NULL; }
+  const char *deviceName();
+  const char *deviceFullName();
+
+  int osscanPerformed(void);
+  void osscanSetFlag(int flag);
 
   struct seq_info seq;
   int distance;
-  FingerPrintResults *FPR1; /* FP results get by the old OS scan system. */
-  FingerPrintResults *FPR; /* FP results get by the new OS scan system. */
-  int osscan_performed; /* nonzero if an osscan was performed */
+  FingerPrintResults *FPR; /* FP results get by the OS scan system. */
   PortList ports;
-  /*
-  unsigned int up;
-  unsigned int down; */
+
+  // unsigned int up;
+  // unsigned int down;
   int wierd_responses; /* echo responses from other addresses, Ie a network broadcast address */
   unsigned int flags; /* HOST_UP, HOST_DOWN, HOST_FIREWALLED, HOST_BROADCAST (instead of HOST_BROADCAST use wierd_responses */
   struct timeout_info to;
+  char *hostname; // Null if unable to resolve or unset
+  char * targetname; // The name of the target host given on the commmand line if it is a named host
 
+#ifndef NOLUA
+  ScriptResults scriptResults;
+#endif
+
+  state_reason_t reason;
 
   private:
-  char *hostname; // Null if unable to resolve or unset
   void Initialize();
   void FreeInternal(); // Free memory allocated inside this object
  // Creates a "presentation" formatted string out of the IPv4/IPv6 address
@@ -237,16 +271,18 @@ class Target {
   struct sockaddr_storage targetsock, sourcesock, nexthopsock;
   size_t targetsocklen, sourcesocklen, nexthopsocklen;
   int directly_connected; // -1 = unset; 0 = no; 1 = yes
-#ifndef INET6_ADDRSTRLEN
-#define INET6_ADDRSTRLEN 46
-#endif
   char targetipstring[INET6_ADDRSTRLEN];
   char *nameIPBuf; /* for the NameIP(void) function to return */
   u8 MACaddress[6], SrcMACaddress[6], NextHopMACaddress[6];  
   bool MACaddress_set, SrcMACaddress_set, NextHopMACaddress_set;
   struct host_timeout_nfo htn;
   devtype interface_type;
-  char devname[32], devfullname[32];
+  char devname[32];
+	char devfullname[32];
+  /* 0 (OS_NOTPERF) if os detection not performed
+   * 1 (OS_PERF) if os detection performed 
+   * 2 (OS_PERF_UNREL) if an unreliable os detection has been performed */
+  int osscan_flag; 
 };
 
 #endif /* TARGET_H */

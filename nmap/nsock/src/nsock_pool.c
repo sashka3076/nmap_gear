@@ -7,7 +7,7 @@
  *                                                                         *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
- * The nsock parallel socket event library is (C) 1999-2006 Insecure.Com   *
+ * The nsock parallel socket event library is (C) 1999-2008 Insecure.Com   *
  * LLC This library is free software; you may redistribute and/or          *
  * modify it under the terms of the GNU General Public License as          *
  * published by the Free Software Foundation; Version 2.  This guarantees  *
@@ -37,7 +37,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * insecure.org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -56,7 +56,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_pool.c 3870 2006-08-25 01:47:53Z fyodor $ */
+/* $Id: nsock_pool.c 6859 2008-02-28 18:52:17Z fyodor $ */
 
 #include "nsock_internal.h"
 #include "gh_list.h"
@@ -168,6 +168,9 @@ nsock_pool nsp_new(void *userdata) {
   gh_list_init(&nsp->evl.read_events);
   gh_list_init(&nsp->evl.write_events);
   gh_list_init(&nsp->evl.timer_events);
+  #if HAVE_PCAP
+  gh_list_init(&nsp->evl.pcap_read_events);
+  #endif 
   gh_list_init(&nsp->evl.free_events);
   nsp->evl.next_ev.tv_sec = 0;
   nsp->evl.events_pending = 0;
@@ -192,6 +195,9 @@ void nsp_delete(nsock_pool ms_pool) {
                                &nsp->evl.read_events,
                                &nsp->evl.write_events,
                                &nsp->evl.timer_events,
+                               #if HAVE_PCAP
+                               &nsp->evl.pcap_read_events,
+                               #endif
                                0
                              };
    int current_list_idx;
@@ -208,6 +214,7 @@ void nsp_delete(nsock_pool ms_pool) {
 	current_list_idx++) {
       while(GH_LIST_COUNT(event_lists[current_list_idx]) > 0) {
 	nse = (msevent *) gh_list_pop(event_lists[current_list_idx]);
+	assert(nse);
 	nse->status = NSE_STATUS_KILL;
 	nsock_trace_handler_callback(nsp, nse);
 	nse->handler(nsp, nse, nse->userdata);

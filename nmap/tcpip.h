@@ -6,7 +6,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -39,7 +39,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -78,7 +78,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -98,14 +98,14 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: tcpip.h 4209 2006-11-20 07:56:38Z fyodor $ */
+/* $Id: tcpip.h 7220 2008-04-28 17:53:32Z kris $ */
 
 
 #ifndef TCPIP_H
 #define TCPIP_H
 
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+#include "nmap_config.h"
 #endif
 
 #include "nbase.h"
@@ -142,13 +142,12 @@ void *realloc();
 #include <sys/param.h> /* Defines MAXHOSTNAMELEN on BSD*/
 #endif
 
-/* Linux uses these defines in netinet/ip.h and netinet/tcp.h to
-   use the correct struct ip and struct tcphdr */
+/* Linux uses these defines in netinet/ip.h to use the correct struct ip */
 #ifndef __FAVOR_BSD
 #define __FAVOR_BSD 1
 #endif
-#ifndef __BSD_SOURCE
-#define __BSD_SOURCE 1
+#ifndef _BSD_SOURCE
+#define _BSD_SOURCE 1
 #endif
 #ifndef __USE_BSD
 #define __USE_BSD 1
@@ -182,17 +181,6 @@ void *realloc();
 #ifndef NETINET_IP_H  /* why the HELL does OpenBSD not do this? */
 #include <netinet/ip.h>
 #define NETINET_IP_H
-#endif
-#ifndef __FAVOR_BSD
-#define __FAVOR_BSD
-#endif
-#ifndef NETINET_TCP_H  /* why the HELL does OpenBSD not do this? */
-#include <netinet/tcp.h>          /*#include <netinet/ip_tcp.h>*/
-#define NETINET_TCP_H
-#endif
-#ifndef NETINET_UDP_H
-#include <netinet/udp.h>
-#define NETINET_UDP_H
 #endif
 #if HAVE_UNISTD_H
 #include <unistd.h>
@@ -235,22 +223,8 @@ extern "C" {
 
 typedef enum { devt_ethernet, devt_loopback, devt_p2p, devt_other  } devtype;
 
-#include "nmap_error.h"
-#include "utils.h"
 #include "nmap.h"
 #include "global_structures.h"
-
-#ifndef TCPIP_DEBUGGING
-#define TCPIP_DEBUGGING 0
-#endif
-
-/* Explicit Congestion Notification (rfc 2481/3168) */
-#ifndef TH_ECE
-#define TH_ECE        0x40
-#endif
-#ifndef TH_CWR
-#define TH_CWR        0x80
-#endif
 
 #ifndef INET_ADDRSTRLEN
 #define INET_ADDRSTRLEN 16
@@ -382,18 +356,6 @@ struct ip
 
 #endif /* HAVE_STRUCT_IP */
 
-#ifdef LINUX
-typedef struct udphdr_bsd {
-         unsigned short uh_sport;           /* source port */
-         unsigned short uh_dport;           /* destination port */
-         unsigned short uh_ulen;            /* udp length */
-         unsigned short uh_sum;             /* udp checksum */
-} udphdr_bsd;
-#else
- typedef struct udphdr udphdr_bsd;
-#endif 
-
-
 #ifndef HAVE_STRUCT_ICMP
 #define HAVE_STRUCT_ICMP
 /* From Linux /usr/include/netinet/ip_icmp.h GLIBC */
@@ -471,6 +433,10 @@ struct icmp
 };
 #endif /* HAVE_STRUCT_ICMP */
 
+/* Some systems might not have this */
+#ifndef IPPROTO_IGMP
+#define IPPROTO_IGMP 2
+#endif
 
 /* Prototypes */
 /* Converts an IP address given in a sockaddr_storage to an IPv4 or
@@ -512,6 +478,10 @@ bool routethrough(const struct sockaddr_storage * const dest,
 		  int *direct_connect, struct sockaddr_storage *nexthop_ip);
 
 unsigned short in_cksum(u16 *ptr,int nbytes);
+
+unsigned short magic_tcpudp_cksum(const struct in_addr *src,
+				  const struct in_addr *dst,
+				  u8 proto, u16 len, char *hstart);
 
 /* Build and send a raw tcp packet.  If TTL is -1, a partially random
    (but likely large enough) one is chosen */
@@ -578,6 +548,19 @@ u8 *build_icmp_raw(const struct in_addr *source, const struct in_addr *victim,
 		   u16 seq, unsigned short id, u8 ptype, u8 pcode,
 		   char *data, u16 datalen, u32 *packetlen);
 
+/* Builds an IGMP packet (including an IP header) by packing the fields
+   with the given information.  It allocates a new buffer to store the
+   packet contents, and then returns that buffer.  The packet is not
+   actually sent by this function.  Caller must delete the buffer when
+   finished with the packet.  The packet length is returned in packetlen,
+   which must be a valid int pointer.
+ */
+u8 *build_igmp_raw(const struct in_addr *source, const struct in_addr *victim, 
+		   int ttl, u16 ipid, u8 tos, bool df,
+		   u8* ipopt, int ipoptlen,
+		   u8 ptype, u8 pcode,
+		   char *data, u16 datalen, u32 *packetlen);
+
 /* Builds an IP packet (including an IP header) by packing the fields
    with the given information.  It allocates a new buffer to store the
    packet contents, and then returns that buffer.  The packet is not
@@ -634,6 +617,10 @@ int my_pcap_get_selectable_fd(pcap_t *p);
 // invalid (Windows and Amiga), readip_pcap returns the time you called it.
 bool pcap_recv_timeval_valid();
 
+/* Prints stats from a pcap descriptor (number of received and dropped
+   packets). */
+void pcap_print_stats(int logt, pcap_t *pd);
+
 /* A simple function that caches the eth_t from dnet for one device,
    to avoid opening, closing, and re-opening it thousands of tims.  If
    you give a different device, this function will close the first
@@ -665,6 +652,7 @@ struct interface_info *getInterfaceByIP(struct sockaddr_storage *ss);
 struct interface_info *getInterfaceByName(char *iname);
 /* Where the above 4 functions get their info */
 struct interface_info *getinterfaces(int *howmany);
+pcap_if_t *getpcapinterfaces();
 
 /* Parse the system routing table, converting each route into a
    sys_route entry.  Returns an array of sys_routes.  numroutes is set
@@ -674,6 +662,8 @@ struct interface_info *getinterfaces(int *howmany);
    specific matches first. */
 struct sys_route *getsysroutes(int *howmany);
 void sethdrinclude(int sd);
+
+void set_ttl(int sd, int ttl);
 
 /* Fill buf (up to buflen -- truncate if necessary but always
    terminate) with a short representation of the packet stats.
@@ -711,7 +701,7 @@ int isipprivate(const struct in_addr * const addr);
 int unblock_socket(int sd);
 
 // Takes a protocol number like IPPROTO_TCP, IPPROTO_UDP, or
-// IPPROTO_TCP and returns a ascii representation (or "unknown" if it
+// IPPROTO_IP and returns a ascii representation (or "unknown" if it
 // doesn't recognize the number).  If uppercase is true, the returned
 // value will be in all uppercase letters.  You can skip this
 // parameter to use lowercase.
@@ -745,7 +735,7 @@ int read_arp_reply_pcap(pcap_t *pd, u8 *sendermac, struct in_addr *senderIP,
    parameters (if non-null) are filled with 0.  Remember that the
    correct way to check for errors is to look at the return value
    since a zero ts or echots could possibly be valid. */
-int gettcpopt_ts(struct tcphdr *tcp, u32 *timestamp, u32 *echots);
+int gettcpopt_ts(struct tcp_hdr *tcp, u32 *timestamp, u32 *echots);
 
 /* Maximize the receive buffer of a socket descriptor (up to 500K) */
 void max_rcvbuf(int sd);
@@ -770,20 +760,8 @@ int recvtime(int sd, char *buf, int len, int seconds, int *timedout);
 
 /* Sets a pcap filter function -- makes SOCK_RAW reads easier */
 #ifndef WINIP_H
-typedef int (*PFILTERFN)(const char *packet, unsigned int len); /* 1 to keep */
-void set_pcap_filter(const char *device, pcap_t *pd, char *bpf, ...);
+void set_pcap_filter(const char *device, pcap_t *pd, const char *bpf, ...);
 #endif
 
-/* Just accept everything ... TODO: Need a better approach than this flt_ 
-   stuff */
-int flt_all(const char *packet, unsigned int len);
-int flt_icmptcp(const char *packet, unsigned int len);
-int flt_icmptcp_2port(const char *packet, unsigned int len);
-int flt_icmptcp_5port(const char *packet, unsigned int len);
-
 #endif /*TCPIP_H*/
-
-
-
-
 

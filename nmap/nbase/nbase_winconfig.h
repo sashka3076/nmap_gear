@@ -6,7 +6,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -39,7 +39,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -78,7 +78,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -98,7 +98,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_winconfig.h 3899 2006-08-29 05:42:35Z fyodor $ */
+/* $Id: nbase_winconfig.h 6860 2008-02-28 18:52:22Z fyodor $ */
 
 #ifndef NBASE_WINCONFIG_H
 #define NBASE_WINCONFIG_H
@@ -117,7 +117,7 @@
 #define HAVE_SYS_STAT_H 1
 #define HAVE_MEMCPY 1
 #define HAVE_STRERROR 1
-#define HAVE_SYS_SOCKIO_H 1
+/* #define HAVE_SYS_SOCKIO_H 1 */
 /* #undef HAVE_TERMIOS_H */
 #define HAVE_ERRNO_H 1
 #define HAVE_GAI_STRERROR 1
@@ -142,9 +142,13 @@
 #define HAVE_AF_INET6 1
 #define HAVE_SOCKADDR_STORAGE 1
 
-/* Without this, Windows will give us all sorts of crap about using functions
+/* Without these, Windows will give us all sorts of crap about using functions
    like strcpy() even if they are done safely */
 #define _CRT_SECURE_NO_DEPRECATE 1
+#ifndef _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS 1
+#endif 
+#pragma warning(disable: 4996)
 
 #ifdef __GNUC__
 #define bzero(addr, num) __builtin_memset (addr, '\0', num)

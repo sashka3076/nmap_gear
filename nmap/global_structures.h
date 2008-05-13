@@ -5,7 +5,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -38,7 +38,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -77,7 +77,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: global_structures.h 4004 2006-09-25 09:08:56Z fyodor $ */
+/* $Id: global_structures.h 7148 2008-04-11 18:57:32Z david $ */
 
 
 #ifndef GLOBAL_STRUCTURES_H
@@ -133,16 +133,6 @@ struct udpprobeinfo {
   u16 udplen;
   u8 patternbyte;
   struct in_addr target;
-};
-
-struct connectsockinfo {
-  fd_set fds_read;
-  fd_set fds_write;
-  fd_set fds_except;
-  struct portinfo *socklookup[2048]; /* index socket descriptor -> scan[] 
-					index.  No OS better give us
-					an SD > 2047!@#$ */
-  int maxsd;
 };
 
 /* The runtime statistics used to decide how fast to proced and how
@@ -191,14 +181,14 @@ typedef struct FingerTest {
   char *OS_name;
   struct OS_Classification OS_class[MAX_OS_CLASSIFICATIONS_PER_FP];
   int num_OS_Classifications;
-  int line; /* For reference prints, the line # in nmap-os-fingerprints */
+  int line; /* For reference prints, the line # in nmap-os-db */
   const char *name;
   struct AVal *results;
   struct FingerTest *next;
  } FingerPrint;
 
 /* This structure contains the important data from the fingerprint
-   database (nmap-os-db or nmap-os-fingerprints) */
+   database (nmap-os-db) */
 typedef struct FingerPrintDB {
   FingerPrint **prints;
   FingerPrint *MatchPoints;
@@ -212,8 +202,6 @@ struct timeout_info {
 
 struct seq_info {
   int responses;
-  int seqclass; /* SEQ_* defines in nmap.h.  This should be removed when
-		 we remove osscan gen1 cruft. */
   int ts_seqclass; /* TS_SEQ_* defines in nmap.h */
   time_t uptime; /* time of latest system boot (or 0 if unknown ) */
   int ipid_seqclass; /* IPID_SEQ_* defines in nmap.h */
@@ -242,6 +230,6 @@ struct scan_lists {
 	int prot_count;
 };
 
-typedef enum { STYPE_UNKNOWN, HOST_DISCOVERY, ACK_SCAN, SYN_SCAN, FIN_SCAN, XMAS_SCAN, UDP_SCAN, CONNECT_SCAN, NULL_SCAN, WINDOW_SCAN, RPC_SCAN, MAIMON_SCAN, IPPROT_SCAN, PING_SCAN, PING_SCAN_ARP, IDLE_SCAN, BOUNCE_SCAN, SERVICE_SCAN, OS_SCAN} stype;
+typedef enum { STYPE_UNKNOWN, HOST_DISCOVERY, ACK_SCAN, SYN_SCAN, FIN_SCAN, XMAS_SCAN, UDP_SCAN, CONNECT_SCAN, NULL_SCAN, WINDOW_SCAN, RPC_SCAN, MAIMON_SCAN, IPPROT_SCAN, PING_SCAN, PING_SCAN_ARP, IDLE_SCAN, BOUNCE_SCAN, SERVICE_SCAN, OS_SCAN, SCRIPT_SCAN, TRACEROUTE, REF_TRACEROUTE}stype;
 
 #endif /*GLOBAL_STRUCTURES_H */

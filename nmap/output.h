@@ -1,6 +1,6 @@
 
 /***************************************************************************
- * output.c -- Handles the Nmap output system.  This currently involves    *
+ * output.h -- Handles the Nmap output system.  This currently involves    *
  * console-style human readable output, XML output, Script |<iddi3         *
  * output, and the legacy greppable output (used to be called "machine     *
  * readable").  I expect that future output forms (such as HTML) may be    *
@@ -9,7 +9,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -42,7 +42,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -81,7 +81,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -101,7 +101,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: output.h 3896 2006-08-29 04:03:03Z fyodor $ */
+/* $Id: output.h 6858 2008-02-28 18:52:06Z fyodor $ */
 
 #ifndef OUTPUT_H
 #define OUTPUT_H
@@ -117,10 +117,12 @@
 #define LOG_SKID_NOXLT 4096
 #define LOG_MAX LOG_SKID_NOXLT /* The maximum log type value */
 
+#define LOG_PLAIN LOG_NORMAL|LOG_SKID|LOG_STDOUT
+
 #define LOG_NAMES {"normal", "machine", "$Cr!pT |<!dd!3", "XML"}
 
 #include "portlist.h"
-#include "tcpip.h"
+#include "nmap.h"
 #include "global_structures.h"
 
 /* Prints the familiar Nmap tabular output showing the "interesting"
@@ -135,6 +137,8 @@ void printportoutput(Target *currenths, PortList *plist);
    separate call ( print_MAC_XML_Info ) because it needs to be printed
    in a certain place to conform to DTD. */
 void printmacinfo(Target *currenths);
+
+char *logfilename(const char *str, struct tm *tm);
 
 /* Write some information (printf style args) to the given log stream(s).
    Remember to watch out for format string bugs. */
@@ -191,6 +195,9 @@ void printosscanoutput(Target *currenths);
    service scan (if it was performed) */
 void printserviceinfooutput(Target *currenths);
 
+void printhostscriptresults(Target *currenths);
+char* formatScriptOutput(struct script_scan_result ssr);
+
 /* Print a detailed list of Nmap interfaces and routes to
    normal/skiddy/stdout output */
 int print_iflist(void);
@@ -201,6 +208,10 @@ void printStatusMessage();
 /* Prints the statistics and other information that goes at the very end
    of an Nmap run */
 void printfinaloutput();
+
+/* Prints the names of data files that were loaded and the paths at which they
+   were found. */
+void printdatafilepaths();
 
 char* xml_convert (const char* str);
 #endif /* OUTPUT_H */

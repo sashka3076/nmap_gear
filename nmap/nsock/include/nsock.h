@@ -5,7 +5,7 @@
  *                                                                         *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
- * The nsock parallel socket event library is (C) 1999-2006 Insecure.Com   *
+ * The nsock parallel socket event library is (C) 1999-2008 Insecure.Com   *
  * LLC This library is free software; you may redistribute and/or          *
  * modify it under the terms of the GNU General Public License as          *
  * published by the Free Software Foundation; Version 2.  This guarantees  *
@@ -35,7 +35,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * insecure.org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -54,10 +54,17 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock.h 3870 2006-08-25 01:47:53Z fyodor $ */
+/* $Id: nsock.h 6859 2008-02-28 18:52:17Z fyodor $ */
+
+/* Would you like to include pcap support in nsock?
+ * Pcap support code is currently unstable, so we give
+ * you a choice. In future this #define will be removed.*/
+#define HAVE_PCAP 1
 
 #ifndef NSOCK_H
 #define NSOCK_H
+
+
 
 #include <sys/types.h>
 #ifndef WIN32
@@ -71,10 +78,11 @@
 extern "C" {
 #endif
 
-// The read calls will generally return after reading at least this
-// much data so that the caller can process it and so that the
-// connection spewing data doesn't monopolize resources.  The caller
-// can always initiate another read request to ask for more.
+/* The read calls will generally return after reading at least this
+ * much data so that the caller can process it and so that the
+ * connection spewing data doesn't monopolize resources.  The caller
+ * can always initiate another read request to ask for more.
+ */
 #define NSOCK_READ_CHUNK_SIZE 0x8FFFF
 
 /*********************  TYPEDEFS ********************/
@@ -133,11 +141,12 @@ int nsp_geterrorcode(nsock_pool nsp);
 /* Every nsp has an ID that is unique across the program execution */
 unsigned long nsp_getid(nsock_pool nsp);
 
-// Note that nsi_get1_ssl_session will increment the usage count
-// of the SSL_SESSION, since nsock does a free when the nsi is
-// destroyed.  It's up to any calling function/etc to do a
-// SSL_SESSION_free() on it.  nsi_get0_ssl_session doesn't
-// increment, and is for informational purposes only.
+/* Note that nsi_get1_ssl_session will increment the usage count
+ * of the SSL_SESSION, since nsock does a free when the nsi is
+ * destroyed.  It's up to any calling function/etc to do a
+ * SSL_SESSION_free() on it.  nsi_get0_ssl_session doesn't
+ * increment, and is for informational purposes only.
+ */
 nsock_ssl_session nsi_get1_ssl_session(nsock_iod nsockiod);
 nsock_ssl_session nsi_get0_ssl_session(nsock_iod nsockiod);
 
@@ -177,9 +186,15 @@ void nsp_delete(nsock_pool nsp);
 /* IF YOU ADD NEW NSE_TYPES YOU MUST INCREASE TYPE_CODE_NUM_BITS SO THAT
    IT IS ALWAYS log2(maximum_nse_type_value + 1) */
 #define TYPE_CODE_NUM_BITS 3
-enum nse_type { NSE_TYPE_CONNECT=0, NSE_TYPE_CONNECT_SSL=1, NSE_TYPE_READ=2, NSE_TYPE_WRITE=3, 
-		NSE_TYPE_TIMER=4 };  /* At some point I was considering a 
-				      NSE_TYPE_START and NSE_TYPE_CUSTOM */
+enum nse_type { 
+	NSE_TYPE_CONNECT=0,
+	NSE_TYPE_CONNECT_SSL=1,
+	NSE_TYPE_READ=2,
+	NSE_TYPE_WRITE=3, 
+	NSE_TYPE_TIMER=4,
+	NSE_TYPE_PCAP_READ=5,
+	NSE_TYPE_MAX=6,
+};  /* At some point I was considering a NSE_TYPE_START and NSE_TYPE_CUSTOM */
 
 /* Find the type of an event that spawned a callback */
 enum nse_type nse_type(nsock_event nse);
@@ -459,6 +474,54 @@ int nsock_event_cancel(nsock_pool ms_pool, nsock_event_id id, int notify );
    nsock has never obtained the time when you call it, it will do so
    before returning */
 const struct timeval *nsock_gettimeofday();
+
+
+#ifdef HAVE_PCAP
+/*
+ * Open pcap device and connect it to nsp. Other parameters have the
+ * same meaning as for pcap_open_live in pcap(3).
+ * 	device   : pcap-style device name
+ * 	snaplen  : size of packet to be copied to handler
+ * 	promisc  : whether to open device in promiscous mode
+ * 	bpf_fmt	 : berkeley filter 
+ * return value: NULL if everything was okay, or error string if error occurred
+ * [sorry Fyodor for breaking the API, but it's just simpler]
+ * */
+char *nsock_pcap_open(nsock_pool nsp, nsock_iod nsiod, 
+		const char *pcap_device, int snaplen, int promisc,
+		const char *bpf_fmt, ...);
+
+/*
+ * Requests exacly one packet to be captured.from pcap. 
+ * See nsock_read() for parameters description.
+ * */
+nsock_event_id nsock_pcap_read_packet(nsock_pool nsp, nsock_iod nsiod, 
+			 nsock_ev_handler handler, int timeout_msecs,
+			 void *userdata);
+
+/*
+ * Gets packet data. This should be called after succesfull receiving of packet
+ * to get packet.  If you're not interested in some values, just pass NULL
+ * instead of valid pointer.
+ * l3_data is just after l2_data in buffer. Feel free to treat l2_data as one
+ * buffer with size of (l2_len + l3_len). 
+ * Ts time is fixed for systems that don't support proper timing, like Windows.
+ * So TS is pointing to time when packet was received or to the time _after_.
+ * As a result you'll get longer times than you should, but it's safer to
+ * think that host is a bit further. 
+ * */
+void nse_readpcap(nsock_event nsee,
+	const unsigned char **l2_data, size_t *l2_len,
+	const unsigned char **l3_data, size_t *l3_len,
+	size_t *packet_len, struct timeval *ts); 
+
+/* Well. Just pcap-style datalink. Like DLT_EN10MB or DLT_SLIP. Check in pcap(3) manpage. */
+int nsi_pcap_linktype(nsock_iod nsiod);
+
+/* Is this nsiod a pcap descriptor? */
+int nsi_is_pcap(nsock_iod nsiod);
+
+#endif /* HAVE_PCAP */
 
 #ifdef __cplusplus
 } /* End of 'extern "C"' */

@@ -1,11 +1,10 @@
-
 /***************************************************************************
  * portlist.h -- Functions for manipulating various lists of ports         *
  * maintained internally by Nmap.                                          *
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -38,7 +37,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -77,7 +76,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -97,13 +96,18 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: portlist.h 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: portlist.h 6858 2008-02-28 18:52:06Z fyodor $ */
 
 #ifndef PORTLIST_H
 #define PORTLIST_H
 
-#include <nbase.h>
 #include <map>
+#include "nbase.h"
+#ifndef NOLUA
+#include "nse_main.h"
+#endif 
+
+#include "portreasons.h"
 
 /* port states */
 #define PORT_UNKNOWN 0
@@ -177,9 +181,8 @@ struct serviceDeductions {
   unsigned long rpc_program; /* Only valid if rpc_state == RPC_STATUS_GOOD_PROG */
   unsigned int rpc_lowver;
   unsigned int rpc_highver;
+
 };
-
-
 
 class Port {
  public:
@@ -222,7 +225,11 @@ class Port {
   char *owner;
   int state; 
   int confidence; /* How sure are we about the state? */
+  state_reason_t reason;
 
+#ifndef NOLUA
+  ScriptResults scriptResults;
+#endif
 
  private:
   int rpc_status; /* RPC_STATUS_UNTESTED means we haven't checked
@@ -298,7 +305,10 @@ class PortList {
   /* Set Port structure to PortList structure.*/
   void  setPortEntry(u16 portno, u8 protocol, Port *port);
 
+  int setStateReason(u16 portno, u8 proto, reason_t reason, u8 ttl, u32 ip_addr);
+
   int numports; /* Total number of ports in list in ANY state */
+  int numscriptresults; /* Total number of scripts which produced output */
 
   /* Get number of ports in this state. This a sum for protocols. */
   int getStateCounts(int state);
@@ -329,7 +339,7 @@ class PortList {
   int state_counts_proto[PORTLIST_PROTO_MAX][PORT_HIGHEST_STATE];
   Port **port_list[PORTLIST_PROTO_MAX];
  protected:
-  /* Mapps port_number to index in port_list array.
+  /* Maps port_number to index in port_list array.
    * Only functions: getPortEntry, setPortEntry, initializePortMap and 
    * nextPort should access this structure directly. */
   static u16 *port_map[PORTLIST_PROTO_MAX];

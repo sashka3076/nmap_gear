@@ -4,7 +4,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -37,7 +37,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -76,7 +76,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -97,7 +97,7 @@
  ***************************************************************************/
 
 #ifndef WIN32
-#include "config.h"
+#include "nmap_config.h"
 #endif
 
 #include <sys/types.h>
@@ -115,7 +115,6 @@
 #endif
 #include <stdlib.h>
 
-#include "output.h"
 #include "nmap_tty.h"
 #include "NmapOps.h"
 
@@ -128,6 +127,13 @@ extern NmapOps o;
 void tty_init() { return; }
 static int tty_getchar() { return _kbhit() ? _getch() : -1; }
 static void tty_done() { return; }
+
+static void tty_flush(void)
+{
+	static HANDLE stdinput = GetStdHandle(STD_INPUT_HANDLE);
+
+	FlushConsoleInputBuffer(stdinput);
+}
 
 #else
 #if !defined(O_NONBLOCK) && defined(O_NDELAY)
@@ -183,6 +189,15 @@ static void tty_done()
 	tty_fd = 0;
 }
 
+static void tty_flush(void)
+{
+	/* we don't need to test for tty_fd==0 here because
+	 * this isn't called unless we succeeded
+	 */
+
+	tcflush(tty_fd, TCIFLUSH);
+}
+
 /*
  * Initializes the terminal for unbuffered non-blocking input. Also
  * registers tty_done() via atexit().  You need to call this before
@@ -191,6 +206,9 @@ static void tty_done()
 void tty_init()
 {
 	struct termios ti;
+
+	if(o.noninteractive)
+		return;
 
 	if (tty_fd)
 		return;
@@ -228,8 +246,7 @@ bool keyWasPressed()
     return false;
 
   if ((c = tty_getchar()) >= 0) {
-    // Eat any extra keys (so they can't queue up and print forever)
-    while (tty_getchar() >= 0); 
+    tty_flush(); /* flush input queue */
 
     // printf("You pressed key '%c'!\n", c);
     if (c == 'v') {
@@ -259,7 +276,7 @@ bool keyWasPressed()
 		"d/D             Increase/decrease debugging\n"
 		"p/P             Enable/disable packet tracing\n"
 		"anything else   Print status\n"
-                "More help: http://www.insecure.org/nmap/man/man-runtime-interaction.html\n");
+                "More help: http://nmap.org/man/man-runtime-interaction.html\n");
     } else {
        printStatusMessage();
        return true;

@@ -5,7 +5,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -38,7 +38,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -77,7 +77,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -97,7 +97,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOutputTable.cc 3869 2006-08-25 01:47:49Z fyodor $ */
+/* $Id: NmapOutputTable.cc 6858 2008-02-28 18:52:06Z fyodor $ */
 
 #ifdef WIN32
 #include "nmap_winconfig.h"
@@ -140,6 +140,21 @@ NmapOutputTable::~NmapOutputTable() {
   if (tableout) free(tableout);
 }
 
+void NmapOutputTable::addItem(unsigned int row, unsigned int column, bool fullrow,
+				bool copy, const char *item, int itemlen) {
+  struct NmapOutputTableCell *cell;
+  int mc = maxColLen[column];
+  
+  addItem(row, column, copy, item, itemlen);
+
+  if(fullrow) {
+    maxColLen[column] = mc;
+    cell = getCellAddy(row, column);
+    cell->fullrow = fullrow;
+  }
+  return;
+}
+
 void NmapOutputTable::addItem(unsigned int row, unsigned int column, bool copy, const char *item, 
 			      int itemlen) {
   struct NmapOutputTableCell *cell;
@@ -174,50 +189,82 @@ void NmapOutputTable::addItem(unsigned int row, unsigned int column, bool copy, 
   return;
 }
 
-// Like addItem except this version takes a printf-style format string 
-// followed by varargs
 void NmapOutputTable::addItemFormatted(unsigned int row, 
-					  unsigned int column, 
+					  unsigned int column,
+					  bool fullrow,
 					  const char *fmt, ...) {
+  struct NmapOutputTableCell *cell;
+  int mc = maxColLen[column];
   unsigned int res;
   va_list ap; 
   va_start(ap,fmt);
   char buf[4096];
-  res = vsnprintf(buf, sizeof(buf), fmt, ap);
+  res = Vsnprintf(buf, sizeof(buf), fmt, ap);
   va_end(ap);
 
   if (res > sizeof(buf))
-    fatal("NmapOutputTable only supports adding up to 4096 to a cell via addItemFormatString.");
+    fatal("NmapOutputTable only supports adding up to 4096 to a cell via %s.", __func__);
 
-  addItem(row, column, true, buf, res);
+  addItem(row, column, fullrow, true, buf, res);
 
-  return;
+  if(fullrow) {
+    maxColLen[column] = mc;
+    cell = getCellAddy(row, column);
+    cell->fullrow = fullrow;
+  }
 }
 
 // Returns the maximum size neccessary to create a printableTable() (the 
 // actual size could be less);
 int NmapOutputTable::printableSize() {
 
+  struct NmapOutputTableCell *cell;
   int rowlen = 0;
   unsigned int i;
 
   for(i = 0; i < numColumns; i++) {
-    rowlen += maxColLen[i];
+    rowlen += maxColLen[i]; 
   }
 
   /* Add the delimeter between each column, and the final newline */
   rowlen += numColumns;
+
+  // if one of the fullrow tables is larger than the single column
+  // roles then the maximal rowlen needs to be adjusted.
+  for(i = 0; i < numRows; i++) {
+    cell = getCellAddy(i, 0);
+    if(cell->fullrow && cell->strlength > rowlen)
+      rowlen = cell->strlength;
+  }
   
   return rowlen * numRows;
 
+}
+
+/* True if every column in nrow is empty */
+bool NmapOutputTable::emptyRow(unsigned int nrow) {
+	NmapOutputTableCell *cell;
+	unsigned int col;
+	bool isEmpty = true;
+	
+	assert(nrow < numRows);
+
+	for(col = 0 ; col < numColumns; col++) {
+		cell = getCellAddy(nrow, col);
+		if(cell->strlength > 0) {
+			isEmpty = false;
+			break;
+		}
+	}
+	return isEmpty;		
 }
 
  // This function sticks the entire table into a character buffer.
  // Note that the buffer is likely to be reused if you call the
  // function again, and it will also be invalidated if you free the
  // table. If size is not NULL, it will be filled with the size of
- // the ASCII table in bytes (not including the terminating NUL)
-
+ // the ASCII table in bytes (not including the terminating NUL) 
+ // All blank rows are removed from the returned string
 char *NmapOutputTable::printableTable(int *size) {
   unsigned int col, row;
   int maxsz = printableSize();
@@ -235,18 +282,28 @@ char *NmapOutputTable::printableTable(int *size) {
 
   for(row = 0; row < numRows; row++) {
     validthisrow = 0;
-    for(col = 0; col < numColumns; col++) {
-      cell = getCellAddy(row, col);
-      clen = maxColLen[col];
-      if (cell->strlength > 0) {
-	memcpy(p, cell->str,  cell->strlength);
-	p += cell->strlength;
-	validthisrow++;
-      }
-      // No point leaving trailing spaces ...
-      if (validthisrow < itemsInRow[row]) {
-	for(i=cell->strlength; i <= clen; i++) // one extra because of space between columns
-	  *(p++) = ' ';
+
+    if(emptyRow(row)) 
+	continue;
+
+    cell = getCellAddy(row, 0);
+    if(cell->fullrow && cell->strlength > 0) {
+      memcpy(p, cell->str,  cell->strlength);
+      p += cell->strlength;
+    } else {
+      for(col = 0; col < numColumns; col++) {
+        cell = getCellAddy(row, col);
+        clen = maxColLen[col];
+        if (cell->strlength > 0) {
+          memcpy(p, cell->str,  cell->strlength);
+          p += cell->strlength;
+          validthisrow++;
+        }
+        // No point leaving trailing spaces ...
+        if (validthisrow < itemsInRow[row]) {
+          for(i=cell->strlength; i <= clen; i++) // one extra because of space between columns
+            *(p++) = ' ';
+        }
       }
     }
     *(p++) = '\n';

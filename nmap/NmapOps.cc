@@ -5,7 +5,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2006 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -38,7 +38,7 @@
  * These restrictions only apply when you actually redistribute Nmap.  For *
  * example, nothing stops you from writing and selling a proprietary       *
  * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://insecure.org/nmap/ to download Nmap.                             *
+ * http://nmap.org to download Nmap.                                       *
  *                                                                         *
  * We don't consider these to be added restrictions on top of the GPL, but *
  * just a clarification of how we interpret "derived works" as it applies  *
@@ -77,7 +77,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -97,10 +97,12 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOps.cc 4068 2006-10-14 01:25:43Z fyodor $ */
+/* $Id: NmapOps.cc 7099 2008-04-09 02:11:20Z fyodor $ */
 #include "nmap.h"
 #include "nbase.h"
 #include "NmapOps.h"
+#include "services.h"
+#include "utils.h"
 #ifdef WIN32
 #include "winfix.h"
 #endif
@@ -114,6 +116,10 @@ NmapOps::NmapOps() {
 }
 
 NmapOps::~NmapOps() {
+  if (ping_synprobes) free(ping_synprobes);
+  if (ping_ackprobes) free(ping_ackprobes);
+  if (ping_udpprobes) free(ping_udpprobes);
+  if (ping_protoprobes) free(ping_protoprobes);
   if (datadir) free(datadir);
   if (xsl_stylesheet) free(xsl_stylesheet);
 }
@@ -182,23 +188,27 @@ void NmapOps::Initialize() {
 #else
   if (getenv("NMAP_PRIVILEGED"))
     isr00t = 1;
+  else if (getenv("NMAP_UNPRIVILEGED"))
+    isr00t = 0;
   else
     isr00t = !(geteuid());
 #endif
-  debugging = DEBUGGING;
-  verbose = DEBUGGING;
+  debugging = 0;
+  verbose = 0;
+  min_packet_send_rate = 0.0; /* Unset. */
   randomize_hosts = 0;
   sendpref = PACKET_SEND_NOPREF;
   spoofsource = 0;
+  fastscan = 0;
   device[0] = '\0';
   interactivemode = 0;
   ping_group_sz = PING_GROUP_SZ;
   generate_random_ips = 0;
-  reference_FPs1 = NULL;
   reference_FPs = NULL;
   magic_port = 33000 + (get_random_uint() % 31000);
   magic_port_set = 0;
-  num_ping_synprobes = num_ping_ackprobes = num_ping_udpprobes = 0;
+  num_ping_synprobes = num_ping_ackprobes = num_ping_udpprobes = num_ping_protoprobes = 0;
+  ping_synprobes = ping_ackprobes = ping_udpprobes = ping_protoprobes = NULL;
   timing_level = 3;
   max_parallelism = 0;
   min_parallelism = 0;
@@ -238,12 +248,13 @@ void NmapOps::Initialize() {
   nmap_stdout = stdout;
   gettimeofday(&start_time, NULL);
   pTrace = vTrace = false;
+  reason = false;
   if (datadir) free(datadir);
   datadir = NULL;
 #if WIN32
   Strncpy(tmpxsl, "nmap.xsl", sizeof(tmpxsl));
 #else
-  snprintf(tmpxsl, sizeof(tmpxsl), "%s/nmap.xsl", NMAPDATADIR);
+  Snprintf(tmpxsl, sizeof(tmpxsl), "%s/nmap.xsl", NMAPDATADIR);
 #endif
   if (xsl_stylesheet) free(xsl_stylesheet);
   xsl_stylesheet = strdup(tmpxsl);
@@ -259,7 +270,13 @@ void NmapOps::Initialize() {
   ipopt_firsthop = 0;
   ipopt_lasthop  = 0;  
   release_memory = false;
-
+  topportlevel = -1;
+#ifndef NOLUA
+  script = 0;
+  scriptversion = 0;
+  scripttrace = 0;
+  scriptupdatedb = 0;
+#endif
 }
 
 bool NmapOps::TCPScan() {
@@ -277,7 +294,7 @@ bool NmapOps::UDPScan() {
 bool NmapOps::RawScan() {
   if (ackscan|finscan|idlescan|ipprotscan|maimonscan|nullscan|osscan|synscan|udpscan|windowscan|xmasscan)
     return true;
-  if (o.pingtype & (PINGTYPE_ICMP_PING|PINGTYPE_ICMP_MASK|PINGTYPE_ICMP_TS|PINGTYPE_TCP_USE_ACK|PINGTYPE_RAWTCP|PINGTYPE_UDP))
+  if (pingtype & (PINGTYPE_ICMP_PING|PINGTYPE_ICMP_MASK|PINGTYPE_ICMP_TS|PINGTYPE_TCP_USE_ACK|PINGTYPE_UDP))
     return true;
 
    return false; 
@@ -286,15 +303,15 @@ bool NmapOps::RawScan() {
 
 void NmapOps::ValidateOptions() {
 #ifdef WIN32
-	const char *privreq = "that WinPcap version 3.1 or higher and iphlpapi.dll be installed. You seem to be missing one or both of these.  Winpcap is available from http://www.winpcap.org.  iphlpapi.dll comes with Win98 and later operating sytems and NT 4.0 with SP4 or greater.  For previous windows versions, you may be able to take iphlpapi.dll from anotyer system and place it in your system32 dir (e.g. c:\\windows\\system32)";
+	const char *privreq = "that WinPcap version 3.1 or higher and iphlpapi.dll be installed. You seem to be missing one or both of these.  Winpcap is available from http://www.winpcap.org.  iphlpapi.dll comes with Win98 and later operating sytems and NT 4.0 with SP4 or greater.  For previous windows versions, you may be able to take iphlpapi.dll from another system and place it in your system32 dir (e.g. c:\\windows\\system32)";
 #else
 	const char *privreq = "root privileges";
 #endif
   if (pingtype == PINGTYPE_UNKNOWN) {
     if (isr00t && af() == AF_INET) pingtype = DEFAULT_PING_TYPES;
     else pingtype = PINGTYPE_TCP; // if nonr00t or IPv6
-    num_ping_ackprobes = 1;
-    ping_ackprobes[0] = DEFAULT_TCP_PROBE_PORT;
+    getpts_simple(DEFAULT_TCP_PROBE_PORT_SPEC, SCAN_TCP_PORT, &o.ping_ackprobes, &o.num_ping_ackprobes);
+    assert(o.num_ping_ackprobes > 0);
   }
 
   /* Insure that at least one scantype is selected */
@@ -305,27 +322,29 @@ void NmapOps::ValidateOptions() {
     //    if (verbose) error("No tcp, udp, or ICMP scantype specified, assuming %s scan. Use -sP if you really don't want to portscan (and just want to see what hosts are up).", synscan? "SYN Stealth" : "vanilla tcp connect()");
   }
 
-  if ((pingtype & PINGTYPE_TCP) && (!o.isr00t || o.af() != AF_INET)) {
+  if ((pingtype & PINGTYPE_TCP) && (!isr00t || af() != AF_INET)) {
     /* We will have to do a connect() style ping */
     if (num_ping_synprobes && num_ping_ackprobes) {
       fatal("Cannot use both SYN and ACK ping probes if you are nonroot or using IPv6");
     }
     
+    /* Pretend we wanted SYN probes all along. */
     if (num_ping_ackprobes > 0) { 
-      memcpy(ping_synprobes, ping_ackprobes, num_ping_ackprobes * sizeof(*ping_synprobes));
       num_ping_synprobes = num_ping_ackprobes;
+      ping_synprobes = ping_ackprobes;
       num_ping_ackprobes = 0;
+      ping_ackprobes = NULL;
     }
     pingtype &= ~PINGTYPE_TCP_USE_ACK;
     pingtype |= PINGTYPE_TCP_USE_SYN;
   }
 
   if (pingtype != PINGTYPE_NONE && spoofsource) {
-    error("WARNING:  If -S is being used to fake your source address, you may also have to use -e <interface> and -P0 .  If you are using it to specify your real source address, you can ignore this warning.");
+    error("WARNING:  If -S is being used to fake your source address, you may also have to use -e <interface> and -PN .  If you are using it to specify your real source address, you can ignore this warning.");
   }
 
   if (pingtype != PINGTYPE_NONE && idlescan) {
-    error("WARNING: Many people use -P0 w/Idlescan to prevent pings from their true IP.  On the other hand, timing info Nmap gains from pings can allow for faster, more reliable scans.");
+    error("WARNING: Many people use -PN w/Idlescan to prevent pings from their true IP.  On the other hand, timing info Nmap gains from pings can allow for faster, more reliable scans.");
     sleep(2); /* Give ppl a chance for ^C :) */
   }
 
@@ -337,17 +356,20 @@ void NmapOps::ValidateOptions() {
     error("WARNING:  -S will only affect the source address used in a connect() scan if you specify one of your own addresses.  Use -sS or another raw scan if you want to completely spoof your source address, but then you need to know what you're doing to obtain meaningful results.");
   }
 
- if ((pingtype & PINGTYPE_UDP) && (!o.isr00t || o.af() != AF_INET)) {
+ if ((pingtype & PINGTYPE_UDP) && (!isr00t || af() != AF_INET)) {
    fatal("Sorry, UDP Ping (-PU) only works if you are root (because we need to read raw responses off the wire) and only for IPv4 (cause fyodor is too lazy right now to add IPv6 support and nobody has sent a patch)");
  }
 
+ if ((pingtype & PINGTYPE_PROTO) && (!isr00t || af() != AF_INET)) {
+   fatal("Sorry, IPProto Ping (-PO) only works if you are root (because we need to read raw responses off the wire) and only for IPv4");
+ }
 
  if (ipprotscan + (TCPScan() || UDPScan()) + listscan + pingscan > 1) {
    fatal("Sorry, the IPProtoscan, Listscan, and Pingscan (-sO, -sL, -sP) must currently be used alone rather than combined with other scan types.");
  }
 
  if ((pingscan && pingtype == PINGTYPE_NONE)) {
-    fatal("-P0 (skip ping) is incompatable with -sP (ping scan).  If you only want to enumerate hosts, try list scan (-sL)");
+    fatal("-PN (skip ping) is incompatable with -sP (ping scan).  If you only want to enumerate hosts, try list scan (-sL)");
   }
 
  if (pingscan && (TCPScan() || UDPScan() || ipprotscan || listscan)) {
@@ -370,27 +392,30 @@ void NmapOps::ValidateOptions() {
       pingtype = PINGTYPE_TCP;
       if (num_ping_synprobes == 0)
 	{
-	  num_ping_synprobes = 1;
-	  ping_synprobes[0] = DEFAULT_TCP_PROBE_PORT;
+          getpts_simple(DEFAULT_TCP_PROBE_PORT_SPEC, SCAN_TCP_PORT, &o.ping_synprobes, &o.num_ping_synprobes);
+          assert(o.num_ping_synprobes > 0);
 	}
     }
 #endif
     
     if (ackscan|finscan|idlescan|ipprotscan|maimonscan|nullscan|synscan|udpscan|windowscan|xmasscan) {
-      fatal("You requested a scan type which requires %s.  Sorry dude.\n", privreq);
+      fatal("You requested a scan type which requires %s.", privreq);
     }
     
     if (numdecoys > 0) {
-      fatal("Sorry, but decoys (-D) require %s.\n", privreq);
+      fatal("Sorry, but decoys (-D) require %s.", privreq);
     }
     
     if (fragscan) {
-      fatal("Sorry, but fragscan requires %s\n", privreq);
+      fatal("Sorry, but fragscan requires %s.", privreq);
     }
     
     if (osscan) {
-      fatal("TCP/IP fingerprinting (for OS scan) requires %s.  Sorry, dude.\n", privreq);
+      fatal("TCP/IP fingerprinting (for OS scan) requires %s.", privreq);
     }
+
+    if (ipoptionslen)
+      fatal("Sorry, using ip options requires %s.", privreq);
   }
   
   
@@ -399,7 +424,7 @@ void NmapOps::ValidateOptions() {
   }
   
   if (bouncescan && pingtype != PINGTYPE_NONE) 
-    log_write(LOG_STDOUT, "Hint: if your bounce scan target hosts aren't reachable from here, remember to use -P0 so we don't try and ping them prior to the scan\n");
+    log_write(LOG_STDOUT, "Hint: if your bounce scan target hosts aren't reachable from here, remember to use -PN so we don't try and ping them prior to the scan\n");
   
   if (ackscan+bouncescan+connectscan+finscan+idlescan+maimonscan+nullscan+synscan+windowscan+xmasscan > 1)
     fatal("You specified more than one type of TCP scan.  Please choose only one of -sA, -b, -sT, -sF, -sI, -sM, -sN, -sS, -sW, and -sX");
@@ -419,13 +444,26 @@ void NmapOps::ValidateOptions() {
   
 #if !defined(LINUX) && !defined(OPENBSD) && !defined(FREEBSD) && !defined(NETBSD)
   if (fragscan) {
-    fprintf(stderr, "Warning: Packet fragmentation selected on a host other than Linux, OpenBSD, FreeBSD, or NetBSD.  This may or may not work.\n");
+    error("Warning: Packet fragmentation selected on a host other than Linux, OpenBSD, FreeBSD, or NetBSD.  This may or may not work.");
   }
 #endif
   
   if (osscan && pingscan) {
     fatal("WARNING:  OS Scan is unreliable with a ping scan.  You need to use a scan type along with it, such as -sS, -sT, -sF, etc instead of -sP");
   }
+
+  if (osscan && ipprotscan) {
+    error("WARNING: Disabling OS Scan (-O) as it is incompatible with the IPProto Scan (-sO)");
+    osscan = 0;
+  }
+
+  if (servicescan && ipprotscan) {
+    error("WARNING: Disabling Service Scan (-sV) as it is incompatible with the IPProto Scan (-sO)");
+    servicescan = 0;
+  }
+
+  if (servicescan && pingscan)
+    servicescan = 0;
 
   if (defeat_rst_ratelimit && !synscan) {
       fatal("Option --defeat-rst-ratelimit works only with a SYN scan (-sS)");
@@ -442,7 +480,7 @@ void NmapOps::ValidateOptions() {
     fatal("--min-parallelism=%i must be less than or equal to --max-parallelism=%i",min_parallelism,max_parallelism);
   }
   
-  if (af() == AF_INET6 && (numdecoys|osscan|bouncescan|fragscan|ackscan|finscan|idlescan|ipprotscan|maimonscan|nullscan|rpcscan|synscan|udpscan|windowscan|xmasscan)) {
+  if (af() == AF_INET6 && (numdecoys|osscan|bouncescan|fragscan|ackscan|finscan|idlescan|ipprotscan|maimonscan|nullscan|synscan|udpscan|windowscan|xmasscan)) {
     fatal("Sorry -- IPv6 support is currently only available for connect() scan (-sT), ping scan (-sP), and list scan (-sL).  OS detection and decoys are also not supported with IPv6.  Further support is under consideration.");
   }
 
@@ -452,23 +490,20 @@ void NmapOps::ValidateOptions() {
   if (min_parallelism > max_parallelism)
     max_parallelism = min_parallelism;
 
-  if(o.ipoptionslen && ! o.isr00t)
-    fatal("To use ip options you must be root.");
-
-  if(o.ipoptions && o.osscan)
+  if(ipoptions && osscan)
     error("WARNING: Ip options are NOT used while OS scanning!");
     
 }
 
 void NmapOps::setMaxOSTries(int mot) {
   if (mot <= 0) 
-    fatal("NmapOps::setMaxOSTries(): value must be at least 1");
+    fatal("%s: value must be at least 1", __func__);
   max_os_tries = mot; 
 }
 
 void NmapOps::setMaxRttTimeout(int rtt) 
 { 
-  if (rtt <= 0) fatal("NmapOps::setMaxRttTimeout(): maximum round trip time must be greater than 0");
+  if (rtt <= 0) fatal("%s: maximum round trip time must be greater than 0", __func__);
   max_rtt_timeout = rtt; 
   if (rtt < min_rtt_timeout) min_rtt_timeout = rtt; 
   if (rtt < initial_rtt_timeout) initial_rtt_timeout = rtt;
@@ -476,7 +511,7 @@ void NmapOps::setMaxRttTimeout(int rtt)
 
 void NmapOps::setMinRttTimeout(int rtt) 
 { 
-  if (rtt < 0) fatal("NmapOps::setMinRttTimeout(): minimum round trip time must be at least 0");
+  if (rtt < 0) fatal("%s: minimum round trip time must be at least 0", __func__);
   min_rtt_timeout = rtt; 
   if (rtt > max_rtt_timeout) max_rtt_timeout = rtt;  
   if (rtt > initial_rtt_timeout) initial_rtt_timeout = rtt;
@@ -484,7 +519,7 @@ void NmapOps::setMinRttTimeout(int rtt)
 
 void NmapOps::setInitialRttTimeout(int rtt) 
 { 
-  if (rtt <= 0) fatal("NmapOps::setInitialRttTimeout(): initial round trip time must be greater than 0");
+  if (rtt <= 0) fatal("%s: initial round trip time must be greater than 0", __func__);
   initial_rtt_timeout = rtt; 
   if (rtt > max_rtt_timeout) max_rtt_timeout = rtt;  
   if (rtt < min_rtt_timeout) min_rtt_timeout = rtt;
@@ -493,7 +528,7 @@ void NmapOps::setInitialRttTimeout(int rtt)
 void NmapOps::setMaxRetransmissions(int max_retransmit)
 {
     if (max_retransmit < 0)
-        fatal("NmapOps::setMaxRetransmissions(): must be positive");
+        fatal("%s: must be positive", __func__);
     max_retransmissions = max_retransmit;
 }
 
@@ -516,7 +551,7 @@ void NmapOps::setMaxHostGroupSz(unsigned int sz) {
      If this is never called, a default stylesheet distributed with
      Nmap is used.  If you call it with NULL as the xslname, no
      stylesheet line is printed. */
-void NmapOps::setXSLStyleSheet(char *xslname) {
+void NmapOps::setXSLStyleSheet(const char *xslname) {
   if (xsl_stylesheet) free(xsl_stylesheet);
   xsl_stylesheet = xslname? strdup(xslname) : NULL;
 }
@@ -525,3 +560,15 @@ void NmapOps::setSpoofMACAddress(u8 *mac_data) {
   memcpy(spoof_mac, mac_data, 6);
   spoof_mac_set = true;
 }
+
+#ifndef NOLUA
+void NmapOps::chooseScripts(char* argument) {
+	char *ap;
+
+	ap = strtok(argument, ",");
+	while(ap != NULL) {
+		chosenScripts.push_back(std::string(ap));
+		ap = strtok(NULL, ",");
+	}
+}
+#endif

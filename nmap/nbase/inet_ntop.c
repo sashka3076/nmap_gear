@@ -17,7 +17,7 @@
 /* Modified by Fyodor (fyodor@insecure.org) for inclusion in the Nmap 
  * Security Scanner.
  *
- * $Id: inet_ntop.c 3293 2006-04-29 06:21:04Z fyodor $
+ * $Id: inet_ntop.c 5538 2007-08-14 06:46:54Z kris $
  */
 
 #include "nbase.h"
@@ -227,7 +227,7 @@ inet_ntop6(const unsigned char *src, char *dst, size_t size)
             tp += strlen(tp);
             break;
         }
-        tp += snprintf(tp, sizeof tmp - (tp - tmp), "%x", words[i]);
+        tp += Snprintf(tp, sizeof tmp - (tp - tmp), "%x", words[i]);
         i++;
     }
     /* Was it a trailing run of 0x00's? */

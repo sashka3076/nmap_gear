@@ -4,7 +4,7 @@
  * connections from the nsock parallel socket event library                *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
- * The nsock parallel socket event library is (C) 1999-2006 Insecure.Com   *
+ * The nsock parallel socket event library is (C) 1999-2008 Insecure.Com   *
  * LLC This library is free software; you may redistribute and/or          *
  * modify it under the terms of the GNU General Public License as          *
  * published by the Free Software Foundation; Version 2.  This guarantees  *
@@ -34,7 +34,7 @@
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
  * to fyodor@insecure.org for possible incorporation into the main         *
- * distribution.  By sending these changes to Fyodor or one the            *
+ * distribution.  By sending these changes to Fyodor or one of the         *
  * insecure.org development mailing lists, it is assumed that you are      *
  * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
  * to reuse, modify, and relicense the code.  Nmap will always be          *
@@ -53,7 +53,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_connect.c 3870 2006-08-25 01:47:53Z fyodor $ */
+/* $Id: nsock_connect.c 6859 2008-02-28 18:52:17Z fyodor $ */
 
 #include "nsock.h"
 #include "nsock_internal.h"
@@ -194,7 +194,7 @@ nsock_event_id nsock_connect_ssl(nsock_pool nsp, nsock_iod nsiod,
 		    userdata);
   assert(nse);
   
-  // Set our SSL_SESSION so we can benefit from session-id reuse.
+  /* Set our SSL_SESSION so we can benefit from session-id reuse. */
   nsi_set_ssl_session(nsi, (SSL_SESSION *) ssl_session);
   
   if (ms->tracelevel > 0)
@@ -230,7 +230,7 @@ nsock_event_id nsock_reconnect_ssl(nsock_pool nsp, nsock_iod nsiod,
   nse = msevent_new(ms, NSE_TYPE_CONNECT_SSL, nsi, timeout_msecs, handler, userdata);
   assert(nse);
 
-  // Set our SSL_SESSION so we can benefit from session-id reuse.
+  /* Set our SSL_SESSION so we can benefit from session-id reuse. */
   nsi_set_ssl_session(nsi, (SSL_SESSION *) ssl_session);
 
   if (ms->tracelevel > 0)
@@ -345,7 +345,7 @@ int nsi_getlastcommunicationinfo(nsock_iod ms_iod, int *protocol,
     if (remote) memset(remote, 0, socklen);
     if (local) memset(local, 0, socklen);
     if (protocol) *protocol = -1;
-    if (*af) *af = -1;
+    if (af) *af = -1;
   }
   return ret;
 }
