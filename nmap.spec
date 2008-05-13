@@ -20,7 +20,6 @@ Patch2: nmap-4.62-alt-owl-drop-priv.patch
 Patch3: nmap-4.62-alt-owl-dot-dir.patch
 Patch4: nmap-4.62-alt-owl-fileexistsandisreadable.patch
 Patch5: nmap-4.62-alt-libdnet.patch
-Patch6: nmap-4.01-alt-nmapfe.desktop.patch
 
 Requires: chrooted-resolv, libdnet >= 0:1.11-alt4
 BuildRequires: gcc-c++, libcap-devel, libdnet-devel, libgtk+2-devel
@@ -51,7 +50,6 @@ This package includes nmapfe, a Gtk+ frontend for nmap.
 %patch3 -p1
 %patch4 -p1
 %patch5 -p1
-%patch6 -p1
 find -type f -name \*.orig -delete -print
 bzip2 -9 CHANGELOG
 
