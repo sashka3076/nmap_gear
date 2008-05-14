@@ -335,8 +335,8 @@
      /* First let us try Linux-style /proc/net/route */
 -    routefp = fopen("/proc/net/route", "r");
 +    routethrough_init();
-     if (routefp) {
-       (void) fgets(buf, sizeof(buf), routefp); /* Kill the first line (column headers) */
+     /* Kill the first line (column headers) */
+     if (routefp && fgets(buf, sizeof(buf), routefp)) {
        while(fgets(buf,sizeof(buf), routefp)) {
 @@ -3008,6 +3016,8 @@ struct sys_route *getsysroutes(int *howmany) {
  	  routes = (struct sys_route *) safe_realloc(routes, route_capacity * sizeof(struct sys_route));
