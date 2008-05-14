@@ -36,7 +36,7 @@
  .cc.o:
 --- nmap-4.62/configure.ac
 +++ nmap-4.62/configure.ac
-@@ -671,6 +671,50 @@ if test $ac_cv_ip_has_ip_sum = yes ; then
+@@ -673,6 +673,50 @@ if test $ac_cv_ip_has_ip_sum = yes ; then
          AC_DEFINE(HAVE_IP_IP_SUM, 1, [Define to 1 for ip_sum member])
  fi
  

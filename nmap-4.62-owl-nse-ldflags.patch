@@ -1,0 +1,46 @@
+--- nmap-4.62/configure.ac
++++ nmap-4.62/configure.ac
+@@ -108,6 +108,7 @@ AC_PATH_TOOL([STRIP], [strip], [/bin/true])
+ 
+ needs_cpp_precomp=no
+ LUAFLAGS="MYCFLAGS=\"$CFLAGS -DLUA_USE_POSIX -DLUA_USE_DLOPEN\""
++NSE_LDFLAGS=""
+ 
+ case "$host" in
+   *alpha-dec-osf*)
+@@ -115,15 +116,15 @@ case "$host" in
+     ;;
+   *-netbsd* | *-knetbsd*-gnu)
+     AC_DEFINE(NETBSD)
+-    LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
++    NSE_LDFLAGS="-Wl,-E" # needed for nse-C-module support
+     ;;
+   *-openbsd*)
+     AC_DEFINE(OPENBSD)
+-    LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
++    NSE_LDFLAGS="-Wl,-E" # needed for nse-C-module support
+     ;;
+   *-freebsd* | *-kfreebsd*-gnu | *-dragonfly*)
+     AC_DEFINE(FREEBSD)
+-    LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
++    NSE_LDFLAGS="-Wl,-E" # needed for nse-C-module support
+     ;;
+   *-bsdi*)
+     AC_DEFINE(BSDI)
+@@ -152,7 +153,7 @@ case "$host" in
+   *-linux*)
+     AC_DEFINE(LINUX)
+     AC_DEFINE(PCAP_TIMEOUT_IGNORED)  # libpcap doesn't even LOOK at the timeout you give it under Linux
+-    LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
++    NSE_LDFLAGS="-Wl,-E" # needed for nse-C-module support
+     ;;
+   *-apple-darwin*)
+     AC_DEFINE(MACOSX)
+@@ -545,6 +546,7 @@ else
+     AC_MSG_RESULT(yes) 
+   fi
+ 
++  LDFLAGS="$NSE_LDFLAGS $LDFLAGS"
+   INSTALLNSE="install-nse"
+ fi
+ 

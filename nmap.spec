@@ -12,13 +12,14 @@ Packager: Dmitry V. Levin <ldv@altlinux.org>
 %define srcname nmap-%version
 Source: %url/dist/%srcname.tar
 
-Patch1: nmap-4.62-alt-owl-autoheader.patch
-Patch2: nmap-4.62-owl-warnings.patch
-Patch3: nmap-4.62-alt-owl-drop-priv.patch
-Patch4: nmap-4.62-alt-owl-dot-dir.patch
-Patch5: nmap-4.62-alt-owl-fileexistsandisreadable.patch
-Patch6: nmap-4.62-alt-libdnet.patch
-Patch7: nmap-4.62-svn-20080505-makefile.patch
+Patch1: nmap-4.62-owl-warnings.patch
+Patch2: nmap-4.62-owl-nse-ldflags.patch
+Patch3: nmap-4.62-alt-owl-autoheader.patch
+Patch4: nmap-4.62-alt-owl-drop-priv.patch
+Patch5: nmap-4.62-alt-owl-dot-dir.patch
+Patch6: nmap-4.62-alt-owl-fileexistsandisreadable.patch
+Patch7: nmap-4.62-alt-libdnet.patch
+Patch8: nmap-4.62-svn-20080505-makefile.patch
 
 Requires: chrooted-resolv, libdnet >= 0:1.11-alt4
 BuildRequires: gcc-c++, libcap-devel, libdnet-devel
@@ -42,6 +43,7 @@ and more.
 %patch5 -p1
 %patch6 -p1
 %patch7 -p1
+%patch8 -p1
 bzip2 -9 CHANGELOG
 
 %build

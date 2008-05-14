@@ -36,7 +36,7 @@
  AC_MSG_CHECKING(for __func__)
  AC_TRY_COMPILE([
  #include <stdio.h>
-@@ -111,51 +133,52 @@ LUAFLAGS="MYCFLAGS=\"$CFLAGS -DLUA_USE_POSIX -DLUA_USE_DLOPEN\""
+@@ -112,51 +134,52 @@ NSE_LDFLAGS=""
  
  case "$host" in
    *alpha-dec-osf*)
@@ -46,17 +46,17 @@
    *-netbsd* | *-knetbsd*-gnu)
 -    AC_DEFINE(NETBSD)
 +    AC_DEFINE(NETBSD, 1, [Define to 1 for NetBSD])
-     LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
+     NSE_LDFLAGS="-Wl,-E" # needed for nse-C-module support
      ;;
    *-openbsd*)
 -    AC_DEFINE(OPENBSD)
 +    AC_DEFINE(OPENBSD, 1, [Define to 1 for OpenBSD])
-     LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
+     NSE_LDFLAGS="-Wl,-E" # needed for nse-C-module support
      ;;
    *-freebsd* | *-kfreebsd*-gnu | *-dragonfly*)
 -    AC_DEFINE(FREEBSD)
 +    AC_DEFINE(FREEBSD, 1, [Define to 1 for FreeBSD])
-     LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
+     NSE_LDFLAGS="-Wl,-E" # needed for nse-C-module support
      ;;
    *-bsdi*)
 -    AC_DEFINE(BSDI)
@@ -96,7 +96,7 @@
 +    AC_DEFINE(LINUX, 1, [Define to 1 for Linux])
 +    AC_DEFINE(PCAP_TIMEOUT_IGNORED, 1, [Define to 1 if pcap(3) timeout is ignored])
 +    # libpcap doesn't even LOOK at the timeout you give it under Linux
-     LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
+     NSE_LDFLAGS="-Wl,-E" # needed for nse-C-module support
      ;;
    *-apple-darwin*)
 -    AC_DEFINE(MACOSX)
@@ -104,7 +104,7 @@
      dnl on Mac OSX the math library seems to contain unwanted getopt cruft
      AC_CHECK_LIB(m, main)
      LUAFLAGS="MYCFLAGS=\"$CFLAGS -DLUA_USE_MACOSX\""
-@@ -246,7 +269,7 @@ fi
+@@ -247,7 +270,7 @@ fi
  
  OPENSSL_LIBS=
  if test "$use_openssl" = "yes"; then
@@ -113,7 +113,7 @@
    OPENSSL_LIBS="-lssl -lcrypto"
  fi
  
-@@ -331,7 +354,7 @@ if test $have_libpcap = yes; then
+@@ -332,7 +355,7 @@ if test $have_libpcap = yes; then
    PCAP_BUILD=""
    PCAP_CLEAN=""
    PCAP_DIST_CLEAN=""
@@ -122,7 +122,7 @@
  else
    if test "${LIBPCAP_INC+set}" = "set"; then
      LDFLAGS="-L$libpcapdir $_ldflags"
-@@ -578,7 +601,7 @@ AC_CACHE_CHECK(if sockaddr{} has sa_len member, ac_cv_sockaddr_has_sa_len,
+@@ -580,7 +603,7 @@ AC_CACHE_CHECK(if sockaddr{} has sa_len member, ac_cv_sockaddr_has_sa_len,
          ac_cv_sockaddr_has_sa_len=yes,
          ac_cv_sockaddr_has_sa_len=no))
  if test $ac_cv_sockaddr_has_sa_len = yes ; then
@@ -131,7 +131,7 @@
  fi
  
  #dnl check endedness
-@@ -587,11 +610,11 @@ AC_C_BIGENDIAN
+@@ -589,11 +612,11 @@ AC_C_BIGENDIAN
  AC_MSG_CHECKING([if struct in_addr is a wacky huge structure (some Sun boxes)])
  
  AC_TRY_COMPILE([#include <netinet/in.h>], struct in_addr i; i._S_un._S_addr;, \
@@ -145,7 +145,7 @@
                               AC_MSG_RESULT(yes) , \
                               AC_MSG_RESULT(no);))
  
-@@ -610,7 +633,7 @@ AC_CACHE_CHECK(if struct icmp exists, ac_cv_struct_icmp_exists,
+@@ -612,7 +635,7 @@ AC_CACHE_CHECK(if struct icmp exists, ac_cv_struct_icmp_exists,
          ac_cv_struct_icmp_exists=yes,
          ac_cv_struct_icmp_exists=no))
  if test $ac_cv_struct_icmp_exists = yes ; then
@@ -154,7 +154,7 @@
  fi
  
  AC_CACHE_CHECK(if struct ip exists, ac_cv_struct_ip_exists,
-@@ -627,7 +650,7 @@ AC_CACHE_CHECK(if struct ip exists, ac_cv_struct_ip_exists,
+@@ -629,7 +652,7 @@ AC_CACHE_CHECK(if struct ip exists, ac_cv_struct_ip_exists,
          ac_cv_struct_ip_exists=yes,
          ac_cv_struct_ip_exists=no))
  if test $ac_cv_struct_ip_exists = yes ; then
@@ -163,7 +163,7 @@
  fi
  
  AC_CACHE_CHECK(if struct ip has ip_sum member, ac_cv_ip_has_ip_sum,
-@@ -645,7 +668,7 @@ AC_CACHE_CHECK(if struct ip has ip_sum member, ac_cv_ip_has_ip_sum,
+@@ -647,7 +670,7 @@ AC_CACHE_CHECK(if struct ip has ip_sum member, ac_cv_ip_has_ip_sum,
          ac_cv_ip_has_ip_sum=yes,
          ac_cv_ip_has_ip_sum=no))
  if test $ac_cv_ip_has_ip_sum = yes ; then
