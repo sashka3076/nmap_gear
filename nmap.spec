@@ -4,7 +4,7 @@ Release: alt1
 Epoch: 20020501
 
 Summary: Network exploration tool and security scanner
-License: GPL
+License: GPLv2
 Group: Monitoring
 Url: http://nmap.org/
 Packager: Dmitry V. Levin <ldv@altlinux.org>
@@ -67,7 +67,7 @@ export ac_cv_header_libiberty_h=no
 %_bindir/nmap
 %_datadir/nmap
 %_man1dir/nmap.*
-%doc CHANGELOG.bz2 docs/{README,*.txt}
+%doc COPYING* CHANGELOG.bz2 docs/{README,*.txt}
 
 %changelog
 * Fri Apr 11 2008 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.20-alt3
