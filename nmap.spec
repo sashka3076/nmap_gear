@@ -17,6 +17,7 @@ Patch2: nmap-4.62-alt-owl-drop-priv.patch
 Patch3: nmap-4.62-alt-owl-dot-dir.patch
 Patch4: nmap-4.62-alt-owl-fileexistsandisreadable.patch
 Patch5: nmap-4.62-alt-libdnet.patch
+Patch6: nmap-4.62-svn-20080505-makefile.patch
 
 Requires: chrooted-resolv, libdnet >= 0:1.11-alt4
 BuildRequires: gcc-c++, libcap-devel, libdnet-devel
@@ -38,6 +39,7 @@ and more.
 %patch3 -p1
 %patch4 -p1
 %patch5 -p1
+%patch6 -p1
 bzip2 -9 CHANGELOG
 
 %build
