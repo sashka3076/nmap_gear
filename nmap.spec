@@ -76,6 +76,10 @@ export ac_cv_header_libiberty_h=no
 %doc COPYING* CHANGELOG.bz2 docs/{README,*.txt}
 
 %changelog
+* Fri May 30 2008 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.62-alt1
+- Updated to 4.62.
+- Configure without lua and zenmap yet.
+
 * Fri Apr 11 2008 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.20-alt3
 - Use %%update_menus/%%clean_menus for frontend subpackage again.
 - Do not package developer docs.
