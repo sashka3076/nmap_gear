@@ -1,6 +1,6 @@
---- nmap-4.62/tcpip.cc
-+++ nmap-4.62/tcpip.cc
-@@ -2926,8 +2926,8 @@ struct sys_route *getsysroutes(int *howmany) {
+--- nmap-4.65/tcpip.cc
++++ nmap-4.65/tcpip.cc
+@@ -2924,8 +2924,8 @@ struct sys_route *getsysroutes(int *howmany) {
      ifaces = getinterfaces(&numifaces);
      /* First let us try Linux-style /proc/net/route */
      routefp = fopen("/proc/net/route", "r");

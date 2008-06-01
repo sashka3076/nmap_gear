@@ -1,5 +1,5 @@
 Name: nmap
-Version: 4.62
+Version: 4.65
 Release: alt1
 Epoch: 20020501
 
@@ -12,14 +12,13 @@ Packager: Dmitry V. Levin <ldv@altlinux.org>
 %define srcname nmap-%version
 Source: %url/dist/%srcname.tar
 
-Patch1: nmap-4.62-owl-warnings.patch
-Patch2: nmap-4.62-owl-nse-ldflags.patch
-Patch3: nmap-4.62-alt-owl-autoheader.patch
-Patch4: nmap-4.62-alt-owl-drop-priv.patch
-Patch5: nmap-4.62-alt-owl-dot-dir.patch
-Patch6: nmap-4.62-alt-owl-fileexistsandisreadable.patch
-Patch7: nmap-4.62-alt-libdnet.patch
-Patch8: nmap-4.62-svn-20080505-makefile.patch
+Patch1: nmap-4.65-owl-warnings.patch
+Patch2: nmap-4.65-owl-nse-ldflags.patch
+Patch3: nmap-4.65-alt-owl-autoheader.patch
+Patch4: nmap-4.65-alt-owl-drop-priv.patch
+Patch5: nmap-4.65-alt-owl-dot-dir.patch
+Patch6: nmap-4.65-alt-owl-fileexistsandisreadable.patch
+Patch7: nmap-4.65-alt-libdnet.patch
 
 Requires: chrooted-resolv, libdnet >= 0:1.11-alt4
 BuildRequires: gcc-c++, libcap-devel, libdnet-devel
@@ -43,7 +42,6 @@ and more.
 %patch5 -p1
 %patch6 -p1
 %patch7 -p1
-%patch8 -p1
 bzip2 -9 CHANGELOG
 
 %build
@@ -76,6 +74,9 @@ export ac_cv_header_libiberty_h=no
 %doc COPYING* CHANGELOG.bz2 docs/{README,*.txt}
 
 %changelog
+* Sun Jun 01 2008 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.65-alt1
+- Updated to 4.65.
+
 * Fri May 30 2008 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.62-alt1
 - Updated to 4.62.
 - Configure without lua and zenmap yet.

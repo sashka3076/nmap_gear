@@ -1,6 +1,6 @@
---- nmap-4.62/nmap.cc
-+++ nmap-4.62/nmap.cc
-@@ -2631,10 +2631,13 @@ int fileexistsandisreadable(char *pathname) {
+--- nmap-4.65/nmap.cc
++++ nmap-4.65/nmap.cc
+@@ -2665,10 +2665,13 @@ int fileexistsandisreadable(const char *pathname) {
  
    struct stat st;
  
@@ -10,7 +10,7 @@
 -    status = S_ISDIR(st.st_mode) ? 2 : 1;
 +  if (access(pathname_buf, R_OK) == 0 && stat(pathname_buf, &st) == 0) {
 +      if (S_ISREG(st.st_mode)) {
-+      	status = 1;
++	status = 1;
 +      } else if (S_ISDIR(st.st_mode)) {
 +	status = 2;
 +      }
