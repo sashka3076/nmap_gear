@@ -16,7 +16,7 @@
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
  * permission to link the code of this program with any version of the     *
  * OpenSSL library which is distributed under a license identical to that  *
- * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * listed in the included COPYING.OpenSSL file, and distribute linked      *
  * combinations including the two. You must obey the GNU GPL in all        *
  * respects for all of the code used other than OpenSSL.  If you modify    *
  * this file, you may extend this exception to your version of the file,   *
@@ -48,12 +48,12 @@
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
- * General Public License for more details (                               *
- * http://www.gnu.org/copyleft/gpl.html ).                                 *
+ * General Public License v2.0 for more details                            *
+ * (http://www.gnu.org/licenses/gpl-2.0.html).                             *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_core.c 6859 2008-02-28 18:52:17Z fyodor $ */
+/* $Id: nsock_core.c 7592 2008-05-21 06:20:33Z mixter $ */
 
 #include "nsock_internal.h"
 #include "gh_list.h"
@@ -475,6 +475,9 @@ static int do_actual_read(mspool *ms, msevent *nse) {
     /* Traditional read() - no SSL - using recv() because that works better on Windows */
     do {
       buflen = recv(iod->sd, buf, sizeof(buf), 0);
+      /* Using recv() was failing, at least on UNIX, for non-network sockets (i.e. stdin)
+       * in this case, a read() is done - as on ENOTSOCK we may have a non-network socket */
+      if (buflen == -1 && socket_errno() == ENOTSOCK) buflen = read(iod->sd, buf, sizeof(buf));
       if (buflen == -1) err = socket_errno();
       if (buflen > 0) {
 	if (fscat(&nse->iobuf, buf, buflen) == -1) {

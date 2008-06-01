@@ -26,7 +26,7 @@
  * following:                                                              *
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
- *   nmap-os-fingerprints or nmap-service-probes.                          *
+ *   nmap-os-db or nmap-service-probes.                                    *
  * o Executes Nmap and parses the results (as opposed to typical shell or  *
  *   execution-menu apps, which simply display raw Nmap output and so are  *
  *   not derivative works.)                                                * 
@@ -61,7 +61,7 @@
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
  * permission to link the code of this program with any version of the     *
  * OpenSSL library which is distributed under a license identical to that  *
- * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * listed in the included COPYING.OpenSSL file, and distribute linked      *
  * combinations including the two. You must obey the GNU GPL in all        *
  * respects for all of the code used other than OpenSSL.  If you modify    *
  * this file, you may extend this exception to your version of the file,   *
@@ -93,13 +93,13 @@
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
- * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
- * with Nmap.                                                              *
+ * General Public License v2.0 for more details at                         *
+ * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
+ * included with Nmap.                                                     *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: TargetGroup.cc 6858 2008-02-28 18:52:06Z fyodor $ */
+/* $Id: TargetGroup.cc 7640 2008-05-22 20:45:32Z fyodor $ */
 
 #include "TargetGroup.h"
 #include "NmapOps.h"
@@ -296,7 +296,7 @@ int TargetGroup::parse_expr(const char * const target_expr, int af) {
     }
     assert(result->ai_addrlen == sizeof(struct sockaddr_in6));
     struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) result->ai_addr;
-    memcpy(ip6.s6_addr, sin6->sin6_addr.s6_addr, 16);
+    memcpy(&ip6, sin6, sizeof(struct sockaddr_in6));
     ipsleft = 1;
     freeaddrinfo(result);
 #else // HAVE_IPV6
@@ -443,7 +443,8 @@ int TargetGroup::get_next_host(struct sockaddr_storage *ss, size_t *sslen) {
 #ifdef SIN_LEN
     sin6->sin6_len = *sslen;
 #endif /* SIN_LEN */
-    memcpy(sin6->sin6_addr.s6_addr, ip6.s6_addr, 16);
+    memcpy(sin6->sin6_addr.s6_addr, ip6.sin6_addr.s6_addr, 16);
+    sin6->sin6_scope_id = ip6.sin6_scope_id;
 #else
     fatal("IPV6 not supported on this platform");
 #endif // HAVE_IPV6

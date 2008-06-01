@@ -20,6 +20,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 import re
+import locale
 import os
 import os.path
 import time
@@ -170,16 +171,6 @@ this instead: '%s'" % str(id))
         return self._hostnames
 
     # IP
-    def set_ip_address(self, addr):
-        log.warning(_("zenmapCore.NmapParser.set_ip_address deprecated! Use \
-zenmapCore.NmapParser.set_ip instead."))
-        self.set_ip(addr)
-    
-    def get_ip_address(self):
-        log.warning(_("zenmapCore.NmapParser.get_ip_address deprecated! Use \
-zenmapCore.NmapParser.get_ip instead."))
-        return self.get_ip()
-
     def set_ip(self, addr):
         self._ip = addr
 
@@ -194,16 +185,6 @@ zenmapCore.NmapParser.get_ip instead."))
         self._comment = comment
 
     # MAC
-    def set_mac_address(self, addr):
-        log.warning(_("zenmapCore.NmapParser.set_mac_address deprecated! Use \
-zenmapCore.NmapParser.set_mac instead."))
-        self.set_mac(addr)
-    
-    def get_mac_address(self):
-        log.warning(_("zenmapCore.NmapParser.get_mac_address deprecated! Use \
-zenmapCore.NmapParser.get_mac instead."))
-        return self.get_mac()
-
     def set_mac(self, addr):
         self._mac = addr
 
@@ -211,16 +192,6 @@ zenmapCore.NmapParser.get_mac instead."))
         return self._mac
 
     # IPv6
-    def set_ipv6_address(self, addr):
-        log.warning(_("zenmapCore.NmapParser.set_ipv6_address deprecated! Use \
-zenmapCore.NmapParser.set_ipv6 instead."))
-        self.set_ipv6(addr)
-    
-    def get_ipv6_address(self):
-        log.warning(_("zenmapCore.NmapParser.get_ipv6_address deprecated! Use \
-zenmapCore.NmapParser.get_ipv6 instead."))
-        return self.get_ipv6()
-
     def set_ipv6(self, addr):
         self._ipv6 = addr
 
@@ -575,11 +546,6 @@ in epoch format!")
         self.nmap['nmaprun']['version'] = version
 
     # IPv4
-    def get_ipv4_addresses (self):
-        log.warning(_("zenmapCore.NmapParser.get_ipv4_address deprecated! Use \
-zenmapCore.NmapParser.get_ipv4 instead."))
-        return self.get_ipv4()
-
     def get_ipv4(self):
         addresses = []
         for host in self.nmap.get('hosts', []):
@@ -591,11 +557,6 @@ zenmapCore.NmapParser.get_ipv4 instead."))
         return addresses
 
     # MAC
-    def get_mac_addresses (self):
-        log.warning(_("zenmapCore.NmapParser.get_mac_address deprecated! Use \
-zenmapCore.NmapParser.get_mac instead."))
-        return self.get_mac()
-
     def get_mac(self):
         addresses = []
         for host in self.nmap.get('hosts', []):
@@ -607,11 +568,6 @@ zenmapCore.NmapParser.get_mac instead."))
         return addresses
 
     # IPv6
-    def get_ipv6_addresses (self):
-        log.warning(_("zenmapCore.NmapParser.get_ipv6_address deprecated! Use \
-zenmapCore.NmapParser.get_ipv6 instead."))
-        return self.get_ipv6()
-
     def get_ipv6(self):
         addresses = []
         for host in self.nmap.get('hosts', []):
@@ -1254,7 +1210,7 @@ class NmapParserSAX(ParserBasics, ContentHandler):
                                 args = str(self.nmap_command),
                                 description = str(self.profile_description),
                                 hint = str(self.profile_hint),
-                                nmap_output = str(self.nmap_output),
+                                nmap_output = self.nmap_output.decode(locale.getpreferredencoding(), 'replace'),
                                 options = str(self.profile_options),
                                 profile = str(self.profile),
                                 profile_name = str(self.profile_name),

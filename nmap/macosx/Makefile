@@ -1,5 +1,5 @@
-# This makefile builds a disk image (.dmg) containing the Zenmap application
-# bundle.
+# This makefile builds a disk image (.dmg) containing the installer for Nmap
+# and Zenmap.
 
 NMAP_VERSION := $(shell grep '^\#[ \t]*define[ \t]\+NMAP_VERSION' ../nmap.h | sed -e 's/.*"\(.*\)".*/\1/' -e 'q')
 NMAP_NUM_VERSION := $(shell grep '^\#[ \t]*define[ \t]\+NMAP_NUM_VERSION' ../nmap.h | sed -e 's/.*"\(.*\)".*/\1/' -e 'q')
@@ -52,6 +52,9 @@ stage-nmap:
 	make -C $(NMAP_BUILD_DIR)
 	rm -rf $(NMAP_STAGING_DIR)
 	make -C $(NMAP_BUILD_DIR) install DESTDIR="`pwd`/$(NMAP_STAGING_DIR)"
+
+# make-bundle.sh uses these to build its authorization wrapper.
+export CC CPPFLAGS CFLAGS CXXFLAGS LDFLAGS
 
 stage-zenmap:
 	mkdir -p $(ZENMAP_STAGING_DIR)/Applications

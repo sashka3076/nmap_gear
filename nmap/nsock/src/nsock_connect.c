@@ -16,7 +16,7 @@
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
  * permission to link the code of this program with any version of the     *
  * OpenSSL library which is distributed under a license identical to that  *
- * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * listed in the included COPYING.OpenSSL file, and distribute linked      *
  * combinations including the two. You must obey the GNU GPL in all        *
  * respects for all of the code used other than OpenSSL.  If you modify    *
  * this file, you may extend this exception to your version of the file,   *
@@ -48,12 +48,12 @@
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
- * General Public License for more details (                               *
- * http://www.gnu.org/copyleft/gpl.html ).                                 *
+ * General Public License v2.0 for more details                            *
+ * (http://www.gnu.org/licenses/gpl-2.0.html).                             *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_connect.c 6859 2008-02-28 18:52:17Z fyodor $ */
+/* $Id: nsock_connect.c 7327 2008-05-05 04:10:20Z fyodor $ */
 
 #include "nsock.h"
 #include "nsock_internal.h"

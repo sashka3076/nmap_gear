@@ -24,7 +24,7 @@
  * following:                                                              *
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
- *   nmap-os-fingerprints or nmap-service-probes.                          *
+ *   nmap-os-db or nmap-service-probes.                                    *
  * o Executes Nmap and parses the results (as opposed to typical shell or  *
  *   execution-menu apps, which simply display raw Nmap output and so are  *
  *   not derivative works.)                                                * 
@@ -59,7 +59,7 @@
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
  * permission to link the code of this program with any version of the     *
  * OpenSSL library which is distributed under a license identical to that  *
- * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * listed in the included COPYING.OpenSSL file, and distribute linked      *
  * combinations including the two. You must obey the GNU GPL in all        *
  * respects for all of the code used other than OpenSSL.  If you modify    *
  * this file, you may extend this exception to your version of the file,   *
@@ -91,13 +91,13 @@
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
- * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
- * with Nmap.                                                              *
+ * General Public License v2.0 for more details at                         *
+ * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
+ * included with Nmap.                                                     *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.cc 7182 2008-04-24 03:23:01Z fyodor $ */
+/* $Id: nmap.cc 7817 2008-05-31 02:39:27Z batrick $ */
 
 #include "nmap.h"
 #include "osscan.h"
@@ -256,7 +256,7 @@ printf("%s %s ( %s )\n"
        "  --version-trace: Show detailed version scan activity (for debugging)\n"
 #ifndef NOLUA
        "SCRIPT SCAN:\n"
-       "  -sC: equivalent to --script=safe,intrusive\n"
+       "  -sC: equivalent to --script=default\n"
        "  --script=<Lua scripts>: <Lua scripts> is a comma separated list of \n"
 	   "           directories, script-files or script-categories\n"
 	   "  --script-args=<n1=v1,[n2=v2,...]>: provide arguments to scripts\n"
@@ -380,8 +380,8 @@ static int ip_is_reserved(struct in_addr *ip)
       break;
     }
 
-  /* 100-113/8 is IANA reserved */
-  if (i1 >= 100 && i1 <= 113)
+  /* 100-111/8 is IANA reserved */
+  if (i1 >= 100 && i1 <= 111)
     return 1;
 
   /* 172.16.0.0/12 is reserved for private nets by RFC1819 */
@@ -460,6 +460,44 @@ static char *grab_next_host_spec(FILE *inputfd, int argc, char **fakeargv) {
   return host_spec;
 }
 
+void validate_scan_lists(scan_lists &ports, NmapOps &o){
+	if (o.pingtype == PINGTYPE_UNKNOWN) {
+		if (o.isr00t && o.pf() == PF_INET) o.pingtype = DEFAULT_PING_TYPES;
+		else o.pingtype = PINGTYPE_TCP; // if nonr00t or IPv6
+		getpts_simple(DEFAULT_TCP_PROBE_PORT_SPEC, SCAN_TCP_PORT, &ports.ack_ping_ports, &ports.ack_ping_count);
+		assert(ports.ack_ping_count > 0);
+	}
+
+	if (!o.isr00t || o.pf() != PF_INET) {
+    		// We will have to do a connect() style ping 
+		if (ports.syn_ping_count && ports.ack_ping_count) {
+			fatal("Cannot use both SYN and ACK ping probes if you are nonroot or using IPv6");
+		}
+		// Pretend we wanted SYN probes all along.
+		if (ports.ack_ping_count > 0) { 
+			ports.syn_ping_count = ports.ack_ping_count;
+			ports.syn_ping_ports = ports.ack_ping_ports;
+			ports.ack_ping_count = 0;
+			ports.ack_ping_ports = NULL;
+		}
+		o.pingtype &= ~PINGTYPE_TCP_USE_ACK;
+		o.pingtype |= PINGTYPE_TCP_USE_SYN;
+	}
+
+	#ifndef WIN32	/*	Win32 has perfectly fine ICMP socket support */
+	if (!o.isr00t) {
+		if (o.pingtype & (PINGTYPE_ICMP_PING|PINGTYPE_ICMP_MASK|PINGTYPE_ICMP_TS)) {
+			error("Warning:  You are not root -- using TCP pingscan rather than ICMP");
+			o.pingtype = PINGTYPE_TCP;
+			if (ports.syn_ping_count == 0){
+				getpts_simple(DEFAULT_TCP_PROBE_PORT_SPEC, SCAN_TCP_PORT, &ports.syn_ping_ports, &ports.syn_ping_count);
+				assert(ports.syn_ping_count > 0);
+			}
+		}
+	}
+	#endif
+}
+
 int nmap_main(int argc, char *argv[]) {
   char *p, *q;
   int i, arg;
@@ -478,7 +516,7 @@ int nmap_main(int argc, char *argv[]) {
   struct tm *tm;
   HostGroupState *hstate = NULL;
   char *endptr = NULL;
-  struct scan_lists *ports = NULL;
+  struct scan_lists ports = { 0 };
   TargetGroup *exclude_group = NULL;
   Traceroute *troute = NULL;
   char myname[MAXHOSTNAMELEN + 1];
@@ -505,7 +543,6 @@ int nmap_main(int argc, char *argv[]) {
   size_t sslen;
   int option_index;
   bool iflist = false;
-  struct timeval tv;
 
   // Pre-specified timing parameters.
   // These are stored here during the parsing of the arguments so that we can
@@ -648,10 +685,6 @@ int nmap_main(int argc, char *argv[]) {
   fakeargv[argc] = NULL;
 
   if (argc < 2 ) printusage(argv[0], -1);
-
-  /* You never know when "random" numbers will come in handy ... */
-  gettimeofday(&tv, NULL);
-  srand((tv.tv_sec ^ tv.tv_usec) ^ getpid() + 31337);
 
   Targets.reserve(100);
 #ifdef WIN32
@@ -1039,76 +1072,76 @@ int nmap_main(int argc, char *argv[]) {
       else if (*optarg == 'R')
 	o.pingtype |= PINGTYPE_ARP;
       else if (*optarg == 'S') {
+	if (ports.syn_ping_count > 0)
+	  fatal("Only one -PS option is allowed. Combine port ranges with commas.");
 	o.pingtype |= (PINGTYPE_TCP|PINGTYPE_TCP_USE_SYN);
 	if (*(optarg + 1) != '\0') {
-	  getpts_simple(optarg + 1, SCAN_TCP_PORT, &o.ping_synprobes, &o.num_ping_synprobes);
-	  if (o.num_ping_synprobes <= 0) {
+	  getpts_simple(optarg + 1, SCAN_TCP_PORT, &ports.syn_ping_ports, &ports.syn_ping_count);
+	  if (ports.syn_ping_count <= 0)
 	    fatal("Bogus argument to -PS: %s", optarg + 1);
-	  }
-	}
-	if (o.num_ping_synprobes == 0) {
-	  getpts_simple(DEFAULT_TCP_PROBE_PORT_SPEC, SCAN_TCP_PORT, &o.ping_synprobes, &o.num_ping_synprobes);
-	  assert(o.num_ping_synprobes > 0);
+	} else {
+	  getpts_simple(DEFAULT_TCP_PROBE_PORT_SPEC, SCAN_TCP_PORT, &ports.syn_ping_ports, &ports.syn_ping_count);
+	  assert(ports.syn_ping_count > 0);
 	}
       }
       else if (*optarg == 'T' || *optarg == 'A') {
-	/* NmapOps::ValidateOptions() takes care of changing this
-	   to SYN if not root or if IPv6 */
+	if (ports.ack_ping_count > 0)
+	  fatal("Only one -PB, -PA, or -PT option is allowed. Combine port ranges with commas.");
+        /* validate_scan_lists takes case of changing this to
+           to SYN if not root or if IPv6. */
 	o.pingtype |= (PINGTYPE_TCP|PINGTYPE_TCP_USE_ACK);
 	if (*(optarg + 1) != '\0') {
-	  getpts_simple(optarg + 1, SCAN_TCP_PORT, &o.ping_ackprobes, &o.num_ping_ackprobes);
-	  if (o.num_ping_ackprobes <= 0) {
+	  getpts_simple(optarg + 1, SCAN_TCP_PORT, &ports.ack_ping_ports, &ports.ack_ping_count);
+	  if (ports.ack_ping_count <= 0)
 	    fatal("Bogus argument to -PA: %s", optarg + 1);
-	  }
-	}
-	if (o.num_ping_ackprobes == 0) {
-	  getpts_simple(DEFAULT_TCP_PROBE_PORT_SPEC, SCAN_TCP_PORT, &o.ping_ackprobes, &o.num_ping_ackprobes);
-	  assert(o.num_ping_ackprobes > 0);
+	} else {
+	  getpts_simple(DEFAULT_TCP_PROBE_PORT_SPEC, SCAN_TCP_PORT, &ports.ack_ping_ports, &ports.ack_ping_count);
+	  assert(ports.ack_ping_count > 0);
 	}
       }
       else if (*optarg == 'U') {
+	if (ports.udp_ping_count > 0)
+	  fatal("Only one -PU option is allowed. Combine port ranges with commas.");
 	o.pingtype |= (PINGTYPE_UDP);
 	if (*(optarg + 1) != '\0') {
-	  getpts_simple(optarg + 1, SCAN_UDP_PORT, &o.ping_udpprobes, &o.num_ping_udpprobes);
-	  if (o.num_ping_udpprobes <= 0) {
+	  getpts_simple(optarg + 1, SCAN_UDP_PORT, &ports.udp_ping_ports, &ports.udp_ping_count);
+	  if (ports.udp_ping_count <= 0)
 	    fatal("Bogus argument to -PU: %s", optarg + 1);
-	  }
-	}
-	if (o.num_ping_udpprobes == 0) {
-	  getpts_simple(DEFAULT_UDP_PROBE_PORT_SPEC, SCAN_UDP_PORT, &o.ping_udpprobes, &o.num_ping_udpprobes);
-	  assert(o.num_ping_udpprobes > 0);
+	} else {
+	  getpts_simple(DEFAULT_UDP_PROBE_PORT_SPEC, SCAN_UDP_PORT, &ports.udp_ping_ports, &ports.udp_ping_count);
+	  assert(ports.udp_ping_count > 0);
 	}
       }
       else if (*optarg == 'B') {
-	o.pingtype = (PINGTYPE_TCP|PINGTYPE_TCP_USE_ACK|PINGTYPE_ICMP_PING);
+	if (ports.ack_ping_count > 0)
+	  fatal("Only one -PB, -PA, or -PT option is allowed. Combine port ranges with commas.");
+	o.pingtype = DEFAULT_PING_TYPES;
 	if (*(optarg + 1) != '\0') {
-	  getpts_simple(optarg + 1, SCAN_TCP_PORT, &o.ping_ackprobes, &o.num_ping_ackprobes);
-	  if (o.num_ping_ackprobes <= 0) {
+	  getpts_simple(optarg + 1, SCAN_TCP_PORT, &ports.ack_ping_ports, &ports.ack_ping_count);
+	  if (ports.ack_ping_count <= 0)
 	    fatal("Bogus argument to -PB: %s", optarg + 1);
-	  }
-	}
-	if (o.num_ping_ackprobes == 0) {
-	  getpts_simple(DEFAULT_TCP_PROBE_PORT_SPEC, SCAN_TCP_PORT, &o.ping_ackprobes, &o.num_ping_ackprobes);
-	  assert(o.num_ping_ackprobes > 0);
+	} else {
+	  getpts_simple(DEFAULT_TCP_PROBE_PORT_SPEC, SCAN_TCP_PORT, &ports.ack_ping_ports, &ports.ack_ping_count);
+	  assert(ports.ack_ping_count > 0);
 	}
       } else if (*optarg == 'O') {
+	if (ports.proto_ping_count > 0)
+	  fatal("Only one -PO option is allowed. Combine port ranges with commas.");
 	o.pingtype |= PINGTYPE_PROTO;
 	if (*(optarg + 1) != '\0') {
-	  getpts_simple(optarg + 1, SCAN_PROTOCOLS, &o.ping_protoprobes, &o.num_ping_protoprobes);
-	  if (o.num_ping_protoprobes <= 0) {
+	  getpts_simple(optarg + 1, SCAN_PROTOCOLS, &ports.proto_ping_ports, &ports.proto_ping_count);
+	  if (ports.proto_ping_count <= 0)
 	    fatal("Bogus argument to -PO: %s", optarg + 1);
-	  }
-	}
-	if (o.num_ping_protoprobes == 0) {
-	  getpts_simple(DEFAULT_PROTO_PROBE_PORT_SPEC, SCAN_PROTOCOLS, &o.ping_protoprobes, &o.num_ping_protoprobes);
-	  assert(o.num_ping_protoprobes > 0);
+	} else {
+	  getpts_simple(DEFAULT_PROTO_PROBE_PORT_SPEC, SCAN_PROTOCOLS, &ports.proto_ping_ports, &ports.proto_ping_count);
+	  assert(ports.proto_ping_count > 0);
 	}
       } else { 
 	fatal("Illegal Argument to -P, use -PN, -PO, -PI, -PB, -PE, -PM, -PP, -PA, -PU, -PT, or -PT80 (or whatever number you want for the TCP probe destination port)"); 
       }
       break;
     case 'p': 
-      if (ports || portlist)
+      if (portlist)
 	fatal("Only 1 -p option allowed, separate multiple ranges with commas.");
       portlist = strdup(optarg);
       break;
@@ -1236,6 +1269,7 @@ int nmap_main(int argc, char *argv[]) {
   if (o.osscan == OS_SCAN_DEFAULT)
     o.reference_FPs = parse_fingerprint_reference_file("nmap-os-db");
 
+  validate_scan_lists(ports,o);
   o.ValidateOptions();
 
   // print ip options
@@ -1292,14 +1326,11 @@ int nmap_main(int argc, char *argv[]) {
     fatal("You cannot use -F (fast scan) with -p (explicit port selection) but see --top-ports and --port-ratio to fast scan a range of ports");
 
   if (o.ipprotscan) {
-    if (portlist) ports = getpts(portlist);
-    else ports = getpts((char *) (o.fastscan ? "[P:0-]" : "0-"));  // Default protocols to scan
+	  if (portlist) getpts(portlist, &ports);
+	  else getpts((char *) (o.fastscan ? "[P:0-]" : "0-"), &ports);  // Default protocols to scan
   } else {
-    ports = gettoppts(o.topportlevel, portlist);
+    gettoppts(o.topportlevel, portlist, &ports);
   }
-
-  if (portlist && !ports)
-    fatal("Your port specification string is not parseable");
 
   if (portlist) {
     free(portlist);
@@ -1307,7 +1338,7 @@ int nmap_main(int argc, char *argv[]) {
   }
 
   // Uncomment the following line to use the common lisp port spec test suite
-  //printf("port spec: (%d %d %d)\n", ports->tcp_count, ports->udp_count, ports->prot_count); exit(0);
+  //printf("port spec: (%d %d %d)\n", ports.tcp_count, ports.udp_count, ports.prot_count); exit(0);
 
 #ifdef WIN32
   if (o.sendpref & PACKET_SEND_IP) {
@@ -1366,11 +1397,11 @@ int nmap_main(int argc, char *argv[]) {
    * (such as OS ident scan) might break cause no ports were specified,  but
    * we've given our warning...
    */
-  if ((o.TCPScan()) && ports->tcp_count == 0)
+  if ((o.TCPScan()) && ports.tcp_count == 0)
     error("WARNING: a TCP scan type was requested, but no tcp ports were specified.  Skipping this scan type.");
-  if (o.UDPScan() && ports->udp_count == 0)
+  if (o.UDPScan() && ports.udp_count == 0)
     error("WARNING: UDP scan was requested, but no udp ports were specified.  Skipping this scan type.");
-  if (o.ipprotscan && ports->prot_count == 0)
+  if (o.ipprotscan && ports.prot_count == 0)
     error("WARNING: protocol scan was requested, but no protocols were specified to be scanned.  Skipping this scan type.");
 
   /* Set up our array of decoys! */
@@ -1453,7 +1484,7 @@ int nmap_main(int argc, char *argv[]) {
   log_write(LOG_XML, "start=\"%lu\" startstr=\"%s\" version=\"%s\" xmloutputversion=\"1.02\">\n",
 	    (unsigned long) timep, mytime, NMAP_VERSION);
 
-  output_xml_scaninfo_records(ports);
+  output_xml_scaninfo_records(&ports);
 
   log_write(LOG_XML, "<verbose level=\"%d\" />\n<debugging level=\"%d\" />\n",
 	    o.verbose, o.debugging);
@@ -1461,7 +1492,7 @@ int nmap_main(int argc, char *argv[]) {
   /* Before we randomize the ports scanned, lets output them to machine 
      parseable output */
   if (o.verbose)
-    output_ports_to_machine_parseable_output(ports, o.TCPScan(), o.udpscan, o.ipprotscan);
+    output_ports_to_machine_parseable_output(&ports, o.TCPScan(), o.udpscan, o.ipprotscan);
 
   /* more fakeargv junk, BTW malloc'ing extra space in argv[0] doesn't work */
   if (quashargv) {
@@ -1500,22 +1531,22 @@ int nmap_main(int argc, char *argv[]) {
 
   /* Before we randomize the ports scanned, we must initialize PortList class. */
   if (o.ipprotscan)
-    PortList::initializePortMap(IPPROTO_IP,  ports->prots, ports->prot_count);
+    PortList::initializePortMap(IPPROTO_IP,  ports.prots, ports.prot_count);
   if (o.TCPScan())
-    PortList::initializePortMap(IPPROTO_TCP, ports->tcp_ports, ports->tcp_count);
+    PortList::initializePortMap(IPPROTO_TCP, ports.tcp_ports, ports.tcp_count);
   if (o.UDPScan())
-    PortList::initializePortMap(IPPROTO_UDP, ports->udp_ports, ports->udp_count);
+    PortList::initializePortMap(IPPROTO_UDP, ports.udp_ports, ports.udp_count);
   
   if  (randomize) {
-    if (ports->tcp_count) {
-      shortfry(ports->tcp_ports, ports->tcp_count); 
+    if (ports.tcp_count) {
+      shortfry(ports.tcp_ports, ports.tcp_count); 
       // move a few more common ports closer to the beginning to speed scan
-      random_port_cheat(ports->tcp_ports, ports->tcp_count);
+      random_port_cheat(ports.tcp_ports, ports.tcp_count);
     }
-    if (ports->udp_count) 
-      shortfry(ports->udp_ports, ports->udp_count); 
-    if (ports->prot_count) 
-      shortfry(ports->prots, ports->prot_count); 
+    if (ports.udp_count) 
+      shortfry(ports.udp_ports, ports.udp_count); 
+    if (ports.prot_count) 
+      shortfry(ports.prots, ports.prot_count); 
   }
 
   /* lets load our exclude list */
@@ -1549,10 +1580,10 @@ int nmap_main(int argc, char *argv[]) {
 			      host_exp_group, num_host_exp_groups);
 
   do {
-    ideal_scan_group_sz = determineScanGroupSize(o.numhosts_scanned, ports);
+    ideal_scan_group_sz = determineScanGroupSize(o.numhosts_scanned, &ports);
     while(Targets.size() < ideal_scan_group_sz) {
       o.current_scantype = HOST_DISCOVERY;
-      currenths = nexthost(hstate, exclude_group, ports, o.pingtype);
+      currenths = nexthost(hstate, exclude_group, &ports, o.pingtype);
       if (!currenths) {
 	/* Try to refill with any remaining expressions */
 	/* First free the old ones */
@@ -1573,7 +1604,7 @@ int nmap_main(int argc, char *argv[]) {
 				    host_exp_group, num_host_exp_groups);
       
 	/* Try one last time -- with new expressions */
-	currenths = nexthost(hstate, exclude_group, ports, o.pingtype);
+	currenths = nexthost(hstate, exclude_group, &ports, o.pingtype);
 	if (!currenths)
 	  break;
       }
@@ -1658,7 +1689,7 @@ int nmap_main(int argc, char *argv[]) {
     /* ping scan traceroutes */
     if(o.traceroute && o.pingscan) {
         /* Assume that all targets in a group use the same device */
-        troute = new Traceroute(Targets[0]->deviceName(), Targets[0]->ifType());
+        troute = new Traceroute(Targets[0]->deviceName(), Targets[0]->ifType(), &ports);
         troute->trace(Targets);
         troute->resolveHops();
 
@@ -1686,34 +1717,34 @@ int nmap_main(int argc, char *argv[]) {
 
     // Ultra_scan sets o.scantype for us so we don't have to worry
     if (o.synscan)
-      ultra_scan(Targets, ports, SYN_SCAN);
+      ultra_scan(Targets, &ports, SYN_SCAN);
     
     if (o.ackscan)
-      ultra_scan(Targets, ports, ACK_SCAN);
+      ultra_scan(Targets, &ports, ACK_SCAN);
     
     if (o.windowscan)
-      ultra_scan(Targets, ports, WINDOW_SCAN);
+      ultra_scan(Targets, &ports, WINDOW_SCAN);
     
     if (o.finscan)
-      ultra_scan(Targets, ports, FIN_SCAN);
+      ultra_scan(Targets, &ports, FIN_SCAN);
     
     if (o.xmasscan)
-      ultra_scan(Targets, ports, XMAS_SCAN);
+      ultra_scan(Targets, &ports, XMAS_SCAN);
     
     if (o.nullscan)
-      ultra_scan(Targets, ports, NULL_SCAN);
+      ultra_scan(Targets, &ports, NULL_SCAN);
     
     if (o.maimonscan)
-      ultra_scan(Targets, ports, MAIMON_SCAN);
+      ultra_scan(Targets, &ports, MAIMON_SCAN);
     
     if (o.udpscan)
-      ultra_scan(Targets, ports, UDP_SCAN);
+      ultra_scan(Targets, &ports, UDP_SCAN);
     
     if (o.connectscan)
-      ultra_scan(Targets, ports, CONNECT_SCAN);
+      ultra_scan(Targets, &ports, CONNECT_SCAN);
     
     if (o.ipprotscan)
-      ultra_scan(Targets, ports, IPPROT_SCAN);
+      ultra_scan(Targets, &ports, IPPROT_SCAN);
     
     /* These lame functions can only handle one target at a time */
     for(targetno = 0; targetno < Targets.size(); targetno++) {
@@ -1721,15 +1752,15 @@ int nmap_main(int argc, char *argv[]) {
       if (o.idlescan) {
          o.current_scantype = IDLE_SCAN;
          keyWasPressed(); // Check if a status message should be printed
-         idle_scan(currenths, ports->tcp_ports, 
-				ports->tcp_count, idleProxy);
+         idle_scan(currenths, ports.tcp_ports, 
+				ports.tcp_count, idleProxy, &ports);
       }
       if (o.bouncescan) {
          o.current_scantype = BOUNCE_SCAN;
          keyWasPressed(); // Check if a status message should be printed
 	if (ftp.sd <= 0) ftp_anon_connect(&ftp);
-	if (ftp.sd > 0) bounce_scan(currenths, ports->tcp_ports, 
-				    ports->tcp_count, &ftp);
+	if (ftp.sd > 0) bounce_scan(currenths, ports.tcp_ports, 
+				    ports.tcp_count, &ftp);
       }
     }
 
@@ -1747,7 +1778,7 @@ int nmap_main(int argc, char *argv[]) {
 	  os_scan2(Targets);
 
     if(o.traceroute) {
-        troute = new Traceroute(Targets[0]->deviceName(), Targets[0]->ifType());
+        troute = new Traceroute(Targets[0]->deviceName(), Targets[0]->ifType(), &ports);
         troute->trace(Targets);
         troute->resolveHops();
     }
@@ -1770,7 +1801,9 @@ int nmap_main(int argc, char *argv[]) {
     for(targetno = 0; targetno < Targets.size(); targetno++) {
       currenths = Targets[targetno];
     /* Now I can do the output and such for each host */
-      log_write(LOG_XML, "<host>");
+      log_write(LOG_XML, "<host starttime=\"%lu\" endtime=\"%lu\">",
+		(unsigned long) currenths->StartTime(),
+		(unsigned long) currenths->EndTime());
       write_host_status(currenths, o.resolve_all);
       if (currenths->timedOut(NULL)) {
 	log_write(LOG_PLAIN,"Skipping host %s due to host timeout\n", 
@@ -1828,7 +1861,7 @@ int nmap_main(int argc, char *argv[]) {
 
   printfinaloutput();
 
-  free_scan_lists(ports);
+  free_scan_lists(&ports);
 
   eth_close_cached();
 
@@ -2061,9 +2094,8 @@ void init_socket(int sd) {
 static void getpts_aux(const char *origexpr, int nested, u8 *porttbl, int range_type,
                        int *portwarning, bool change_range_type = true);
 
-struct scan_lists *getpts(const char *origexpr) {
+void getpts(const char *origexpr, struct scan_lists *ports) {
   u8 *porttbl;
-  struct scan_lists *ports;
   int range_type = 0;
   int portwarning = 0;
   int i, tcpi, udpi, proti;
@@ -2076,7 +2108,6 @@ struct scan_lists *getpts(const char *origexpr) {
     range_type |= SCAN_PROTOCOLS;
 
   porttbl = (u8 *) safe_zalloc(65536);
-  ports = (struct scan_lists *) safe_zalloc(sizeof(struct scan_lists));
 
   getpts_aux(origexpr,      // Pass on the expression
              0,             // Don't start off nested
@@ -2119,15 +2150,12 @@ struct scan_lists *getpts(const char *origexpr) {
   }
 
   free(porttbl);
-
-  return ports;
-
 }
 
-/* This function is like getpts except that instead of returning several lists
-   of ports in a struct scan_lists, it allocates only one list and stores it in
-   the list and count arguments. For that reason, T:, U:, and P: restrictions
-   are not allowed and only one bit in range_type may be set. */
+/* This function is like getpts except it only allocates space for and stores
+  values into one unsigned short array, instead of an entire scan_lists struct
+  For that reason, T:, U:, and P: restrictions are not allowed and only one
+  bit in range_type may be set. */
 void getpts_simple(const char *origexpr, int range_type,
                    unsigned short **list, int *count) {
   u8 *porttbl;
@@ -2150,8 +2178,10 @@ void getpts_simple(const char *origexpr, int range_type,
       (*count)++;
   }
 
-  if (*count == 0)
+  if (*count == 0){
+    free(porttbl);
     return;
+  }
 
   *list = (unsigned short *) safe_zalloc(*count * sizeof(unsigned short));
 
@@ -2322,7 +2352,10 @@ static void getpts_aux(const char *origexpr, int nested, u8 *porttbl, int range_
     /* Find the next range */
     while(isspace((int) *current_range)) current_range++;
 
-    if (*current_range == ']') return;
+    if (*current_range == ']') {
+      if (!nested) fatal("Unexpected ] character in port/protocol specification");
+      return;
+    }
 
     if (*current_range && *current_range != ',') {
       fatal("Error #488: Your port specifications are illegal.  Example of proper form: \"%s\"", syntax_example);
@@ -2334,12 +2367,13 @@ static void getpts_aux(const char *origexpr, int nested, u8 *porttbl, int range_
 }
 
 void free_scan_lists(struct scan_lists *ports) {
-  if (ports) {
-    if (ports->tcp_ports) free(ports->tcp_ports);
-    if (ports->udp_ports) free(ports->udp_ports);
-    if (ports->prots) free(ports->prots);
-    free(ports);
-  }
+  if (ports->tcp_ports) free(ports->tcp_ports);
+  if (ports->udp_ports) free(ports->udp_ports);
+  if (ports->prots) free(ports->prots);
+  if (ports->syn_ping_ports) free(ports->syn_ping_ports);
+  if (ports->ack_ping_ports) free(ports->ack_ping_ports);
+  if (ports->udp_ping_ports) free(ports->udp_ping_ports);
+  if (ports->proto_ping_ports) free(ports->proto_ping_ports);
 }
 
 void printinteractiveusage() {
@@ -2611,7 +2645,7 @@ void sigdie(int signo) {
  * and is a directory.  Otherwise returns 0.
  */
 
-int fileexistsandisreadable(char *pathname) {
+int fileexistsandisreadable(const char *pathname) {
 	char *pathname_buf = strdup(pathname);
 	int status = 0;
 
@@ -2637,7 +2671,7 @@ int fileexistsandisreadable(char *pathname) {
   return status;
 }
 
-int nmap_fileexistsandisreadable(char* pathname) {
+int nmap_fileexistsandisreadable(const char* pathname) {
 	return fileexistsandisreadable(pathname);
 }
 
@@ -2770,4 +2804,5 @@ int nmap_fetchfile(char *filename_returned, int bufferlen, const char *file) {
   return foundsomething;
 
 }
+
 

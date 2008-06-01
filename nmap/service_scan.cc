@@ -25,7 +25,7 @@
  * following:                                                              *
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
- *   nmap-os-fingerprints or nmap-service-probes.                          *
+ *   nmap-os-db or nmap-service-probes.                                    *
  * o Executes Nmap and parses the results (as opposed to typical shell or  *
  *   execution-menu apps, which simply display raw Nmap output and so are  *
  *   not derivative works.)                                                * 
@@ -60,7 +60,7 @@
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
  * permission to link the code of this program with any version of the     *
  * OpenSSL library which is distributed under a license identical to that  *
- * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * listed in the included COPYING.OpenSSL file, and distribute linked      *
  * combinations including the two. You must obey the GNU GPL in all        *
  * respects for all of the code used other than OpenSSL.  If you modify    *
  * this file, you may extend this exception to your version of the file,   *
@@ -92,13 +92,13 @@
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
- * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
- * with Nmap.                                                              *
+ * General Public License v2.0 for more details at                         *
+ * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
+ * included with Nmap.                                                     *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: service_scan.cc 7099 2008-04-09 02:11:20Z fyodor $ */
+/* $Id: service_scan.cc 7752 2008-05-29 07:49:37Z michael $ */
 
 
 #include "service_scan.h"
@@ -131,10 +131,6 @@
 /* Workaround for lack of namespace std on HP-UX 11.00 */
 namespace std {};
 using namespace std;
-
-// Because this file uses assert()s for some security checking, we can't
-// have anyone turning off debugging.
-#undef NDEBUG
 
 extern NmapOps o;
 
@@ -1074,10 +1070,10 @@ void parse_nmap_service_probe_file(AllProbes *AP, char *filename) {
       continue;
   
     if (strncmp(line, "Exclude ", 8) == 0) {
-      if (AP->excludedports != NULL)
+      if (AP->excluded_seen)
         fatal("Only 1 Exclude directive is allowed in the nmap-service-probes file");
-
-      AP->excludedports = getpts(line+8);
+      getpts(line+8, &AP->excludedports);
+      AP->excluded_seen = true;
       continue;
     }
   
@@ -1195,7 +1191,8 @@ const struct MatchDetails *ServiceProbe::testMatch(const u8 *buf, int buflen) {
 
 AllProbes::AllProbes() {
   nullProbe = NULL;
-  excludedports = NULL;
+  excluded_seen = false;
+  memset(&excludedports, 0, sizeof(excludedports));
 }
 
 AllProbes::~AllProbes() {
@@ -1207,7 +1204,7 @@ AllProbes::~AllProbes() {
   }
   if(nullProbe)
     delete nullProbe;
-  free_scan_lists(excludedports);
+  free_scan_lists(&excludedports);
 }
 
   // Tries to find the probe in this AllProbes class which have the
@@ -1239,14 +1236,14 @@ int AllProbes::isExcluded(unsigned short port, int proto) {
   unsigned short *p=NULL;
   int count=-1,i;
 
-  if (!excludedports) return 0;
+  if (!excluded_seen) return 0;
 
   if (proto == IPPROTO_TCP) {
-    p = excludedports->tcp_ports;
-    count = excludedports->tcp_count;
+    p = excludedports.tcp_ports;
+    count = excludedports.tcp_count;
   } else if (proto == IPPROTO_UDP) {
-    p = excludedports->udp_ports;
-    count = excludedports->udp_count;
+    p = excludedports.udp_ports;
+    count = excludedports.udp_count;
   } else {
     fatal("Bad proto number (%d) specified in %s", proto, __func__);
   }

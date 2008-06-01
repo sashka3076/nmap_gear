@@ -28,7 +28,7 @@
  * following:                                                              *
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
- *   nmap-os-fingerprints or nmap-service-probes.                          *
+ *   nmap-os-db or nmap-service-probes.                                    *
  * o Executes Nmap and parses the results (as opposed to typical shell or  *
  *   execution-menu apps, which simply display raw Nmap output and so are  *
  *   not derivative works.)                                                * 
@@ -63,7 +63,7 @@
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
  * permission to link the code of this program with any version of the     *
  * OpenSSL library which is distributed under a license identical to that  *
- * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * listed in the included COPYING.OpenSSL file, and distribute linked      *
  * combinations including the two. You must obey the GNU GPL in all        *
  * respects for all of the code used other than OpenSSL.  If you modify    *
  * this file, you may extend this exception to your version of the file,   *
@@ -95,13 +95,13 @@
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
- * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
- * with Nmap.                                                              *
+ * General Public License v2.0 for more details at                         *
+ * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
+ * included with Nmap.                                                     *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: output.cc 7179 2008-04-23 22:42:41Z david $ */
+/* $Id: output.cc 7764 2008-05-29 20:05:02Z david $ */
 
 #include "output.h"
 #include "osscan.h"
@@ -129,8 +129,9 @@ static const char *logtypes[LOG_NUM_FILES]=LOG_NAMES;
 static void skid_output(char *s)
 {
   int i;
-  for (i=0;s[i];i++)
-    if (rand()%2==0)
+  for (i=0; s[i]; i++)
+    /* We need a 50/50 chance here, use a random number */
+    if ((get_random_u8() & 0x01) == 0)
       /* Substitutions commented out are not known to me, but maybe look nice */
       switch(s[i])
 	{
@@ -142,7 +143,7 @@ static void skid_output(char *s)
 	case 'e':
 	case 'E': s[i]='3'; break;
 	case 'i':
-	case 'I': s[i]="!|1"[rand()%3]; break;
+	case 'I': s[i]="!|1"[get_random_u8() % 3]; break;
 	  /*      case 'k': s[i]='c'; break;
 	        case 'K': s[i]='C'; break;*/
 	case 'o':
@@ -158,8 +159,13 @@ static void skid_output(char *s)
 	}  
     else
       {
-	if (s[i]>='A' && s[i]<='Z' && (rand()%3==0)) s[i]+='a'-'A';
-	else if (s[i]>='a' && s[i]<='z' && (rand()%3==0)) s[i]-='a'-'A';
+	if (s[i] >= 'A' && s[i] <= 'Z' &&
+	    (get_random_u8() % 3 == 0)) {
+	  s[i] += 'a'-'A'; /* 1/3 chance of lower-case */
+	}
+	else if (s[i] >= 'a' && s[i] <= 'z' && (get_random_u8() % 3 == 0)) {
+	  s[i] -= 'a'-'A'; /* 1/3 chance of upper-case */
+	}
       }
 }
 
@@ -496,6 +502,19 @@ void printportoutput(Target *currenths, PortList *plist) {
     return;
   }
 
+  if (o.verbose > 1 || o.debugging) {
+    time_t tm_secs, tm_sece;
+    struct tm *tm;
+    char tbufs[128];
+    tm_secs = currenths->StartTime();    
+    tm_sece = currenths->EndTime();    
+    tm = localtime(&tm_secs);
+	if (strftime(tbufs, sizeof(tbufs), "%Y-%m-%d %H:%M:%S %Z", tm) <= 0)
+      fatal("Unable to properly format host start time");
+
+    log_write(LOG_PLAIN,"Scanned at %s for %lds\n",
+	      tbufs, tm_sece - tm_secs);
+  }
   log_write(LOG_PLAIN,"Interesting %s on %s:\n",
 	    (o.ipprotscan)? "protocols" : "ports", 
 	    currenths->NameIP(hostname, sizeof(hostname)));
@@ -732,8 +751,12 @@ void printportoutput(Target *currenths, PortList *plist) {
     
   }
   /*  log_write(LOG_PLAIN,"\n"); */
-  if (plist->getStateCounts(istate) > 0)
-    log_write(LOG_MACHINE, "\tIgnored State: %s (%d)", statenum2str(istate), plist->getStateCounts(istate));
+  /* Grepable output supports only one ignored state. */
+  if (plist->numIgnoredStates() == 1) {
+    istate = plist->nextIgnoredState(PORT_UNKNOWN);
+    if (plist->getStateCounts(istate) > 0)
+      log_write(LOG_MACHINE, "\tIgnored State: %s (%d)", statenum2str(istate), plist->getStateCounts(istate));
+  }
   log_write(LOG_XML, "</ports>\n");
 
   // Now we write the table for the user

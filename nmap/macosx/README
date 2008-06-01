@@ -1,20 +1,7 @@
-This is a test packaging of Nmap and Zenmap for Mac OS X. It is meant to
-work on both Intel and PowerPC Macs running Mac OS X 10.4 or later.
+Nmap is a free and open source utility for network exploration and security auditing. Zenmap is a multi-platform graphical frontend and results viewer for Nmap.
 
-We are distributing this in the hope of creating a really great
-distribution of Nmap and Zenmap on the Mac, and for that we need your
-help. Please try it out and send comments and suggestions to
-nmap-dev@insecure.org.
+This package contains Nmap and Zenmap. It is intended to work on Intel and PowerPC Macs running Mac OS X 10.4 or later.
 
-The nmap command-line binary will be installed in /usr/local/bin, and
-additional support files will be installed in /usr/local/libexec and
-/usr/local/share.
+Installation of both Nmap and Zenmap is optional. Unselect Zenmap to get just the command-line tool. Unselect Nmap if you prefer to use a copy of Nmap that is already installed. Zenmap will not work without Nmap.
 
-Zenmap is installed as an application bundle in
-/Applications/Zenmap.app.
-
-Known issues:
-
-Zenmap doesn't run as root. Work to allow this is underway. A workaround
-is to peek inside the application bundle:
-	sudo /Applications/Zenmap.app/Contents/MacOS/zenmap
+The nmap command-line binary will be installed in /usr/local/bin, and additional support files will be installed in /usr/local/libexec and /usr/local/share. The Zenmap application bundle will be installed in /Applications/Zenmap.app.

@@ -25,7 +25,7 @@
  * following:                                                              *
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
- *   nmap-os-fingerprints or nmap-service-probes.                          *
+ *   nmap-os-db or nmap-service-probes.                                    *
  * o Executes Nmap and parses the results (as opposed to typical shell or  *
  *   execution-menu apps, which simply display raw Nmap output and so are  *
  *   not derivative works.)                                                * 
@@ -60,7 +60,7 @@
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
  * permission to link the code of this program with any version of the     *
  * OpenSSL library which is distributed under a license identical to that  *
- * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * listed in the included COPYING.OpenSSL file, and distribute linked      *
  * combinations including the two. You must obey the GNU GPL in all        *
  * respects for all of the code used other than OpenSSL.  If you modify    *
  * this file, you may extend this exception to your version of the file,   *
@@ -92,13 +92,13 @@
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
- * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
- * with Nmap.                                                              *
+ * General Public License v2.0 for more details at                         *
+ * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
+ * included with Nmap.                                                     *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: scan_engine.cc 7299 2008-05-03 05:42:16Z david $ */
+/* $Id: scan_engine.cc 7753 2008-05-29 14:47:05Z david $ */
 
 #ifdef WIN32
 #include "nmap_winconfig.h"
@@ -1473,12 +1473,12 @@ unsigned int UltraScanInfo::numProbesPerHost()
     numprobes = 0;
     if (ptech.rawtcpscan) {
       if (o.pingtype & PINGTYPE_TCP_USE_ACK)
-        numprobes += o.num_ping_ackprobes;
+        numprobes += ports->ack_ping_count;
       if (o.pingtype & PINGTYPE_TCP_USE_SYN)
-        numprobes += o.num_ping_synprobes;
+        numprobes += ports->syn_ping_count;
     }
     if (ptech.rawudpscan)
-      numprobes += o.num_ping_udpprobes;
+      numprobes += ports->udp_ping_count;
     if (ptech.rawicmpscan) {
       if (o.pingtype & PINGTYPE_ICMP_PING)
         numprobes++;
@@ -1488,9 +1488,9 @@ unsigned int UltraScanInfo::numProbesPerHost()
         numprobes++;
     }
     if (ptech.rawprotoscan)
-      numprobes += o.num_ping_protoprobes;
+      numprobes += ports->proto_ping_count;
     if (ptech.connecttcpscan)
-      numprobes += o.num_ping_synprobes;
+      numprobes += ports->syn_ping_count;
   } else assert(0); /* TODO: RPC scan */
 
   return numprobes;
@@ -1762,22 +1762,22 @@ static int get_next_target_probe(UltraScanInfo *USI, HostScanStats *hss,
       pspec->type = PS_TCP;
       pspec->proto = IPPROTO_TCP;
       if ((o.pingtype & PINGTYPE_TCP_USE_ACK)
-        && hss->next_ackportpingidx < o.num_ping_ackprobes) {
-        pspec->pd.tcp.dport = o.ping_ackprobes[hss->next_ackportpingidx++];
+        && hss->next_ackportpingidx < USI->ports->ack_ping_count) {
+        pspec->pd.tcp.dport = USI->ports->ack_ping_ports[hss->next_ackportpingidx++];
         pspec->pd.tcp.flags = TH_ACK;
         return 0;
       }
       if ((o.pingtype & PINGTYPE_TCP_USE_SYN)
-        && hss->next_synportpingidx < o.num_ping_synprobes) {
-        pspec->pd.tcp.dport = o.ping_synprobes[hss->next_synportpingidx++];
+        && hss->next_synportpingidx < USI->ports->syn_ping_count) {
+        pspec->pd.tcp.dport = USI->ports->syn_ping_ports[hss->next_synportpingidx++];
         pspec->pd.tcp.flags = TH_SYN;
         return 0;
       }
     }
-    if (USI->ptech.rawudpscan && hss->next_udpportpingidx < o.num_ping_udpprobes) {
+    if (USI->ptech.rawudpscan && hss->next_udpportpingidx < USI->ports->udp_ping_count) {
       pspec->type = PS_UDP;
       pspec->proto = IPPROTO_UDP;
-      pspec->pd.udp.dport = o.ping_udpprobes[hss->next_udpportpingidx++];
+      pspec->pd.udp.dport = USI->ports->udp_ping_ports[hss->next_udpportpingidx++];
       return 0;
     }
     if (USI->ptech.rawicmpscan) {
@@ -1804,13 +1804,13 @@ static int get_next_target_probe(UltraScanInfo *USI, HostScanStats *hss,
     }
     if (USI->ptech.rawprotoscan) {
       pspec->type = PS_PROTO;
-      pspec->proto = o.ping_protoprobes[hss->next_protoportpingidx++];
+      pspec->proto = USI->ports->proto_ping_ports[hss->next_protoportpingidx++];
       return 0;
     }
-    if (USI->ptech.connecttcpscan && hss->next_synportpingidx < o.num_ping_synprobes) {
+    if (USI->ptech.connecttcpscan && hss->next_synportpingidx < USI->ports->syn_ping_count) {
       pspec->type = PS_CONNECTTCP;
       pspec->proto = IPPROTO_TCP;
-      pspec->pd.tcp.dport = o.ping_synprobes[hss->next_synportpingidx++];
+      pspec->pd.tcp.dport = USI->ports->syn_ping_ports[hss->next_synportpingidx++];
       pspec->pd.tcp.flags = TH_SYN;
       return 0;
     }
@@ -1840,14 +1840,14 @@ int HostScanStats::freshPortsLeft() {
     unsigned int num_probes = 0;
     if (USI->ptech.rawtcpscan) {
       if ((o.pingtype & PINGTYPE_TCP_USE_ACK)
-        && next_ackportpingidx < o.num_ping_ackprobes)
-        num_probes += o.num_ping_ackprobes - next_ackportpingidx;
+        && next_ackportpingidx < USI->ports->ack_ping_count)
+        num_probes += USI->ports->ack_ping_count - next_ackportpingidx;
       if ((o.pingtype & PINGTYPE_TCP_USE_SYN)
-        && next_synportpingidx < o.num_ping_synprobes)
-        num_probes += o.num_ping_synprobes - next_synportpingidx;
+        && next_synportpingidx < USI->ports->syn_ping_count)
+        num_probes += USI->ports->syn_ping_count - next_synportpingidx;
     }
-    if (USI->ptech.rawudpscan && next_udpportpingidx < o.num_ping_udpprobes)
-      num_probes += o.num_ping_udpprobes - next_udpportpingidx;
+    if (USI->ptech.rawudpscan && next_udpportpingidx < USI->ports->udp_ping_count)
+      num_probes += USI->ports->udp_ping_count - next_udpportpingidx;
     if (USI->ptech.rawicmpscan) {
       if ((o.pingtype & PINGTYPE_ICMP_PING) && !sent_icmp_ping)
         num_probes++;
@@ -1857,9 +1857,9 @@ int HostScanStats::freshPortsLeft() {
         num_probes++;
     }
     if (USI->ptech.rawprotoscan)
-      num_probes += o.num_ping_protoprobes - next_protoportpingidx;
-    if (USI->ptech.connecttcpscan && next_synportpingidx < o.num_ping_synprobes)
-      num_probes += o.num_ping_synprobes - next_synportpingidx;
+      num_probes += USI->ports->proto_ping_count - next_protoportpingidx;
+    if (USI->ptech.connecttcpscan && next_synportpingidx < USI->ports->syn_ping_count)
+      num_probes += USI->ports->syn_ping_count - next_synportpingidx;
     return num_probes;
   }
   assert(0);
@@ -2718,7 +2718,7 @@ static UltraProbe *sendIPScanProbe(UltraScanInfo *USI, HostScanStats *hss,
 
     seq = seq32_encode(USI, tryno, pingseq);
     if (pspec->pd.tcp.flags & TH_ACK)
-	  ack = rand();
+	  ack = get_random_u32();
 
     if (pspec->pd.tcp.flags & TH_SYN) {
       tcpops = (u8 *) "\x02\x04\x05\xb4";
@@ -3351,7 +3351,7 @@ static bool do_one_select_round(UltraScanInfo *USI, struct timeval *stime) {
 	  current_reason = ER_CONREFUSED;
 	  break;
 	case EAGAIN:
-	  log_write(LOG_STDOUT, "Machine %s MIGHT actually be listening on probe port %d\n", host->target->targetipstr(), o.ping_synprobes[probe->dport()]);
+	  log_write(LOG_STDOUT, "Machine %s MIGHT actually be listening on probe port %d\n", host->target->targetipstr(), USI->ports->syn_ping_ports[probe->dport()]);
 	  /* Fall through. */
 #ifdef WIN32
 	case WSAENOTCONN:

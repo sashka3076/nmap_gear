@@ -1,5 +1,5 @@
 # Nmap service detection probe list -*- mode: fundamental; -*-
-# $Id: nmap-service-probes 7244 2008-04-29 20:56:57Z kris $ 
+# $Id: nmap-service-probes 7678 2008-05-26 17:49:16Z kris $ 
 #
 # This is a database of custom probes and expected responses that the
 # Nmap Security Scanner ( http://nmap.org ) uses to
@@ -85,6 +85,8 @@ match backdoor m|^\xfa\xcb\xd9\xd9\xdd\xc5\xd8\xce\xd6| p/Theef trojan/ i/**BACK
 match backdoor m|^220 SSL Connection Established - Loading Protocol\.\.\.\.\r\n| p/dhcpse.exe/ i/**BACKDOOR**/ o/Windows/
 match backdoor m|^A-311 Death welcome\x001| p/Haxdoor trojan/ i/**BACKDOOR**/ o/Windows/
 match backdoor m|^220 CAFEiNi [-\w_.]+ FTP server\r\n$| p/CAFEiNi trojan/ i/**BACKDOOR**/ o/Windows/
+match backdoor m/^220 (Stny|fuck)Ftpd 0wns j0\r?\n/ p/Kibuv.b worm/ i/**BACKDOOR**/ o/Windows/
+match backdoor m|^220 [Sf.][tu.][nc.][yk.][.F][t.][p.][d.] [0.][w.][n.][s.] [j.][0.]\r?\n|i p/Generic Kibuv worm/ i/**BACKDOOR**/ o/Windows/
 
 match bf2rcon m|^### Battlefield 2 ModManager Rcon v([\d.]+)\.\n### Digest seed: \w+\n\n| p/Battlefield 2 ModManager Remote Console/ v/$1/
 
@@ -482,7 +484,6 @@ match ftp m|^220 HD316\r FTP server\(Version([\d.]+)\) ready\.\r\n| p/Panasonic 
 match ftp m=^220 \w+ IBM Infoprint (Color |)(\d+) FTP Server ([\d.]+) ready\.\r\n= p/IBM Inforprint $1$2 ftpd/ v/$3/ d/printer/
 match ftp m|^220 ShareIt FTP Server ([\d.]+) \(WINCE\) Ready\.\r\n| p/ShareIt ftpd/ v/$1/ d/PDA/
 match ftp m|^220 ShareIt FTP Pro ([\d.]+) \(WINCE\) Ready\.\r\n| p/ShareIt Pro ftpd/ v/$1/ d/PDA/
-match ftp m|^220 StnyFtpd 0wns j0\n$| p/Unknown ftp backdoor/
 match ftp m|^220 ISOS FTP Server for Upgrade Purpose \(([\d.]+)\) ready\r\n| p/Billion 741GE ADSL router/ v/$1/ d/router/
 match ftp m|^220 PV11 FTP Server ready\r\n| p/Unknown wireless acces point ftpd/ i/Runs Phar Lap RTOS/ d/router/
 match ftp m|^220 Alize Session Manager FTP Server\r\n| p/Alcatel OmniPCX ftpd/ d/PBX/
@@ -954,6 +955,8 @@ match kismet m|^\*KISMET: 0\.0\.0 \d+ \x01Kismet\x01 \d+ \d+ (\S+) \n\*PROTOCOLS
 match kismet m|^\*KISMET: ([\d.]+) \d+ \x01Kismet\x01 \d+ \n\*PROTOCOLS:| p/Kismet server/ v/$1/
 match ksystemguard m|^ksysguardd ([\d.]+)\n\(c\)| p/ksystemguardd/ v/$1/
 
+match landesk m|^TDMM\x1c\0\0\0\x14\0\0\0| p/LANDesk Management Suite/ i/Targeted Multicast Service/
+
 match ldap m|^unable to set certificate file\n6292:error:02001002:system library:fopen:No such file or directory:bss_file\.c:| p/OpenLDAP over SSL/ i/broken/
 
 match lisa m|^\d+ \*+\n.*\x000 succeeded\n\0$|s p/LAN Information Server/ i/Sanitized/
@@ -973,6 +976,7 @@ match lucent-fwadm m|^0001;2$| p/Lucent Secure Management Server/
 match mailq m|^version zmailer ([\d.]+)\n220 MAILQ-V2-CHALLENGE: | p/zmailer/ v/$1/ o/Unix/
 match meetingmaker m/^\xc1,$/ p/Meeting Maker calendaring/
 match melange m|^\+\+\+Online\r\n>> Melange Chat Server \(Version (\d[-.\w]+)\), Apr-25-1999\r\n\nWelcome | p/Melange Chat Server/ v/$1/
+match metasploit m|^\n.*=\[ msf v([^\r\n]+)\r?\n.*\d+ exploits.*\d+ payloads.*\d+ encoders.*\d+ nops.*msf > $|s p/Metasploit Framework msfd/ v/$1/
 match midas m|^MIDASd v([\w.]+) connection accepted\n\xff| p/midasd/ v/$1/
 match mpd m|^OK MPD ([\d.]+)\n$| p/Music Player Daemon/ v/$1/
 # lopster 1.2.0.1 on Linux 1.1
@@ -2130,6 +2134,7 @@ match telnet m|^\xff\xfb\x01\xff\xfb\x03\xff\xfd\x18\xff\xfd\x1f\r\n\r\nWelcome 
 match telnet m|^\xff\xfb\x01\xff\xfd\x18\nTelnet Service on the PrintServer\n\n\rPassword: | p|Hawking/TRENDnet Print Server telnetd| d/print server/
 match telnet m|^\xff\xfb\x01\xff\xfb\x03\r\n\r\n Welcome to OpenVMS \(TM\) Alpha Operating System, Version V([\d.]+)    \r\n\r\n\rUsername: | p/OpenVMS telnetd/ i/OpenVMS $1/ o/OpenVMS/
 match telnet m|^\xff\xfb\x01\xff\xfb\x03\xff\xfd\x03\xff\xfd\x18\xff\xfd\x1f\xff\xfd \xff\xfd!\x07\r\n\r\n Welcome to OpenVMS \(TM\) Alpha Operating System, Version V([-\w_.]+)  \r\n\r\n\rUsername: | p/OpenVMS telnetd/ i/OpenVMS $1/ o/OpenVMS/
+match telnet m|\xff\xfb\x01\xff\xfb\x03\r\n\r\n Welcome to OpenVMS Alpha OS, Version V[\d+.]+| p/OpenVMS telnetd/ i/OpenVMS $1/ o/OpenVMS/
 match telnet m|^\xff\xfb\x01\xff\xfb\x03\xff\xfd\x01\x1b\[0;37;40m\x1b\[2J\x1b\[0;37;40m\x1b\[1m\x1b\[5;27HVertical Horizon Stack Manager\x1b\[0;37;40m\x1b\[1m\x1b\[10;26HEnterasys Networks, Incorporated| p/Enterasys Vertical Horizon Manager/ d/switch/
 match telnet m|^\xff\xfd\($| p|IBM OS/390 or SNA telnetd|
 match telnet m|^\xff\xfb\r\nRemotelyAnywhere Telnet Server v([\d.]+)\r\n.*\r\n\r\n([-\w_. ]+) login\r\nuser name: | p/RemotelyAnywhere telnetd/ v/$1/ i/Name $2/ o/Windows/
@@ -2501,9 +2506,13 @@ match keriopfgui m|^\x12\0\r\0\x03\0\0\0\0\x02\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
 # Tiny Personal Firewall 2.0
 # Kerio Personal Firewall, Firewall engine version 2.1.5 Driver version 3.0.0 on WinXP
 match tinyfw m|^\x0f\0\n\0\x01\0\0\0\0\x02\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0| p/Kerio Personal Firewall/ v/2.1.X/ i/or Tiny Personal Firewall/
+
+# VMWare has a buch of different auth settings so this gets messy
+match vmware-auth m/^220 VMware Authentication Daemon Version (\d[-.\w]+), ServerDaemonProtocol:(SOAP|IPC), MKSDisplayProtocol:VNC/ p/VMware Authentication Daemon/ v/$1/ i/Uses VNC, $2/
+
 match ssl/vmware-auth m|^220 VMware Authentication Daemon Version (\d[-.\w]+): SSL Required\r\n| p/VMware Authentication Daemon/ v/$1/
-match ssl/vmware-auth m|^220 VMware Authentication Daemon Version (\d[-.\w]+): SSL [rR]equired, MKSDisplayProtocol:VNC \r\n| p/VMware GSX Authentication Daemon/ v/$1/ i/Uses VNC/
-match ssl/vmware-auth m|^220 VMware Authentication Daemon Version (\d[-.\w]+): SSL Required, ServerDaemonProtocol:SOAP, MKSDisplayProtocol:VNC| p/VMware GSX Authentication Daemon/ v/$1/ i/Uses VNC, SOAP/
+match ssl/vmware-auth m|^220 VMware Authentication Daemon Version (\d[-.\w]+): SSL [rR]equired, MKSDisplayProtocol:VNC(?: ,)? \r\n| p/VMware Authentication Daemon/ v/$1/ i/Uses VNC/
+match ssl/vmware-auth m/^220 VMware Authentication Daemon Version (\d[-.\w]+): SSL Required, ServerDaemonProtocol:(SOAP|IPC), MKSDisplayProtocol:VNC/ p/VMware Authentication Daemon/ v/$1/ i/Uses VNC, $2/
 
 match vnc m|^RFB 003\.00(\d)\n$| p/VNC/ i/protocol 3.$1/
 match vnc m|^RFB 003\.00(\d)\n\0\0\0\0\0\0\0\x1aToo many security failures$| p/VNC/ i/protocol 3.$1; Locked out/
@@ -3135,7 +3144,7 @@ match http m|^HTTP/1\.1 \d\d\d .*\r\nContent-Type: text/html\r\nDate: .*Server: 
 match http m|^HTTP/1\.0 302 Moved Temporarily\r\nserver: IronPort httpd/(\d[-.\w]+)\r\n| p/IronPort mail appliance admin websever/ v/$1/
 match http m|^HTTP/1\.1 200 OK\r\nServer: Virata-EmWeb/R(\d[-.\w]+)\r\nContent-Type: text/html\r\nExpires: .*\r\nCache-Control: no-cache\r\nPragma: no-cache\r\n\r\n\n<html>\n<head><title>(CopperJet [-.+\w ]+)</title>| p/Allied Data CopperJet aDSL modem/ i/Embedded Virata-EmWeb $1; $2/ d/broadband router/
 match http m|^HTTP/1\.0 \d\d\d .*\r\nDate: .*\nServer: dhttpd/(\d[-.\w]+)\r\n| p/dhttpd/ v/$1/
-match http m|^HTTP/1\.0 401 Unauthorized\r\nServer: Snap Appliance, Inc\./(\d[-.\w]+)\r\n| p/Snap Appliance storage system webadmin/ v/$1/
+match http m|^HTTP/1\.0 \d\d\d .*\r\nServer: Snap Appliance, Inc\./(\d[-.\w]+)\r\n| p/Snap Appliance storage system webadmin/ v/$1/
 match http m|^HTTP/1\.0 200 OK\r\nPragma: no-cache\r\nContent-Type: text/html\r\n\r\n<HTML>\n<FRAMESET COLS=\"105,\*\" FRAMEBORDER=NO BORDER=0\nFRAMESPACING=0>\n<FRAME SRC=\"/side\.html\" SCROLLING=NO>\n<FRAME SRC=\"/startupdata\.html\">\n</FRAMESET>\n</HTML>\n$| p/Motorola cable modem webadmin/ d/router/
 match http m|^HTTP/1\.0 200 OK\nDate: .*\nServer: Intel NetportExpressPro/(\d[-.\w]+)\n| p/Intel NetportExpress Pro print server webadmin/ v/$1/ d/print server/
 match http m|^HTTP/1\.0 200 Ok\r\nContent-Type: text/html; charset=\"utf-8\"\r\n\r\n<HTTP>\r\n<HEAD>\r\n  <TITLE>MythTV Status</TITLE>| p/MythTV Linux PVR webadmin/ o/Linux/
@@ -3317,7 +3326,7 @@ match 3dm-http m|^HTTP/1\.0 200 OK\r\nServer: 3ware/(\d[-.\w]+)\r\n.*<title>3war
 match http m|^HTTP/1\.0 \d\d\d .*\r\nServer: publicfile|s p/publicfile httpd/
 
 # APACHE
-match http m|^HTTP/1\.[01].*Server: Apache/(\d+\.\d+\.[-.\w]+) ([^\r\n]+)|s p/Apache httpd/ v/$1/ i/$2/
+match http m|^HTTP/1\.[01].*?\r\nServer: Apache/(\d+\.\d+\.[-.\w]+) ([^\r\n]+)|s p/Apache httpd/ v/$1/ i/$2/
 match http m|^HTTP/1\.[01].*Server: Apache/([\d\.\w-]+)\s*\r?\n|s p/Apache httpd/ v/$1/
 match http m|^HTTP/1\.1 \d\d\d .*\r\nServer: Apache/(\d[-.\w]+)\r\n.*X-Powered-By: ([^\r\n]+)\r\n|s p/Apache httpd/ v/$1/ i/$2/
 match http m|^HTTP/1\.1 \d\d\d .*\r\nServer: Apache/(\d[-.\w]+)\r\n|s p/Apache httpd/ v/$1/
@@ -4027,8 +4036,7 @@ match http m|^HTTP/1\.1 401 Unauthorized\r\nServer: VOIP\r\nWWW-Authenticate: Di
 match http m|^HTTP/1\.0 \d\d\d .*\r\nServer: KHAPI/([\d.]+) \(Linux\)\r\n|s p/KHAPI httpd/ v/$1/ o/Linux/
 # HP OpenView ITO agent (probably version 7.25) on Windows, port 383
 # Moved from RTSPRequest because fallback can take care of it
-match http m|^HTTP/1\.1 400 Bad Request\r\nContent-Type: text/html\r\nServer: Microsoft-HTTPAPI/([\d.]+)\r\n| p/Microsoft HTTPAPI httpd/ v/$1/ o/Windows/
-match http m|^HTTP/1\.1 503 Service Unavailable\r\nContent-Type: text/html; charset=us-ascii\r\nServer: Microsoft-HTTPAPI/([\d.]+)\r\n| p/Microsoft HTTPAPI httpd/ v/$1/ o/Windows/
+match http m|^HTTP/1\.1 \d\d\d.*\r\nContent-Type: text/html(?:; charset=us-ascii)?\r\nServer: Microsoft-HTTPAPI/([\d.]+)\r\n| p/Microsoft HTTPAPI httpd/ v/$1/ i|SSDP/UPnP| o/Windows/
 match http m|^HTTP/1\.1 \d\d\d .*\r\nDate: .*\r\nServer: Mediasurface/([\d.]+)\r\n| p/Mediasurface CMS httpd/ v/$1/
 match http m|^HTTP/1\.0 \d\d\d .*\r\nServer: RapidLogic/([\d.]+)\r\n.*<TITLE>WireSpeed Data Gateway</TITLE>|s p/WireSpeed Data Gateway router http config/ i/RapidLogic httpd $1/ d/router/
 match http m|^HTTP/1\.1 \d\d\d .*\r\nServer: SmarterTools/([\d.]+)\r\n.*SmarterStats|s p/SmarterTools SmarterStats httpd/ v/$1/ o/Windows/
@@ -4559,6 +4567,7 @@ match http m|^HTTP/1\.0 \d\d\d .*\r\n(?:Date: .*\r\n)?Server: GroupWise POA ([-_
 match http m|^HTTP/1\.0 \d\d\d .*\r\n(?:Date: .*\r\n)?Server: GroupWise GWIA ([-_.\d\w\(\) ]+)\r\n| p/Novell GroupWise GWIA httpd/ v/$1/ i/GroupWise Internet Agent/ o/Unix/
 match http m|^HTTP/1\.0 \d\d\d .*\r\n(?:Date: .*\r\n)?Server: Messenger-MA ([-_.\d\w\(\) ]+)\r\n| p/Novell Messenger httpd/ v/$1/ i/Messenger Agent/ o/Unix/
 match http m|^HTTP/1\.0 200 .*\r\nDate: .*\r\nContent-Length: .*\r\nContent-Type: .*\r\n\r\n<html>\r\n<head>\r\n<title>Novell Messenger Download</title>| p/Novell Messenger download httpd/ o/Unix/
+match http m|^HTTP/1\.[01] \d\d\d .*\r\nServer: Hunchentoot ([\w-_.]+)\r\n|s p/Hunchentoot httpd/ v/$1/
 
 #(insert http)
 
@@ -5171,8 +5180,8 @@ rarity 1
 ports 53,1967,2967
 match domain m|\x07version\x04bind.*\x0cdnsmasq-([-\w._ ]+)$|s p/dnsmasq/ v/$1/
 # Allow 3-12 character version numbers
-match domain m|\x07version\x04bind.*[\x03-\x14]([-\w._ ]{3,20})$|s p/ISC BIND/ v/$1/
-match domain m|\x07version\x04bind.*[\x03-\x14]BIND ([-\w._]{3,20})$|s p/ISC BIND/ v/$1/
+match domain m|\x07version\x04bind.*[\x03-\x14]([-\w._ ]{3,20})|s p/ISC BIND/ v/$1/
+match domain m|\x07version\x04bind.*[\x03-\x14]BIND ([-\w._]{3,20})|s p/ISC BIND/ v/$1/
 # ISC BIND 9.1.3
 match domain m|\x07version\x04bind\0\0\x10\0\x03\xc0\x0c\0\x10\0\x03\0\0\0\0\0\x01\0| p/ISC BIND/ v/9.X/
 match domain m|\x07version\x04bind\0\0\x10\0\x03\x07VERSION\x04BIND\0\0\x10\0\x03\0\0\0\0\0| p/ISC BIND/ v/8.X/
@@ -5216,8 +5225,8 @@ Probe TCP DNSVersionBindReq q|\0\x1E\0\x06\x01\0\0\x01\0\0\0\0\0\0\x07version\x0
 rarity 3
 ports 53,135,512-514,543,544,1029,13783,1521,2068,2105,2967,5323,5520,5530,5555,6543,7000,7008
 match domain m|\x07version\x04bind.*\x0cdnsmasq-([-\w._ ]+)$|s p/dnsmasq/ v/$1/
-match domain m|\x07version\x04bind.*[\x03-\x14]([-\w._ ]{3,20})$|s p/ISC BIND/ v/$1/
-match domain m|\x07version\x04bind.*[\x03-\x14]BIND ([-\w._]{3,20})$|s p/ISC BIND/ v/$1/
+match domain m|\x07version\x04bind.*[\x03-\x14]([-\w._ ]{3,20})|s p/ISC BIND/ v/$1/
+match domain m|\x07version\x04bind.*[\x03-\x14]BIND ([-\w._]{3,20})|s p/ISC BIND/ v/$1/
 # ISC Bind 9.1.3
 match domain m|\x07version\x04bind\0\0\x10\0\x03\xc0\x0c\0\x10\0\x03\0\0\0\0\0\x01\0| p/ISC BIND/ v/9.X/
 

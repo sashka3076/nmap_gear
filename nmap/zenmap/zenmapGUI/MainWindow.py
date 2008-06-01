@@ -54,6 +54,7 @@ from zenmapCore.UmitOptionParser import option_parser
 from zenmapCore.UmitConf import SearchConfig, is_maemo
 from zenmapCore.UmitDB import Scans, UmitDB
 
+# Check to see if we're running with root privileges
 root = False
 try:
     if sys.platform == 'win32':
@@ -96,6 +97,7 @@ class MainWindow(UmitMainWindow):
         
         self.add_accel_group(self.main_accel_group)
         
+        # self.vbox is a container for the menubar, the toolbar, and the scan notebook
         self.add(self.vbox)
         
         self.connect ('delete-event', self._exit_cb)
@@ -105,7 +107,7 @@ class MainWindow(UmitMainWindow):
         self._create_scan_notebook()
         self._verify_root()
         
-        # These dialogs should be instanciated on demand
+        # These dialogs should be instantiated on demand
         # Unfortunately, due to a GTK bug on the filefilters (or our own
         # stupidity), we are creating/destroying them at each callback
         # invocation. sigh.
@@ -119,13 +121,17 @@ class MainWindow(UmitMainWindow):
                 self._load(filename=file)
 
     def configure_focus_chain(self):
+        """Sets the focus chain for the self.vbox element."""
         self.vbox.set_focus_chain()
 
     def _verify_root(self):
+        """Displays a warning if Zenmap is running without root privileges."""
         if not root:
             non_root = NonRootWarning()
 
     def _create_ui_manager(self):
+        """Creates the UI Manager and a default set of actions, and builds
+        the menus and the toolbar using those actions."""
         self.ui_manager = gtk.UIManager()
         
         # See info on ActionGroup at:
@@ -145,9 +151,11 @@ class MainWindow(UmitMainWindow):
         #   _('Open the results of a previous scan'),
         #   lambda x: True) 
         
-        about_icon = None
-        try: about_icon = gtk.STOCK_ABOUT
-        except: pass
+        # gtk.STOCK_ABOUT is only available in PyGTK 2.6 and later.
+        try:
+            about_icon = gtk.STOCK_ABOUT
+        except:
+            about_icon = None
         
         self.main_actions = [ \
             # Top level
@@ -252,7 +260,7 @@ class MainWindow(UmitMainWindow):
             ('About',
                 about_icon,
                 _('_About'),
-                '<Control>a',
+                None,
                 _("About %s" % APP_DISPLAY_NAME),
                 self._show_about_cb
                 ),
@@ -328,33 +336,46 @@ class MainWindow(UmitMainWindow):
         self.ui_manager.add_ui_from_string(self.default_ui)
 
     def _show_bug_report(self, widget):
+        """Displays a 'How to report a bug' window."""
         bug = BugReport()
         bug.show_all()
 
     def _search_scan_result(self, widget):
+        """Displays a search window."""
         search_window = SearchWindow(self._load_search_result, self.scan_notebook)
         search_window.show_all()
 
     def _load_search_result(self, results):
+        """This function is passed as an argument to the SearchWindow.__init__ method.
+        When the user selects scans in the search window and clicks on \"Open\", this
+        function is called to load the selected scans into the main window."""
+        
         for result in results:
             if results[result][1].is_unsaved():
+                # The search found a currently open and unsaved scan. We iterate through
+                # all scan tabs and find it.
                 for i in range(self.scan_notebook.get_n_pages()):
                     if results[result][0] == "Unsaved " + \
                     self.scan_notebook.get_nth_page(i).get_tab_label():
+                        # Make this scan's tab active
                         self.scan_notebook.set_current_page(i)
             else:
+                # We load the scan into the Scan Notebook
                 page = self._load(parsed_result=results[result][1],
                               title=results[result][1].scan_name)
                 page.status.set_search_loaded()
 
     def _close_scan_cb(self, widget, data=None):
-        # data can be none, if the current page is to be closed
+        """'Close Scan' callback function. Displays a warning dialog if the scan
+        has unsaved changes or if the scan is currently running."""
+        
         if data == None:
+            # The current page is to be closed
             page_num = self.scan_notebook.get_current_page()
-        # but can also be this page's content, which will be used
-        # to find this page number
         else:
+            # data contains this page's content, which is used to find this page's number
             page_num = self.scan_notebook.page_num(data)
+        
         page = self.scan_notebook.get_nth_page(page_num)
         filename = None
 
@@ -404,7 +425,7 @@ What do you want to do?'))
             
             if response == gtk.RESPONSE_OK:
                 filename = self._save_scan_results_cb(page)
-                # filename = None means that user didn't saved the result
+                # filename = None means that user didn't save the result
             elif response == gtk.RESPONSE_CANCEL:
                 return False
 
@@ -469,6 +490,9 @@ Scan Tab?'),
         return True
 
     def store_result(self, page, filename):
+        """Stores the scan result into the database. If no filename was given,
+        a temporary file is created to hold the XML output until it is saved
+        into the database."""
         page.parsed.scan_name = self.scan_notebook.get_tab_title(page)
         
         if not filename:
@@ -480,16 +504,17 @@ Scan Tab?'),
         search_config = SearchConfig()
         if search_config.store_results:
             try:
-                log.debug(">>> Saving result into data base...")
+                log.debug(">>> Saving result into database...")
                 scan = Scans(scan_name=self.scan_notebook.get_tab_title(page),
                              nmap_xml_output=open(filename).read(),
                              date=time())
             except:
-                log.debug("Error while trying to store result in Data Base!")
+                log.debug("Error while trying to store the result into database!")
 
 
 
     def get_recent_scans(self):
+        """Gets seven most recent scans and appends them to the default UI definition."""
         r_scans = recent_scans.get_recent_scans_list()
         new_rscan_xml = ''
 
@@ -578,12 +603,15 @@ with %s" % (target, profile))
         self.vbox.pack_start(self.statusbar, False, False, 0)
 
     def _wizard_cb(self, widget):
+        """'Command Wizard' callback function. Creates a Wizard window and displays it."""
         w = Wizard()
         w.set_notebook(self.scan_notebook)
         
         w.show_all()
 
     def _load_scan_results_cb(self, p):
+        """'Open Scan' callback function. Displays a file chooser dialog and loads the
+        scan from the selected file."""
         self._results_filechooser_dialog = ResultsFileChooserDialog(title=p.get_name())
         
         if (self._results_filechooser_dialog.run() == gtk.RESPONSE_OK):
@@ -593,13 +621,13 @@ with %s" % (target, profile))
         self._results_filechooser_dialog = None
     
     def _load_recent_scan(self, widget):
+        """A helper function for loading a recent scan directly from the menu."""
         self._load(widget.get_name())
 
     def _verify_page_usage(self, page):
-        """Verifies if given page is empty and can be used to load a result, or
+        """Verifies if the given page is empty and can be used to load a result, or
         if it's not empty and shouldn't be used to load a result. Returns True, if
-        it's ok to be used, and False if not.
-        """
+        it's OK to be used, and False if not."""
         if page == None \
                or page.status.saved\
                or page.status.unsaved_unchanged\
@@ -614,6 +642,7 @@ with %s" % (target, profile))
             return True
     
     def _load(self, filename=None, parsed_result=None, title=None):
+        """Loads the scan from a file or from a parsed result."""
         scan_page = None
         
         if filename or parsed_result:
@@ -660,7 +689,7 @@ with %s" % (target, profile))
             return 
         else:
             alert = HIGAlertDialog(message_format=_('Could not load result'),
-                                   secondary_text=_('An unidentified error occouried and the \
+                                   secondary_text=_('An unidentified error has occurred and the \
 scan result was unable to be loaded properly.'))
             alert.run()
             alert.destroy()
@@ -676,6 +705,9 @@ this scan result yet")
         return scan_page
     
     def _save_scan_results_cb(self, saving_page):
+        """'Save Scan' callback function. If it's OK to save the scan, it displays a
+        'Save File' dialog and saves the scan. If not, it displays an appropriate
+        alert dialog."""
         current_page = self.scan_notebook.get_nth_page(self.scan_notebook.get_current_page())
 
         try:
@@ -694,8 +726,8 @@ been shown. Run a scan and then try to save it.'))
         if status.empty or status.unknown:    # EMPTY or UNKNOWN
             # Show a dialog saying that there is nothing to be saved
             alert = HIGAlertDialog(message_format=_('Nothing to save'),
-                                   secondary_text=_('No scan on this tab. Start a scan an \
-then try again'))
+                                   secondary_text=_('This scan has not \
+been run yet. Start the scan with the "Scan" button first.'))
             alert.run()
             alert.destroy()
 
@@ -759,7 +791,9 @@ Wait until the scan is finished and then try to save it again.'))
         a.show_all()
     
     def _save(self, saving_page, saved_filename):
-        log.debug(">>> File been saved: %s" % saved_filename)
+        """Saves the scan into a file with a given filename. Displays an alert dialog
+        if we don't have write privileges."""
+        log.debug(">>> File being saved: %s" % saved_filename)
         if os.access(split(saved_filename)[0], os.W_OK):
             f = None
             try:
@@ -827,6 +861,8 @@ Wait until the scan is finished and then try to save it again.'))
         pe.show_all()
     
     def _new_scan_profile_with_selected_cb(self, p):
+        """If there exists a currently open scan tab, this function loads its profile into
+        the Profile Editor. If there's no active tab, it simply opens the Profile Editor."""
         page = self.scan_notebook.get_nth_page(self.scan_notebook.get_current_page())
 
         if page:
@@ -866,6 +902,8 @@ documentation in our Support & Development section.""" % (APP_DISPLAY_NAME, APP_
             d.destroy()
 
     def _exit_cb (self, widget=None, extra=None):
+        """Closes all tabs and exits the application. If one of the tabs couldn't be
+        closed, the function returns True and doesn't exit the application."""
         for page in self.scan_notebook.get_children():
             if not self._close_scan_cb(page):
                 self.show_all()
@@ -877,8 +915,10 @@ documentation in our Support & Development section.""" % (APP_DISPLAY_NAME, APP_
             gtk.main_quit()
 
     def _load_diff_compare_cb (self, widget=None, extra=None):
+        """Loads all active scans into a dictionary, passes it to the DiffWindow
+        constructor, and then displays the 'Compare Results' window."""
         # We must change this test dict
-        # This dict has the following sintax:
+        # This dict has the following syntax:
         # key = Scan name
         # value = nmap output in string format
         dic = {}

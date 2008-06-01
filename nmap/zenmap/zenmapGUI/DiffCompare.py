@@ -19,6 +19,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
+import gobject
 import gtk
 import pango
 import os
@@ -41,24 +42,27 @@ from zenmapCore.I18N import _
 
 from tempfile import mktemp
 from types import StringTypes
-from zenmapGUI.FileChoosers import RegularDiffiesFileFilter, HtmlDiffiesFileFilter
+from zenmapGUI.FileChoosers import ResultsFileChooserDialog
 
+# difflib.HtmlDiff, used by zenmapCore.DiffHtml, is only in Python 2.4 or later.
 try:
     from zenmapCore.DiffHtml import DiffHtml
-    from zenmapGUI.FileChoosers import AllFilesFileChooserDialog,\
-         ResultsFileChooserDialog,\
-         FullDiffiesFileChooserDialog as DiffiesFileChooserDialog
     use_html = True
 except:
-    from zenmapGUI.FileChoosers import AllFilesFileChooserDialog,\
-         ResultsFileChooserDialog,\
-         SingleDiffiesFileChooserDialog as DiffiesFileChooserDialog
     use_html = False
 
 
 class ScanChooser(HIGVBox):
+    """This class allows the selection of scan results from the list of open
+    tabs or from a file. It emits the "changed" signal when the scan selection
+    has changed."""
+
+    __gsignals__ = {
+        "changed": (gobject.SIGNAL_RUN_FIRST, gobject.TYPE_NONE, ())
+    }
+
     def __init__(self, scan_dict, num=""):
-        HIGVBox.__init__(self)
+        self.__gobject_init__()
         self.num = num
         self.scan_dict = scan_dict
         
@@ -77,6 +81,7 @@ class ScanChooser(HIGVBox):
             self.list_scan.append([scan])
         
         self.combo_scan.connect('changed', self.show_scan)
+        self.combo_scan.connect('changed', lambda x: self.emit('changed'))
         
         self._pack_noexpand_nofill(self.lbl_scan)
         self._pack_expand_fill(self.hbox)
@@ -97,8 +102,9 @@ class ScanChooser(HIGVBox):
         return self.txt_scan_result.get_buffer()
     
     def show_scan (self, widget):
-        self.txt_scan_result.get_buffer().\
-             set_text(self.normalize_output(self.scan_dict[widget.child.get_text()].nmap_output))
+        nmap_output = self.get_nmap_output()
+        if nmap_output is not None:
+            self.txt_scan_result.get_buffer().set_text(nmap_output)
 
     def normalize_output(self, output):
         return "\n".join(output.split("\\n"))
@@ -183,17 +189,22 @@ another." % APP_DISPLAY_NAME))
         buff = self.txt_scan_result.get_buffer ()
         buff.apply_tag(self.txg_tag, buff.get_start_iter(), buff.get_end_iter())
 
-    def get_nmap_output(self):
-        parsed = self.parsed_scan
-        if parsed:
-            return parsed.nmap_output
-        return False
-
     def get_parsed_scan(self):
+        """Return the currently selected scan's parsed output as an NmapParser
+        object, or None if no valid scan is selected."""
         selected_scan = self.combo_scan.child.get_text()
-        if selected_scan:
+        if selected_scan in self.scan_dict:
             return self.scan_dict[selected_scan]
-        return False
+        # What's typed in the entry doesn't match a registered scan.
+        return None
+
+    def get_nmap_output(self):
+        """Return the currently selected scan's output as a string, or None if
+        no valid scan is selected."""
+        parsed = self.parsed_scan
+        if parsed is not None:
+            return parsed.nmap_output
+        return None
 
     nmap_output = property(get_nmap_output)
     parsed_scan = property(get_parsed_scan)
@@ -289,20 +300,29 @@ class DiffWindow(gtk.Window):
         self.compare_mode.connect("clicked", self._change_to_compare)
         self.scan_chooser1.exp_scan.connect('activate', self.resize_vpane)
         self.scan_chooser2.exp_scan.connect('activate', self.resize_vpane)
-        self.scan_buffer1.connect('changed', self.text_changed)
-        self.scan_buffer2.connect('changed', self.text_changed)
+        self.scan_chooser1.connect('changed', self.refresh_diff)
+        self.scan_chooser2.connect('changed', self.refresh_diff)
 
     def open_browser(self, widget):
-        text1=self.scan_buffer1.get_text(self.scan_buffer1.get_start_iter(),\
-                                self.scan_buffer1.get_end_iter())
-        text2=self.scan_buffer2.get_text(self.scan_buffer2.get_start_iter(),\
-                                self.scan_buffer2.get_end_iter())
+        text1 = self.scan_chooser1.nmap_output
+        text2 = self.scan_chooser2.nmap_output
 
-        if not text1 or not text2:
+        if text1 is None or text2 is None:
             alert = HIGAlertDialog(
                     message_format='<b>'+_('Select Scan')+'</b>',
                     secondary_text=_("You must select two different scans to \
 generate diff."))
+            alert.run()
+            alert.destroy()
+            return False
+
+        if text1 == '' and text2 == '':
+            alert = HIGAlertDialog(
+                    message_format='<b>'+_('No Text Output')+'</b>',
+                    secondary_text=_("Neither of the scans you selected has \
+any text output. (Scans loaded from plain Nmap XML output files do not contain \
+text output.) The HTML diff shows only differences between text output, so \
+there is nothing to show."))
             alert.run()
             alert.destroy()
             return False
@@ -343,28 +363,33 @@ because you dont have Python 2.4 or higher.)\n''')
         legend_window = DiffLegendWindow(self.colors)
         legend_window.run()
         legend_window.destroy()
-        self.text_changed(None)
+        self.refresh_diff(None)
 
-    def text_changed (self, widget):
-        text1 = self.scan_buffer1.get_text(self.scan_buffer1.get_start_iter(),\
-                                           self.scan_buffer1.get_end_iter())
-        text2 = self.scan_buffer2.get_text(self.scan_buffer2.get_start_iter(),\
-                                           self.scan_buffer2.get_end_iter())
+    def refresh_diff (self, widget):
+        """This method is called whenever the diff output might have changed,
+        such as when a different scan was selected in one of the choosers."""
 
-        if text1 != '' and text2 != '':
-            if self.compare_mode.get_active():
-                self.compare_view.make_diff(self.scan_chooser1.parsed_scan,
-                                            self.scan_chooser2.parsed_scan)
-                self.compare_view.activate_color(self.check_color.get_active())
+        if self.compare_mode.get_active():
+            # Graphical comparison mode.
+            parsed1 = self.scan_chooser1.parsed_scan
+            parsed2 = self.scan_chooser2.parsed_scan
+
+            if parsed1 is not None and parsed2 is not None:
+                self.compare_view.make_diff(parsed1, parsed2)
             else:
-                self.text1 = text1.split ('\n')
-                self.text2 = text2.split ('\n')
-            
-                self.diff = Diff(self.text1, self.text2)
-                self.text_view.txt_diff_result.get_buffer().set_text\
-                               ('\n'.join(self.diff.generate_without_banner()))
-                self.text_view.activate_color(self.check_color.get_active())
-                self.text_view._text_changed(None)
+                self.compare_view.clear_diff_tree()
+            self.compare_view.activate_color(self.check_color.get_active())
+        else:
+            # Text comparison mode.
+            text1 = self.scan_chooser1.nmap_output
+            text2 = self.scan_chooser2.nmap_output
+
+            if text1 is not None and text2 is not None:
+                diff = Diff(text1.split('\n'), text2.split('\n'))
+                self.text_view.set_text('\n'.join(diff.generate_without_banner()))
+            else:
+                self.text_view.clear()
+            self.text_view.activate_color(self.check_color.get_active())
 
     def resize_vpane(self, widget):
         exp1 = not widget.get_expanded()
@@ -394,7 +419,7 @@ because you dont have Python 2.4 or higher.)\n''')
         self.text_view.show_all()
         
         self.compare_mode.set_active(False)
-        self.text_changed(None)
+        self.refresh_diff(None)
 
     def _change_to_compare(self, widget):
         if not widget.get_active():
@@ -411,7 +436,7 @@ because you dont have Python 2.4 or higher.)\n''')
         self.compare_view.show_all()
         
         self.text_mode.set_active(False)
-        self.text_changed(None)
+        self.refresh_diff(None)
 
     def _set_color(self, widget):
         activate = widget.get_active()
@@ -463,11 +488,19 @@ class DiffText(HIGVBox, object):
         # Setting scrolled window
         self.scrolled.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
 
+    def set_text(self, text):
+        """Set the raw diff text of this diff view."""
+        self.txt_diff_result.get_buffer().set_text(text)
+
+    def clear(self):
+        """Make this diff view empty."""
+        self.set_text("")
+
     def activate_color(self, activate):
         self.check_color = activate
-        self._text_changed(None)
+        self._refresh()
     
-    def _set_text_view (self):
+    def _set_text_view(self):
         self.txg_table = self.txt_diff_result.get_buffer().get_tag_table()
         self.txg_table.add(self.txg_tag)
         self.txg_table.add(self.txg_added)
@@ -478,9 +511,9 @@ class DiffText(HIGVBox, object):
         
         self.txt_diff_result.set_wrap_mode(gtk.WRAP_WORD)
         self.txt_diff_result.set_editable(False)
-        self.txt_diff_result.get_buffer().connect("changed", self._text_changed)
+        self.txt_diff_result.get_buffer().connect("changed", self._refresh)
         
-    def _text_changed (self, widget):
+    def _refresh(self, *args):
         self.txg_added.set_property("background-gdk", self.colors.added)
         self.txg_removed.set_property("background-gdk", self.colors.not_present)
         

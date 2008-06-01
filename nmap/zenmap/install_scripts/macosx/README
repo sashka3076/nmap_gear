@@ -10,39 +10,49 @@ properties added by py2app.
 This is a patch to apply to a MacPorts 1.7.0 ports tree to allow
 building "universal" (dual-architecture) dependencies of Zenmap. As of
 this writing, version 1.7.0 is available only as a Subversion checkout.
-To build a universal environment, do the following:
+
+The following instructions show how to make a 10.4-compatible universal
+environment suitable for building Zenmap packages. It will be a separate
+installation in /opt/local-universal-10.4 that won't interfere with your
+normal MacPorts installation in /opt/local.
 
 1. Install MacPorts to be universal.
 	export PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/X11/bin
-	sudo mkdir /Library/Tcl/macports-universal-10.4 ./configure --with-universal-target=10.4 --with-universal-sysroot=/Developer/SDKs/MacOSX10.4u.sdk
+	sudo mkdir /Library/Tcl/macports-universal-10.4
+	./configure --prefix=/opt/local-universal-10.4 --with-tclpackage=/Library/Tcl/macports-universal-10.4 --with-universal-target=10.4 --with-universal-sysroot=/Developer/SDKs/MacOSX10.4u.sdk --with-x11-prefix=/Developer/SDKs/MacOSX10.4u.sdk/usr/X11R6
 	make
 	sudo make install
-2. Set up a local ports tree.
+2. Sync the ports tree. Be sure to use "sync", not "selfupdate", or you
+   will get downgraded to 1.6.0.
+	sudo /opt/local-universal-10.4/bin/port sync
+3. Set up a local ports tree.
 	mkdir -p ~/macports-sources/ports/devel
-	cp -R /opt/local/var/macports/sources/rsync.macports.org/release/ports/devel/glib2 ~/macports-sources/ports/devel/
+	cp -R /opt/local-universal-10.4/var/macports/sources/rsync.macports.org/release/ports/devel/{glib2,openssl} ~/macports-sources/ports/devel/
+	mkdir -p ~/macports-sources/ports/graphics
+	cp -R /opt/local-universal-10.4/var/macports/sources/rsync.macports.org/release/ports/graphics/cairo ~/macports-sources/ports/graphics/
 	mkdir -p ~/macports-sources/ports/lang
-	cp -R /opt/local/var/macports/sources/rsync.macports.org/release/ports/lang/python25 ~/macports-sources/ports/lang/
+	cp -R /opt/local-universal-10.4/var/macports/sources/rsync.macports.org/release/ports/lang/python25 ~/macports-sources/ports/lang/
 	mkdir -p ~/macports-sources/ports/python
-	cp -R /opt/local/var/macports/sources/rsync.macports.org/release/ports/python/{py25-hashlib,py25-libxml2,py25-numeric,py25-numpy,py25-sqlite3,py25-zlib} ~/macports-sources/ports/python/
+	cp -R /opt/local-universal-10.4/var/macports/sources/rsync.macports.org/release/ports/python/{py25-altgraph,py25-bdist_mpkg,py25-hashlib,py25-libxml2,py25-modulegraph-devel,py25-numeric,py25-numpy,py25-py2app-devel,py25-setuptools,py25-sqlite3,py25-zlib} ~/macports-sources/ports/python/
 	mkdir -p ~/macports-sources/ports/x11
-	cp -R /opt/local/var/macports/sources/rsync.macports.org/release/ports/x11/gtk2 ~/macports-sources/ports/x11/
-3. Patch the tree
+	cp -R /opt/local-universal-10.4/var/macports/sources/rsync.macports.org/release/ports/x11/{gtk2,pango,xrender} ~/macports-sources/ports/x11/
+4. Patch the tree
 	cd ~/macports-sources
 	patch -p0 < macports-1.7.0-universal.diff
-4. Build a port index.
-	cd ~/macports-sources
-	portindex
-5. Edit the file /opt/local/etc/macports/sources.conf. Add a line
+5. Build a port index.
+	cd ~/macports-sources/ports
+	/opt/local-universal-10.4/bin/portindex
+6. Edit the file /opt/local-universal-10.4/etc/macports/sources.conf.
+   Add a line
         file:///Users/user/macports-sources/ports/
    above the rsync line.
-6. Edit the file /opt/local/etc/macports/variants.conf. Add a line
+7. Edit the file /opt/local-universal-10.4/etc/macports/variants.conf.
+   Add a line
         +universal
-7. Install the dependencies of Zenmap.
-	sudo port sync ("sync", not "selfupdate", or you will get downgraded to 1.6.0!)
-	sudo port install py25-gtk py25-sqlite3 py25-zlib
-
-Note that you can reserve a separate MacPorts installation for the
-universal environment; see http://guide.macports.org/#installing.source.multiple.
+8. Install the dependencies of Zenmap.
+	sudo /opt/local-universal-10.4/bin/port install py25-gtk py25-py2app-devel py25-sqlite3 py25-zlib
+   For me the build kept hanging up on Python modules, but just
+   restarting the build made the problem go away.
 
 == make-bundle.sh
 This script builds a .app bundle. It must be run from the root of the
@@ -57,5 +67,11 @@ The icon file for the bundle. It was created using the Icon Composer
 utility as described at
 http://developer.apple.com/documentation/Cocoa/Conceptual/ObjCTutorial/08Configuring/chapter_8_section_5.html.
 
+== zenmap_auth.c
+This is a simple wrapper program that attempts to run zenmap_wrapper.py
+with privileges.
+
 == zenmap_wrapper.py
 This is a wrapper script that gets installed in the application bundle.
+It sets up an execution environment and then calls the main zenmap
+executable.

@@ -28,7 +28,7 @@
  * following:                                                              *
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
- *   nmap-os-fingerprints or nmap-service-probes.                          *
+ *   nmap-os-db or nmap-service-probes.                                    *
  * o Executes Nmap and parses the results (as opposed to typical shell or  *
  *   execution-menu apps, which simply display raw Nmap output and so are  *
  *   not derivative works.)                                                * 
@@ -63,7 +63,7 @@
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
  * permission to link the code of this program with any version of the     *
  * OpenSSL library which is distributed under a license identical to that  *
- * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * listed in the included COPYING.OpenSSL file, and distribute linked      *
  * combinations including the two. You must obey the GNU GPL in all        *
  * respects for all of the code used other than OpenSSL.  If you modify    *
  * this file, you may extend this exception to your version of the file,   *
@@ -95,13 +95,13 @@
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
- * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
- * with Nmap.                                                              *
+ * General Public License v2.0 for more details at                         *
+ * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
+ * included with Nmap.                                                     *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: idle_scan.cc 7079 2008-04-08 19:59:56Z david $ */
+/* $Id: idle_scan.cc 7752 2008-05-29 07:49:37Z michael $ */
 
 #include "idle_scan.h"
 #include "timing.h"
@@ -284,7 +284,7 @@ static void initialize_proxy_struct(struct idle_proxy_info *proxy) {
    the program */
 #define NUM_IPID_PROBES 6
 static void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
-			  const struct in_addr *first_target) {
+			  const struct in_addr *first_target, const struct scan_lists * ports) {
   int probes_sent = 0, probes_returned = 0;
   int hardtimeout = 9000000; /* Generally don't wait more than 9 secs total */
   unsigned int bytes, to_usec;
@@ -331,10 +331,10 @@ static void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
       fatal("Invalid port number given in IP ID zombie specification: %s", proxyName);
     }
   } else {
-    if (o.num_ping_synprobes > 0) {
-      proxy->probe_port = o.ping_synprobes[0];
-    } else if (o.num_ping_ackprobes > 0) {
-      proxy->probe_port = o.ping_ackprobes[0];
+    if (ports->syn_ping_count > 0) {
+      proxy->probe_port = ports->syn_ping_ports[0];
+    } else if (ports->ack_ping_count > 0) {
+      proxy->probe_port = ports->ack_ping_ports[0];
     } else {
       u16 *ports;
       int count;
@@ -980,7 +980,7 @@ static int idle_treescan(struct idle_proxy_info *proxy, Target *target,
    host using the given proxy -- the proxy is cached so that you can keep
    calling this function with different targets */
 void idle_scan(Target *target, u16 *portarray, int numports,
-	       char *proxyName) {
+	       char *proxyName, const struct scan_lists * ports) {
 
   static char lastproxy[MAXHOSTNAMELEN + 1] = ""; /* The proxy used in any previous call */
   static struct idle_proxy_info proxy;
@@ -1011,7 +1011,7 @@ void idle_scan(Target *target, u16 *portarray, int numports,
 
   /* If this is the first call,  */
   if (!*lastproxy) {
-    initialize_idleproxy(&proxy, proxyName, target->v4hostip());
+    initialize_idleproxy(&proxy, proxyName, target->v4hostip(), ports);
   }
 
   starttime = time(NULL);

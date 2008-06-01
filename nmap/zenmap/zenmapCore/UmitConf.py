@@ -573,6 +573,28 @@ class DiffColors(object):
     modified = property(get_modified, set_modified)
     not_present = property(get_not_present, set_not_present)
 
+
+# Retrieve details from zenmap.conf regarding paths subsection
+# (e.g. nmap_command_path) - jurand
+class PathsConfig(object):
+    def __init__(self):
+        self.parser = Path.config_parser
+        self.section_name = "paths"
+
+    def __get_it(self, p_name):
+        return self.parser.get(self.section_name, p_name)
+
+    def __set_it(self, property_name, settings):
+        self.parser.set(self.section_name, property_name, settings)
+
+    def get_nmap_command_path(self):
+        return self.__get_it("nmap_command_path")
+
+    def set_nmap_command_path(self, settings):
+        self.__set_it("nmap_command_path", settings)
+
+    nmap_command_path = property(get_nmap_command_path, set_nmap_command_path)
+
 # Exceptions
 class ProfileNotFound:
     def __init__ (self, profile):

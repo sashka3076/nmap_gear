@@ -182,11 +182,10 @@ Nmap finished: 1 IP address (1 host up) scanned in 0.907 seconds
     <para>NSE scripts define a list of categories they belong to.
           Currently defined categories are <literal>safe</literal>,
           <literal>intrusive</literal>, <literal>malware</literal>,
-          <literal>version</literal>, <literal>discovery</literal> and
-          <literal>vulnerability</literal>.  By default, Nmap runs all
-          scripts in either the <literal>safe</literal> or
-          <literal>intrusive</literal> categories.  Categories are not
-          case sensitive.  The following list describes each category.</para>
+          <literal>version</literal>, <literal>discovery</literal>,
+          <literal>vulnerability</literal> and <literal>default</literal>.
+          Categories are not case sensitive.  The following list
+          describes each category.</para>
 
      <variablelist>
         <varlistentry>
@@ -264,6 +263,21 @@ Nmap finished: 1 IP address (1 host up) scanned in 0.907 seconds
             <para>These scripts check for a specific vulnerability and report results only if it is found.</para>
           </listitem>
         </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>default</option>
+          </term>
+          <listitem>
+            <para>These scripts are the default set and are run when
+            using <option>-sC</option>.  This category can also be
+            specified like any other with <option>--script</option>.
+            Don't be fooled into thinking that just because these scripts
+            are run by default that they are all completely unobtrusive:
+            these scripts should not be run against target networks without
+            permission.</para>
+          </listitem>
+        </varlistentry>
     </variablelist>
 
     </sect2>
@@ -290,7 +304,7 @@ $ nmap -sC --script-args user=foo,pass=bar,anonFTP={pass=ftp@foobar.com}
 	  which would result in the Lua table: 
           </para>
 <programlisting>
-{user="foo",pass="bar",anonFTP={pass=nobody@foobar.com}}
+{user="foo",pass="bar",anonFTP={pass="nobody@foobar.com"}}
 </programlisting>
  
 	  <para>You could therefore access the username (<literal>"foo"</literal>)
@@ -316,9 +330,10 @@ $ nmap -sC --script-args user=foo,pass=bar,anonFTP={pass=ftp@foobar.com}
             </indexterm>
           </term>
           <listitem>
-            <para>Performs a script scan using the default set of scripts. It is
-              equivalent to
-              <option>--script=safe,intrusive</option>.</para>
+          <para>Performs a script scan using the default set of scripts. It is 
+		  equivalent to <option>--script=default</option>. Some of the
+		  scripts in this category are considered intrusive and should
+		  not be run against a target network without permission. </para>
           </listitem>
         </varlistentry>
 
@@ -859,7 +874,7 @@ license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
 		<indexterm><primary>pcre.match</primary></indexterm></term>
 	      <listitem>
 		<para>
-		  Returns the start point and the end point point of
+		  Returns the start point and the end point of
 		  the first match of the compiled regular expression
 		  pcre_obj in the string.  A third
 		  returned value is a table which contains
@@ -1592,8 +1607,8 @@ if(s) code_to_be_done_on_match end
 	    <term><option>host.targetname</option>
 	      <indexterm><primary>host.targetname</primary></indexterm></term>
 	    <listitem>
-	      <para>Contains the name of the host as specified on the commandline.
-		If the target given on the commandline contains a netmask or is an IP
+	      <para>Contains the name of the host as specified on the command line.
+		If the target given on the command line contains a netmask or is an IP
 		address the value of the field is <literal>nil</literal>.
 	      </para>
 	    </listitem>
@@ -1733,7 +1748,7 @@ if(s) code_to_be_done_on_match end
 
    <row>
     <entry><literal>name_confidence</literal></entry>
-    <entry>Evaluates how confident the version detection is is about the accuracy of <literal>name</literal>, from one (least confident) to 10.</entry>
+    <entry>Evaluates how confident the version detection is about the accuracy of <literal>name</literal>, from one (least confident) to 10.</entry>
    </row>
 
    <row>
@@ -3297,7 +3312,7 @@ also get stored inside the <literal>registry</literal>.</para>
 		<para>
 		The next phase of NSE initialization is loading the chosen
 		scripts, which are the arguments provided to the 
-		<option>--script</option> option or <literal>safe,intrusive</literal>, in 
+		<option>--script</option> option or <literal>default</literal>, in 
 		case of a default script scan.  The string <literal>version</literal> 
 		is appended, if version detection was enabled.
 		The arguments afterwards are tried to be 
@@ -3451,7 +3466,7 @@ executed if it is run against a specific target. After the check those script-ta
       <remark>Fyodor is working on this.  The general idea is for scripts to be contributed
 	and distributed under the same license as Nmap, as described
 	in <ulink url="http://seclists.org/nmap-dev/2006/q3/0156.html">this
-	nmap-dev post</ulink>.  We certainly welcome script contributions!</remark>
+	<citetitle>nmap-dev</citetitle> post</ulink>.  We certainly welcome script contributions!</remark>
 
     </para>
   </sect1>

@@ -2,7 +2,12 @@
 /***************************************************************************
  * nbase_rnd.c -- Some simple routines for obtaining random numbers for    *
  * casual use.  These are pretty secure on systems with /dev/urandom, but  *
- * falls back to poor entropy on systems without such support.             *
+ * falls back to poor entropy for seeding on systems without such support. *
+ *                                                                         *
+ *                   Based on DNET / OpenBSD arc4random().                 *
+ *                                                                         *
+ * Copyright (c) 2000 Dug Song <dugsong@monkey.org>                        *
+ * Copyright (c) 1996 David Mazieres <dm@lcs.mit.edu>                      *
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
@@ -25,7 +30,7 @@
  * following:                                                              *
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
- *   nmap-os-fingerprints or nmap-service-probes.                          *
+ *   nmap-os-db or nmap-service-probes.                                    *
  * o Executes Nmap and parses the results (as opposed to typical shell or  *
  *   execution-menu apps, which simply display raw Nmap output and so are  *
  *   not derivative works.)                                                * 
@@ -60,7 +65,7 @@
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
  * permission to link the code of this program with any version of the     *
  * OpenSSL library which is distributed under a license identical to that  *
- * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * listed in the included COPYING.OpenSSL file, and distribute linked      *
  * combinations including the two. You must obey the GNU GPL in all        *
  * respects for all of the code used other than OpenSSL.  If you modify    *
  * this file, you may extend this exception to your version of the file,   *
@@ -92,81 +97,135 @@
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
- * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
- * with Nmap.                                                              *
+ * General Public License v2.0 for more details at                         *
+ * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
+ * included with Nmap.                                                     *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_rnd.c 7259 2008-04-30 20:43:09Z bmenrigh $ */
+/* $Id: nbase_rnd.c 7641 2008-05-22 20:45:49Z fyodor $ */
 
 #include "nbase.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>
 #if HAVE_SYS_TIME_H
 #include <sys/time.h>
+#endif /* HAV_SYS_TIME_H */
+#ifdef WIN32
+#include <wincrypt.h>
+#endif /* WIN32 */
+
+/* data for our random state */
+struct nrand_handle {
+  u8	 i, j, s[256], *tmp;
+  int	 tmplen;
+};
+typedef struct nrand_handle nrand_h;
+
+static void nrand_addrandom(nrand_h *rand, u8 *buf, int len) {
+  int i;
+  u8 si;
+	
+  /* Mix entropy in buf with s[]...
+   * 
+   * This is the ARC4 key-schedule.  It is rather poor and doesn't mix
+   * the key in very well.  This causes a bias at the start of the stream.
+   * To eliminate most of this bias, the first N bytes of the stream should
+   * be dropped.
+   */
+  rand->i--;
+  for (i = 0; i < 256; i++) {
+    rand->i = (rand->i + 1);
+    si = rand->s[rand->i];
+    rand->j = (rand->j + si + buf[i % len]);
+    rand->s[rand->i] = rand->s[rand->j];
+    rand->s[rand->j] = si;
+  }
+  rand->j = rand->i;
+}
+
+static u8 nrand_getbyte(nrand_h *r) {
+  u8 si, sj;
+  
+  /* This is the core of ARC4 and provides the pseudo-randomness */
+  r->i = (r->i + 1);
+  si = r->s[r->i];
+  r->j = (r->j + si);
+  sj = r->s[r->j];
+  r->s[r->i] = sj; /* The start of the the swap */
+  r->s[r->j] = si; /* The other half of the swap */
+  return (r->s[(si + sj) & 0xff]);
+}
+
+int nrand_get(nrand_h *r, void *buf, size_t len) {
+  u8 *p;
+  size_t i;
+
+  /* Hand out however many bytes were asked for */
+  for (p = buf, i = 0; i < len; i++) {
+    p[i] = nrand_getbyte(r);
+  }
+  return (0);
+}
+
+void nrand_init(nrand_h *r) {
+  u8 seed[256]; /* Starts out with "random" stack data */
+  int i;
+
+  /* Gather seed entropy with best the OS has to offer */
+#ifdef WIN32
+  HCRYPTPROV hcrypt = 0;
+
+  CryptAcquireContext(&hcrypt, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT);
+  CryptGenRandom(hcrypt, sizeof(seed), seed);
+  CryptReleaseContext(hcrypt, 0);
+#else
+  struct timeval *tv = (struct timeval *)seed;
+  int *pid = (int *)(seed + sizeof(*tv));
+  int fd;
+
+  gettimeofday(tv, NULL); /* fill lowest seed[] with time */
+  *pid = getpid();        /* fill next lowest seed[] with pid */
+
+  /* Try to fill the rest of the state with OS provided entropy */
+  if ((fd = open("/dev/urandom", O_RDONLY)) != -1 ||
+      (fd = open("/dev/arandom", O_RDONLY)) != -1) {
+    read(fd, seed + sizeof(*tv) + sizeof(*pid),
+	 sizeof(seed) - sizeof(*tv) - sizeof(*pid));
+    close(fd);
+  }
 #endif
 
+  /* Fill up our handle with starter values */
+  for (i = 0; i < 256; i++) { r->s[i] = i; };
+  r->i = r->j = 0;
+
+  nrand_addrandom(r, seed, 128); /* lower half of seed data for entropy */
+  nrand_addrandom(r, seed + 128, 128); /* Now use upper half */
+  r->tmp = NULL;
+  r->tmplen = 0;
+
+  /* This stream will start biased.  Get rid of 1K of the stream */
+  nrand_get(r, seed, 256); nrand_get(r, seed, 256);
+  nrand_get(r, seed, 256); nrand_get(r, seed, 256);
+}
+
 int get_random_bytes(void *buf, int numbytes) {
-  static char bytebuf[2048];
-  static char badrandomwarning = 0;
-  static int bytesleft = 0;
-  int tmp;
-  int res;
-  struct timeval tv;
-  FILE *fp = NULL;
-  unsigned int i;
-  short *iptr;
-  short step;
+  static nrand_h state;
+  static int state_init = 0;
   
-  if (numbytes < 0 || numbytes > 0xFFFF) return -1;
-  
-  if (bytesleft == 0) {
-    fp = fopen("/dev/arandom", "r");
-    if (!fp) fp = fopen("/dev/urandom", "r");
-    if (!fp) fp = fopen("/dev/random", "r");
-    if (fp) {
-      res = (int) fread(bytebuf, 1, sizeof(bytebuf), fp);
-      if (res != sizeof(bytebuf)) {    
-	fprintf(stderr, "Failed to read from /dev/urandom or /dev/random\n");
-	fclose(fp);
-	fp = NULL;
-      }      
-      bytesleft = sizeof(bytebuf);
-    }
-    if (!fp) {  
-      if (badrandomwarning == 0) {
-	badrandomwarning++;
-	/*      error("WARNING: your system apparently does not offer /dev/urandom or /dev/random.  Reverting to less secure version."); */
-	
-	/* Seed our random generator */
-	gettimeofday(&tv, NULL);
-	srand((tv.tv_sec ^ tv.tv_usec) ^ getpid());
-      }
-      if (RAND_MAX >= 0xFFFF) {
-        step = sizeof(short);
-      } else step = 1;
-      for(i=0; i < sizeof(bytebuf) / step; i++) {
-	iptr = (short *) ((char *)bytebuf + i * step);
-	*iptr = rand();
-      }
-      bytesleft = (sizeof(bytebuf) / step) * step;
-      /*    ^^^^^^^^^^^^^^^not as meaningless as it looks  */
-    } else fclose(fp);
+  /* Initialize if we need to */
+  if (!state_init) {
+    nrand_init(&state);
+    state_init = 1;
   }
-  
-  if (numbytes <= bytesleft) { /* we can cover it */
-    memcpy(buf, bytebuf + (sizeof(bytebuf) - bytesleft), numbytes);
-    bytesleft -= numbytes;
-    return 0;
-  }
-  
-  /* We don't have enough */
-  memcpy(buf, bytebuf + (sizeof(bytebuf) - bytesleft), bytesleft);
-  tmp = bytesleft;
-  bytesleft = 0;
-  return get_random_bytes((char *)buf + tmp, numbytes - tmp);
+
+  /* Now fill our buffer */
+  nrand_get(&state, buf, numbytes);
+
+  return 0;
 }
 
 int get_random_int() {
