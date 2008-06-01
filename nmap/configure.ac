@@ -46,10 +46,6 @@ AC_PROG_CXX
  if test -n "$GXX"; then
       CXXFLAGS="$CXXFLAGS -Wall "
  fi
-AC_CHECK_PROG(CXXPROG, "$CXX", "AVAILABLE", "MISSING", "$PATH":/)
-if test $CXXPROG = "MISSING"; then
-  AC_MSG_ERROR([Could not locate a C++ compiler. If it exists, add it to your PATH or give configure the CXX=path_to_compiler argument.  Otherwise, install a C++ compiler such as g++ or install a binary package of Nmap (see http://nmap.org/download.html ))])
-fi
 
 AC_MSG_CHECKING([whether the compiler is gcc 4 or greater])
 if test x"$GXX" = xno; then
@@ -107,7 +103,8 @@ AC_SUBST(COMPAT_SRCS)
 AC_PATH_TOOL([STRIP], [strip], [/bin/true])
 
 needs_cpp_precomp=no
-LUAFLAGS="MYCFLAGS=\"$CFLAGS -DLUA_USE_POSIX -DLUA_USE_DLOPEN\""
+
+LUA_CFLAGS="-DLUA_USE_POSIX -DLUA_USE_DLOPEN"
 
 case "$host" in
   *alpha-dec-osf*)
@@ -127,7 +124,6 @@ case "$host" in
     ;;
   *-bsdi*)
     AC_DEFINE(BSDI)
-    LUAFLAVOR=bsd
     ;;
   *-sgi-irix5* | *-sgi-irix6*)
     AC_DEFINE(IRIX)
@@ -138,7 +134,30 @@ case "$host" in
     # on HP-UX 11.11 (other versions?) Mikhail Zakharov (zmey20000@yahoo.com)
     AC_CHECK_LIB(nm, open_mib)
     ;;
-  *-solaris2.0* | *-solaris2.1* | *-solaris2.2* | *-solaris2.3* | *-solaris2.4* | *-solaris2.5.1 )  
+  *-solaris2.0*)  
+    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+    AC_DEFINE(SOLARIS)
+    ;;
+  *-solaris2.[[1-9]][[0-9]]*)
+    AC_DEFINE(SOLARIS)
+    ;;
+  *-solaris2.1*)
+    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+    AC_DEFINE(SOLARIS)
+    ;;
+  *-solaris2.2*)
+    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+    AC_DEFINE(SOLARIS)
+    ;;
+  *-solaris2.3*)
+    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+    AC_DEFINE(SOLARIS)
+    ;;
+  *-solaris2.4*)
+    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+    AC_DEFINE(SOLARIS)
+    ;;
+  *-solaris2.5.1)
     AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
     AC_DEFINE(SOLARIS)
     ;;
@@ -158,14 +177,12 @@ case "$host" in
     AC_DEFINE(MACOSX)
     dnl on Mac OSX the math library seems to contain unwanted getopt cruft
     AC_CHECK_LIB(m, main)
-    LUAFLAGS="MYCFLAGS=\"$CFLAGS -DLUA_USE_MACOSX\""
+    LUA_CFLAGS="-DLUA_USE_MACOSX"
     needs_cpp_precomp=yes
     ;;
-  *)
-   LUAFLAGS="MYCFLAGS=\"$CFLAGS -DLUA_USE_POSIX -DLUA_USE_DLOPEN\""
 esac
 
-AC_SUBST(LUAFLAGS)
+AC_SUBST(LUA_CFLAGS)
 
 dnl Checks for header files.
 AC_CHECK_HEADERS(pwd.h termios.h sys/sockio.h)
@@ -189,16 +206,19 @@ fi
 if test "$with_zenmap" = "no"; then
   BUILDZENMAP=""
   INSTALLZENMAP=""
+  UNINSTALLZENMAP=""
   ZENMAP_CLEAN=""
   ZENMAP_DIST_CLEAN=""
 else
   BUILDZENMAP=build-zenmap
   INSTALLZENMAP=install-zenmap
+  UNINSTALLZENMAP=uninstall-zenmap
   ZENMAP_CLEAN=zenmap_clean
   ZENMAP_DIST_CLEAN=zenmap_dist_clean
 fi
 AC_SUBST(BUILDZENMAP)
 AC_SUBST(INSTALLZENMAP)
+AC_SUBST(UNINSTALLZENMAP)
 AC_SUBST(ZENMAP_CLEAN)
 AC_SUBST(ZENMAP_DIST_CLEAN)
 
@@ -493,13 +513,12 @@ AC_HELP_STRING([--without-liblua], [Compile without lua (this will exclude all o
   *)
     CPPFLAGS="-I$with_liblua/include $CPPFLAGS"
     LDFLAGS="-L$with_liblua/lib $LDFLAGS"
-    have_lua=yes
   ;;
   esac]
 )
 
 # They don't want lua
-if test $no_lua == yes; then
+if test "$no_lua" = "yes"; then
   CXXFLAGS="-DNOLUA $CXXFLAGS"
   LIBLUA_LIBS=""
   LUA_DEPENDS=""

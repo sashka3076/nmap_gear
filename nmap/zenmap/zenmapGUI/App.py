@@ -43,6 +43,7 @@ def main_is_frozen():
 
 
 class App:
+    """This is the main application class. Zenmap is started by calling the run() method."""
     def __init__(self, args=sys.argv):
         pass
 
@@ -61,10 +62,12 @@ class App:
         self.main_window.show_all()
     
     def safe_shutdown(self, signum, stack):
+        """Kills any active scans/tabs and shuts down the application."""
         log.debug("\n\n%s\nSAFE SHUTDOWN!\n%s\n" % ("#" * 30, "#" * 30))
         log.debug("SIGNUM: %s" % signum)
 
         try:
+            # Killing all scans
             scans = self.main_window.scan_notebook.get_children()
             for scan in scans:
                 log.debug(">>> Killing Scan: %s" % scan.get_tab_label())
@@ -80,7 +83,7 @@ class App:
 
     def run(self):
         # Try to load psyco module, saving this information
-        # if we care to use it later (such as in a About Dialog)
+        # if we care to use it later (such as in an About Dialog)
         try:
             import psyco
             psyco.profile()
@@ -89,7 +92,7 @@ class App:
             log.warning(_("RUNNING WITHOUT PSYCO!"))
             log.warning(_("""Psyco is a module that speeds up the execution \
 of this application. It is not a requirement, \
-but you're encourajed to install it to have a better \
+but you're encouraged to install it to have a better \
 speed experience. Download it at http://psyco.sf.net/"""))
             self.using_psyco = False
 

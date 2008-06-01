@@ -57,11 +57,12 @@ TARGET = nmap
 INSTALLNSE=@INSTALLNSE@
 BUILDZENMAP=@BUILDZENMAP@
 INSTALLZENMAP=@INSTALLZENMAP@
+UNINSTALLZENMAP=@UNINSTALLZENMAP@
 
 ifneq (@LIBLUA_LIBS@,)
-NSE_SRC=nse_main.cc nse_auxiliar.cc nse_nsock.cc nse_init.cc nse_nmaplib.cc nse_debug.cc nse_pcrelib.cc nse_string.cc 
-NSE_HDRS=nse_main.h nse_auxiliar.h nse_nsock.h nse_init.h nse_nmaplib.h nse_debug.h nse_macros.h nse_pcrelib.h nse_string.h
-NSE_OBJS=nse_main.o nse_auxiliar.o nse_nsock.o nse_init.o nse_nmaplib.o nse_debug.o nse_pcrelib.o nse_string.o
+NSE_SRC=nse_main.cc nse_nsock.cc nse_init.cc nse_fs.cc nse_nmaplib.cc nse_debug.cc nse_pcrelib.cc nse_string.cc 
+NSE_HDRS=nse_main.h nse_nsock.h nse_init.h nse_fs.h nse_nmaplib.h nse_debug.h nse_macros.h nse_pcrelib.h nse_string.h
+NSE_OBJS=nse_main.o nse_nsock.o nse_init.o nse_fs.o nse_nmaplib.o nse_debug.o nse_pcrelib.o nse_string.o
 NSESTDLIB=nsestdlib
 endif
 
@@ -105,7 +106,7 @@ nsock_build: $(NSOCKDIR)/src/Makefile
 	cd $(NSOCKDIR)/src && $(MAKE)
 
 lua_build: $(LIBLUADIR)/Makefile
-	@echo Compiling liblua; cd $(LIBLUADIR) && $(MAKE) liblua.a @LUAFLAGS@
+	@echo Compiling liblua; cd $(LIBLUADIR) && $(MAKE) liblua.a CC="$(CC)" MYCFLAGS="$(CFLAGS) @LUA_CFLAGS@"
 
 #$(LIBPCAPDIR)/Makefile:
 #	@echo Configuring libpcap; cd $(LIBPCAPDIR); ./configure
@@ -129,7 +130,7 @@ web:
 clean: @LUA_CLEAN@ @PCAP_CLEAN@ @PCRE_CLEAN@ @DNET_CLEAN@ nsock_clean nbase_clean my_clean @NSELIB_CLEAN@ @ZENMAP_CLEAN@
 
 my_clean:
-	rm -f dependencies.mk
+	rm -f dependencies.mk makefile.dep
 	rm -f $(OBJS) $(TARGET) config.cache
 pcap_clean:
 	-cd $(LIBPCAPDIR) && $(MAKE) clean
@@ -178,7 +179,7 @@ install-nmap: $(TARGET)
 # Use strip -x to avoid stripping dynamically loaded NSE functions. See
 # http://seclists.org/nmap-dev/2007/q4/0272.html.
 	$(STRIP) -x $(DESTDIR)$(bindir)/nmap
-	$(INSTALL) -c -m 644 docs/$(TARGET).1 docs/zenmap.1 $(DESTDIR)$(mandir)/man1/
+	$(INSTALL) -c -m 644 docs/$(TARGET).1 $(DESTDIR)$(mandir)/man1/
 	$(INSTALL) -c -m 644 docs/nmap.xsl $(DESTDIR)$(nmapdatadir)/
 	$(INSTALL) -c -m 644 docs/nmap.dtd $(DESTDIR)$(nmapdatadir)/
 	$(INSTALL) -c -m 644 nmap-services $(DESTDIR)$(nmapdatadir)/
@@ -210,7 +211,9 @@ build-zenmap: $(ZENMAPDIR)/setup.py $(ZENMAPDIR)/zenmapCore/Version.py
 	cd $(ZENMAPDIR) && $(PYTHON) setup.py build $(if $(DESTDIR),--executable "$(DEFAULT_PYTHON_PATH)")
 
 install-zenmap: $(ZENMAPDIR)/setup.py
+	$(SHTOOL) mkdir -f -p -m 755 $(DESTDIR)$(bindir) $(DESTDIR)$(mandir)/man1
 	cd $(ZENMAPDIR) && $(PYTHON) setup.py install --prefix "$(prefix)" $(if $(DESTDIR),--root "$(DESTDIR)")
+	$(INSTALL) -c -m 644 docs/zenmap.1 $(DESTDIR)$(mandir)/man1/
 # Create a symlink from nmapfe to zenmap if nmapfe doesn't exist or is
 # already a link.
 	if [ ! -e $(DESTDIR)$(bindir)/nmapfe -o -L $(DESTDIR)$(bindir)/nmapfe ]; then \
@@ -234,10 +237,21 @@ install-nse: $(TARGET)
 install: install-nmap $(INSTALLNSE) $(INSTALLZENMAP)
 	@echo "NMAP SUCCESSFULLY INSTALLED"
 
-uninstall:
-	rm -f $(bindir)/$(TARGET) $(bindir)/xnmap
-	rm -f $(mandir)/man1/$(TARGET).1 $(mandir)/man1/zenmap.1
-	rm -rf $(nmapdatadir) $(nmaplibexecdir)
+uninstall: uninstall-nmap $(UNINSTALLZENMAP)
+
+uninstall-nmap:
+	rm -f $(DESTDIR)$(bindir)/$(TARGET)
+	rm -f $(DESTDIR)$(mandir)/man1/$(TARGET).1
+	rm -rf $(DESTDIR)$(nmapdatadir) $(DESTDIR)$(nmaplibexecdir)
+
+uninstall-zenmap:
+	cd $(ZENMAPDIR) && $(PYTHON) setup.py uninstall
+	rm -f $(DESTDIR)$(mandir)/man1/zenmap.1
+# Uninstall nmapfe only if it's a symlink.
+	if [ -L $(DESTDIR)$(bindir)/nmapfe ]; then \
+		rm -f $(DESTDIR)$(bindir)/nmapfe; \
+	fi
+	rm -f $(DESTDIR)$(bindir)/xnmap
 
 ${srcdir}/configure: configure.ac 
 	cd ${srcdir} && autoconf

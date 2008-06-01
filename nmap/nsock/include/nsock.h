@@ -17,7 +17,7 @@
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
  * permission to link the code of this program with any version of the     *
  * OpenSSL library which is distributed under a license identical to that  *
- * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * listed in the included COPYING.OpenSSL file, and distribute linked      *
  * combinations including the two. You must obey the GNU GPL in all        *
  * respects for all of the code used other than OpenSSL.  If you modify    *
  * this file, you may extend this exception to your version of the file,   *
@@ -49,12 +49,12 @@
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
- * General Public License for more details (                               *
- * http://www.gnu.org/copyleft/gpl.html ).                                 *
+ * General Public License v2.0 for more details                            *
+ * (http://www.gnu.org/licenses/gpl-2.0.html).                             *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock.h 6859 2008-02-28 18:52:17Z fyodor $ */
+/* $Id: nsock.h 7631 2008-05-22 18:14:15Z kris $ */
 
 /* Would you like to include pcap support in nsock?
  * Pcap support code is currently unstable, so we give
@@ -64,7 +64,8 @@
 #ifndef NSOCK_H
 #define NSOCK_H
 
-
+/* Keep assert() defined for security reasons */
+#undef NDEBUG
 
 #include <sys/types.h>
 #ifndef WIN32
@@ -528,6 +529,7 @@ int nsi_is_pcap(nsock_iod nsiod);
 #endif
 
 #endif /* NSOCK_H */
+
 
 
 

@@ -670,11 +670,10 @@ OBJEXT
 CXX
 CXXFLAGS
 ac_ct_CXX
-CXXPROG
 COMPAT_OBJS
 COMPAT_SRCS
 STRIP
-LUAFLAGS
+LUA_CFLAGS
 CPP
 GREP
 EGREP
@@ -689,6 +688,7 @@ pyexecdir
 pkgpyexecdir
 BUILDZENMAP
 INSTALLZENMAP
+UNINSTALLZENMAP
 ZENMAP_CLEAN
 ZENMAP_DIST_CLEAN
 OPENSSL_LIBS
@@ -3956,50 +3956,6 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
  if test -n "$GXX"; then
       CXXFLAGS="$CXXFLAGS -Wall "
  fi
-# Extract the first word of ""$CXX"", so it can be a program name with args.
-set dummy "$CXX"; ac_word=$2
-{ echo "$as_me:$LINENO: checking for $ac_word" >&5
-echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6; }
-if test "${ac_cv_prog_CXXPROG+set}" = set; then
-  echo $ECHO_N "(cached) $ECHO_C" >&6
-else
-  if test -n "$CXXPROG"; then
-  ac_cv_prog_CXXPROG="$CXXPROG" # Let the user override the test.
-else
-as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-as_dummy=""$PATH":/"
-for as_dir in $as_dummy
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-  for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_prog_CXXPROG=""AVAILABLE""
-    echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-done
-IFS=$as_save_IFS
-
-  test -z "$ac_cv_prog_CXXPROG" && ac_cv_prog_CXXPROG=""MISSING""
-fi
-fi
-CXXPROG=$ac_cv_prog_CXXPROG
-if test -n "$CXXPROG"; then
-  { echo "$as_me:$LINENO: result: $CXXPROG" >&5
-echo "${ECHO_T}$CXXPROG" >&6; }
-else
-  { echo "$as_me:$LINENO: result: no" >&5
-echo "${ECHO_T}no" >&6; }
-fi
-
-
-if test $CXXPROG = "MISSING"; then
-  { { echo "$as_me:$LINENO: error: Could not locate a C++ compiler. If it exists, add it to your PATH or give configure the CXX=path_to_compiler argument.  Otherwise, install a C++ compiler such as g++ or install a binary package of Nmap (see http://nmap.org/download.html ))" >&5
-echo "$as_me: error: Could not locate a C++ compiler. If it exists, add it to your PATH or give configure the CXX=path_to_compiler argument.  Otherwise, install a C++ compiler such as g++ or install a binary package of Nmap (see http://nmap.org/download.html ))" >&2;}
-   { (exit 1); exit 1; }; }
-fi
 
 { echo "$as_me:$LINENO: checking whether the compiler is gcc 4 or greater" >&5
 echo $ECHO_N "checking whether the compiler is gcc 4 or greater... $ECHO_C" >&6; }
@@ -4252,7 +4208,8 @@ fi
 
 
 needs_cpp_precomp=no
-LUAFLAGS="MYCFLAGS=\"$CFLAGS -DLUA_USE_POSIX -DLUA_USE_DLOPEN\""
+
+LUA_CFLAGS="-DLUA_USE_POSIX -DLUA_USE_DLOPEN"
 
 case "$host" in
   *alpha-dec-osf*)
@@ -4287,7 +4244,6 @@ _ACEOF
 #define BSDI 1
 _ACEOF
 
-    LUAFLAVOR=bsd
     ;;
   *-sgi-irix5* | *-sgi-irix6*)
     cat >>confdefs.h <<\_ACEOF
@@ -4374,7 +4330,63 @@ _ACEOF
 fi
 
     ;;
-  *-solaris2.0* | *-solaris2.1* | *-solaris2.2* | *-solaris2.3* | *-solaris2.4* | *-solaris2.5.1 )
+  *-solaris2.0*)
+    cat >>confdefs.h <<\_ACEOF
+#define STUPID_SOLARIS_CHECKSUM_BUG 1
+_ACEOF
+
+    cat >>confdefs.h <<\_ACEOF
+#define SOLARIS 1
+_ACEOF
+
+    ;;
+  *-solaris2.[1-9][0-9]*)
+    cat >>confdefs.h <<\_ACEOF
+#define SOLARIS 1
+_ACEOF
+
+    ;;
+  *-solaris2.1*)
+    cat >>confdefs.h <<\_ACEOF
+#define STUPID_SOLARIS_CHECKSUM_BUG 1
+_ACEOF
+
+    cat >>confdefs.h <<\_ACEOF
+#define SOLARIS 1
+_ACEOF
+
+    ;;
+  *-solaris2.2*)
+    cat >>confdefs.h <<\_ACEOF
+#define STUPID_SOLARIS_CHECKSUM_BUG 1
+_ACEOF
+
+    cat >>confdefs.h <<\_ACEOF
+#define SOLARIS 1
+_ACEOF
+
+    ;;
+  *-solaris2.3*)
+    cat >>confdefs.h <<\_ACEOF
+#define STUPID_SOLARIS_CHECKSUM_BUG 1
+_ACEOF
+
+    cat >>confdefs.h <<\_ACEOF
+#define SOLARIS 1
+_ACEOF
+
+    ;;
+  *-solaris2.4*)
+    cat >>confdefs.h <<\_ACEOF
+#define STUPID_SOLARIS_CHECKSUM_BUG 1
+_ACEOF
+
+    cat >>confdefs.h <<\_ACEOF
+#define SOLARIS 1
+_ACEOF
+
+    ;;
+  *-solaris2.5.1)
     cat >>confdefs.h <<\_ACEOF
 #define STUPID_SOLARIS_CHECKSUM_BUG 1
 _ACEOF
@@ -4481,11 +4493,9 @@ _ACEOF
 
 fi
 
-    LUAFLAGS="MYCFLAGS=\"$CFLAGS -DLUA_USE_MACOSX\""
+    LUA_CFLAGS="-DLUA_USE_MACOSX"
     needs_cpp_precomp=yes
     ;;
-  *)
-   LUAFLAGS="MYCFLAGS=\"$CFLAGS -DLUA_USE_POSIX -DLUA_USE_DLOPEN\""
 esac
 
 
@@ -5645,14 +5655,17 @@ fi
 if test "$with_zenmap" = "no"; then
   BUILDZENMAP=""
   INSTALLZENMAP=""
+  UNINSTALLZENMAP=""
   ZENMAP_CLEAN=""
   ZENMAP_DIST_CLEAN=""
 else
   BUILDZENMAP=build-zenmap
   INSTALLZENMAP=install-zenmap
+  UNINSTALLZENMAP=uninstall-zenmap
   ZENMAP_CLEAN=zenmap_clean
   ZENMAP_DIST_CLEAN=zenmap_dist_clean
 fi
+
 
 
 
@@ -7181,7 +7194,6 @@ if test "${with_liblua+set}" = set; then
   *)
     CPPFLAGS="-I$with_liblua/include $CPPFLAGS"
     LDFLAGS="-L$with_liblua/lib $LDFLAGS"
-    have_lua=yes
   ;;
   esac
 
@@ -7189,7 +7201,7 @@ fi
 
 
 # They don't want lua
-if test $no_lua == yes; then
+if test "$no_lua" = "yes"; then
   CXXFLAGS="-DNOLUA $CXXFLAGS"
   LIBLUA_LIBS=""
   LUA_DEPENDS=""
@@ -9105,11 +9117,10 @@ OBJEXT!$OBJEXT$ac_delim
 CXX!$CXX$ac_delim
 CXXFLAGS!$CXXFLAGS$ac_delim
 ac_ct_CXX!$ac_ct_CXX$ac_delim
-CXXPROG!$CXXPROG$ac_delim
 COMPAT_OBJS!$COMPAT_OBJS$ac_delim
 COMPAT_SRCS!$COMPAT_SRCS$ac_delim
 STRIP!$STRIP$ac_delim
-LUAFLAGS!$LUAFLAGS$ac_delim
+LUA_CFLAGS!$LUA_CFLAGS$ac_delim
 CPP!$CPP$ac_delim
 GREP!$GREP$ac_delim
 EGREP!$EGREP$ac_delim
@@ -9124,6 +9135,7 @@ pyexecdir!$pyexecdir$ac_delim
 pkgpyexecdir!$pkgpyexecdir$ac_delim
 BUILDZENMAP!$BUILDZENMAP$ac_delim
 INSTALLZENMAP!$INSTALLZENMAP$ac_delim
+UNINSTALLZENMAP!$UNINSTALLZENMAP$ac_delim
 ZENMAP_CLEAN!$ZENMAP_CLEAN$ac_delim
 ZENMAP_DIST_CLEAN!$ZENMAP_DIST_CLEAN$ac_delim
 OPENSSL_LIBS!$OPENSSL_LIBS$ac_delim

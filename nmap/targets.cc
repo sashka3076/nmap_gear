@@ -25,7 +25,7 @@
  * following:                                                              *
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
- *   nmap-os-fingerprints or nmap-service-probes.                          *
+ *   nmap-os-db or nmap-service-probes.                                    *
  * o Executes Nmap and parses the results (as opposed to typical shell or  *
  *   execution-menu apps, which simply display raw Nmap output and so are  *
  *   not derivative works.)                                                * 
@@ -60,7 +60,7 @@
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
  * permission to link the code of this program with any version of the     *
  * OpenSSL library which is distributed under a license identical to that  *
- * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * listed in the included COPYING.OpenSSL file, and distribute linked      *
  * combinations including the two. You must obey the GNU GPL in all        *
  * respects for all of the code used other than OpenSSL.  If you modify    *
  * this file, you may extend this exception to your version of the file,   *
@@ -92,13 +92,13 @@
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
- * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
- * with Nmap.                                                              *
+ * General Public License v2.0 for more details at                         *
+ * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
+ * included with Nmap.                                                     *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: targets.cc 7099 2008-04-09 02:11:20Z fyodor $ */
+/* $Id: targets.cc 7757 2008-05-29 18:20:33Z david $ */
 
 
 #include "targets.h"
@@ -429,7 +429,7 @@ int dumpExclude(TargetGroup *exclude_group) {
   return 1;
 }
  
-static void massping(Target *hostbatch[], int num_hosts, int pingtype) {
+static void massping(Target *hostbatch[], int num_hosts, struct scan_lists *ports) {
   static struct timeout_info group_to = { 0, 0, 0 };
   static char prev_device_name[16] = "";
   const char *device_name;
@@ -459,8 +459,7 @@ static void massping(Target *hostbatch[], int num_hosts, int pingtype) {
     targets.push_back(hostbatch[i]);
   }
 
-  /* ultra_scan gets pingtype from o.pingtype. */
-  ultra_scan(targets, NULL, PING_SCAN, &group_to);
+  ultra_scan(targets, ports, PING_SCAN, &group_to);
 }
 
 Target *nexthost(HostGroupState *hs, TargetGroup *exclude_group,
@@ -611,10 +610,7 @@ if (hs->randomize) {
      }
    }
  } else if (!arpping_done) {
-   if (pingtype & PINGTYPE_ARP) /* A host that we can't arp scan ... maybe localhost */
-     massping(hs->hostbatch, hs->current_batch_sz, DEFAULT_PING_TYPES);
-   else
-     massping(hs->hostbatch, hs->current_batch_sz, pingtype);
+   massping(hs->hostbatch, hs->current_batch_sz, ports);
  }
  
  if (!o.noresolve) nmap_mass_rdns(hs->hostbatch, hs->current_batch_sz);

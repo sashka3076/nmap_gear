@@ -1,7 +1,7 @@
 diff --unidirectional-new-file -ru -x PortIndex ports.orig/devel/glib2/Portfile ports/devel/glib2/Portfile
---- ports.orig/devel/glib2/Portfile	2008-04-12 21:22:52.000000000 -0600
-+++ ports/devel/glib2/Portfile	2008-05-02 11:48:01.000000000 -0600
-@@ -33,7 +33,8 @@
+--- ports.orig/devel/glib2/Portfile	2008-05-03 21:32:06.000000000 -0600
++++ ports/devel/glib2/Portfile	2008-05-09 09:40:19.000000000 -0600
+@@ -34,7 +34,8 @@
  patchfiles \
      patch-glib-2.0.pc.in.diff \
      patch-gutils.c.diff \
@@ -13,7 +13,7 @@ diff --unidirectional-new-file -ru -x PortIndex ports.orig/devel/glib2/Portfile 
      port:pkgconfig
 diff --unidirectional-new-file -ru -x PortIndex ports.orig/devel/glib2/files/patch-configure.diff ports/devel/glib2/files/patch-configure.diff
 --- ports.orig/devel/glib2/files/patch-configure.diff	1969-12-31 17:00:00.000000000 -0700
-+++ ports/devel/glib2/files/patch-configure.diff	2008-05-02 11:53:38.000000000 -0600
++++ ports/devel/glib2/files/patch-configure.diff	2008-05-09 09:40:19.000000000 -0600
 @@ -0,0 +1,152 @@
 +Patch glib configure to defer some decisions to run time rather than
 +configure time, using the __ppc__ macro. Otherwise, for example, there
@@ -167,20 +167,68 @@ diff --unidirectional-new-file -ru -x PortIndex ports.orig/devel/glib2/files/pat
 + 
 + #define GLIB_SYSDEF_POLLIN =$g_pollin
 + #define GLIB_SYSDEF_POLLOUT =$g_pollout
+diff --unidirectional-new-file -ru -x PortIndex ports.orig/devel/openssl/Portfile ports/devel/openssl/Portfile
+--- ports.orig/devel/openssl/Portfile	2007-12-12 11:52:41.000000000 -0700
++++ ports/devel/openssl/Portfile	2008-05-09 14:03:01.000000000 -0600
+@@ -57,9 +57,21 @@
+ 	}
+ 
+ 	configure {
++		# Save configure.universal_archs because we modify it before
++		# each invocation of Configure.
++		set tmp_universal_archs ${configure.universal_archs}
+ 		foreach arch {i386 ppc} {
+ 			system "cd ${workpath}/${arch} && ./Configure darwin-${arch}-cc ${configure.pre_args} ${configure.args}"
++			# We configure for one arch at a time.
++			configure.universal_archs ${arch}
++			reinplace "s|^\\(CFLAG=.*\\)|\\1 ${configure.cflags} ${configure.universal_cflags}|" \
++				${workpath}/${arch}/Makefile
++			reinplace "s|^\\(SHARED_LDFLAGS=.*\\)|\\1 ${configure.ldflags} ${configure.universal_ldflags}|" \
++				${workpath}/${arch}/Makefile \
++				${workpath}/${arch}/Makefile.shared
+ 		}
++		# Restore configure.universal_archs.
++		configure.universal_archs $tmp_universal_archs
+ #		system "cd ${workpath}/x86_64 && ./Configure darwin64-x86_64-cc ${configure.pre_args} ${configure.args}"
+ #		system "cd ${workpath}/ppc64 && ./Configure darwin64-ppc-cc ${configure.pre_args} ${configure.args}"
+ 	}
+diff --unidirectional-new-file -ru -x PortIndex ports.orig/graphics/cairo/Portfile ports/graphics/cairo/Portfile
+--- ports.orig/graphics/cairo/Portfile	2008-05-03 21:44:33.000000000 -0600
++++ ports/graphics/cairo/Portfile	2008-05-09 14:19:15.000000000 -0600
+@@ -57,6 +57,8 @@
+     --enable-xlib-xrender \
+     --with-x
+ 
++configure.args-append  --x-includes=${x11prefix}/include --x-libraries=${x11prefix}/lib
++
+ variant glitz conflicts no_x11 description {Add glitz graphics interface} {
+     depends_lib-append \
+         port:glitz
+@@ -105,12 +107,16 @@
+     }
+     
+     configure {
++        # Save configure.universal_archs because we modify it before each
++        # invocation of Configure.
++        set tmp_universal_archs ${configure.universal_archs}
+         foreach arch ${my_universal_archs} {
+-            set my_arch_flag "-arch ${arch}"
+-            set my_cflags "${configure.cflags} -isysroot ${sysroot} ${my_arch_flag}"
+-            set my_ldflags "${configure.ldflags} ${my_arch_flag}"
+-            system "cd ${workpath}/${arch} && CFLAGS=\"${my_cflags}\" CXXFLAGS=\"${my_cflags}\" LDFLAGS=\"${my_ldflags}\" ${configure.cmd} ${configure.pre_args} ${configure.args}"
++            # We configure for one arch at a time.
++            configure.universal_archs ${arch}
++            system "cd ${workpath}/${arch} && CFLAGS=\"${configure.cflags} ${configure.universal_cflags}\" CXXFLAGS=\"${configure.cflags} ${configure.universal_cxxflags}\" LDFLAGS=\"${configure.ldflags} ${configure.universal_ldflags}\" ${configure.cmd} ${configure.pre_args} ${configure.args} ${configure.universal_args}"
+         }
++        # Restore configure.universal_archs.
++        configure.universal_archs $tmp_universal_archs
+     }
+     
+     build {
 diff --unidirectional-new-file -ru -x PortIndex ports.orig/lang/python25/files/patch-Makefile.pre.in.diff ports/lang/python25/files/patch-Makefile.pre.in.diff
 --- ports.orig/lang/python25/files/patch-Makefile.pre.in.diff	2008-02-22 16:26:05.000000000 -0700
-+++ ports/lang/python25/files/patch-Makefile.pre.in.diff	2008-04-07 12:30:30.000000000 -0600
-@@ -1,6 +1,6 @@
----- Makefile.pre.in.orig	2007-09-29 02:15:52.000000000 +0200
--+++ Makefile.pre.in	2007-09-29 02:18:57.000000000 +0200
--@@ -373,6 +373,13 @@
-+--- Makefile.pre.in.orig	2007-12-05 13:43:57.000000000 -0700
-++++ Makefile.pre.in	2008-04-07 09:13:58.000000000 -0600
-+@@ -376,6 +376,13 @@
-  libpython$(VERSION).sl: $(LIBRARY_OBJS)
-  	$(LDSHARED) -o $@ $(LIBRARY_OBJS) $(SHLIBS) $(LIBC) $(LIBM)
-  
-@@ -9,12 +9,12 @@
++++ ports/lang/python25/files/patch-Makefile.pre.in.diff	2008-05-09 09:46:56.000000000 -0600
+@@ -9,7 +9,7 @@
  +		-all_load $(LIBRARY) -single_module \
  +		-install_name $(LIBDIR)/$@ \
  +		-compatibility_version $(VERSION) \
@@ -189,15 +237,33 @@ diff --unidirectional-new-file -ru -x PortIndex ports.orig/lang/python25/files/p
  +
   # This rule is here for OPENSTEP/Rhapsody/MacOSX. It builds a temporary
   # minimal framework (not including the Lib directory and such) in the current
-  # directory.
--@@ -675,6 +682,9 @@
-+@@ -684,6 +691,9 @@
-  			fi \
-  		fi; \
-  	else	true; \
+diff --unidirectional-new-file -ru -x PortIndex ports.orig/python/py25-altgraph/Portfile ports/python/py25-altgraph/Portfile
+--- ports.orig/python/py25-altgraph/Portfile	2008-04-30 23:05:55.000000000 -0600
++++ ports/python/py25-altgraph/Portfile	2008-05-09 09:40:19.000000000 -0600
+@@ -26,6 +26,8 @@
+ 					sha1 880627405473520b336f771fa529dab52fb3e1fb \
+ 					rmd160 dac7a7a81fe80a4aa08de60dcf0ddcd7cbdb1690
+ 
++universal_variant	no
++
+ depends_lib-append	port:py25-setuptools
+ 
+ livecheck.check regex
+diff --unidirectional-new-file -ru -x PortIndex ports.orig/python/py25-bdist_mpkg/Portfile ports/python/py25-bdist_mpkg/Portfile
+--- ports.orig/python/py25-bdist_mpkg/Portfile	2008-04-30 23:09:57.000000000 -0600
++++ ports/python/py25-bdist_mpkg/Portfile	2008-05-09 09:40:19.000000000 -0600
+@@ -26,6 +26,8 @@
+                     sha1 5c578511081d6481f85e973c40fed617be3504f7 \
+                     rmd160 d43dafdb409d5c0ece0de61c91eeee4228f54068
+ 
++universal_variant   no
++
+ livecheck.check regex
+ livecheck.url   http://pypi.python.org/pypi/bdist_mpkg/
+ livecheck.regex bdist_mpkg (0\.\[0-9\]+\.\[0-9\]+)
 diff --unidirectional-new-file -ru -x PortIndex ports.orig/python/py25-hashlib/Portfile ports/python/py25-hashlib/Portfile
 --- ports.orig/python/py25-hashlib/Portfile	2008-02-22 16:37:41.000000000 -0700
-+++ ports/python/py25-hashlib/Portfile	2008-04-07 12:29:21.000000000 -0600
++++ ports/python/py25-hashlib/Portfile	2008-05-09 09:40:19.000000000 -0600
 @@ -21,6 +21,8 @@
  
  depends_lib-append	port:openssl
@@ -209,7 +275,7 @@ diff --unidirectional-new-file -ru -x PortIndex ports.orig/python/py25-hashlib/P
  extract.post_args	"| tar -xf - ${distname}/Modules/_hashopenssl.c"
 diff --unidirectional-new-file -ru -x PortIndex ports.orig/python/py25-libxml2/Portfile ports/python/py25-libxml2/Portfile
 --- ports.orig/python/py25-libxml2/Portfile	2007-10-11 07:36:52.000000000 -0600
-+++ ports/python/py25-libxml2/Portfile	2008-04-07 12:29:27.000000000 -0600
++++ ports/python/py25-libxml2/Portfile	2008-05-09 09:40:19.000000000 -0600
 @@ -28,6 +28,8 @@
  
  build.env               LDFLAGS=-L${prefix}/lib
@@ -219,9 +285,57 @@ diff --unidirectional-new-file -ru -x PortIndex ports.orig/python/py25-libxml2/P
  post-patch {
    reinplace "s|@PREFIX@|$prefix|" ${worksrcpath}/setup.py
  }
+diff --unidirectional-new-file -ru -x PortIndex ports.orig/python/py25-macholib-devel/Portfile ports/python/py25-macholib-devel/Portfile
+--- ports.orig/python/py25-macholib-devel/Portfile	1969-12-31 17:00:00.000000000 -0700
++++ ports/python/py25-macholib-devel/Portfile	2008-05-09 09:39:20.000000000 -0600
+@@ -0,0 +1,32 @@
++# -*- coding: utf-8; mode: tcl; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- vim:fenc=utf-8:ft=tcl:et:sw=4:ts=4:sts=4
++
++PortSystem          1.0
++PortGroup           python25 1.0
++
++name                py25-macholib-devel
++version             1.2
++categories-append   devel
++maintainers         openmaintainer
++description         Mach-O header analysis and editing
++long_description \
++    macholib can be used to analyze and edit Mach-O headers, the executable \
++    format used by Mac OS X. \
++    It is typically used as a dependency analysis tool, and also to rewrite \
++    dylib references in Mach-O headers to be @executable_path relative. \
++    Though this tool targets a platform specific file format, it is pure \
++    python code that is platform and endian independent.
++
++platforms       darwin
++
++homepage        http://undefined.org/python/#macholib
++fetch.type      svn
++svn.url         http://svn.pythonmac.org/macholib/macholib/trunk/
++worksrcdir      trunk
++
++depends_lib-append  port:py25-altgraph
++
++universal_variant no
++
++livecheck.check regex
++livecheck.url   http://svn.pythonmac.org/macholib/macholib/trunk/macholib/__init__.py
++livecheck.regex {__version__ = "([0-9\.]+)"}
+diff --unidirectional-new-file -ru -x PortIndex ports.orig/python/py25-modulegraph-devel/Portfile ports/python/py25-modulegraph-devel/Portfile
+--- ports.orig/python/py25-modulegraph-devel/Portfile	2008-04-30 23:28:10.000000000 -0600
++++ ports/python/py25-modulegraph-devel/Portfile	2008-05-09 09:40:25.000000000 -0600
+@@ -26,6 +26,8 @@
+ 
+ depends_lib-append  port:py25-altgraph
+ 
++universal_variant   no
++
+ livecheck.check regex
+ livecheck.url   http://svn.pythonmac.org/modulegraph/modulegraph/trunk/setup.py
+ livecheck.regex {VERSION = '([0-9\.]+)'}
 diff --unidirectional-new-file -ru -x PortIndex ports.orig/python/py25-numeric/Portfile ports/python/py25-numeric/Portfile
 --- ports.orig/python/py25-numeric/Portfile	2007-11-22 03:04:31.000000000 -0700
-+++ ports/python/py25-numeric/Portfile	2008-04-07 12:29:30.000000000 -0600
++++ ports/python/py25-numeric/Portfile	2008-05-09 09:40:25.000000000 -0600
 @@ -27,6 +27,8 @@
  
  patchfiles      patch-ranf.c
@@ -233,7 +347,7 @@ diff --unidirectional-new-file -ru -x PortIndex ports.orig/python/py25-numeric/P
          copy -force ${filespath}/customize.py-macosx ${worksrcpath}/customize.py
 diff --unidirectional-new-file -ru -x PortIndex ports.orig/python/py25-numpy/Portfile ports/python/py25-numpy/Portfile
 --- ports.orig/python/py25-numpy/Portfile	2008-03-11 12:55:11.000000000 -0600
-+++ ports/python/py25-numpy/Portfile	2008-04-07 12:29:34.000000000 -0600
++++ ports/python/py25-numpy/Portfile	2008-05-09 09:40:25.000000000 -0600
 @@ -26,6 +26,8 @@
  depends_lib-append      port:fftw-3 \
                          port:py25-hashlib
@@ -243,9 +357,38 @@ diff --unidirectional-new-file -ru -x PortIndex ports.orig/python/py25-numpy/Por
  post-patch {
    reinplace "s|@@MPORTS_PREFIX@@|${prefix}|" ${worksrcpath}/numpy/distutils/fcompiler/g95.py
  }
+diff --unidirectional-new-file -ru -x PortIndex ports.orig/python/py25-py2app-devel/Portfile ports/python/py25-py2app-devel/Portfile
+--- ports.orig/python/py25-py2app-devel/Portfile	2008-04-30 23:29:58.000000000 -0600
++++ ports/python/py25-py2app-devel/Portfile	2008-05-09 09:40:25.000000000 -0600
+@@ -24,10 +24,12 @@
+ 
+ depends_lib-append  port:py25-setuptools \
+                     port:py25-altgraph \
+-                    port:py25-macholib \
++                    port:py25-macholib-devel \
+                     port:py25-modulegraph-devel \
+                     port:py25-bdist_mpkg
+ 
++universal_variant   no
++
+ post-destroot {
+     xinstall -m 755 -d ${destroot}${prefix}/share/doc/${name} \
+     ${destroot}${prefix}/share/examples/${name}
+diff --unidirectional-new-file -ru -x PortIndex ports.orig/python/py25-setuptools/Portfile ports/python/py25-setuptools/Portfile
+--- ports.orig/python/py25-setuptools/Portfile	2008-03-13 14:25:23.000000000 -0600
++++ ports/python/py25-setuptools/Portfile	2008-05-09 09:40:25.000000000 -0600
+@@ -27,6 +27,8 @@
+ 				sha1 dbc7a4955672964c1c656ae4ca736cf661409d06 \
+ 				rmd160 081f49dccefae08d59f905d074ad15d348d51527
+ 
++universal_variant	no
++
+ post-destroot {
+ 	xinstall -m 755 -d ${destroot}${prefix}/share/doc/${name}
+ 	xinstall -m 644 -W ${worksrcpath} EasyInstall.txt api_tests.txt \
 diff --unidirectional-new-file -ru -x PortIndex ports.orig/python/py25-sqlite3/Portfile ports/python/py25-sqlite3/Portfile
 --- ports.orig/python/py25-sqlite3/Portfile	2008-02-22 16:37:41.000000000 -0700
-+++ ports/python/py25-sqlite3/Portfile	2008-05-01 09:34:52.000000000 -0600
++++ ports/python/py25-sqlite3/Portfile	2008-05-09 09:40:25.000000000 -0600
 @@ -18,6 +18,8 @@
  checksums		sha1 4755d212f50af704c20224a6966e23acc5aea60f
  use_bzip2		yes
@@ -257,7 +400,7 @@ diff --unidirectional-new-file -ru -x PortIndex ports.orig/python/py25-sqlite3/P
  extract.post_args	"| tar -xf - ${distname}/Modules/_sqlite"
 diff --unidirectional-new-file -ru -x PortIndex ports.orig/python/py25-zlib/Portfile ports/python/py25-zlib/Portfile
 --- ports.orig/python/py25-zlib/Portfile	2008-02-22 16:37:41.000000000 -0700
-+++ ports/python/py25-zlib/Portfile	2008-04-07 12:29:41.000000000 -0600
++++ ports/python/py25-zlib/Portfile	2008-05-09 09:40:25.000000000 -0600
 @@ -20,6 +20,8 @@
  
  worksrcdir		${worksrcdir}/Modules
@@ -268,16 +411,38 @@ diff --unidirectional-new-file -ru -x PortIndex ports.orig/python/py25-zlib/Port
  post-extract {
  	file copy	${filespath}/setup.py ${worksrcpath}
 diff --unidirectional-new-file -ru -x PortIndex ports.orig/x11/gtk2/Portfile ports/x11/gtk2/Portfile
---- ports.orig/x11/gtk2/Portfile	2008-04-28 21:30:07.000000000 -0600
-+++ ports/x11/gtk2/Portfile	2008-05-01 09:20:13.000000000 -0600
-@@ -32,6 +32,10 @@
-     default_variants    +x11
- }
+--- ports.orig/x11/gtk2/Portfile	2008-05-08 09:38:21.000000000 -0600
++++ ports/x11/gtk2/Portfile	2008-05-09 09:43:47.000000000 -0600
+@@ -79,6 +79,8 @@
+                 --disable-glibtest \
+                 --with-included-loaders
  
-+if {[variant_isset universal]} {
-+    configure.env-append    CUPS_CONFIG="${configure.universal_sysroot}/usr/bin/cups-config"
-+}
++configure.args-append       --x-includes=${x11prefix}/include --x-libraries=${x11prefix}/lib
 +
- pre-fetch {
-     if {![variant_isset quartz] && ![variant_isset x11]} {
-         error "Either +x11 or +quartz is required"
+ configure.ccache            no
+ configure.cppflags-append   -no-cpp-precomp -DX_LOCALE
+ configure.cflags-append     -funroll-loops -fstrict-aliasing
+diff --unidirectional-new-file -ru -x PortIndex ports.orig/x11/pango/Portfile ports/x11/pango/Portfile
+--- ports.orig/x11/pango/Portfile	2008-05-03 21:47:46.000000000 -0600
++++ ports/x11/pango/Portfile	2008-05-09 09:40:27.000000000 -0600
+@@ -47,6 +47,8 @@
+     --enable-static \
+     --enable-cairo
+ 
++configure.args-append  --x-includes=${x11prefix}/include --x-libraries=${x11prefix}/lib
++
+ variant no_x11 description {Disable X11 support} {
+     depends_lib-delete \
+         lib:libX11.6:XFree86 \
+diff --unidirectional-new-file -ru -x PortIndex ports.orig/x11/xrender/Portfile ports/x11/xrender/Portfile
+--- ports.orig/x11/xrender/Portfile	2008-01-23 02:32:47.000000000 -0700
++++ ports/x11/xrender/Portfile	2008-05-09 09:40:27.000000000 -0600
+@@ -25,6 +25,8 @@
+ depends_lib			lib:libX11.6:XFree86 \
+ 					port:render
+ 
++configure.args-append	--x-includes=${x11prefix}/include --x-libraries=${x11prefix}/lib
++
+ post-patch {
+     # Brute-force things into building with the universal LDFLAGS
+     if {[variant_isset universal]} {

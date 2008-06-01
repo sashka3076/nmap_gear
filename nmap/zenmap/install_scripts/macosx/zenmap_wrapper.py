@@ -2,12 +2,17 @@
 
 # This is a wrapper script around the zenmap executable, used in a Mac OS X .app
 # bundle. It sets environment variables, fills in template configuration files,
-# and execs the real zenmap executable.
+# starts X11 if necessary, and execs the real zenmap executable.
+#
+# This program is the second link in the chain
+#     zenmap_auth -> zenmap_wrapper.py -> zenmap.bin
 
 import errno
 import os
 import os.path
 import sys
+
+HOME = os.path.expanduser("~")
 
 def create_dir(path):
     """Create a directory with os.makedirs without raising an error if the
@@ -140,7 +145,63 @@ def substitute_modules_file(in_file_name, out_file_name, replacements):
     in_file.close()
     out_file.close()
 
+def escape_shell(arg):
+    """Escape a string to be a shell argument."""
+    result = []
+    for c in arg:
+        if c in "$`\"\\":
+            c = "\\" + c
+        result.append(c)
+    return "\"" + "".join(result) + "\""
+
+def hack_xinitrc(system_xinitrc_filename, home_xinitrc_filename):
+    """Hack the system xinitrc file and put the modified contents into another
+    file. The parameter names reflect the fact that this is intended to copy
+    the system xinitrc into ~/.xinitrc. The modified xinitrc will delete itself
+    on its first invocation and will not run any instances of xterm. This is
+    necessary on Mac OS X 10.4 and earlier, which include a call to xterm in
+    the system xinitrc."""
+    system_xinitrc = open(system_xinitrc_filename, "r")
+    home_xinitrc = open(home_xinitrc_filename, "w")
+    lines = iter(system_xinitrc)
+    # Look for the first non-comment line so we don't pre-empt the #! line.
+    for line in lines:
+        if not line.lstrip().startswith("#"):
+            break
+        home_xinitrc.write(line)
+    # Write the self-destruct line.
+    home_xinitrc.write("\n")
+    home_xinitrc.write("rm -f %s\n" % escape_shell(home_xinitrc_filename))
+    home_xinitrc.write(line)
+    # Copy the rest, removing any calls to xterm
+    for line in lines:
+        if line.lstrip().startswith("xterm"):
+            line = "# " + line
+        home_xinitrc.write(line)
+    system_xinitrc.close()
+    home_xinitrc.close()
+
+def start_x11():
+    """Start the X11 server if necessary and set the DISPLAY environment as
+    appropriate. If the user hasn't set up a custom ~/.xinitrc, call
+    hack_xinitrc to make a ~/.xinitrc that will not start an xterm along with
+    the application. A similar approach is taken by Wireshark and Inkscape."""
+    if os.environ.has_key("DISPLAY"):
+        return
+    system_xinitrc_filename = "/usr/X11R6/lib/X11/xinit/xinitrc"
+    home_xinitrc_filename = os.path.join(HOME, ".xinitrc")
+    if not os.path.exists(home_xinitrc_filename):
+        hack_xinitrc(system_xinitrc_filename, home_xinitrc_filename)
+    os.system("open -a X11")
+    os.environ["DISPLAY"] = ":0"
+
 if __name__ == "__main__":
+    # Make the real UID equal the effective UID. They are unequal when running
+    # with privileges under AuthorizationExecuteWithPrivileges. GTK+ refuses to
+    # run if they are different.
+    if os.getuid() != os.geteuid():
+        os.setuid(os.geteuid())
+
     # Paths within the application bundle.
     currentdir = os.path.dirname(os.path.abspath(sys.argv[0]))
     parentdir = os.path.dirname(currentdir)
@@ -150,7 +211,7 @@ if __name__ == "__main__":
     # This could be something different like /tmp or "~/Library/Application
     # Support/Zenmap". It is put somewhere other than within the application
     # bundle to allow running from a read-only filesystem.
-    etcdir = os.path.join(os.path.expanduser("~"), ".zenmap-etc")
+    etcdir = os.path.join(HOME, ".zenmap-etc")
 
     # Override the dynamic library search path. This makes the various GTK+ and
     # Pango shared objects look at the bundled copies of the libraries.  py2app
@@ -198,5 +259,7 @@ if __name__ == "__main__":
         out_file_name = os.path.join(etcdir, f)
         substitute_modules_file(in_file_name, out_file_name, REPLACEMENTS)
 
+    start_x11()
+
     # exec the real program.
-    os.execl(sys.argv[0] + ".bin", *sys.argv)
+    os.execl(os.path.join(os.path.dirname(sys.argv[0]), "zenmap.bin"), *sys.argv)

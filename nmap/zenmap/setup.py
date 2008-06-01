@@ -19,13 +19,15 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
+import errno
 import sys
 import os
 import os.path
 import re
 
 import distutils.sysconfig
-from distutils.core import setup
+from distutils import log
+from distutils.core import setup, Command
 from distutils.command.install import install
 
 from glob import glob
@@ -34,15 +36,20 @@ from stat import *
 from zenmapCore.Version import VERSION
 from zenmapCore.Name import APP_NAME, APP_DISPLAY_NAME, APP_WEB_SITE, APP_DOWNLOAD_SITE, NMAP_DISPLAY_NAME
 
+# The name of the file used to record the list of installed files, so that the
+# uninstall command can remove them.
+INSTALLED_FILES_NAME = "INSTALLED_FILES"
+
 # Directories for POSIX operating systems
 # These are created after a "install" or "py2exe" command
 # These directories are relative to the installation or dist directory
 pixmaps_dir = os.path.join('share', 'pixmaps')
 icons_dir = os.path.join('share', 'icons')
-locale_dir = os.path.join('share', APP_NAME, 'locale')
-config_dir = os.path.join('share', APP_NAME, 'config')
-docs_dir = os.path.join('share', APP_NAME, 'docs')
-misc_dir = os.path.join('share', APP_NAME, 'misc')
+data_dir = os.path.join('share', APP_NAME)
+locale_dir = os.path.join(data_dir, 'locale')
+config_dir = os.path.join(data_dir, 'config')
+docs_dir = os.path.join(data_dir, 'docs')
+misc_dir = os.path.join(data_dir, 'misc')
 
 def mo_find(result, dirname, fnames):
     files = []
@@ -75,6 +82,43 @@ data_files = [ (pixmaps_dir, glob(os.path.join(pixmaps_dir, '*.svg')) +
 # Add i18n files to data_files list
 os.path.walk(locale_dir, mo_find, data_files)
 
+# path_startswith and path_strip_prefix are used to deal with the installation
+# root (--root option, also known as DESTDIR).
+
+def path_startswith(path, prefix):
+    """Returns True if path starts with prefix. It's a little more intelligent
+    than str.startswith because it normalizes the paths to remove multiple
+    directory separators and down-up traversals."""
+    path = os.path.normpath(path)
+    prefix = os.path.normpath(prefix)
+    return path.startswith(prefix)
+
+def path_strip_prefix(path, prefix):
+    """Return path stripped of its directory prefix if it starts with prefix,
+    otherwise return path unmodified. This only works correctly with Unix paths;
+    for example it will not replace the drive letter on a Windows path.
+    Examples:
+    >>> path_strip_prefix('/tmp/destdir/usr/bin', '/tmp/destdir')
+    '/usr/bin'
+    >>> path_strip_prefix('/tmp/../tmp/destdir/usr/bin', '/tmp///destdir')
+    '/usr/bin'
+    >>> path_strip_prefix('/etc', '/tmp/destdir')
+    '/etc'
+    >>> path_strip_prefix('/etc', '/')
+    '/etc'
+    >>> path_strip_prefix('/etc', '')
+    '/etc'
+    """
+    absolute = os.path.isabs(path)
+    path = os.path.normpath(path)
+    prefix = os.path.normpath(prefix)
+    if path.startswith(prefix) and prefix != os.sep:
+        path = path[len(prefix):]
+    # Absolute paths must remain absolute and relative paths must remain
+    # relative.
+    assert os.path.isabs(path) == absolute
+    return path
+
 ################################################################################
 # Distutils subclasses
 
@@ -86,34 +130,95 @@ class my_install(install):
         self.set_modules_path()
         self.fix_paths()
         self.create_uninstaller()
+        self.write_installed_files()
+
+    def get_installed_files(self):
+        """Return a list of installed files and directories, each prefixed with
+        the installation root if given. The list of installed directories
+        doesn't come from distutils so it may be incomplete."""
+        installed_files = self.get_outputs()
+        for package in self.distribution.packages:
+            installed_files.append(os.path.join(self.install_lib, package))
+        # Recursively include all the directories in data_dir (share/zenmap).
+        # This is mainly for convenience in listing locale directories.
+        installed_files.append(os.path.join(self.install_data, data_dir))
+        for dirpath, dirs, files in os.walk(os.path.join(self.install_data, data_dir)):
+            for dir in dirs:
+                installed_files.append(os.path.join(dirpath, dir))
+        installed_files.append(os.path.join(self.install_scripts, "uninstall_" + APP_NAME))
+        return installed_files
 
     def create_uninstaller(self):
         uninstaller_filename = os.path.join(self.install_scripts, "uninstall_" + APP_NAME)
-        uninstaller = """#!/usr/bin/env python
+
+        uninstaller = """\
+#!/usr/bin/env python
 import os, os.path, sys
 
-print
-print '%(line)s Uninstall %(name)s %(version)s %(line)s'
-print
+print 'Uninstall %(name)s %(version)s'
 
-answer = raw_input('Are you sure that you want to completly uninstall %(name)s %(version)s? \
-(yes/no) ')
+answer = raw_input('Are you sure that you want to uninstall %(name)s %(version)s? (yes/no) ')
 
 if answer != 'yes' and answer != 'y':
+    print 'Not uninstalling.'
     sys.exit(0)
 
-print
-print '%(line)s Uninstalling %(name)s %(version)s... %(line)s'
-print
-""" % {'name':APP_DISPLAY_NAME, 'version':VERSION, 'line':'-'*10}
+""" % {'name':APP_DISPLAY_NAME, 'version':VERSION}
 
-        for output in self.get_outputs():
-            uninstaller += "print 'Removing %s...'\n" % output
-            uninstaller += "if os.path.exists('%s'): os.remove('%s')\n" % (output,
-                                                                         output)
+        installed_files = []
+        for output in self.get_installed_files():
+            if self.root is not None:
+                # If we have a root (DESTDIR), we need to strip it off the front
+                # of paths so the uninstaller runs on the target host. The path
+                # manipulations are tricky, but made easier because the
+                # uninstaller only has to run on Unix.
+                if not path_startswith(output, self.root):
+                    # This should never happen (everything gets installed inside
+                    # the root), but if it does, be safe and don't delete
+                    # anything.
+                    uninstaller += "print '%s was not installed inside the root %s; skipping.'\n" % (output, self.root)
+                    continue
+                output = path_strip_prefix(output, self.root)
+                assert os.path.isabs(output)
+            installed_files.append(output)
 
-        uninstaller += "print 'Removing uninstaller itself...'\n"
-        uninstaller += "os.remove('%s')\n" % uninstaller_filename
+        uninstaller += """\
+INSTALLED_FILES = (
+"""
+        for file in installed_files:
+            uninstaller += "    %s,\n" % repr(file)
+        uninstaller += """\
+)
+
+# Split the list into lists of files and directories.
+files = []
+dirs = []
+for path in INSTALLED_FILES:
+    if os.path.isfile(path) or os.path.islink(path):
+        files.append(path)
+    elif os.path.isdir(path):
+        dirs.append(path)
+# Delete the files.
+for file in files:
+    print "Removing '%s'." % file
+    try:
+        os.remove(file)
+    except OSError, e:
+        print >> sys.stderr, '  Error: %s.' % str(e)
+# Delete the directories. First reverse-sort the normalized paths by
+# length so that child directories are deleted before their parents.
+dirs = [os.path.normpath(dir) for dir in dirs]
+dirs.sort(key = len, reverse = True)
+for dir in dirs:
+    try:
+        print "Removing the directory '%s'." % dir
+        os.rmdir(dir)
+    except OSError, e:
+        if e.errno == errno.ENOTEMPTY:
+            print "Directory '%s' not empty; not removing." % dir
+        else:
+            print >> sys.stderr, str(e)
+"""
 
         uninstaller_file = open(uninstaller_filename, 'w')
         uninstaller_file.write(uninstaller)
@@ -126,11 +231,11 @@ print
     def set_modules_path(self):
         app_file_name = os.path.join(self.install_scripts, APP_NAME)
         # Find where the modules are installed. distutils will put them in
-        # self.install_lib, but that path can contain DESTDIR (--root option),
-        # so we must strip it off if necessary.
+        # self.install_lib, but that path can contain the root (DESTDIR), so we
+        # must strip it off if necessary.
         modules = self.install_lib
-        if self.root is not None and modules.startswith(self.root):
-            modules = modules[len(self.root):]
+        if self.root is not None:
+            modules = path_strip_prefix(modules, self.root)
 
         re_sys = re.compile("^import sys$")
 
@@ -144,7 +249,7 @@ print
                 uline = line + 1
                 break
 
-        ucontent.insert(uline, "sys.path.append('%s')\n" % modules)
+        ucontent.insert(uline, "sys.path.append(%s)\n" % repr(modules))
 
         ufile = open(app_file_name, "w")
         ufile.writelines(ucontent)
@@ -152,7 +257,7 @@ print
 
     def set_perms(self):
         re_bin = re.compile("(bin)")
-        for output in self.get_outputs():
+        for output in self.get_installed_files():
             if re_bin.findall(output):
                 continue
 
@@ -193,7 +298,7 @@ print
         # Replace the path definitions.
         for path, replacement in interesting_paths.items():
             pcontent = re.sub("%s\s+=\s+.+" % path,
-                              "%s = \"%s\"" % (path, replacement),
+                              "%s = %s" % (path, repr(replacement)),
                               pcontent)
 
         # Write the modified file.
@@ -201,6 +306,77 @@ print
         pf.write(pcontent)
         pf.close()
 
+    def write_installed_files(self):
+        """Write a list of installed files for use by the uninstall command.
+        This is similar to what happens with the --record option except that it
+        doesn't strip off the installation root, if any. File names containing
+        newline characters are not handled."""
+        if INSTALLED_FILES_NAME == self.record:
+            distutils.log.warn("warning: installation record is overwriting --record file '%s'." % self.record)
+        f = open(INSTALLED_FILES_NAME, "w")
+        try:
+            for output in self.get_installed_files():
+                assert "\n" not in output
+                print >> f, output
+        finally:
+            f.close()
+
+class my_uninstall(Command):
+    """A distutils command that performs uninstallation. It reads the list of
+    installed files written by the install command."""
+
+    command_name = "uninstall"
+    description = "uninstall installed files recorded in '%s'" % INSTALLED_FILES_NAME
+    user_options = []
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        # Read the list of installed files.
+        try:
+            f = open(INSTALLED_FILES_NAME, "r")
+        except IOError, e:
+            if e.errno == errno.ENOENT:
+                log.error("Couldn't open the installation record '%s'. Have you installed yet?" % INSTALLED_FILES_NAME)
+                return
+        installed_files = [file.rstrip("\n") for file in f.readlines()]
+        f.close()
+        # Delete the installation record too.
+        installed_files.append(INSTALLED_FILES_NAME)
+        # Split the list into lists of files and directories.
+        files = []
+        dirs = []
+        for path in installed_files:
+            if os.path.isfile(path) or os.path.islink(path):
+                files.append(path)
+            elif os.path.isdir(path):
+                dirs.append(path)
+        # Delete the files.
+        for file in files:
+            log.info("Removing '%s'." % file)
+            try:
+                if not self.dry_run:
+                    os.remove(file)
+            except OSError, e:
+                log.error(str(e))
+        # Delete the directories. First reverse-sort the normalized paths by
+        # length so that child directories are deleted before their parents.
+        dirs = [os.path.normpath(dir) for dir in dirs]
+        dirs.sort(key = len, reverse = True)
+        for dir in dirs:
+            try:
+                log.info("Removing the directory '%s'." % dir)
+                if not self.dry_run:
+                    os.rmdir(dir)
+            except OSError, e:
+                if e.errno == errno.ENOTEMPTY:
+                    log.info("Directory '%s' not empty; not removing." % dir)
+                else:
+                    log.error(str(e))
 
 # setup can be called in different ways depending on what we're doing. (For
 # example py2exe needs special handling.) These arguments are common between all
@@ -283,7 +459,7 @@ elif 'py2app' in sys.argv:
 else:
     # Default args.
     DEFAULT_SETUP_ARGS = {
-        'cmdclass': {'install': my_install},
+        'cmdclass': {'install': my_install, 'uninstall': my_uninstall},
     }
 
     setup_args.update(DEFAULT_SETUP_ARGS)

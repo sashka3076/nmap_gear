@@ -24,7 +24,7 @@
  * following:                                                              *
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
- *   nmap-os-fingerprints or nmap-service-probes.                          *
+ *   nmap-os-db or nmap-service-probes.                                    *
  * o Executes Nmap and parses the results (as opposed to typical shell or  *
  *   execution-menu apps, which simply display raw Nmap output and so are  *
  *   not derivative works.)                                                * 
@@ -59,7 +59,7 @@
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
  * permission to link the code of this program with any version of the     *
  * OpenSSL library which is distributed under a license identical to that  *
- * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * listed in the included COPYING.OpenSSL file, and distribute linked      *
  * combinations including the two. You must obey the GNU GPL in all        *
  * respects for all of the code used other than OpenSSL.  If you modify    *
  * this file, you may extend this exception to your version of the file,   *
@@ -91,13 +91,13 @@
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
- * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
- * with Nmap.                                                              *
+ * General Public License v2.0 for more details at                         *
+ * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
+ * included with Nmap.                                                     *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: global_structures.h 7148 2008-04-11 18:57:32Z david $ */
+/* $Id: global_structures.h 7752 2008-05-29 07:49:37Z michael $ */
 
 
 #ifndef GLOBAL_STRUCTURES_H
@@ -222,6 +222,17 @@ struct ipid_info {
  * Each element is to point to an array of port/protocol numbers
  */
 struct scan_lists {
+	/* The "synprobes" are also used when doing a connect() ping */
+	unsigned short *syn_ping_ports;
+	unsigned short *ack_ping_ports;
+	unsigned short *udp_ping_ports;
+	unsigned short *proto_ping_ports;
+	int syn_ping_count;
+	int ack_ping_count;
+	int udp_ping_count;
+	int proto_ping_count;
+	//the above fields are only used for host discovery
+	//the fields below are only used for port scanning
 	unsigned short *tcp_ports;
 	int tcp_count;
 	unsigned short *udp_ports;

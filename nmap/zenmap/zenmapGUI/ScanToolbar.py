@@ -31,7 +31,9 @@ from zenmapGUI.TargetCombo import TargetCombo
 
 
 class ScanCommandToolbar(HIGHBox):
+    """This class builds the toolbar devoted to Command entry. It allows you to retrieve and edit the current command entered."""
     def __init__(self):
+        """Initialize command toolbar"""
         HIGHBox.__init__(self)
 
         self.command_label = HIGEntryLabel(_("Command:"))
@@ -41,15 +43,26 @@ class ScanCommandToolbar(HIGHBox):
         self._pack_expand_fill(self.command_entry)
         
     def get_command(self):
+        """Retrieve command entry"""
         return self.command_entry.get_text()
 
     def set_command(self, command):
+        """Set a command entry"""
         self.command_entry.set_text(command)
 
     command = property(get_command, set_command)
 
+
 class ScanToolbar(HIGHBox):
+    """
+    This function regards the Scanning Toolbar, which includes 
+    the Target and Profile editable fields/dropdown boxes, as well as
+    the Scan button and assigns events and and actions associated with
+    each.
+    """
     def __init__(self):
+        """Initialize Scan Toolbar, including Events, and packing all 
+        of the GUI elements in layout"""
         HIGHBox.__init__(self)
 
         self._create_target()
@@ -65,39 +78,34 @@ class ScanToolbar(HIGHBox):
         
         self._pack_noexpand_nofill(self.scan_button)
 
-        self.target_entry.set_focus_child(self.target_entry.child)
-        self.profile_entry.set_focus_child(self.profile_entry.child)
+        # Skip over the dropdown arrow so you can tab to the profile entry.
+        self.target_entry.set_focus_chain((self.target_entry.child,))
 
-        self.target_entry.child.grab_focus()
-
-        # Events
-        self.target_entry.child.connect('key-press-event',\
-                        self.next, self.profile_entry.child)
         self.target_entry.child.connect('activate',
-                        lambda x: self.profile_entry.child.grab_focus())
+                        lambda x: self.profile_entry.grab_focus())
         self.profile_entry.child.connect('activate',
                         lambda x: self.scan_button.clicked())
         
     def _create_target(self):
+        """Create a target and update the list"""
         self.target_label = HIGEntryLabel(_("Target:"))
         self.target_entry = TargetCombo()
         
         self.update_target_list()
 
     def _create_profile(self):
+        """Create new profile and update list"""
         self.profile_label = HIGEntryLabel(_('Profile:'))
         self.profile_entry = ProfileCombo()
         
         self.update()
 
-    def next(self, widget, event, next_widget):
-        if event.hardware_keycode == 23:
-            next_widget.grab_focus()
-
     def get_target(self):
+        """Return the text of given target entry"""
         return self.target_entry.get_child().get_text()
 
     def get_profile_name(self):
+        """Return the text of given profile entry"""
         return self.profile_entry.get_child().get_text()
 
     def update_target_list(self):
@@ -107,21 +115,26 @@ class ScanToolbar(HIGHBox):
         self.target_entry.add_new_target(target)
 
     def get_selected_target(self):
+        """Return currently selected target"""
         return self.target_entry.selected_target
 
     def set_selected_target(self, target):
+        """Modify currently selected target"""
         self.target_entry.selected_target = target
 
     def update(self):
         self.profile_entry.update()
     
     def set_profiles(self, profiles):
+        """Modify profile"""
         self.profile_entry.set_profiles(profiles)
 
     def get_selected_profile(self):
+        """Return currently selected profile"""
         return self.profile_entry.selected_profile
 
     def set_selected_profile(self, profile):
+        """Modify currently selected profile"""
         self.profile_entry.selected_profile = profile
 
     selected_profile = property(get_selected_profile, set_selected_profile)

@@ -25,7 +25,7 @@
  * following:                                                              *
  * o Integrates source code from Nmap                                      *
  * o Reads or includes Nmap copyrighted data files, such as                *
- *   nmap-os-fingerprints or nmap-service-probes.                          *
+ *   nmap-os-db or nmap-service-probes.                                    *
  * o Executes Nmap and parses the results (as opposed to typical shell or  *
  *   execution-menu apps, which simply display raw Nmap output and so are  *
  *   not derivative works.)                                                * 
@@ -60,7 +60,7 @@
  * As a special exception to the GPL terms, Insecure.Com LLC grants        *
  * permission to link the code of this program with any version of the     *
  * OpenSSL library which is distributed under a license identical to that  *
- * listed in the included Copying.OpenSSL file, and distribute linked      *
+ * listed in the included COPYING.OpenSSL file, and distribute linked      *
  * combinations including the two. You must obey the GNU GPL in all        *
  * respects for all of the code used other than OpenSSL.  If you modify    *
  * this file, you may extend this exception to your version of the file,   *
@@ -92,13 +92,13 @@
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
- * General Public License for more details at                              *
- * http://www.gnu.org/copyleft/gpl.html , or in the COPYING file included  *
- * with Nmap.                                                              *
+ * General Public License v2.0 for more details at                         *
+ * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
+ * included with Nmap.                                                     *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.h 7301 2008-05-03 08:22:18Z fyodor $ */
+/* $Id: nmap.h 7817M 2008-06-01 03:58:19Z (local) $ */
 
 #ifndef NMAP_H
 #define NMAP_H
@@ -227,6 +227,9 @@ void *realloc();
 #include <arpa/inet.h>
 #endif
 
+/* Keep assert() defined for security reasons */
+#undef NDEBUG
+
 #include <math.h>
 #include <assert.h>
 
@@ -253,8 +256,8 @@ void *realloc();
 #ifndef NMAP_VERSION
 /* Edit this definition only within the quotes, because it is read from this
    file by the makefiles. */
-#define NMAP_VERSION "4.62"
-#define NMAP_NUM_VERSION "4.62.0.0"
+#define NMAP_VERSION "4.65"
+#define NMAP_NUM_VERSION "4.65.0.0"
 #endif
 
 /* User configurable #defines: */
@@ -401,7 +404,7 @@ void printinteractiveusage();
 int ftp_anon_connect(struct ftpinfo *ftp);
 
 /* port manipulators */
-struct scan_lists *getpts(const char *expr); /* someone stole the name getports()! */
+void getpts(const char *expr, struct scan_lists * ports); /* someone stole the name getports()! */
 void getpts_simple(const char *origexpr, int range_type,
                    unsigned short **list, int *count);
 void free_scan_lists(struct scan_lists *ports);
@@ -431,7 +434,7 @@ const char *tsseqclass2ascii(int seqclass);
 const char *seqidx2difficultystr(unsigned long idx);
 const char *seqidx2difficultystr1(unsigned long idx);
 int nmap_fetchfile(char *filename_returned, int bufferlen, const char *file);
-int nmap_fileexistsandisreadable(char* pathname);
+int nmap_fileexistsandisreadable(const char* pathname);
 int gather_logfile_resumption_state(char *fname, int *myargc, char ***myargv);
 
 #endif /* NMAP_H */

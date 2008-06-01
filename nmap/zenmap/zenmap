@@ -104,7 +104,6 @@ A required module was not found.
 
             report_result = False
             try:
-                old_stdout.write("Bug reported!")
                 c = CrashReport("%s Crash - '%s'" % (APP_DISPLAY_NAME, value), outputs)
                 c.show_all()
                 gtk.main()

@@ -19,6 +19,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
+import locale
 import sys
 import gtk
 import gtk.gdk
@@ -29,7 +30,7 @@ from threading import Thread
 
 from higwidgets.higbuttons import HIGButton
 
-from zenmapCore.I18N import _, enc
+from zenmapCore.I18N import _
 from zenmapCore.UmitLogging import log
 from zenmapCore.UmitConf import NmapOutputHighlight
 
@@ -238,8 +239,8 @@ gtk.color_selection_palette_to_string([gtk.gdk.Color(*highlight_color),]))
 
                     for m in match:
                         try:
-                            buff.apply_tag(tag, buff.get_iter_at_line_index(pos, m.start()),
-                                           buff.get_iter_at_line_index(pos, m.end()))
+                            buff.apply_tag(tag, buff.get_iter_at_line_offset(pos, m.start()),
+                                           buff.get_iter_at_line_offset(pos, m.end()))
                         except:
                             pass
 
@@ -267,23 +268,23 @@ gtk.color_selection_palette_to_string([gtk.gdk.Color(*highlight_color),]))
                         tag3.set_property("weight", pango.WEIGHT_HEAVY)
 
                         try:
-                            buff.apply_tag(tag1, buff.get_iter_at_line_index(pos, m.start()),
-                                           buff.get_iter_at_line_index(pos, m.end() - 5))
+                            buff.apply_tag(tag1, buff.get_iter_at_line_offset(pos, m.start()),
+                                           buff.get_iter_at_line_offset(pos, m.end() - 5))
 
-                            buff.apply_tag(tag2, buff.get_iter_at_line_index(pos, m.start() + 1),
-                                           buff.get_iter_at_line_index(pos, m.end() -4))
+                            buff.apply_tag(tag2, buff.get_iter_at_line_offset(pos, m.start() + 1),
+                                           buff.get_iter_at_line_offset(pos, m.end() -4))
 
-                            buff.apply_tag(tag3, buff.get_iter_at_line_index(pos, m.start() + 2),
-                                           buff.get_iter_at_line_index(pos, m.end() - 3))
+                            buff.apply_tag(tag3, buff.get_iter_at_line_offset(pos, m.start() + 2),
+                                           buff.get_iter_at_line_offset(pos, m.end() - 3))
                             
-                            buff.apply_tag(tag1, buff.get_iter_at_line_index(pos, m.start() + 3),
-                                           buff.get_iter_at_line_index(pos, m.end() - 2))
+                            buff.apply_tag(tag1, buff.get_iter_at_line_offset(pos, m.start() + 3),
+                                           buff.get_iter_at_line_offset(pos, m.end() - 2))
 
-                            buff.apply_tag(tag2, buff.get_iter_at_line_index(pos, m.start() + 4),
-                                           buff.get_iter_at_line_index(pos, m.end() - 1))
+                            buff.apply_tag(tag2, buff.get_iter_at_line_offset(pos, m.start() + 4),
+                                           buff.get_iter_at_line_offset(pos, m.end() - 1))
 
-                            buff.apply_tag(tag3, buff.get_iter_at_line_index(pos, m.start() + 5),
-                                           buff.get_iter_at_line_index(pos, m.end()))
+                            buff.apply_tag(tag3, buff.get_iter_at_line_offset(pos, m.start() + 5),
+                                           buff.get_iter_at_line_offset(pos, m.end()))
                         except:
                             pass
                     else:
@@ -313,14 +314,14 @@ gtk.color_selection_palette_to_string([gtk.gdk.Color(*highlight_color),]))
                         tag3.set_property("weight", pango.WEIGHT_HEAVY)
 
                         try:
-                            buff.apply_tag(tag1, buff.get_iter_at_line_index(pos, m.start()),
-                                           buff.get_iter_at_line_index(pos, m.end() - 2))
+                            buff.apply_tag(tag1, buff.get_iter_at_line_offset(pos, m.start()),
+                                           buff.get_iter_at_line_offset(pos, m.end() - 2))
 
-                            buff.apply_tag(tag2, buff.get_iter_at_line_index(pos, m.start() + 1),
-                                           buff.get_iter_at_line_index(pos, m.end() -1))
+                            buff.apply_tag(tag2, buff.get_iter_at_line_offset(pos, m.start() + 1),
+                                           buff.get_iter_at_line_offset(pos, m.end() -1))
 
-                            buff.apply_tag(tag3, buff.get_iter_at_line_index(pos, m.start() + 2),
-                                           buff.get_iter_at_line_index(pos, m.end()))
+                            buff.apply_tag(tag3, buff.get_iter_at_line_offset(pos, m.start() + 2),
+                                           buff.get_iter_at_line_offset(pos, m.end()))
                         except:
                             pass
                     else:
@@ -359,7 +360,9 @@ gtk.color_selection_palette_to_string([gtk.gdk.Color(*highlight_color),]))
         new_output = nmap_of.read()
 
         if self.nmap_previous_output != new_output:
-            self.text_buffer.set_text(enc(new_output))
+            # Decode the output from an encoded byte string to a unicode object
+            # before displaying it.
+            self.text_buffer.set_text(new_output.decode(locale.getpreferredencoding(), 'replace'))
             self.nmap_previous_output = new_output
 
         nmap_of.close()

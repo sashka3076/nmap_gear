@@ -22,6 +22,7 @@
 import gtk
 
 from zenmapCore.I18N import _
+from zenmapCore.Name import UMIT_DISPLAY_NAME
 
 class AllFilesFileFilter(gtk.FileFilter):
     def __init__(self):
@@ -31,49 +32,13 @@ class AllFilesFileFilter(gtk.FileFilter):
         self.add_pattern(pattern)
         self.set_name(_("All Files (%s)") % pattern)
         
-class ProfileFileFilter(gtk.FileFilter):
-    def __init__(self):
-        gtk.FileFilter.__init__(self)
-
-        pattern = "*.usp"
-        self.add_pattern(pattern)
-        self.set_name(_("UMIT Scan Profile (%s)") % pattern)
-
 class ResultsFileFilter(gtk.FileFilter):
     def __init__(self):
         gtk.FileFilter.__init__(self)
 
         pattern = "*.usr"
         self.add_pattern(pattern)
-        self.set_name(_("UMIT Scan Results (%s)") % pattern)
-
-class RegularDiffiesFileFilter(gtk.FileFilter):
-    def __init__(self):
-        gtk.FileFilter.__init__(self)
-
-        pattern = "*.urd"
-        self.add_pattern(pattern)
-        self.set_name(_("UMIT Regular Diff (%s)") % pattern)
-
-class HtmlDiffiesFileFilter(gtk.FileFilter):
-    def __init__(self):
-        gtk.FileFilter.__init__(self)
-
-        pattern = "*.html"
-        self.add_pattern(pattern)
-        self.set_name(_("UMIT HTML Diff (%s)") % pattern)
-
-class ProfileFileChooserDialog(gtk.FileChooserDialog):
-    def __init__(self, title="", parent=None,
-                 action=gtk.FILE_CHOOSER_ACTION_OPEN,
-                 buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-                          gtk.STOCK_OPEN, gtk.RESPONSE_OK), backend=None):
-
-        gtk.FileChooserDialog.__init__(self, title, parent,
-                                       action, buttons)
-
-        for f in (ProfileFileFilter(), AllFilesFileFilter()):
-            self.add_filter(f)
+        self.set_name(_("%s Scan Results (%s)") % (UMIT_DISPLAY_NAME, pattern))
 
 class AllFilesFileChooserDialog(gtk.FileChooserDialog):
     def __init__(self, title="", parent=None,
@@ -108,29 +73,6 @@ class SaveResultsFileChooserDialog(gtk.FileChooserDialog):
 
         for f in (ResultsFileFilter(), AllFilesFileFilter()):
             self.add_filter(f)
-
-class FullDiffiesFileChooserDialog(gtk.FileChooserDialog):
-    def __init__(self, title="", parent=None,
-                 action=gtk.FILE_CHOOSER_ACTION_OPEN,
-                 buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-                          gtk.STOCK_OPEN, gtk.RESPONSE_OK), backend=None):
-
-        gtk.FileChooserDialog.__init__(self, title, parent,
-                                       action, buttons)
-
-        for f in (RegularDiffiesFileFilter(), HtmlDiffiesFileFilter()):
-            self.add_filter(f)
-
-class SingleDiffiesFileChooserDialog(gtk.FileChooserDialog):
-    def __init__(self, title="", parent=None,
-                 action=gtk.FILE_CHOOSER_ACTION_OPEN,
-                 buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-                          gtk.STOCK_OPEN, gtk.RESPONSE_OK), backend=None):
-
-        gtk.FileChooserDialog.__init__(self, title, parent,
-                                       action, buttons)
-
-        self.add_filter(RegularDiffiesFileFilter())
 
 class DirectoryChooserDialog(gtk.FileChooserDialog):
     def __init__(self, title="", parent=None,

@@ -15,22 +15,13 @@ author = "Kris Katterjohn <katterjohn@gmail.com>"
 
 license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
 
-categories = { "discovery", "safe" }
+categories = { "default", "discovery", "safe" }
 
 require 'bit'
 
 -- Grabs NUL-terminated string
 local getstring = function(orig)
-	local str = ""
-	local index = 1
-
-	while orig:byte(index) ~= 0 do
-		str = str .. string.char(orig:byte(index))
-
-		index = index + 1
-	end
-
-	return str
+    return orig:match("^([^%z]*)");
 end
 
 -- Convert two bytes into a number

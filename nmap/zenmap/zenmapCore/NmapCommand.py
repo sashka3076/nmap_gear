@@ -19,6 +19,10 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
+# This file contains the definitions of two main classes:
+# NmapCommand represents and runs an Nmap command line. CommandConstructor
+# builds a command line string from textual option descriptions.
+
 import sys
 import os
 import re
@@ -36,27 +40,47 @@ import zenmapCore.Paths
 from zenmapCore.NmapOptions import NmapOptions
 from zenmapCore.OptionsConf import options_file
 from zenmapCore.UmitLogging import log
-from zenmapCore.I18N import _, enc
+from zenmapCore.I18N import _
+from zenmapCore.UmitConf import PathsConfig
 
-# shell_state = True avoids python to open a terminal to execute nmap.exe
-# shell_state = False is needed to run correctly at Linux
+# This variable is used in the call to Popen. It determines whether the
+# subprocess invocation uses the shell or not. If it is False on Unix, the nmap
+# process is started with execve and a list of arguments, which is what we want.
+# (Indeed it fails when shell_state = True because it tries to exec
+# ['sh', '-c', 'nmap', '-v', ...], which is wrong.) So normally we would want
+# shell_state = False. But if shell_state = False on Windows, a big ugly black
+# shell window opens whenever a scan is run, at least under py2exe. So we define
+# shell_state = True on Windows only. Windows doesn't have exec, so it runs the
+# command basically the same way regardless of shell_state.
 shell_state = (sys.platform == "win32")
 
-nmap_command_path = "nmap"
-# Don't need the line below anymore
-#if sys.platform == "win32":
-#   nmap_command_path = os.path.join(os.path.split(os.path.abspath(sys.executable))[0], "Nmap", "nmap.exe")
+# The path to the nmap executable as used by Popen.
+# Find the value from configuation file paths nmap_command_path
+# to use for the location of the nmap executable.
+# (The bug that nmap_command_path is not used from zenmap.conf has been resolved.)
+
+nmap_paths = PathsConfig()
+nmap_command_path = nmap_paths.nmap_command_path
 
 log.debug(">>> Platform: %s" % sys.platform)
 log.debug(">>> Nmap command path: %s" % nmap_command_path)
 
 def split_quoted(s):
     """Like str.split, except that no splits occur inside quoted strings, and
-       quoted strings are unquoted."""
+    quoted strings are unquoted."""
     return [x.replace("\"", "") for x in re.findall('((?:"[^"]*"|[^"\s]+)+)', s)]
 
 class NmapCommand(object):
+    """This class represents an Nmap command line. It is responsible for
+    starting, stopping, and returning the results from a command-line scan. A
+    command line is represented as a backing string in the variable command but
+    it is split into a list of arguments in the variable _command for
+    execution."""
+
     def __init__(self, command=None):
+        """Initialize an Nmap command. This creates temporary files for
+        redirecting the various types of output and sets the backing
+        command-line string."""
         self.xml_output = mktemp()
         self.normal_output = mktemp()
         self.stdout_output = mktemp()
@@ -68,7 +92,8 @@ class NmapCommand(object):
         log.debug(">>> STDOUT OUTPUT: %s" % self.stdout_output)
         log.debug(">>> STDERR OUTPUT: %s" % self.stderr_output)
 
-        # Creating files. Avoid troubles while running at Windows
+        # Pre-create the output files. This had the comment "Avoid troubles
+        # while running at Windows" but it is unnecessary.
         open(self.xml_output,'w').close()
         open(self.normal_output,'w').close()
         open(self.stdout_output,'w').close()
@@ -82,14 +107,21 @@ class NmapCommand(object):
             self.command = command
 
     def get_command(self):
+        """command is a property of this class; this is the getter. It returns
+        the list self._command."""
+        # FIXME: don't allow self._command to be a string.
         if type(self._command) == type(""):
             return self._command.split()
         return self._command
 
     def set_command(self, command):
+        """command is a property of this class; this is the setter. It calls
+        _verify to split the command line into the list self._command."""
         self._command = self._verify(command)
 
     def _verify(self, command):
+        """This misnamed method sanitizes command and splits it into a list
+        suitable for execution."""
         command = self._remove_double_space(command)
         command = self._verify_output_options(command)
         command[0] = nmap_command_path
@@ -97,6 +129,9 @@ class NmapCommand(object):
         return command
 
     def _verify_output_options(self, command):
+        """Remove comments from command, add output options, and return the
+        command split up into a list."""
+        # FIXME: don't allow command to be a list.
         if type(command) == type([]):
             command = " ".join(command)
 
@@ -135,13 +170,10 @@ class NmapCommand(object):
         return splited
 
     def _remove_double_space(self, command):
+        """Coalesce multiple space characters in command into single spaces."""
+        # FIXME: Don't allow command to be a list.
         if type(command) == type([]):
             command = " ".join(command)
-
-        ## Found a better solution for this problem
-        #while re.findall('(  )', command):
-        #    command = command.replace('  ', ' ')
-
 
         # The first join + split ensures to remove double spaces on lists like this:
         # ["nmap    ", "-T4", ...]
@@ -149,7 +181,7 @@ class NmapCommand(object):
         return " ".join(command.split()).split()
 
     def close(self):
-        # Remove temporary files created
+        """Close and remove temporary output files used by the command."""
         self._stdout_handler.close()
         self._stderr_handler.close()
 
@@ -158,6 +190,7 @@ class NmapCommand(object):
         os.remove(self.stdout_output)
 
     def kill(self):
+        """Kill the nmap subprocess."""
         log.debug(">>> Killing scan process %s" % self.command_process.pid)
 
         if sys.platform != "win32":
@@ -192,6 +225,7 @@ class NmapCommand(object):
         return os.pathsep.join(search_paths)
 
     def run_scan(self):
+        """Run the command that has been set."""
         if not self.command:
             raise Exception("You have no command to run! Please, set the command \
 before trying to start scan!")
@@ -219,17 +253,16 @@ before trying to start scan!")
                                      env=env)
 
     def scan_state(self):
+        """Return the current state of a running scan. A return value of True
+        means the scan is running and a return value of False means the scan
+        subprocess completed successfully. If the subprocess terminated with an
+        error an exception is raised. The scan must have been started with
+        run_scan before calling this method."""
         if self.command_process == None:
             raise Exception("Scan is not running yet!")
 
         state = self.command_process.poll()
 
-        ### Buffer is not been used anymore
-        ## This line blocks the GUI execution, once the read method waits until a
-        ## new content come to be buffered
-        #self.command_buffer += self.command_process.stdout.read()
-        ###
-        
         if state == None:
             return True # True means that the process is still running
         elif state == 0:
@@ -245,12 +278,14 @@ before trying to start scan!")
                             self.command_stderr)
 
     def scan_progress(self):
-        """Should return a tuple with the stage and status of the scan execution progress.
-        Will work only when the runtime interaction problem is solved.
+        """Should return a tuple with the stage and status of the scan execution
+        progress. Will work only when the runtime interaction problem is solved.
         """
         pass
 
     def get_raw_output(self):
+        """Return the stdout of the nmap subprocess. This is the same as
+        get_output."""
         raw_desc = open(self.stdout_output, "r")
         raw_output = raw_desc.readlines()
         
@@ -258,6 +293,8 @@ before trying to start scan!")
         return "".join(raw_output)
 
     def get_output(self):
+        """Return the stdout of the nmap subprocess. This is the same as
+        get_raw_output."""
         output_desc = open(self.stdout_output, "r")
         output = output_desc.read()
 
@@ -265,16 +302,23 @@ before trying to start scan!")
         return output
 
     def get_output_file(self):
+        """Return the name of the stdout output file."""
         return self.stdout_output
 
     def get_normal_output(self):
+        """Return the normal (-oN) output of the nmap subprocess."""
         normal_desc = open(self.normal_output, "r")
         normal = normal_desc.read()
 
         normal_desc.close()
         return normal
 
+    def get_normal_output_file(self):
+        """Return the name of the normal (-oN) output file."""
+        return self.normal_output
+
     def get_xml_output(self):
+        """Return the XML (-oX) output of the nmap subprocess."""
         xml_desc = open(self.xml_output, "r")
         xml = xml_desc.read()
 
@@ -282,12 +326,11 @@ before trying to start scan!")
         return xml
 
     def get_xml_output_file(self):
+        """Return the name of the XML (-oX) output file."""
         return self.xml_output
 
-    def get_normal_output_file(self):
-        return self.normal_output
-
     def get_error(self):
+        """Return the stderr output of the nmap subprocess."""
         error_desc = open(self.stderr_output, "r")
         error = error_desc.read()
 
@@ -295,25 +338,40 @@ before trying to start scan!")
         return error
 
     command = property(get_command, set_command)
+    # FIXME: This is a class-level variable but it should be an instance
+    # variable. Is it used?
     _command = None
 
-
 class CommandConstructor:
+    """This class builds a string representing an Nmap command line from textual
+    option descriptions such as 'Aggressive Options' or 'UDP Scan'
+    (corresponding to -A and -sU respectively). The name-to-option mapping is
+    done by the NmapOptions class. Options are stored in a dict that maps the
+    option name to a tuple containing its arguments and "level." The level is
+    the degree of repetition for options like -v that can be given more than
+    once."""
+
     def __init__(self, options = {}):
+        """Initialize a command line using the given options. The options are
+        given as a dict mapping option names to arguments."""
         self.options = {}
         self.option_profile = NmapOptions(options_file)
         for k, v in options.items():
-            self.add_option(k, v, False) # TODO: check this place further
+            self.add_option(k, v, False)
 
     def add_option(self, option_name, args=[], level=False):
+        """Add an option to the command line. Only one of args and level can be
+        defined. If both are defined, level takes precedence and args is
+        ignored."""
         self.options[option_name] = (args, level)
-        
 
     def remove_option(self, option_name):
+        """Remove an option from the command line."""
         if option_name in self.options.keys():
             del(self.options[option_name])
 
     def get_command(self, target):
+        """Return the contructed command line as a plain string."""
         splited = ['%s' % nmap_command_path]
 
         for option_name in self.options:
@@ -335,8 +393,11 @@ class CommandConstructor:
         return ' '.join(splited)
 
     def get_options(self):
+        """Return the options used in the command line, as a dict mapping
+        options names to arguments. The level, if any, is discarded."""
         return dict([(k, v[0]) for k, v in self.options.items()])
 
+# FIXME: This class is unused. Delete it.
 class CommandThread(threading.Thread):
     def __init__(self, command):
         self._stop_event = threading.Event()
@@ -356,6 +417,8 @@ class CommandThread(threading.Thread):
 ##############
 # Exceptions #
 ##############
+
+# FIXME: All these exceptions are unused. Delete them.
 
 class WrongCommandType(Exception):
     def __init__(self, command):

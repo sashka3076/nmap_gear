@@ -11,7 +11,7 @@ CC = @CC@
 AR = ar
 RANLIB = @RANLIB@
 CCOPT = 
-DEFS = @DEFS@ -DNSOCK_VERSION=\"$(NSOCK_VERSION)\" 
+DEFS = @DEFS@ -DNSOCK_VERSION=\"$(NSOCK_VERSION)\"
 INCLS = -I../include -I../../libpcap
 CFLAGS = @CFLAGS@ $(CCOPT) $(DEFS) $(INCLS)
 # CFLAGS = -g -Wall $(DEFS) $(INCLS)

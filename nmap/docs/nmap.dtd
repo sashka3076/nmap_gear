@@ -1,7 +1,7 @@
 <!--
     nmap.dtd
     This is the DTD for nmap's XML output (-oX) format.
-    $Id: nmap.dtd 7149 2008-04-11 19:33:49Z david $
+    $Id: nmap.dtd 7474 2008-05-12 15:54:14Z david $
 
     Originally written by:
     William McVey <wam@cisco.com> <wam+nmap@wamber.net>
@@ -45,7 +45,6 @@
 <!ENTITY % attr_alpha "CDATA" >
 <!ENTITY % attr_numeric "CDATA" >
 <!ENTITY % attr_ipaddr "CDATA" >
-<!ENTITY % attr_percent "CDATA" >
 <!ENTITY % attr_percent "CDATA" >
 <!ENTITY % attr_type "(ipv4 | ipv6 | mac)" >
 
@@ -135,6 +134,10 @@
                           smurf | ports | os | distance | uptime | 
                           tcpsequence | ipidsequence | tcptssequence |
                           hostscript | trace)*, times ) >
+<!ATTLIST host
+			starttime	%attr_numeric;	#IMPLIED
+			endtime		%attr_numeric;	#IMPLIED
+>
 
 <!-- these elements are written by output.c:write_xml_initial_hostinfo() -->
 <!ELEMENT status	EMPTY >

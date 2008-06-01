@@ -3,7 +3,7 @@ description = "determines whether the server (still) supports SSL-v2, and what c
 author = "Matt <mb2263@bristol.ac.uk>"
 license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
 
-categories = {"intrusive"}
+categories = {"default", "intrusive"}
 
 require "shortport"
 
@@ -204,7 +204,9 @@ action = function(host, port)
 		return_string = "server still supports SSLv2\n";
 	end
 
-	available_cyphers = cyphers(cypher_list, cyphers_len);
+	if (nmap.verbosity() > 1 or nmap.debugging() > 0) then
+		available_cyphers = cyphers(cypher_list, cyphers_len);
+	end
 
 	if (	string.len(return_string) > 0
 	or	string.len(available_cyphers) > 0) then

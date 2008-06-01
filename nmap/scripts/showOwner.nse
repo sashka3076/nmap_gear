@@ -7,24 +7,22 @@ author = "Diman Todorov <diman.todorov@gmail.com>"
 
 license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
 
-categories = {"safe"}
+categories = {"default", "safe"}
 
-portrule = function(host, port) 
-	local identd, decision
-
+portrule = function(host, port)
 	local auth_port = { number=113, protocol="tcp" }
-	identd = nmap.get_port_state(host, auth_port)
+	local identd = nmap.get_port_state(host, auth_port)
 
-	if 
+	if
 		identd ~= nil
-		and identd.state == "open" 
+		and identd.state == "open"
+		and port.protocol == "tcp"
+		and port.state == "open"
 	then
-		decision = true
+        return true
 	else
-		decision = false
+        return false
 	end
-
-	return decision
 end
 
 action = function(host, port)

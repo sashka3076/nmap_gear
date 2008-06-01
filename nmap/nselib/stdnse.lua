@@ -1,4 +1,5 @@
 -- See nmaps COPYING for licence
+
 module(..., package.seeall)
 
 print_debug = function(...)
@@ -28,7 +29,7 @@ function strsplit(delimiter, text)
 		error("delimiter matches empty string!")
 	end
 
-	while 1 do
+	while true do
 		local first, last = string.find(text, delimiter, pos)
 		if first then -- found?
 			table.insert(list, string.sub(text, pos, first-1))
@@ -103,4 +104,40 @@ make_buffer = function(sd, sep)
   end
 
   return self
+end
+
+do
+  local t = {
+    ["0"] = "0000",
+    ["1"] = "0001",
+    ["2"] = "0010",
+    ["3"] = "0011",
+    ["4"] = "0100",
+    ["5"] = "0101",
+    ["6"] = "0110",
+    ["7"] = "0111",
+    ["8"] = "1000",
+    ["9"] = "1001",
+    a = "1010",
+    b = "1011",
+    c = "1100",
+    d = "1101",
+    e = "1110",
+    f = "1111"
+  };
+
+  function tobinary(n)
+    assert(tonumber(n), "number expected");
+    return (("%x"):format(n):gsub("%w", t):gsub("^0*", ""));
+  end
+end
+
+function tooctal(n)
+  assert(tonumber(n), "number expected");
+  return ("%o"):format(n)
+end
+
+function tohex(n)
+  assert(tonumber(n), "number expected");
+  return ("%x"):format(n);
 end
