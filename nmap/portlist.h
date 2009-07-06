@@ -4,7 +4,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -32,19 +32,10 @@
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
- * works of Nmap.  This list is not exclusive, but is just meant to        *
- * clarify our interpretation of derived works with some common examples.  *
- * These restrictions only apply when you actually redistribute Nmap.  For *
- * example, nothing stops you from writing and selling a proprietary       *
- * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://nmap.org to download Nmap.                                       *
- *                                                                         *
- * We don't consider these to be added restrictions on top of the GPL, but *
- * just a clarification of how we interpret "derived works" as it applies  *
- * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
- * Torvalds has announced his interpretation of how "derived works"        *
- * applies to Linux kernel modules.  Our interpretation refers only to     *
- * Nmap - we don't speak for any other GPL products.                       *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
  *                                                                         *
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
@@ -75,17 +66,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -96,7 +87,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: portlist.h 7640 2008-05-22 20:45:32Z fyodor $ */
+/* $Id: portlist.h 13888 2009-06-24 21:35:54Z fyodor $ */
 
 #ifndef PORTLIST_H
 #define PORTLIST_H
@@ -122,11 +113,8 @@
 #define PORT_HIGHEST_STATE 9 /* ***IMPORTANT -- BUMP THIS UP WHEN STATES ARE 
 				ADDED *** */
  
-#define TCPANDUDP IPPROTO_MAX
-
-#define CONF_NONE 0
-#define CONF_LOW 1
-#define CONF_HIGH 2
+#define TCPANDUDPANDSCTP IPPROTO_MAX
+#define UDPANDSCTP (IPPROTO_MAX + 1)
 
 enum serviceprobestate {
   PROBESTATE_INITIAL=1, // No probes started yet
@@ -166,9 +154,9 @@ struct serviceDeductions {
   const char *devicetype;
   // SERVICE_TUNNEL_NONE or SERVICE_TUNNEL_SSL
   enum service_tunnel_type service_tunnel; 
-  // This is the combined version of the three fields above.  It will be 
-  // zero length if unavailable.
-  char fullversion[128];
+  // This is a combined representation of product, version, and extrainfo.
+  // It will be zero length if unavailable.
+  char fullversion[160];
   // if we should give the user a service fingerprint to submit, here it is.  Otherwise NULL.
   const char *service_fp; 
   enum service_detection_type dtype; // definition above
@@ -224,7 +212,6 @@ class Port {
   u8 proto;
   char *owner;
   int state; 
-  int confidence; /* How sure are we about the state? */
   state_reason_t reason;
 
 #ifndef NOLUA
@@ -264,8 +251,9 @@ class Port {
 enum portlist_proto {	// PortList Protocols
   PORTLIST_PROTO_TCP	= 0,
   PORTLIST_PROTO_UDP	= 1,
-  PORTLIST_PROTO_IP	= 2,
-  PORTLIST_PROTO_MAX	= 3
+  PORTLIST_PROTO_SCTP	= 2,
+  PORTLIST_PROTO_IP	= 3,
+  PORTLIST_PROTO_MAX	= 4
 };
 
 class PortList {
@@ -291,12 +279,12 @@ class PortList {
    first "afterthisport".  Then supply the most recent returned port
    for each subsequent call.  When no more matching ports remain, NULL
    will be returned.  To restrict returned ports to just one protocol,
-   specify IPPROTO_TCP or IPPROTO_UDP for allowed_protocol. A TCPANDUDP
-   for allowed_protocol matches either. A 0 for allowed_state matches 
-   all possible states. This function returns ports in numeric
-   order from lowest to highest, except that if you ask for both TCP &
-   UDP, every TCP port will be returned before we start returning UDP
-   ports */
+   specify IPPROTO_TCP, IPPROTO_UDP or UPPROTO_SCTP for
+   allowed_protocol. A TCPANDUDPANDSCTP for allowed_protocol matches
+   either. A 0 for allowed_state matches all possible states. This
+   function returns ports in numeric order from lowest to highest,
+   except that if you ask for TCP, UDP & SCTP, all TCP ports will be
+   returned before we start returning UDP and finally SCTP ports */
    Port *nextPort(Port *afterthisport, 
   	          int allowed_protocol, int allowed_state);
 

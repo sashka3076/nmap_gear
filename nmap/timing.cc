@@ -7,7 +7,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -35,19 +35,10 @@
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
- * works of Nmap.  This list is not exclusive, but is just meant to        *
- * clarify our interpretation of derived works with some common examples.  *
- * These restrictions only apply when you actually redistribute Nmap.  For *
- * example, nothing stops you from writing and selling a proprietary       *
- * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://nmap.org to download Nmap.                                       *
- *                                                                         *
- * We don't consider these to be added restrictions on top of the GPL, but *
- * just a clarification of how we interpret "derived works" as it applies  *
- * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
- * Torvalds has announced his interpretation of how "derived works"        *
- * applies to Linux kernel modules.  Our interpretation refers only to     *
- * Nmap - we don't speak for any other GPL products.                       *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
  *                                                                         *
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
@@ -78,17 +69,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -99,7 +90,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: timing.cc 7640 2008-05-22 20:45:32Z fyodor $ */
+/* $Id: timing.cc 13888 2009-06-24 21:35:54Z fyodor $ */
 
 #include "timing.h"
 #include "NmapOps.h"
@@ -160,13 +151,12 @@ void adjust_timeouts2(const struct timeval *sent,
   else {
     if (delta >= 8000000 || delta < 0) {
       if (o.verbose)
-	error("%s: packet supposedly had rtt of %lu microseconds.  Ignoring time.", __func__, delta);
+	error("%s: packet supposedly had rtt of %ld microseconds.  Ignoring time.", __func__, delta);
       return;
     }
     delta -= to->srtt;
     /* sanity check 2*/
     if (delta > 1500000 && delta > 3 * to->srtt + 2 * to->rttvar) {
-      /* WANKER ALERT! */
       if (o.debugging) {
 	log_write(LOG_STDOUT, "Bogus delta: %ld (srtt %d) ... ignoring\n", delta, to->srtt);
       }
@@ -238,19 +228,18 @@ void enforce_scan_delay(struct timeval *tv) {
   return;    
 }
 
-/* Initialize the constant CURRENT_RATE_HISTORY that defines how far back we
-   look when calculating the current rates. */
-RateMeter::RateMeter() : CURRENT_RATE_HISTORY(5.0) {
+/* current_rate_history defines how far back (in seconds) we look when
+   calculating the current rate. */
+RateMeter::RateMeter(double current_rate_history) {
+  this->current_rate_history = current_rate_history;
   start_tv.tv_sec = 0;
   start_tv.tv_usec = 0;
   stop_tv.tv_sec = 0;
   stop_tv.tv_usec = 0;
   last_update_tv.tv_sec = 0;
   last_update_tv.tv_usec = 0;
-  num_packets = 0;
-  num_bytes = 0;
-  current_packet_rate = 0.0;
-  current_byte_rate = 0.0;
+  total = 0.0;
+  current_rate = 0.0;
   assert(!isSet(&start_tv));
   assert(!isSet(&stop_tv));
 }
@@ -273,44 +262,9 @@ void RateMeter::stop(const struct timeval *now) {
     stop_tv = *now;
 }
 
-/* Record a packet of length len. If now is not NULL, use it as the time the
-   packet was received rather than calling gettimeofday. */
-void RateMeter::record(u32 len, const struct timeval *now) {
-  update(1, len, now);
-}
-
-double RateMeter::getOverallPacketRate(const struct timeval *now) const {
-  return num_packets / elapsedTime(now);
-}
-
-/* Get the "current" packet rate (actually a moving average of the last few
-   seconds). If update is true (its default value), lower the rate to account
-   for the time since the last packet was received. */
-double RateMeter::getCurrentPacketRate(const struct timeval *now, bool update) {
-  if (update)
-    this->update(0, 0, now);
-
-  return current_packet_rate;
-}
-
-double RateMeter::getOverallByteRate(const struct timeval *now) const {
-  return num_bytes / elapsedTime(now);
-}
-
-/* Get the "current" byte rate (actually a moving average of the last few
-   seconds). If update is true (its default value), lower the rate to account
-   for the time since the last bytes were received. */
-double RateMeter::getCurrentByteRate(const struct timeval *now, bool update) {
-  if (update)
-    this->update(0, 0, now);
-
-  return current_byte_rate;
-}
-
-/* Update the rates to include packets additional packets and bytes additional
-   bytes. If now is not NULL, use it as the time the packets and bytes were
-   received rather than calling gettimeofday. */
-void RateMeter::update(u32 packets, u32 bytes, const struct timeval *now) {
+/* Update the rates to reflect the given amount added to the total at the time
+   now. If now is NULL, get the current time with gettimeofday. */
+void RateMeter::update(double amount, const struct timeval *now) {
   struct timeval tv;
   double diff;
   double interval;
@@ -319,9 +273,8 @@ void RateMeter::update(u32 packets, u32 bytes, const struct timeval *now) {
   assert(isSet(&start_tv));
   assert(!isSet(&stop_tv));
 
-  /* Update the overall counters. */
-  num_packets += packets;
-  num_bytes += bytes;
+  /* Update the total. */
+  total += amount;
 
   if (now == NULL) {
     gettimeofday(&tv, NULL);
@@ -330,47 +283,77 @@ void RateMeter::update(u32 packets, u32 bytes, const struct timeval *now) {
   if (!isSet(&last_update_tv))
     last_update_tv = start_tv;
 
-  /* Calculate approximate moving averages of how many packets and bytes were
-     recorded in the last CURRENT_RATE_HISTORY seconds. These averages are what
-     are returned as the "current" rates. */
+  /* Calculate the approximate moving average of how much was recorded in the
+     last current_rate_history seconds. This average is what is returned as the
+     "current" rate. */
 
   /* How long since the last update? */
   diff = TIMEVAL_SUBTRACT(*now, last_update_tv) / 1000000.0;
-  assert(diff >= 0.0);
+
+  if (diff < -current_rate_history)
+    /* This happened farther in the past than we care about. */
+    return;
+
+  if (diff < 0.0) {
+    /* If the event happened in the past, just add it into the total and don't
+       change last_update_tv, as if it had happened at the same time as the most
+       recent event. */
+    now = &last_update_tv;
+    diff = 0.0;
+  }
 
   /* Find out how far back in time to look. We want to look back
-     CURRENT_RATE_HISTORY seconds, or to when the last update occurred,
+     current_rate_history seconds, or to when the last update occurred,
      whichever is longer. However, we never look past the start. */
   struct timeval tmp;
-  /* Find the time CURRENT_RATE_HISTORY seconds after the start. That's our
+  /* Find the time current_rate_history seconds after the start. That's our
      threshold for deciding how far back to look. */
-  TIMEVAL_ADD(tmp, start_tv, (time_t) (CURRENT_RATE_HISTORY * 1000000.0));
+  TIMEVAL_ADD(tmp, start_tv, (time_t) (current_rate_history * 1000000.0));
   if (TIMEVAL_AFTER(*now, tmp))
-    interval = MAX(CURRENT_RATE_HISTORY, diff);
+    interval = MAX(current_rate_history, diff);
   else
     interval = TIMEVAL_SUBTRACT(*now, start_tv) / 1000000.0;
   assert(diff <= interval);
-  /* If we get packets in the very same instant that the timer is started,
+  /* If we record an amount in the very same instant that the timer is started,
      there's no way to calculate meaningful rates. Ignore it. */
   if (interval == 0.0)
     return;
 
-  /* To calculate the approximate average of the packet rate over the last
+  /* To calculate the approximate average of the rate over the last
      interval seconds, we assume that the rate was constant over that interval.
-     We calculate how many packets would have been received in that interval,
-     ignoring the first diff seconds' worth:
-       (interval - diff) * current_packet_rate.
-     Then we add how many packets were received in the most recent diff seconds.
-     Divide by the width of the interval to get the average. */
-  count = (interval - diff) * current_packet_rate + packets;
-  current_packet_rate = count / interval;
-  assert(current_packet_rate >= 0.0);
-  /* Likewise with the byte rate. */
-  count = (interval - diff) * current_byte_rate + bytes;
-  current_byte_rate = count / interval;
-  assert(current_byte_rate >= 0.0);
+     We calculate how much would have been received in that interval, ignoring
+     the first diff seconds' worth:
+       (interval - diff) * current_rate.
+     Then we add how much was received in the most recent diff seconds. Divide
+     by the width of the interval to get the average. */
+  count = (interval - diff) * current_rate + amount;
+  current_rate = count / interval;
 
   last_update_tv = *now;
+}
+
+double RateMeter::getOverallRate(const struct timeval *now) const {
+  double elapsed;
+
+  elapsed = elapsedTime(now);
+  if (elapsed <= 0.0)
+    return 0.0;
+  else
+    return total / elapsed;
+}
+
+/* Get the "current" rate (actually a moving average of the last
+   current_rate_history seconds). If update is true (its default value), lower
+   the rate to account for the time since the last record. */
+double RateMeter::getCurrentRate(const struct timeval *now, bool update) {
+  if (update)
+    this->update(0.0, now);
+
+  return current_rate;
+}
+
+double RateMeter::getTotal(void) const {
+  return total;
 }
 
 /* Get the number of seconds the meter has been running: if it has been stopped,
@@ -400,12 +383,57 @@ bool RateMeter::isSet(const struct timeval *tv) {
   return tv->tv_sec != 0 || tv->tv_usec != 0;
 }
 
+PacketRateMeter::PacketRateMeter(double current_rate_history) {
+  packet_rate_meter = RateMeter(current_rate_history);
+  byte_rate_meter = RateMeter(current_rate_history);
+}
+
+void PacketRateMeter::start(const struct timeval *now) {
+  packet_rate_meter.start(now);
+  byte_rate_meter.start(now);
+}
+
+void PacketRateMeter::stop(const struct timeval *now) {
+  packet_rate_meter.stop(now);
+  byte_rate_meter.stop(now);
+}
+
+/* Record one packet of length len. */
+void PacketRateMeter::update(u32 len, const struct timeval *now) {
+  packet_rate_meter.update(1, now);
+  byte_rate_meter.update(len, now);
+}
+
+double PacketRateMeter::getOverallPacketRate(const struct timeval *now) const {
+  return packet_rate_meter.getOverallRate(now);
+}
+
+double PacketRateMeter::getCurrentPacketRate(const struct timeval *now, bool update) {
+  return packet_rate_meter.getCurrentRate(now, update);
+}
+
+double PacketRateMeter::getOverallByteRate(const struct timeval *now) const {
+  return byte_rate_meter.getOverallRate(now);
+}
+
+double PacketRateMeter::getCurrentByteRate(const struct timeval *now, bool update) {
+  return byte_rate_meter.getCurrentRate(now, update);
+}
+
+unsigned long long PacketRateMeter::getNumPackets(void) const {
+  return (unsigned long long) packet_rate_meter.getTotal();
+}
+
+unsigned long long PacketRateMeter::getNumBytes(void) const {
+  return (unsigned long long) byte_rate_meter.getTotal();
+}
+
 ScanProgressMeter::ScanProgressMeter(const char *stypestr) {
   scantypestr = strdup(stypestr);
   gettimeofday(&begin, NULL);
   last_print_test = begin;
   memset(&last_print, 0, sizeof(last_print));
-  memset(&last_est, 0, sizeof(last_print));
+  memset(&last_est, 0, sizeof(last_est));
   beginOrEndTask(&begin, NULL, true);
 }
 
@@ -422,7 +450,7 @@ ScanProgressMeter::~ScanProgressMeter() {
    might as well check this before spending much time computing
    progress info.  now can be NULL if caller doesn't have the current
    time handy.  Just because this function returns true does not mean
-   that the next printStatsIfNeccessary will always print something.
+   that the next printStatsIfNecessary will always print something.
    It depends on whether time estimates have changed, which this func
    doesn't even know about. */
 bool ScanProgressMeter::mayBePrinted(const struct timeval *now) {
@@ -438,40 +466,51 @@ bool ScanProgressMeter::mayBePrinted(const struct timeval *now) {
 
   if (last_print.tv_sec == 0) {
     /* We've never printed before -- the rules are less stringent */
-    if (TIMEVAL_MSEC_SUBTRACT(*now, begin) > 30000)
+    if (difftime(now->tv_sec, begin.tv_sec) > 30)
       return true;
-    else return false;
+    else
+      return false;
   } 
 
-  if (TIMEVAL_MSEC_SUBTRACT(*now, last_print_test) < 3000) 
+  if (difftime(now->tv_sec, last_print_test.tv_sec) < 3)
     return false;  /* No point even checking too often */
 
   /* We'd never want to print more than once per 30 seconds */
-  if (TIMEVAL_MSEC_SUBTRACT(*now, last_print) < 30000)
+  if (difftime(now->tv_sec, last_print.tv_sec) < 30)
     return false;
 
   return true;
+}
+
+/* Return an estimate of the time remaining if a process was started at begin
+   and is perc_done of the way finished. Returns inf if perc_done == 0.0. */
+static double estimate_time_left(double perc_done,
+                                 const struct timeval *begin,
+                                 const struct timeval *now) {
+  double time_used_s;
+  double time_needed_s;
+
+  time_used_s = difftime(now->tv_sec, begin->tv_sec);
+  time_needed_s = time_used_s / perc_done;
+
+  return time_needed_s - time_used_s;
 }
 
 /* Prints an estimate of when this scan will complete.  It only does
    so if mayBePrinted() is true, and it seems reasonable to do so
    because the estimate has changed significantly.  Returns whether
    or not a line was printed.*/
-bool ScanProgressMeter::printStatsIfNeccessary(double perc_done, 
+bool ScanProgressMeter::printStatsIfNecessary(double perc_done, 
 					       const struct timeval *now) {
   struct timeval tvtmp;
-  long time_used_ms;
-  long time_needed_ms;
-  long time_left_ms;
-  long prev_est_time_left_ms; /* Time left as per prev. estimate */
-  long change_abs_ms; /* absolute value of change */
+  double time_left_s;
   bool printit = false;
 
   if (!now) {
     gettimeofday(&tvtmp, NULL);
     now = (const struct timeval *) &tvtmp;
   }
-  
+
   if (!mayBePrinted(now))
     return false;
 
@@ -482,45 +521,39 @@ bool ScanProgressMeter::printStatsIfNeccessary(double perc_done,
 
   assert(perc_done <= 1.0);
 
-  /* OK, now lets estimate the time to finish */
-  time_used_ms = TIMEVAL_MSEC_SUBTRACT(*now, begin);
-  time_needed_ms = (int) ((double) time_used_ms / perc_done);
-  time_left_ms = time_needed_ms - time_used_ms;
+  time_left_s = estimate_time_left(perc_done, &begin, now);
 
-  if (time_left_ms < 30000)
+  if (time_left_s < 30)
     return false; /* No point in updating when it is virtually finished. */
 
-  /* If we have not printed before, or if our previous ETC has elapsed, print
-     a new one */
-  if (last_print.tv_sec < 0)
+  if (last_est.tv_sec == 0) {
+    /* We don't have an estimate yet (probably means a low completion). */
     printit = true;
-  else {
-    /* If the estimate changed by more than X minutes, and if that
-       change represents at least X% of the time remaining, print
-       it.  */
-    prev_est_time_left_ms = TIMEVAL_MSEC_SUBTRACT(last_est, *now);
-    change_abs_ms = ABS(prev_est_time_left_ms - time_left_ms);
-    if (prev_est_time_left_ms <= 0)
-      printit = true;
-    else if (o.debugging || (change_abs_ms > 180000 && change_abs_ms > .05 * MAX(time_left_ms, prev_est_time_left_ms)))
+  } else if (TIMEVAL_AFTER(*now, last_est)) {
+    /* The last estimate we printed has passed. Print a new one. */
+    printit = true;
+  } else {
+    /* If the estimate changed by more than 3 minutes, and if that change
+       represents at least 5% of the total time, print it. */
+    double prev_est_total_time_s = difftime(last_est.tv_sec, begin.tv_sec);
+    double prev_est_time_left_s = difftime(last_est.tv_sec, last_print.tv_sec);
+    double change_abs_s = ABS(prev_est_time_left_s - time_left_s);
+    if (o.debugging || (change_abs_s > 15 && change_abs_s > .05 * prev_est_total_time_s))
       printit = true;
   }
 
   if (printit) {
      return printStats(perc_done, now);
   } 
+
   return false;
 }
-
 
 /* Prints an estimate of when this scan will complete.  */
 bool ScanProgressMeter::printStats(double perc_done, 
                                    const struct timeval *now) {
   struct timeval tvtmp;
-  long time_used_ms;
-  long time_needed_ms;
-  long time_left_ms;
-  long sec_left;
+  double time_left_s;
   time_t timet;
   struct tm *ltime;
 
@@ -528,38 +561,41 @@ bool ScanProgressMeter::printStats(double perc_done,
     gettimeofday(&tvtmp, NULL);
     now = (const struct timeval *) &tvtmp;
   }
-  
-  /* OK, now lets estimate the time to finish */
-  time_used_ms = TIMEVAL_MSEC_SUBTRACT(*now, begin);
-  time_needed_ms = (int) ((double) time_used_ms / perc_done);
-  time_left_ms = time_needed_ms - time_used_ms;
 
-    /* Here we go! */
-    last_print = *now;
-    TIMEVAL_MSEC_ADD(last_est, *now, time_left_ms);
-    timet = last_est.tv_sec;
-    ltime = localtime(&timet);
-    assert(ltime);
+  last_print = *now;
 
-    sec_left = time_left_ms / 1000;
-
-    // If we're less than 1% done we probably don't have enough
-    // data for decent timing estimates. Also with perc_done == 0
-    // these elements will be nonsensical.
-    if (perc_done < 0.01) {
-      log_write(LOG_STDOUT, "%s Timing: About %.2f%% done\n", 
-                scantypestr, perc_done * 100);
-      log_flush(LOG_STDOUT);
-    } else {
-      log_write(LOG_STDOUT, "%s Timing: About %.2f%% done; ETC: %02d:%02d (%li:%02li:%02li remaining)\n", 
-                scantypestr, perc_done * 100, ltime->tm_hour, ltime->tm_min, sec_left / 3600, 
-                (sec_left % 3600) / 60, sec_left % 60);
-      log_write(LOG_XML, "<taskprogress task=\"%s\" time=\"%lu\" percent=\"%.2f\" remaining=\"%li\" etc=\"%lu\" />\n",
-		scantypestr, (unsigned long) now->tv_sec,
-		perc_done * 100, sec_left, (unsigned long) last_est.tv_sec);
-      log_flush(LOG_STDOUT|LOG_XML);
-    }
+  // If we're less than 1% done we probably don't have enough
+  // data for decent timing estimates. Also with perc_done == 0
+  // these elements will be nonsensical.
+  if (perc_done < 0.01) {
+    log_write(LOG_STDOUT, "%s Timing: About %.2f%% done\n",
+        scantypestr, perc_done * 100);
+    log_flush(LOG_STDOUT);
     return true;
+  }
+
+  /* Add 0.5 to get the effect of rounding in integer calculations. */
+  time_left_s = estimate_time_left(perc_done, &begin, now) + 0.5;
+
+  last_est = *now;
+  last_est.tv_sec += (time_t)time_left_s;
+
+  /* Get the estimated time of day at completion */
+  timet = last_est.tv_sec;
+  ltime = localtime(&timet);
+  assert(ltime);
+
+  log_write(LOG_STDOUT, "%s Timing: About %.2f%% done; ETC: %02d:%02d (%.f:%02.f:%02.f remaining)\n",
+      scantypestr, perc_done * 100, ltime->tm_hour, ltime->tm_min,
+      floor(time_left_s / 60.0 / 60.0),
+      floor(fmod(time_left_s / 60.0, 60.0)),
+      floor(fmod(time_left_s, 60.0)));
+  log_write(LOG_XML, "<taskprogress task=\"%s\" time=\"%lu\" percent=\"%.2f\" remaining=\"%.f\" etc=\"%lu\" />\n",
+      scantypestr, (unsigned long) now->tv_sec,
+      perc_done * 100, time_left_s, (unsigned long) last_est.tv_sec);
+  log_flush(LOG_STDOUT|LOG_XML);
+ 
+  return true;
 }
 
 /* Indicates that the task is beginning or ending, and that a message should

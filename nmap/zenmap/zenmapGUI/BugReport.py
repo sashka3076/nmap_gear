@@ -23,13 +23,10 @@ import gtk
 import gobject
 import webbrowser
 
-from higwidgets.higdialogs import HIGAlertDialog
-from higwidgets.higlabels import HIGSectionLabel, HIGHintSectionLabel
-from higwidgets.higboxes import HIGHBox, HIGVBox
+from zenmapGUI.higwidgets.higboxes import HIGVBox
 
 from zenmapCore.Name import APP_DISPLAY_NAME, NMAP_DISPLAY_NAME, NMAP_WEB_SITE
-from zenmapCore.BugRegister import BugRegister
-from zenmapCore.I18N import _
+import zenmapCore.I18N
 
 # For escaping text in marked-up labels.
 from xml.sax.saxutils import escape
@@ -56,7 +53,7 @@ class BugReport(gtk.Window, object):
         self.vbox.set_border_width(6)
         
         self.text.set_line_wrap(True)
-        self.text.set_markup("""\
+        self.text.set_markup(_("""\
 <big><b>How to report a bug</b></big>
 
 Like their author, %(nmap)s and %(app)s aren't perfect. But you can help \
@@ -77,7 +74,7 @@ Code patches to fix bugs are even better than bug reports. Basic \
 instructions for creating patch files with your changes are available at \
 http://nmap.org/data/HACKING. Patches may be sent to nmap-dev \
 (recommended) or to Fyodor directly.
-""" % {"app": escape(APP_DISPLAY_NAME), "nmap": escape(NMAP_DISPLAY_NAME), "nmap_web": escape(NMAP_WEB_SITE)})
+""") % {"app": escape(APP_DISPLAY_NAME), "nmap": escape(NMAP_DISPLAY_NAME), "nmap_web": escape(NMAP_WEB_SITE)})
         self.vbox.add(self.text)
 
         self.button_box.set_layout(gtk.BUTTONBOX_END)

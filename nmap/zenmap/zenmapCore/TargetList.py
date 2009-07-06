@@ -46,9 +46,6 @@ class TargetList(object):
         else:
             self.using_file = False
 
-    def __del__(self):
-        self.save()
-
     def save(self):
         if self.using_file:
             target_file = open(self.target_list_file, "w")
@@ -77,7 +74,6 @@ target_list = TargetList()
 if __name__ == "__main__":
     import sys
     from os.path import split
-    Path.set_umit_conf(split(sys.argv[0])[0])
     t = TargetList()
     print ">>> Getting empty list:", t.get_target_list()
     print ">>> Adding target 127.0.0.1:", t.add_target("127.0.0.3")

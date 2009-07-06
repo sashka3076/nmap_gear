@@ -20,30 +20,33 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 import locale
+import sys
 
-from zenmapCore.Name import APP_NAME, APP_DISPLAY_NAME, APP_WEB_SITE, NMAP_DISPLAY_NAME
+from zenmapCore.Name import APP_NAME
+from zenmapCore.Paths import Path
 
-LC_ALL = locale.setlocale(locale.LC_ALL, '')
-LANG, ENC = locale.getdefaultlocale()
-ERRORS = "ignore"
+def get_locales():
+    """Get a list of locales to use based on system configuration."""
+    locales = []
+    loc, enc = locale.getdefaultlocale()
+    if loc is not None:
+        locales.append(loc)
+    return locales
 
-# If not correct locale could be retrieved, set en_US.utf8 as default
-if ENC == None:
-    ENC = "utf8"
-
-if LANG == None:
-    LANG = "en_US"
+try:
+    locale.setlocale(locale.LC_ALL, '')
+except locale.Error:
+    # This can happen if the LANG environment variable is set to something
+    # invalid, like LANG=nothing or LANG=en_US/utf8 or LANG=us-ascii. Continue
+    # without internationalization.
+    pass
 
 try:
     import gettext
-    from gettext import gettext as _
-
-    gettext.install(APP_NAME, unicode=True)
-
 except ImportError:
     # define _() so program will not fail
     import __builtin__
     __builtin__.__dict__["_"] = str
-
-if __name__ == '__main__':
-    print _('%s - The %s frontend' % (APP_DISPLAY_NAME, NMAP_DISPLAY_NAME))
+else:
+    t = gettext.translation(APP_NAME, Path.locale_dir, languages = get_locales(), fallback = True)
+    t.install(unicode = True)

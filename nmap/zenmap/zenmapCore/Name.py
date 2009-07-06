@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2007 Insecure.Com LLC.
+# Copyright (C) 2007-2009 Insecure.Com LLC.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,10 +25,11 @@ APP_NAME = "zenmap"
 APP_DISPLAY_NAME = "Zenmap"
 APP_WEB_SITE = "http://nmap.org/zenmap"
 APP_DOWNLOAD_SITE = "http://nmap.org/download.html"
-APP_COPYRIGHT = "Copyright 2005-2008 Insecure.Com LLC"
+APP_DOCUMENTATION_SITE = "http://nmap.org/docs.html"
+APP_COPYRIGHT = "Copyright 2005-2009 Insecure.Com LLC"
 
-NMAP_DISPLAY_NAME = "Nmap"
+NMAP_DISPLAY_NAME = u"Nmap"
 NMAP_WEB_SITE = "http://nmap.org"
 
 UMIT_DISPLAY_NAME = "Umit"
-UMIT_WEB_SITE = "http://umit.sourceforge.net/"
+UMIT_WEB_SITE = "http://www.umitproject.org/"

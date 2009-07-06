@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2005 Insecure.Com LLC.
+# Copyright (C) 2005,2008 Insecure.Com LLC.
 #
 # Author: Adriano Monteiro Marques <py.adriano@gmail.com>
+# Modified: Jurand Nogiec <jurand@jurand.net>, 2008
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,287 +25,37 @@ import gtk
 import gobject
 import os
 import re
+import xml.sax
 
-from higwidgets.hignotebooks import HIGNotebook, HIGAnimatedTabLabel
-from higwidgets.higboxes import HIGVBox
-from higwidgets.higdialogs import HIGAlertDialog, HIGDialog
-from higwidgets.higscrollers import HIGScrolledWindow
+from zenmapGUI.higwidgets.hignotebooks import HIGNotebook, HIGAnimatedTabLabel
+from zenmapGUI.higwidgets.higboxes import HIGVBox
+from zenmapGUI.higwidgets.higdialogs import HIGAlertDialog, HIGDialog
+from zenmapGUI.higwidgets.higscrollers import HIGScrolledWindow
 
-from zenmapGUI.NmapOutputViewer import NmapOutputViewer
 from zenmapGUI.ScanHostDetailsPage import ScanHostDetailsPage
 from zenmapGUI.ScanToolbar import ScanCommandToolbar, ScanToolbar
-from zenmapGUI.ScanHostsView import ScanHostsView, SCANNING
+from zenmapGUI.ScanHostsView import ScanHostsView, SCANNING, CANCELLED
 from zenmapGUI.ScanOpenPortsPage import ScanOpenPortsPage
 from zenmapGUI.ScanRunDetailsPage import ScanRunDetailsPage
 from zenmapGUI.ScanNmapOutputPage import ScanNmapOutputPage
+from zenmapGUI.ScanScanListPage import ScanScanListPage
+from zenmapGUI.ScansListStore import ScansListStore
+from zenmapGUI.TopologyPage import TopologyPage
 from zenmapGUI.Icons import get_os_icon, get_os_logo, get_vulnerability_logo
 
+from zenmapCore.NetworkInventory import NetworkInventory
 from zenmapCore.NmapCommand import NmapCommand
-from zenmapCore.NmapCommand import CommandConstructor
 from zenmapCore.UmitConf import CommandProfile, ProfileNotFound, is_maemo
 from zenmapCore.NmapParser import NmapParser
 from zenmapCore.Paths import Path, get_extra_executable_search_paths
 from zenmapCore.UmitLogging import log
-from zenmapCore.I18N import _
+from zenmapCore.NmapOptions import NmapOptions
+import zenmapCore.I18N
 
-icon_dir = Path.pixmaps_dir
-
-class PageStatus(object):
-    """
-    Pages status:
-    The page status can be one of the following:
-       * saved: there is nothing to be saved in the current scan tab
-       * unsaved_unchanged: for recently scanned results that were parsed and is unchanged.
-       * unsaved_changed: for recently scanned results that were parsed and got some changes
-         on its contents (like a comment)
-       * loaded_unchanged: for scan results that were loaded from a file and got no
-         modifications
-       * loaded_changed: for scan results that were loaded from a file and got some
-         modifications (like comments)
-       * parsing_result: the result is been parsed to be displayed at the tab
-       * scanning: there is no parsed result related to this tab, but there is a related scan
-         running to show results on that tab
-       * empty: there is nothing related to this tab. His widgets are disabled and this is
-         the initial state of a new tab
-       * unknown: the page status is unknown
-       * scan_failed: the scan has failed
-       * search_loaded: the scan was loaded from a search result
-    """
-    def __init__(self, status=False):
-        if status:
-            self.status = status
-        else:
-            self.set_unknown()
-
-    def set_empty(self):
-        self._status = "empty"
-
-    def set_saved(self):
-        self._status = "saved"
-
-    def set_unsaved_unchanged(self):
-        self._status = "unsaved_unchanged"
-
-    def set_unsaved_changed(self):
-        self._status = "unsaved_changed"
-
-    def set_loaded_unchanged(self):
-        self._status = "loaded_unchanged"
-
-    def set_loaded_changed(self):
-        self._status = "loaded_changed"
-
-    def set_parsing_result(self):
-        self._status = "parsing_result"
-
-    def set_scanning(self):
-        self._status = "scanning"
-
-    def set_unknown(self):
-        self._status = "unknown"
-
-    def set_scan_failed(self):
-        self._status = "scan_failed"
-
-    def set_search_loaded(self):
-        self._status = "search_loaded"
-
-    def get_status(self):
-        return self._status
-
-    def set_status(self, status):
-        if status in self.available_status:
-            self._status = status
-        else:
-            raise Exception("Unknown status!")
-
-    def _verify_status(self, status):
-        if self._status == status:
-            return True
-        return False
-
-    def get_unsaved_unchanged(self):
-        return self._verify_status("unsaved_unchanged")
-
-    def get_unsaved_changed(self):
-        return self._verify_status("unsaved_changed")
-
-    def get_loaded_unchanged(self):
-        return self._verify_status("loaded_unchanged")
-
-    def get_loaded_changed(self):
-        return self._verify_status("loaded_changed")
-
-    def get_parsing_result(self):
-        return self._verify_status("parsing_result")
-
-    def get_scanning(self):
-        return self._verify_status("scanning")
-
-    def get_empty(self):
-        return self._verify_status("empty")
-
-    def get_unknown(self):
-        return self._verify_status("unknown")
-
-    def get_saved(self):
-        return self._verify_status("saved")
-
-    def get_scan_failed(self):
-        return self._verify_status("scan_failed")
-
-    def get_search_loaded(self):
-        return self._verify_status("search_loaded")
-
-
-    status = property(get_status, set_status)
-    saved = property(get_saved)
-    unsaved_unchanged = property(get_unsaved_unchanged)
-    unsaved_changed = property(get_unsaved_changed)
-    loaded_unchanged = property(get_loaded_unchanged)
-    loaded_changed = property(get_loaded_changed)
-    parsing_result = property(get_parsing_result)
-    scanning = property(get_scanning)
-    empty = property(get_empty)
-    unknown = property(get_unknown)
-    scan_failed = property(get_scan_failed)
-    search_loaded = property(get_search_loaded)
-    
-    _status = "unknown"
-    available_status = ["saved",
-                        "unsaved_unchanged",
-                        "unsaved_changed",
-                        "loaded_unchanged",
-                        "loaded_changed",
-                        "parsing_result",
-                        "scanning",
-                        "empty",
-                        "unknown",
-                        "search_loaded"]
-
-class ScanNotebook(HIGNotebook):
-    """
-    ScanNotebook
-    Manages the Notebook tabs within Zenmap.
-    Gives functions that allow you to remove and add pages.
-    Provides similar functionality for the tab titles, as well as a
-    "sanitized" title formatting functionality.
-    """
-    def __init__(self):
-        HIGNotebook.__init__(self)
-        self.set_scrollable(True)
-        self.tab_titles = []
-        self.scan_num = 1
-        self.close_scan_cb = None
-
-    def remove_page(self, page_num):
-        page = self.get_nth_page(page_num)
-        self.remove_tab_title(self.get_tab_title(page))
-        
-        HIGNotebook.remove_page(self, page_num)
-
-    def add_scan_page(self, title):
-        """Adds a new scan page using append_page function with the given page and tab title,
-        selecting the first profile and setting the focus at the target combo box."""
-
-        page = ScanNotebookPage()
-        page.select_first_profile()
-
-        self.append_page(page, self.close_scan_cb, tab_title=title)
-        page.show_all()
-
-        self.set_current_page(-1)
-
-        # Put focus at the target combo.
-        page.target_focus()
-
-        return page
-
-    def append_page(self, page, close_cb, tab_label=None, tab_title=None):
-        """Appending a new page involves either getting a tab's label, title,
-        or else the newest tab's title, and setting the given tab's label to the value.
-        Also, connects a tab-closing listener."""
-
-        log.debug(">>> Appending Scan Tab.")
-        if tab_label:
-            tab_label.set_text(self.sanitize_tab_title(tab_label.get_text()))
-        elif tab_title:
-            tab_label = HIGAnimatedTabLabel(self.sanitize_tab_title(tab_title))
-        else:
-            tab_label = HIGAnimatedTabLabel(self.get_new_tab_title())
-
-        tab_label.connect("close-clicked", close_cb, page)
-        HIGNotebook.append_page(self, page, tab_label)
-
-    def sanitize_tab_title(self, title):
-        """Sanitizes the tab title, which means that it concatenates the tab title
-        with its incremental scan_id (based on the number of tab titles) and adds this
-        new tab title value."""
-
-        #log.debug(">>> Sanitize this title: %s" % title)
-        scan_id = 1
-        title2 = title
-        while title2 in self.tab_titles:
-            title2 = "%s (%s)" % (title, scan_id)
-            scan_id += 1
-        
-        self.add_tab_title(title2)
-        #log.debug(">>> Title sanitized: %s" % title2)
-        return title2
-
-    def remove_tab_title(self, title):
-        log.debug(">>> Remove tab title: %s" % title)
-        try: self.tab_titles.remove(title)
-        except: pass
-
-    def get_new_tab_title(self, parsed_result=None):
-        """Retrieves and sanitizes the newest tab title. Checks to see if the result
-        already has a scan_name. If it does, it returns this value as the title.
-        Otherwise, finds the value in nmap_xml_file"""
-
-        log.debug(">>> Get new tab title")
-        if parsed_result:
-            if parsed_result.scan_name:
-                return self.sanitize_tab_title(parsed_result.scan_name)
-            try:
-                filename = parsed_result.nmap_xml_file
-                if filename and type(filename) in StringTypes:
-                    return self.sanitize_tab_title(filename)
-            except:
-                pass
-    
-        index = self.scan_num
-        self.scan_num += 1
-        return self.sanitize_tab_title(_('untitled_scan%s') % index)
-
-    def add_tab_title(self, title):
-        log.debug(">>> Add tab title: %s" % title)
-        self.tab_titles.append(title)
-
-    def get_tab_title(self, page):
-        log.debug(">>> Get tab title")
-        return self.get_tab_label(page).get_text()
-
-    def set_tab_title(self, page, title):
-        log.debug(">>> Set tab title: %s" % title)
-        
-        old_title = self.get_tab_title(page)
-        if old_title:
-            self.remove_tab_title(old_title)
-            
-        if not title:
-            title = self.get_new_tab_title(page.parsed)
-        else:
-            title = self.sanitize_tab_title(title)
-        
-        self.get_tab_label(page).set_text(title)
-
-
-class ScanNotebookPage(HIGVBox):
-    """
-    ScanNotebookPage
-    Manages all the information associated with a Notebook page.
-    """
+class ScanInterface(HIGVBox):
+    """ScanInterface contains the scan toolbar and the scan results. Each
+    ScanInterface represents a single NetworkInventory as well as a set of
+    running scans."""
     def __init__(self):
         HIGVBox.__init__(self)
 
@@ -314,22 +65,42 @@ class ScanNotebookPage(HIGVBox):
             self.set_border_width(0)
         
         self.set_spacing(0)
-        self.status = PageStatus()
-        self.status.set_empty()
-        
-        self.changes = False
-        self.comments = {}
 
-        self.parsed = NmapParser()
+        # True if nothing has happened here page yet, i.e., it's okay to load a
+        # scan from a file here.
+        self.empty = True
+
+        # The most recent name the inventory on this page has been saved under.
+        self.saved_filename = None
+        
+        # The network inventory shown by this page. It may consist of multiple
+        # scans.
+        self.inventory = NetworkInventory()
+
+        # The list of currently running scans (NmapCommand objects).
+        self.jobs = []
+
+        # The list of running and finished scans shown on the Nmap Output page.
+        self.scans_store = ScansListStore()
+
         self.top_box = HIGVBox()
         
         self.__create_toolbar()
         self.__create_command_toolbar()
-        self.__create_scan_result()
-        self.disable_widgets()
-        
-        self.saved = False
-        self.saved_filename = ''
+
+        self.select_default_profile()
+
+        self.scan_result = ScanResult(self.inventory, self.scans_store)
+        self.host_view_selection = self.scan_result.get_host_selection()
+        self.service_view_selection = self.scan_result.get_service_selection()
+        self.host_view_selection.connect('changed', self.update_host_info)
+        self.service_view_selection.connect('changed', self.update_service_info)
+
+        self.scan_result.scan_result_notebook.nmap_output.connect("changed", self._displayed_scan_change_cb)
+        self.scan_result.scan_result_notebook.scans_list.remove_button.connect("clicked", self._remove_scan_cb)
+
+        self.hosts = {}
+        self.services = {}
 
         self.top_box.set_border_width(6)
         self.top_box.set_spacing(5)
@@ -340,175 +111,133 @@ class ScanNotebookPage(HIGVBox):
         self._pack_noexpand_nofill(self.top_box)
         self._pack_expand_fill(self.scan_result)
 
-    def target_focus(self):
-        self.toolbar.target_entry.grab_focus()
+        self.scan_result.scan_result_notebook.scans_list.cancel_button.connect("clicked", self._cancel_scans_list_cb)
+        self.update_cancel_button()
 
-    def select_first_profile(self):
-        self.toolbar.profile_entry.child.set_text(self.toolbar.profile_entry.get_model()[0][0])
+    def is_changed(self):
+        """Return true if this window has unsaved changes."""
+        for scan in self.inventory.get_scans():
+            if scan.unsaved:
+                return True
+        return False
+    changed = property(is_changed)
 
-    def verify_changes(self):
-        return self.__verify_comments_changes()
+    def num_scans_running(self):
+        return len(self.jobs)
+
+    def select_default_profile(self):
+        """Select a "default" profile. Currently this is defined to the first
+        profile."""
+        if len(self.toolbar.profile_entry.get_model()) > 0:
+            self.toolbar.profile_entry.set_active(0)
 
     def go_to_host(self, host):
         """Go to host line on nmap output result"""
         self.scan_result.scan_result_notebook.nmap_output.nmap_output.go_to_host(host)
 
-    def __create_scan_result(self):
-        self.scan_result = ScanResult()
-
     def __create_toolbar(self):
-        """Create Scan Toolbar with a set empty_target. Handles changed commands by performing
-        a refresh. A clicked scan button runs the scan."""
-
         self.toolbar = ScanToolbar()
-        self.empty_target = _("<target>")
         
-        self.toolbar.target_entry.connect('changed', self.refresh_command_target)
-        self.toolbar.profile_entry.connect('changed', self.refresh_command)
+        self.target_entry_changed_handler = \
+            self.toolbar.target_entry.connect('changed', self._target_entry_changed)
+        self.profile_entry_changed_handler = \
+            self.toolbar.profile_entry.connect('changed', self._profile_entry_changed)
 
         self.toolbar.scan_button.connect('clicked', self.start_scan_cb)
+        self.toolbar.cancel_button.connect('clicked', self._cancel_scan_cb)
 
     
     def __create_command_toolbar(self):
         """Assigns several events to the command toolbar, including activate
-        on scan button being clicked, retaining command when a user clicks
-        inside a command entry before edition, and check command changes when a
-        user clicks outside the command entry. Sets command_edited variable if
-        command entry was edited."""
+        on scan button being clicked."""
 
         self.command_toolbar = ScanCommandToolbar()
         self.command_toolbar.command_entry.connect('activate',
                                     lambda x: self.toolbar.scan_button.clicked())
-        self.command_edited = False
-        self.command_toolbar.command_entry.connect("focus-in-event", self.remember_command)
-        self.command_toolbar.command_entry.connect("focus-in-event", self.check_command)
 
-        # If you modify the command field entry at all, it will clear the profile, target fields
-	# so as to not use a profile when you change the command manually, but instead just run
-	# the command given in the field.
-        self.command_toolbar.command_entry.connect('key-press-event', self.clear_profile_target)
+        self.command_entry_changed_handler = \
+            self.command_toolbar.command_entry.connect('changed', self._command_entry_changed)
 
-    def clear_profile_target(self, extra1=None, extra2=None):
-        """Used to clear the profile & target fields, so that no profile is used upon command field
-        modification."""
+    def _command_entry_changed(self, editable):
+        command_string = self.command_toolbar.get_command()
+        command_list = command_string.split()
+        ops = NmapOptions()
+        ops.parse(command_list[1:])
 
-        self.toolbar.profile_entry.child.set_text("")
-        self.toolbar.target_entry.child.set_text("")
+        # Set the target and profile without propagating the "changed" signal
+        # back to the command entry.
+        self.set_target_quiet(" ".join(ops.target_specs))
+        self.set_profile_name_quiet("")
 
-    def remember_command(self, widget, extra=None):
-        """Remembers the current command entered before the user is editing the command field."""
-        
-        self.old_target = self.toolbar.target_entry.selected_target # Target may be empty
+    def _target_entry_changed(self, editable):
+        target_string = self.toolbar.get_selected_target()
+        targets = target_string.split()
 
-        if not self.old_target:
-            self.old_target = self.empty_target
+        command_string = self.command_toolbar.get_command()
+        command_list = command_string.split()
+        if len(command_list) == 0:
+            command_list = ["nmap"]
+        ops = NmapOptions()
+        ops.parse(command_list[1:])
+        ops.target_specs = targets
 
-        self.old_full_command = self.command_toolbar.command_entry.get_text()
-        self.old_command = self.old_full_command.split(self.old_target)[0]
-        
+        command_string = command_list[0] + " " + ops.render_string()
 
-    def check_command(self, widget, extra=None):
-        """Checking the command involves seeing if anything has been changed
-        in the field by the user."""
+        self.set_command_quiet(command_string)
 
-        new_command = self.command_toolbar.command
+    def _profile_entry_changed(self, widget):
+        """Update the command based on the contents of the target and profile
+        entries. If the command corresponding to the current profile is not
+        blank, use it. Otherwise use the current contents of the command
+        entry."""
+        profile_name = self.toolbar.get_selected_profile()
+        target_string = self.toolbar.get_selected_target()
 
-        # The command entry has been altered, so clear the profile and target.
-        #if new_command != self.old_full_command:
-        #    self.toolbar.profile_entry.child.set_text("")
-        #    self.toolbar.target_entry.child.set_text("")
+        cmd_profile = CommandProfile()
+        command_string = cmd_profile.get_command(profile_name)
+        del(cmd_profile)
+        if command_string == "":
+            command_string = self.command_toolbar.get_command()
 
-        #print "New:", new_command
-        #print "Old:", self.old_full_command
+        command_list = command_string.split()
+        if len(command_list) == 0:
+            command_list = ["nmap"]
+        ops = NmapOptions()
+        ops.parse(command_list[1:])
 
-        #if new_command != self.old_full_command:
-        #    print "Gosh! Is different!! Now, what?"
+        # Use the targets from the command entry, if there are any, otherwise
+        # use any targets from the profile.
+        targets = target_string.split()
+        if len(targets) > 0:
+            ops.target_specs = targets
+        else:
+            self.toolbar.set_selected_target(" ".join(ops.target_specs))
 
+        command_string = command_list[0] + " " + ops.render_string()
 
-        #target = self.toolbar.target_entry.selected_target
-        #self.toolbar.target_entry.child.set_text(self.command_toolbar.command_entry.get_text().split(("<target>"))[0])
+        self.set_command_quiet(command_string)
 
-        #if self.saved_target:
-        #    self.saved_command = self.command_toolbar.command_entry.get_text().split(
-        #                                                                   self.saved_target)[0]
-        #else:
-        #    self.saved_command = self.command_toolbar.command_entry.get_text().split(
-        #                                                                      _("<target>"))[0]
-        
-        #print self.saved_target
-        #print self.saved_command
-    
-    def disable_widgets(self):
-        self.scan_result.set_sensitive(False)
-    
-    def enable_widgets(self):
-                self.scan_result.set_sensitive(True)
-    
-    def refresh_command_target(self, widget):
-        """Refreshes the command target only if the selected profile
-        is not empty."""
+    def set_command_quiet(self, command_string):
+        """Set the command used by this scan interface, ignoring any further
+        "changed" signals."""
+        self.command_toolbar.command_entry.handler_block(self.command_entry_changed_handler)
+        self.command_toolbar.set_command(command_string)
+        self.command_toolbar.command_entry.handler_unblock(self.command_entry_changed_handler)
 
-        #log.debug(">>> Refresh Command Target")
-        
-        profile = self.toolbar.selected_profile
-        #log.debug(">>> Profile: %s" % profile)
-        
-        if profile != '':
-            target = self.toolbar.selected_target
-            #log.debug(">>> Target: %s" % target)
-            try:
-                cmd_profile = CommandProfile()
-                command = cmd_profile.get_command(profile) % target
-                del(cmd_profile)
-                
-                self.command_toolbar.command = command
-            except ProfileNotFound:
-                pass # Go without a profile
-            except TypeError:
-                pass # The target is empty...
-                #self.profile_not_found_dialog()
-    
-    def refresh_command(self, widget):
-        """Try to set a new CommandProfile and delete the current profile, unless
-    find some kind of problem (i.e. Profile not found or not able to be deleted."""
+    def set_target_quiet(self, target_string):
+        """Set the target string used by this scan interface, ignoring any
+        further "changed" signals."""
+        self.toolbar.target_entry.handler_block(self.target_entry_changed_handler)
+        self.toolbar.set_selected_target(target_string)
+        self.toolbar.target_entry.handler_unblock(self.target_entry_changed_handler)
 
-        #log.debug(">>> Refresh Command")
-        profile = self.toolbar.selected_profile
-        target = self.toolbar.selected_target
+    def set_profile_name_quiet(self, profile_name):
+        """Set the profile name used by this scan interface, ignoring any
+        further "changed" signals."""
+        self.toolbar.profile_entry.handler_block(self.profile_entry_changed_handler)
+        self.toolbar.set_selected_profile(profile_name)
+        self.toolbar.profile_entry.handler_unblock(self.profile_entry_changed_handler)
 
-        #log.debug(">>> Profile: %s" % profile)
-        #log.debug(">>> Target: %s" % target)
-        
-        if target == '':
-            target = self.empty_target
-        
-        try:
-            cmd_profile = CommandProfile()
-            command = cmd_profile.get_command(profile) % target
-            del(cmd_profile)
-            
-            self.command_toolbar.command = command
-        except ProfileNotFound:
-            pass
-            #self.profile_not_found_dialog()
-        except TypeError:
-            pass # That means that the command string convertion "%" didn't work
-
-    def profile_not_found_dialog(self):
-        warn_dialog = HIGAlertDialog(message_format=_("Profile not found!"),
-                                     secondary_text=_("The profile name you \
-selected/typed couldn't be found, and probably doesn't exist. Please, check the profile \
-name and try again."),
-                                     type=gtk.MESSAGE_QUESTION)
-        warn_dialog.run()
-        warn_dialog.destroy()
-
-    def get_tab_label(selscf):
-        return self.get_parent().get_tab_title(self)
-
-    def set_tab_label(self, label):
-        self.get_parent().set_tab_title(self, label)
-    
     def start_scan_cb(self, widget=None):
         target = self.toolbar.selected_target
         command = self.command_toolbar.command
@@ -519,123 +248,109 @@ name and try again."),
         log.debug(">>> Profile: '%s'" % profile)
         log.debug(">>> Command: '%s'" % command)
 
-        if target and profile:
-            self.set_tab_label("%s on %s" %(profile, target))
-        elif target:
-            self.set_tab_label("Scan on %s" % target)
-        elif profile:
-            self.set_tab_label(profile)
-        #####
-        else:
-            log.debug("not target OR profile")
-        #####
-
         ##### If target empty, we are not changing the command
         if target != '':    
             self.toolbar.add_new_target(target)
 
-
-
-        if (command.find("-iR") == -1 and command.find("-iL") == -1):
-            if command.find("<target>") > 0:
-                warn_dialog = HIGAlertDialog(message_format=_("No Target Host!"), 
-                                             secondary_text=_("Target specification \
-is mandatory. Either by an address in the target input box or through the '-iR' and \
-'-iL' nmap options. Aborting scan."),
-                                             type=gtk.MESSAGE_ERROR)
-                warn_dialog.run()
-                warn_dialog.destroy()
-                return
-
-        if command != '':
-            # Setting status to scanning
-            self.status.set_scanning()
-            self.execute_command(command)
-        else:
-            warn_dialog = HIGAlertDialog(message_format=_("Empty Nmap Command!"),
+        if command == '':
+            warn_dialog = HIGAlertDialog(message_format=_("Empty Nmap Command"),
                                          secondary_text=_("There is no command to  \
-execute! Maybe the selected/typed profile doesn't exist. Please, check the profile name \
+execute. Maybe the selected/typed profile doesn't exist. Please, check the profile name \
 or type the nmap command you would like to execute."),
                                          type=gtk.MESSAGE_ERROR)
             warn_dialog.run()
             warn_dialog.destroy()
+            return
 
-    def close_tab(self):
-        try:
-            gobject.source_remove(self.verify_thread_timeout_id)
-        except:
-            pass
+        self.execute_command(command, target, profile)
 
-    def collect_umit_info(self):
+    def _displayed_scan_change_cb(self, widget):
+        self.update_cancel_button()
+
+    def update_cancel_button(self):
+        """Make the Cancel button sensitive or not depending on whether the
+        currently displayed scan is running."""
+        entry = self.scan_result.scan_result_notebook.nmap_output.get_active_entry()
+        if entry is None:
+            self.toolbar.cancel_button.set_sensitive(False)
+        else:
+            self.toolbar.cancel_button.set_sensitive(entry.running)
+
+    def _cancel_scan_cb(self, widget):
+        """Cancel the scan whose output is shown."""
+        entry = self.scan_result.scan_result_notebook.nmap_output.get_active_entry()
+        if entry is not None and entry.running:
+            self.cancel_scan(entry.command)
+
+    def _cancel_scans_list_cb(self, widget):
+        """This is like _cancel_scan_cb, but it cancels the scans that are
+        currently selected in the scans list, not the one whose output is
+        currently shown."""
+        model, selection = self.scan_result.scan_result_notebook.scans_list.scans_list.get_selection().get_selected_rows()
+        for path in selection:
+            entry = model.get_value(model.get_iter(path), 0)
+            if entry.running:
+                self.cancel_scan(entry.command)
+
+    def _remove_scan_cb(self, widget):
+        model, selection = self.scan_result.scan_result_notebook.scans_list.scans_list.get_selection().get_selected_rows()
+        selected_refs = []
+        for path in selection:
+            # Kill running scans and remove finished scans from the inventory.
+            entry = model.get_value(model.get_iter(path), 0)
+            if entry.running:
+                self.cancel_scan(entry.command)
+            try:
+                # Remove it from the inentory if present.
+                self.inventory.remove_scan(entry.parsed)
+            except ValueError:
+                pass
+            # Create TreeRowReferences because those persist while we change the
+            # model.
+            selected_refs.append(gtk.TreeRowReference(model, path))
+        # Delete the entries from the ScansListStore.
+        for ref in selected_refs:
+            model.remove(model.get_iter(ref.get_path()))
+        self.update_ui()
+
+    def collect_umit_info(self, command, parsed):
         profile = CommandProfile()
-        profile_name = self.toolbar.selected_profile
+        profile_name = command.profile
         
-        self.parsed.target = self.toolbar.get_target()
-        self.parsed.profile_name = profile_name
-        self.parsed.nmap_command = self.command_toolbar.get_command()
-        self.parsed.profile = profile.get_command(profile_name)
-        self.parsed.profile_hint = profile.get_hint(profile_name)
-        self.parsed.profile_description = profile.get_description(profile_name)
-        self.parsed.profile_annotation = profile.get_annotation(profile_name)
-        self.parsed.profile_options = profile.get_options(profile_name)
+        parsed.target = command.target
+        parsed.profile_name = profile_name
+        parsed.nmap_command = command.command
 
         del(profile)
 
-        try:
-            # First try to get the contents of the output file, if we just ran a
-            # scan.
-            self.parsed.nmap_output = self.command_execution.get_raw_output()
-        except:
-            # Otherwise get the contents of the output display, if we loaded
-            # results from a file and don't have access to the original output
-            # file.
-            self.parsed.nmap_output = self.scan_result.get_nmap_output()
+    def kill_all_scans(self):
+        """Kill all running scans."""
 
-    def kill_scan(self):
-        """Tries to successfully kill scan, and then clear nmap output, host view, and disable
-        widgets, set status set empty."""
+        for scan in self.jobs:
+            try:
+                scan.kill()
+            except AttributeError:
+                pass
+        del self.jobs[:]
 
-        try:
-            self.command_execution.kill()
-        except AttributeError:
-            pass
+    def cancel_scan(self, command):
+        """Cancel a running scan."""
+        self.scans_store.cancel_running_scan(command)
+        command.kill()
+        self.jobs.remove(command)
+        self.update_cancel_button()
 
-        self.scan_result.clear_nmap_output()
-        self.scan_result.clear_host_view()
-        self.status.set_empty()
-        self.disable_widgets()
-    
-    def execute_command(self, command):
+    def execute_command(self, command, target = None, profile = None):
         """If scan state is alive and user responds OK, stop the currently active scan
         and allow creation of another, and if user responds Cancel, wait the current scan to finish.
         Invokes NmapCommand for execution. Verifies if a valid nmap executable exists in PATH, if not,
         displays error with the offending PATH. Refreshes and changes to nmap output view from given file."""
-
-        log.critical("execute_command %s" % command)
-        try:
-            alive = self.command_execution.scan_state()
-            if alive:
-                warn_dialog = HIGAlertDialog(message_format=_("Scan has not finished yet"),
-                                             secondary_text=_("Another scan is running in \
-the background. To start another scan and kill the old one, click Ok. To wait for the \
-conclusion of the old scan, choose Cancel."),
-                                             type=gtk.MESSAGE_QUESTION,
-                                             buttons=gtk.BUTTONS_OK_CANCEL)
-                response = warn_dialog.run()
-                warn_dialog.destroy()
-
-                if response == gtk.RESPONSE_OK:
-                    # Kill current scan, and let the another one to be created
-                    self.kill_scan()
-                else:
-                    return
-        except:
-            pass
-
-        self.command_execution = NmapCommand(command)
+        command_execution = NmapCommand(command)
+        command_execution.target = target
+        command_execution.profile = profile
         
         try:
-            self.command_execution.run_scan()
+            command_execution.run_scan()
         except Exception, e:
             text = str(e)
             if type(e) == OSError:
@@ -660,22 +375,17 @@ conclusion of the old scan, choose Cancel."),
                 secondary_text=text, type=gtk.MESSAGE_ERROR)
             warn_dialog.run()
             warn_dialog.destroy()
+            return
 
-        # Ask NmapOutputViewer to show/refresh nmap output from given file
-        self.scan_result.show_nmap_output(self.command_execution.get_output_file())
+        log.debug("Running command: %s" % command_execution.command)
+        self.jobs.append(command_execution)
 
-        # Set a "EXECUTING" icon to host list
-        self.scan_result.set_hosts({SCANNING:{'stock':gtk.STOCK_EXECUTE,'action':None}})
-        self.scan_result.set_services({SCANNING:{'action':None}})
-
-        # Clear port list, to remove old information
-        self.scan_result.clear_port_list()
+        i = self.scans_store.add_running_scan(command_execution)
+        self.scan_result.scan_result_notebook.nmap_output.set_active_iter(i)
 
         # When scan starts, change to nmap output view tab and refresh output
         self.scan_result.change_to_nmap_output_tab()
         self.scan_result.refresh_nmap_output()
-        
-        self.enable_widgets()
 
         # Add a timeout function
         self.verify_thread_timeout_id = gobject.timeout_add(2000, self.verify_execution)
@@ -685,320 +395,174 @@ conclusion of the old scan, choose Cancel."),
         disable the widgets and set the scan as failed. Automatically refreshes the nmap output. Returns
         True if execution verified, False otherwise"""
 
-        # Using new subprocess style
-        try:
-            alive = self.command_execution.scan_state()
-        except:
-            self.disable_widgets()
-            self.status.set_scan_failed()
-            self.scan_result.set_nmap_output(self.command_execution.get_error())
-            return False
-
-        #log.debug(">>> Process alive? %s" % alive)
-        #log.debug(">>> Nmap output:\n %s" % self.command_execution.get_output())
-
-        # Maybe this automatic refresh should be eliminated to avoid processor burning
         self.scan_result.refresh_nmap_output()
         
-        if alive:
-            return True
+        finished_jobs = []
+        for scan in self.jobs:
+            try:
+                alive = scan.scan_state()
+                if alive:
+                    continue
+            except:
+                log.debug("Scan terminated unexpectedly: %s" % scan.command)
+                self.scans_store.fail_running_scan(scan)
+            else:
+                log.debug("Scan finished: %s" % scan.command)
+                self.load_from_command(scan)
+                scan.close()
+            self.update_cancel_button()
+            finished_jobs.append(scan)
+
+        # Remove finished jobs from the job list
+        for finished in finished_jobs:
+            self.jobs.remove(finished)
+        del(finished_jobs)
+
+        return len(self.jobs) != 0
+
+    def load_from_command(self, command):
+        """Load scan results from a completed NmapCommand."""
+        parsed = None
+        try:
+            parsed = self._parse(command.get_xml_output_filename())
+        except IOError, e:
+            # It's possible to run Nmap without generating an XML output file,
+            # like with "nmap -V".
+            if e.errno != errno.ENOENT:
+                raise
+        except xml.sax.SAXParseException, e:
+            try:
+                # Some options like --iflist cause Nmap to emit an empty XML
+                # file. Ignore the exception in this case.
+                st = os.stat(command.get_xml_output_filename())
+            except:
+                st = None
+            if st is None or st.st_size > 0:
+                warn_dialog = HIGAlertDialog(message_format = _("Parse error"),
+                    secondary_text = _(u"""\
+There was an error while parsing the XML file generated from the scan:
+
+%s\
+""") % str(e), type = gtk.MESSAGE_ERROR)
+                warn_dialog.run()
+                warn_dialog.destroy()
         else:
-            self.parse_result(self.command_execution.get_xml_output_file())
-            return False
+            parsed.unsaved = True
 
-    def load_result(self, file_to_parse):
-        """Sets status to parsing_result and then to loaded_unchanged"""
+            parsed.set_xml_is_temp(command.xml_is_temp)
+            self.collect_umit_info(command, parsed)
+            parsed.nmap_output = command.get_output()
+            self.scan_result.refresh_nmap_output()
 
-        self.status.set_parsing_result()
-        self._parse(file_to_parse=file_to_parse)
+            self.inventory.add_scan(parsed)
+        self.update_ui()
+        self.scans_store.finish_running_scan(command, parsed)
 
-        self.status.set_loaded_unchanged()
+    def load_from_file(self, filename):
+        """Load scan results from a saved file."""
+        parsed = self._parse(filename)
+        parsed.unsaved = False
 
-    def parse_result(self, file_to_parse):
-        """Sets status to parsing_result and then to unsaved_unchanged"""
-
-        self.status.set_parsing_result()
-        self._parse(file_to_parse=file_to_parse)
-
-        self.status.set_unsaved_unchanged()
+        self.update_target_profile(parsed)
+        self.inventory.add_scan(parsed, filename=filename)
+        self.update_ui()
+        i = self.scans_store.add_scan(parsed)
+        self.scan_result.scan_result_notebook.nmap_output.set_active_iter(i)
+        self.scan_result.change_to_ports_hosts_tab()
 
     def load_from_parsed_result(self, parsed_result):
-        """Sets status to parsing_result and then to unsaved_unchanged.
-        Statuses appear to be identical to parse_result."""
+        """Load scan results from a parsed NmapParser object."""
+        parsed = parsed_result
+        parsed.unsaved = False
 
-        self.status.set_parsing_result()
-        self._parse(parsed_result=parsed_result)
+        self.update_target_profile(parsed)
+        self.inventory.add_scan(parsed)
+        self.update_ui()
+        i = self.scans_store.add_scan(parsed)
+        self.scan_result.scan_result_notebook.nmap_output.set_active_iter(i)
+        self.scan_result.change_to_ports_hosts_tab()
 
-        self.status.set_unsaved_unchanged()
-
-    def _parse(self, file_to_parse=None, parsed_result=None):
-        """Called when scan is done. Parses out the results of scan. Verifies if any hosts were found.
-        Attempts to parse unless it hits an error. For all hosts, it gets the host details and states as well
-        as the corresponding host services and matched OS signature. It displays first host it can find, and
-        shows it in nmap output. If target and profile name are non-NULL, set text for target and add new profile,
-        respectively. Special note: removes and recreates self.parsed to avoid duplicate entry in same Scan tab."""
-
+    def _parse(self, file_to_parse):
+        """Parse the given file and return a new NmapParser object. Display an
+        error dialog if there is an error in parsing."""
+        parsed = NmapParser()
         log.debug(">>> XML output file that is going to be parsed: %s" % file_to_parse)
+        log.debug(">>> Start parsing...")
+        parsed.parse_file(file_to_parse)
+        log.debug(">>> Successfully parsed!")
+
+        return parsed
+
+    def update_target_profile(self, parsed):
+        """Update the "Target" and "Profile" entries based on the contents of a
+        parsed scan."""
+        command = parsed.get_nmap_command()
+        target = parsed.get_target()
+        profile_name = parsed.get_profile_name()
+
+        self.set_command_quiet(parsed.get_nmap_command() or "")
+        self.set_target_quiet(target or "")
+        self.set_profile_name_quiet(profile_name or "")
         
-        self.host_view_selection = self.scan_result.get_host_selection()
-        self.service_view_selection = self.scan_result.get_service_selection()
-        
-        # All hosts details pages
-        self.host_pages = []
-        self.changes = True
-        
-        self.host_view_selection.connect('changed', self.update_host_info)
-        self.service_view_selection.connect('changed', self.update_service_info)
+    def update_ui(self):
+        """Update the interface's lists of hosts and ports from a parsed
+        scan."""
+        self.empty = False
+
         self.scan_result.scan_host_view.clear_host_list()
+        self.scan_result.scan_host_view.clear_service_list()
+
+        self.scan_result.scan_result_notebook.topology.update_radialnet()
+
         self.hosts = {}
         self.services = {}
 
-        # Removed and created again to avoid host duplication problems when making
-        # multiple scans inside the same scan tab
-        try: del(self.parsed)
-        except: pass
+        for host in self.inventory.get_hosts():
+            hostname = host.get_hostname()
+            host_page = self.set_host_details(host)
 
-        if file_to_parse:
-            self.parsed = NmapParser()
-            self.parsed.set_xml_file(file_to_parse)
-            try:
-                log.debug(">>> Start parsing...")
-                self.parsed.parse()
-                log.debug(">>> Successfully parsed!")
-            except:
-                log.debug(">>> An exception occurred during xml output parsing")
-                try:
-                    error = self.command_execution.get_error()
-                except:
-                    error = _('Unknown error!')
+            for service in host.services:
+                name = service["service_name"]
+                state = service["port_state"]
 
-                log.debug(">>> Error: '%s'" % error)
+                if state not in ["open", "filtered", "open|filtered"]:
+                    continue
 
-                # Treat root exceptions more carefully!
-                if re.findall('[rR][oO0]{2}[tT]', error):
-                    need_root = HIGAlertDialog(\
-                            message_format=_('Root privileges are needed!'),\
-                            secondary_text=error)
-                    need_root.run()
-                    need_root.destroy()
-                else:
-                    unknown_problem = HIGAlertDialog(\
-                        message_format=_('An unexpected error occurred!'),\
-                        secondary_text=error)
-                    unknown_problem.run()
-                    unknown_problem.destroy()
-                return
-        elif parsed_result:
-            self.parsed = parsed_result
+                if name not in self.services.keys():
+                    self.services[name] = {"hosts":[]}
 
-        if int(self.parsed.get_hosts_up()):
-            for host in self.parsed.get_hosts():
-                hostname = host.get_hostname()
-                host_page = self.set_host_details(host)
-                list_states = ["open", "filtered", "open|filtered"]
+                hs = {"host":host, "page":host_page, "hostname":hostname}
+                hs.update(service)
+                    
+                self.services[name]["hosts"].append(hs)
 
-                for service in host.services:
-                    name = service["service_name"]
-                    state = service["port_state"]
-
-                    if state not in list_states:
-                        continue
-                    
-                    if name not in self.services.keys():
-                        self.services[name] = {"hosts":[]}
-
-                    hs = {"host":host, "page":host_page, "hostname":hostname}
-                    hs.update(service)
-                        
-                    self.services[name]["hosts"].append(hs)
-                    
-                self.hosts[hostname] = {'host':host, 'page':host_page}
-                    
-                host_details = self.hosts[hostname]['page'].host_details
-                host_info = self.hosts[hostname]['host']
-                    
-                try:
-                    host_details.set_os_image(get_os_logo(host.get_osmatch()['name']))
-                except:
-                    host_details.set_os_image(get_os_logo(''))
-                    
-                host_details.set_vulnerability_image(get_vulnerability_logo\
-                                                     (host_info.get_open_ports()))
-                    
-                icon = None
-                try:icon = get_os_icon(host.get_osmatch()['name'])
-                except:icon = get_os_icon('')
-                    
-                self.scan_result.scan_host_view.add_host({hostname:{'stock':icon,
-                                                                    'action':None}})
+            self.hosts[hostname] = {'host':host, 'page':host_page}
                 
+            host_details = self.hosts[hostname]['page'].host_details
+            host_info = self.hosts[hostname]['host']
+
+            try:
+                host_details.set_os_image(get_os_logo(host))
+            except:
+                host_details.set_os_image(get_os_logo(''))
+                
+            host_details.set_vulnerability_image(get_vulnerability_logo\
+                                                 (host_info.get_open_ports()))
+                
+            try:
+                icon = get_os_icon(host)
+            except:
+                icon = get_os_icon('')
+                
+            self.scan_result.scan_host_view.add_host({hostname:{'stock':icon,
+                                                                'action':None}})
+                
+        if len(self.scan_result.scan_host_view.host_list) > 0:
             # Select the first host found
-            self.host_view_selection.select_iter(self.scan_result.scan_host_view.\
-                                                 host_list.get_iter_root())
+            self.host_view_selection.select_iter(self.scan_result.scan_host_view.host_list.get_iter_root())
 
         self.scan_result.scan_host_view.set_services(self.services.keys())
-            
-        try:
-            # And them, we update the nmap output! ;)
-            self.scan_result.scan_result_notebook.nmap_output.nmap_output.refresh_output()
-        except:
-            # Put saved nmap output
-            self.scan_result.scan_result_notebook.nmap_output.\
-                        nmap_output.text_buffer.\
-                        set_text('\n'.join(self.parsed.get_nmap_output().split('\\n')))
-            
-        target = self.parsed.get_target()
-            
-        if target != '':
-            self.toolbar.target_entry.child.set_text(target)
-            
-        profile_name = self.parsed.profile_name
-            
-        if profile_name != '':
-            profile = CommandProfile()
-            profile.add_profile(self.parsed.profile_name,
-                                command=self.parsed.profile,
-                                hint=self.parsed.profile_hint,
-                                options=self.parsed.profile_options,
-                                description=self.parsed.profile_description,
-                                annotation=self.parsed.profile_annotation)
-            del(profile)
-                
-            self.toolbar.profile_entry.update()
-                
-            self.toolbar.selected_profile = profile_name
-        else:
-            self.command_toolbar.command = self.parsed.get_nmap_command()
-            self.clear_profile_target()
 
-        self.collect_umit_info()
-        self.switch_scan_details(self.__set_scan_info())
-        self.check_fingerprints()
-
-    def check_fingerprints(self):
-        """To check if a fingerprint exists, check the lines in the nmap output
-        and search for a matching entry for host/os/service. If no matching entries are found
-        then user is prompted to submit these new fingerprint(s)."""
-
-        re_host = re.compile(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})")
-        re_os_fp = re.compile(r"(SInfo.*\);)")
-        re_service_fp = re.compile(r"(SF-Port.*\);)")
-        re_service_number = re.compile(r"SF-Port(\d+)")
-        
-        nmap_output = self.parsed.nmap_output.split("\\n\\n")
-        fingerprints = {}
-        current_ip = None
-
-        for line in nmap_output:
-            match_host = re_host.search(line)
-            match_os = re_os_fp.search(line)
-            match_service = re_service_fp.search(line)
-            
-            if match_host:
-                current_ip = match_host.groups()[0]
-            if match_os:
-                if current_ip not in fingerprints.keys():
-                    fingerprints[current_ip] = {}
-                
-                fingerprints[current_ip]["os"] = match_os.groups()[0]
-            if match_service:
-                if current_ip not in fingerprints.keys():
-                    fingerprints[current_ip] = {}
-
-                fp = match_service.groups()[0]
-                
-                fingerprints[current_ip]["service"] = fp
-
-                #port = re_service_port.search(fp).groups()[0]
-                #fingerprints[current_ip]["service_port"] = port
-                #fingerprints[current_ip]["service_name"]
-                
-
-        """
-        for fp in fingerprints:
-            # We've found a new fp! Please contribute dialog
-            # If ok, show the form, sending the ip and fingerprint.
-        """
-
-        key_num = len(fingerprints.keys())
-        dialog_text = "%s. The submission and registration of \
-fingerprints are very important for you and the Nmap project! If you would like to contribute \
-to see your favorite network mapper recognizing those fingerprints in the future, choose the \
-Ok button, and a submission page will be open in your default web browser with instructions \
-about how to proceed on this registration."
-        
-        if key_num == 1:
-            msg = _("Your network scan discovered an unknown fingerprint sent by the \
-host %s") % fingerprints.keys()[0]
-            
-            self.show_contribute_dialog(dialog_text % msg)
-
-        elif key_num > 1:
-            msg = _("Your network scan discovered several unknown fingerprints sent by the \
-following hosts: ")
-            for i in fingerprints:
-                msg += "%s, " % i
-            msg = msg[:-2]
-
-            self.show_contribute_dialog(dialog_text % msg)
-
-
-    def show_contribute_dialog(self, dialog_text):
-        """If the Services/OS Fingerprint that was found does not match any that is known, 
-        open browser to the submission site if user gives positive response to the contribution
-        dialog that displays."""
-
-        contribute_dialog = HIGAlertDialog(message_format=_("Unrecognized Services/OS \
-Fingerprints Found!"),
-                                           secondary_text=dialog_text,
-                                           type=gtk.MESSAGE_QUESTION,
-                                           buttons=gtk.BUTTONS_OK_CANCEL)
-        response = contribute_dialog.run()
-        contribute_dialog.destroy()
-
-        if response == gtk.RESPONSE_OK:
-            import webbrowser
-            webbrowser.open("http://nmap.org/submit/")
-        
-
-    def __verify_comments_changes(self):
-        """Making sure that the actual comments changes go through."""
-
-        try:
-            for hostname in self.hosts:
-                if self.hosts[hostname]['page'].host_details.\
-                       get_comment() != self.comments[hostname]:
-                    
-                    log.debug("Changes on comments")
-                    self.changes = True
-                    return True
-        except:
-            return False
-    
-    def __set_scan_info(self):
-        self.clean_scan_details()
-        run_details = ScanRunDetailsPage()
-        
-        run_details.set_command_info(\
-            {'command':self.parsed.get_nmap_command(),\
-             'version':self.parsed.get_scanner_version(),\
-             'verbose':self.parsed.get_verbose_level(),
-             'debug':self.parsed.get_debugging_level()})
-        
-        run_details.set_general_info(\
-            {'start':self.parsed.get_formated_date(),\
-             'finish':self.parsed.get_formated_finish_date(),\
-             'hosts_up':str(self.parsed.get_hosts_up()),\
-             'hosts_down':str(self.parsed.get_hosts_down()),\
-             'hosts_scanned':str(self.parsed.get_hosts_scanned()),\
-             'open_ports':str(self.parsed.get_open_ports()),\
-             'filtered_ports':str(self.parsed.get_filtered_ports()),\
-             'closed_ports':str(self.parsed.get_closed_ports())})
-             
-        run_details.set_scan_infos(self.parsed.get_scaninfo())
-        
-        return run_details
-    
     def update_host_info(self, widget):
         """"""
 
@@ -1045,7 +609,7 @@ Fingerprints Found!"),
 
         if len(serv_objs) == 1:
             self.set_single_service_host(serv_objs[0]['hosts'])
-            self.switch_host_details([page["page"] for page in serv_objs[0]['hosts']])
+            self.switch_host_details([host["page"] for host in serv_objs[0]['hosts']])
         else:
             servs = []
             for s in serv_objs:
@@ -1064,7 +628,7 @@ Fingerprints Found!"),
             self.switch_host_details(pages)
 
         # Change scan tab to "Ports/Hosts"
-        self.scan_result.scan_result_notebook.set_current_page(0)
+        self.scan_result.change_to_ports_hosts_tab()
     
     def clean_host_details(self):
         parent = self.scan_result.scan_result_notebook.host_details_vbox
@@ -1073,13 +637,6 @@ Fingerprints Found!"),
         for child in children:
             parent.remove(child)
             
-    def clean_scan_details(self):
-        parent = self.scan_result.scan_result_notebook.scan_details_vbox
-        children = parent.get_children()
-        
-        for child in children:
-            parent.remove(child)
-
     def switch_host_details(self, page):
         """To switch host details, check the length of the page. If there is multiple pages,
         set them hidden and not expanded. If there is single page, set that page to the first page."""
@@ -1089,7 +646,8 @@ Fingerprints Found!"),
                 for p in page:
                     p.hide()
                     p.set_expanded(False)
-                    self.scan_result.scan_result_notebook.host_details_vbox._pack_noexpand_nofill(p)
+                    if p not in self.scan_result.scan_result_notebook.host_details_vbox:
+                        self.scan_result.scan_result_notebook.host_details_vbox._pack_noexpand_nofill(p)
                 
                 self.scan_result.scan_result_notebook.host_details_vbox.show_all()
                 
@@ -1106,12 +664,6 @@ Fingerprints Found!"),
             page.set_expanded(True)
             page.show_all()
     
-    def switch_scan_details(self, page):
-        """Removes current widget from the host details page and shows the whole of the page."""
-
-        self.scan_result.scan_result_notebook.scan_details_vbox._pack_noexpand_nofill(page)
-        page.show_all()
-    
     def set_multiple_host_details(self, host_list):
         """Set details for multiple hosts in the list"""
 
@@ -1121,19 +673,15 @@ Fingerprints Found!"),
         
         return hosts
 
-    def _save_comment(self, widget, extra, host_id):
-        """Saves comment to the end, changes unsaved/unchanged states accordingly."""
-
-        if self.status.unsaved_unchanged:
-            self.status.set_unsaved_changed()
-        elif self.status.loaded_unchanged or self.status.saved:
-            self.status.set_loaded_changed()
-        
-        # Catch a comment and record it to be saved at the end.
-        log.debug(">>> Catching edited comment to be saved posteriorly.")
+    def _save_comment(self, widget, extra, host):
+        """Sets the comment on a host from the contents of the comment text
+        entry."""
         buff = widget.get_buffer()
-        self.parsed.set_host_comment(host_id, buff.get_text(buff.get_start_iter(),
-                                                            buff.get_end_iter()))
+        host.comment = buff.get_text(buff.get_start_iter(), buff.get_end_iter())
+        for scan in self.inventory.get_scans():
+            if host in scan.get_hosts():
+                scan.unsaved = True
+                break
     
     def set_host_details(self, host):
         """Sets up all the host details and updates the host page with this information.
@@ -1148,18 +696,16 @@ Fingerprints Found!"),
 
         log.debug(">>> Setting host details")
         log.debug(">>> Hostname: %s" % host.get_hostname())
-        log.debug(">>> Comment: %s" % self.parsed.get_host_comment(host.id))
-        host_details.set_comment(self.parsed.get_host_comment(host.id))
+        log.debug(">>> Comment: %s" % host.comment)
+        host_details.set_comment(host.comment)
         
 
         # Setting events to automatically record the commentary to be maintained
         host_page.host_details.comment_txt_vw.connect("insert-at-cursor", self._save_comment,
-                                                      host.id)
+                                                      host)
         host_page.host_details.comment_txt_vw.connect("focus-out-event", self._save_comment,
-                                                      host.id)
+                                                      host)
 
-        
-        self.comments[host.get_hostname()] = host.get_comment()
         
         uptime = host.get_uptime()
 
@@ -1171,23 +717,19 @@ Fingerprints Found!"),
                                       'uptime':uptime['seconds'],
                                       'lastboot':uptime['lastboot']})
 
-        ipv4 = ''
-        try:ipv4 = host.get_ip()['addr']
-        except KeyError: pass
+        addresses = {}
+        if host.ip is not None:
+            addresses['ipv4'] = host.ip['addr']
+        if host.ipv6 is not None:
+            addresses['ipv6'] = host.ipv6['addr']
+        if host.mac is not None:
+            addresses['mac'] = host.mac['addr']
         
-        ipv6 = ''
-        try:ipv6 = host.get_ipv6()['addr']
-        except KeyError: pass
-        
-        mac = ''
-        try:mac = host.get_mac()['addr']
-        except KeyError: pass
-        
-        host_details.set_addresses({'ipv4':ipv4,'ipv6':ipv6,'mac':mac})
+        host_details.set_addresses(addresses)
         
         host_details.set_hostnames(host.get_hostnames())
         
-        os = host.get_osmatch()
+        os = host.get_best_osmatch()
         if os:
             os['portsused'] = host.get_ports_used()
             os['osclass'] = host.get_osclasses()
@@ -1218,7 +760,7 @@ Fingerprints Found!"),
                                 p.get('protocol', ''),
                                 p.get('port_state', ''),
                                 p.get('service_name', ''),
-                                p.get('service_product', '')])
+                                get_version_string(p)])
 
     def set_single_service_host(self, service):
         """For a single host, add each of the host's services including hostname,
@@ -1234,8 +776,7 @@ Fingerprints Found!"),
                                 int(h.get('portid', '0')),
                                 h.get('protocol', ''),
                                 h.get('port_state', ''),
-                                h.get('service_product', ''),
-                                h.get('service_version', '')])
+                                get_version_string(h)])
         
     
     def set_multiple_host_port(self, host_list):
@@ -1248,8 +789,8 @@ Fingerprints Found!"),
         host_page.clear_port_tree()
         
         for host in host_list:
-            parent = host_page.port_tree.append(None, [host['host'].\
-                                            get_hostname(),0,'','','','', ''])
+            parent = host_page.port_tree.append(None, 
+                [host['host'].get_hostname(), None, 0,'','','',''])
             for port in host['host'].get_ports():
                 for p in port.get('port', []):
                     host_page.port_tree.append(parent, \
@@ -1259,7 +800,7 @@ Fingerprints Found!"),
                                  p.get('protocol', ''),
                                  p.get('port_state', ""),
                                  p.get('service_name', _("Unknown")),
-                                 p.get('service_product', "")])
+                                 get_version_string(p)])
 
     def set_multiple_service_host(self, service_list):
         """For multiple hosts that have services in the service list, append its entry to the host tree,
@@ -1272,7 +813,7 @@ Fingerprints Found!"),
         
         for host in service_list:
             parent = host_page.host_tree.append(None, [host['service_name'],
-                                                       '','',0,'','', '', ''])
+                                                       '','',0,'','', ''])
             for h in host['hosts']:
                 host_page.host_tree.append(parent, \
                                            ['',
@@ -1281,11 +822,27 @@ Fingerprints Found!"),
                                             int(h.get('portid', "0")),
                                             h.get('protocol', ""),
                                             h.get('port_state', _("Unknown")),
-                                            h.get('service_product', ''),
-                                            h.get('service_version', _("Unknown"))])
+                                            get_version_string(h)])
     
     def findout_service_icon(self, port_info):
-        return gtk.STOCK_YES
+        if port_info["port_state"] in ["open", "open|filtered"]:
+            return gtk.STOCK_YES
+        else:
+            return gtk.STOCK_NO
+
+def get_version_string(d):
+    """Get a human-readable version string from the dict d. The keys used in d
+    are "service_product", "service_version", and "service_extrainfo" (all are
+    optional). This produces a string like "OpenSSH 4.3p2 Debian 9etch2
+    (protocol 2.0)"."""
+    result = []
+    if d.get("service_product"):
+        result.append(d["service_product"])
+    if d.get("service_version"):
+        result.append(d["service_version"])
+    if d.get("service_extrainfo"):
+        result.append("(" + d["service_extrainfo"] + ")")
+    return " ".join(result)
 
 class ScanResult(gtk.HPaned):
     """
@@ -1295,13 +852,13 @@ class ScanResult(gtk.HPaned):
         selected host/services,        obtain and display the nmap output, let the services and hosts
         lists be selected, and refresh output.
         """
-    def __init__(self):
+    def __init__(self, inventory, scans_store):
         gtk.HPaned.__init__(self)
         
         self.scan_host_view = ScanHostsView()
-        self.scan_result_notebook = ScanResultNotebook()
+        self.scan_result_notebook = ScanResultNotebook(inventory, scans_store)
 
-        self.pack1(self.scan_host_view, True, False)
+        self.pack1(self.scan_host_view, True, True)
         self.pack2(self.scan_result_notebook, True, False)
 
     def set_nmap_output(self, msg):
@@ -1325,10 +882,6 @@ class ScanResult(gtk.HPaned):
     def get_nmap_output(self):
         return self.scan_result_notebook.nmap_output.get_nmap_output()
 
-    def show_nmap_output(self, file):
-        """Ask NmapOutputViewer to show/refresh nmap output from the given file"""
-        self.scan_result_notebook.nmap_output.nmap_output.show_nmap_output(file)
-
     def set_hosts(self, hosts_dic):
         """Set hosts to those in host list"""
         self.scan_host_view.set_hosts(hosts_dic)
@@ -1341,12 +894,17 @@ class ScanResult(gtk.HPaned):
         """Clear the scan result ports list"""
         self.scan_result_notebook.open_ports.host.clear_port_list()
 
-    def change_to_nmap_output_tab(self):
-        """Show the nmap output tab"""
+    def change_to_ports_hosts_tab(self):
+        """Show the "Ports / Hosts" tab"""
         self.scan_result_notebook.set_current_page(1)
 
+    def change_to_nmap_output_tab(self):
+        """Show the nmap output tab"""
+        self.scan_result_notebook.set_current_page(0)
+
     def refresh_nmap_output(self):
-        """Refresh Nmap output in nmap output tab"""
+        """Refresh the Nmap output with the newest output of command_execution,
+        if it is not None."""
         self.scan_result_notebook.nmap_output.nmap_output.refresh_output()
         
 
@@ -1357,81 +915,55 @@ class ScanResultNotebook(HIGNotebook):
     Nmap Output, Host Details, and Scan Details.
     Organizes the way the results for scan is displayed in its new tab.
     """
-    def __init__(self):
+    def __init__(self, inventory, scans_store):
         HIGNotebook.__init__(self)
-        self.set_scrollable(True)
         self.set_border_width(5)
         
-        self.__create_widgets()
-        self.__nmap_output_refreshing()
+        self.__create_widgets(inventory, scans_store)
         
-        self.append_page(self.open_ports_page, gtk.Label(_('Ports / Hosts')))
-        self.append_page(self.nmap_output_page, gtk.Label(_('Nmap Output')))
-        self.append_page(self.host_details_page, gtk.Label(_('Host Details')))
-        self.append_page(self.scan_details_page, gtk.Label(_('Scan Details')))
+        self.scans_list.scans_list.connect("row-activated", self._scan_row_activated)
 
-    def get_nmap_output(self):
-        return self.nmap_output.get_map_output()
-    
+        self.append_page(self.nmap_output_page, gtk.Label(_('Nmap Output')))
+        self.append_page(self.open_ports_page, gtk.Label(_('Ports / Hosts')))
+        self.append_page(self.topology_page, gtk.Label(_('Topology')))
+        self.append_page(self.host_details_page, gtk.Label(_('Host Details')))
+        self.append_page(self.scans_list_page, gtk.Label(_('Scans')))
+
     def host_mode(self):
         self.open_ports.host.host_mode()
 
     def port_mode(self):
         self.open_ports.host.port_mode()
     
-    def __create_widgets(self):
+    def __create_widgets(self, inventory, scans_store):
         self.open_ports_page = HIGVBox()
         self.nmap_output_page = HIGVBox()
+        self.topology_page = HIGVBox()
         self.host_details_page = HIGScrolledWindow()
-        self.scan_details_page = HIGScrolledWindow()
-        self.scan_details_vbox = HIGVBox()
         self.host_details_vbox = HIGVBox()
+        self.scans_list_page = HIGVBox()
         
         self.open_ports = ScanOpenPortsPage()
-        self.nmap_output = ScanNmapOutputPage()
+        self.nmap_output = ScanNmapOutputPage(scans_store)
+        self.topology = TopologyPage(inventory)
+        self.scans_list = ScanScanListPage(scans_store)
         
-        self.no_selected = gtk.Label(_('No host selected!'))
+        self.no_selected = gtk.Label(_('No host selected.'))
         self.host_details = self.no_selected
-        
-        self.no_details = gtk.Label(_('Scan is not finished yet!'))
-        self.scan_details = self.no_details
         
         self.open_ports_page.add(self.open_ports)
         self.nmap_output_page.add(self.nmap_output)
+        self.topology_page.add(self.topology)
+        self.scans_list_page.add(self.scans_list)
         
         self.host_details_page.add_with_viewport(self.host_details_vbox)
         self.host_details_vbox._pack_expand_fill(self.host_details)
-        
-        self.scan_details_page.add_with_viewport(self.scan_details_vbox)
-        self.scan_details_vbox._pack_expand_fill(self.scan_details)
     
-    def __nmap_output_refreshing(self):
-        self.connect('switch-page', self.refresh_cb)
-    
-    def refresh_cb(self, widget, page=None, page_num=None):
-        if self.nmap_output.nmap_output.thread.isAlive():
-            if page_num == 2:
-                self.nmap_output.nmap_output.refresh_output(None)
-
+    def _scan_row_activated(self, treeview, path, view_column):
+        """Switch back to the Nmap Output view when a scan is activated
+        (double-clicked) on the scans list."""
+        self.nmap_output.set_active_iter(treeview.get_model().get_iter(path))
+        self.set_current_page(0)
 
 if __name__ == "__main__":
-    status = PageStatus("empty")
-    status.set_saved()
-    status.set_unsaved_unchanged()
-    status.set_unsaved_changed()
-    status.set_loaded_unchanged()
-    status.set_loaded_changed()
-    status.set_empty()
-    status.set_scanning()
-    status.set_parsing_result()
-    status.set_unknown()
-
-    print "Saved:", status.saved
-    print "Unsaved unchanged:", status.unsaved_unchanged
-    print "Unsaved changed:", status.unsaved_changed
-    print "Loaded unchanged:", status.loaded_unchanged
-    print "Loaded changed:", status.loaded_changed
-    print "Empty:", status.empty
-    print "Scanning:", status.scanning
-    print "Parsing result:", status.parsing_result
-    print "Unknown:", status.unknown
+    pass

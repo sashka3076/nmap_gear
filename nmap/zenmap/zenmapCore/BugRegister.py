@@ -22,64 +22,36 @@
 import urllib
 import urllib2
 
-from tempfile import mktemp
+SF_BUG_TRACKER_SUBMIT = "http://sourceforge.net/tracker/index.php"
 
-group_id = "142490"
-atid = "752647"
-
-sf_site = "http://www.sourceforge.net/"
-sf_project_site = sf_site + "projects/umit/"
-sf_bug_tracker_page = sf_site + "tracker/?group_id=%s&atid=%s" % (group_id, atid)
-sf_bug_tracker_submit = sf_site + "tracker/index.php"
-
+# Base URL data to create a new ticket at SourceForge.
+BASE_QUERY_DATA = {
+"group_id":          "142490",  # group_id and atid identify umit, I guess.
+"atid":              "752647",
+"func":              "postadd", # Means create a ticket.
+"category_id":       "100",     # None.
+"artifact_group_id": "100",     # None.
+"assigned_to":       "1897047", # User name xvg (David Fifield).
+"submit":            "SUBMIT"
+}
 
 class BugRegister(object):
-    def __init__(self):
-        try:
-            urllib.urlopen(sf_site)
-        except:
-            return None
+    def get_report_url(self, summary, details, **options):
+        """Return a URL that submits a new ticket at the SourceForge bug tracker
+        with the given summary and details. The keyword argument private
+        controls whether the report should be private."""
+        query_data = {}
+        query_data["summary"] = summary
+        query_data["details"] = details
+        # Lowest priority.
+        query_data["priority"] = "1"
+        if options.get("private", False):
+            query_data["is_private"] = "1"
 
-        self.group_id = group_id
-        self.atid = atid
-        self.func = "postadd"
-        self.is_private = "1"
-        self.category_id = "862568"
-        self.artifact_group_id = "100" # None
-        self.assigned_to = "1897047" # User name xvg
-        self.priority = "5"
-        self.summary = "Testing bug reporter"
-        self.details = "Just testing the dialog to report bugs directly from the interface!\
- py.adriano@gmail.com"
-        self.input_file = ""
-        self.file_description = ""
-        self.submit = "SUBMIT"
+        query_data.update(BASE_QUERY_DATA)
 
-    def report(self):
-        data = urllib.urlencode({"group_id":self.group_id,
-                                 "atid":self.atid,
-                                 "func":self.func,
-                                 "is_private":self.is_private,
-                                 "category_id":self.category_id,
-                                 "artifact_group_id":self.artifact_group_id,
-                                 "assigned_to":self.assigned_to,
-                                 "priority":self.priority,
-                                 "summary":self.summary,
-                                 "details":self.details,
-                                 "input_file":self.input_file,
-                                 "file_description":self.file_description,
-                                 "submit":self.submit})
-
-        # The submit page source code points that the info should be set using POST method
-        # But, it only worked sending it through GET method. So, I decided to send using
-        # both methods, to insure that it's going to work.
-        request = urllib2.Request(sf_bug_tracker_submit + "?" + data, data)
-        response = urllib2.urlopen(request)
-
-        tfile = mktemp()
-        open(tfile, "w").write(response.read())
-        return tfile
+        return SF_BUG_TRACKER_SUBMIT + "?" + urllib.urlencode(query_data)
 
 if __name__ == "__main__":
     bug = BugRegister()
-    bug.report()
+    print bug.get_report_url("Test", "Description.")

@@ -6,16 +6,11 @@ work as expected.
 This is a description of the scripts in this directory and its
 subdirectories.
 
-unix/setup.sh:
-Just runs utils/create_os_list.py and utils/create_services_dump.py.
+macosx:
+Files and scripts used to build Mac OS X packages. See macosx/README for a
+description of the files in this directory.
 
-utils/create_os_list.py:
-Builds the os_db.dmp database from ../nmap-os-db.
-
-utils/create_services_dump.py:
-Builds the services.dmp database from ../nmap-services.
-
-utils/linux_check.sh:
+unix/linux_check.sh:
 Checks for dependencies on Linux.
 
 utils/version_update.py:
@@ -23,3 +18,6 @@ Updates the Zenmap version number everywhere it needs to be.
 
 windows/copy_and_compile.bat:
 Builds a Windows executable using py2exe.
+
+windows/nmap-eye.ico:
+An icon used on Windows.

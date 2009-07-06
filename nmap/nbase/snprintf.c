@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: snprintf.c 1971 2003-09-06 09:10:55Z fyodor $ */
+/* $Id: snprintf.c 8430 2008-06-22 04:56:02Z bmenrigh $ */
 
 #if HAVE_CONFIG_H
 #include "nbase_config.h"
@@ -127,9 +127,7 @@ as_reserve (struct state *state, size_t n)
     state->sz = max(state->sz * 2, state->sz + n);
     if (state->max_sz)
       state->sz = min(state->sz, state->max_sz);
-    tmp = realloc (state->str, state->sz);
-    if (tmp == NULL)
-      return 1;
+    tmp = safe_realloc(state->str, state->sz);
     state->str = tmp;
     state->s = state->str + off;
     state->theend = state->str + state->sz - 1;
@@ -495,9 +493,7 @@ snprintf (char *str, size_t sz, const char *format, ...)
     int ret2;
     char *tmp;
 
-    tmp = malloc (sz);
-    if (tmp == NULL)
-      abort ();
+    tmp = safe_malloc (sz);
 
     ret2 = vsprintf (tmp, format, args);
     if (ret != ret2 || strcmp(str, tmp))
@@ -522,11 +518,7 @@ vasnprintf (char **ret, size_t max_sz, const char *format, va_list args)
 
   state.max_sz = max_sz;
   state.sz     = 1;
-  state.str    = malloc(state.sz);
-  if (state.str == NULL) {
-    *ret = NULL;
-    return -1;
-  }
+  state.str    = safe_malloc(state.sz);
   state.s = state.str;
   state.theend = state.s + state.sz - 1;
   state.append_char = as_append_char;
@@ -542,7 +534,7 @@ vasnprintf (char **ret, size_t max_sz, const char *format, va_list args)
 
     *state.s = '\0';
     len = state.s - state.str;
-    tmp = realloc (state.str, len+1);
+    tmp = safe_realloc(state.str, len+1);
     if (tmp == NULL) {
       free (state.str);
       *ret = NULL;
@@ -576,9 +568,7 @@ asprintf (char **ret, const char *format, ...)
   {
     int ret2;
     char *tmp;
-    tmp = malloc (val + 1);
-    if (tmp == NULL)
-      abort ();
+    tmp = safe_malloc (val + 1);
 
     ret2 = vsprintf (tmp, format, args);
     if (val != ret2 || strcmp(*ret, tmp))
@@ -606,9 +596,7 @@ asnprintf (char **ret, size_t max_sz, const char *format, ...)
   {
     int ret2;
     char *tmp;
-    tmp = malloc (val + 1);
-    if (tmp == NULL)
-      abort ();
+    tmp = safe_malloc (val + 1);
 
     ret2 = vsprintf (tmp, format, args);
     if (val != ret2 || strcmp(*ret, tmp))

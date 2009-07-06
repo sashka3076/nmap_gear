@@ -7,7 +7,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -35,19 +35,10 @@
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
- * works of Nmap.  This list is not exclusive, but is just meant to        *
- * clarify our interpretation of derived works with some common examples.  *
- * These restrictions only apply when you actually redistribute Nmap.  For *
- * example, nothing stops you from writing and selling a proprietary       *
- * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://nmap.org to download Nmap.                                       *
- *                                                                         *
- * We don't consider these to be added restrictions on top of the GPL, but *
- * just a clarification of how we interpret "derived works" as it applies  *
- * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
- * Torvalds has announced his interpretation of how "derived works"        *
- * applies to Linux kernel modules.  Our interpretation refers only to     *
- * Nmap - we don't speak for any other GPL products.                       *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
  *                                                                         *
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
@@ -78,17 +69,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -99,7 +90,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: TargetGroup.cc 7640 2008-05-22 20:45:32Z fyodor $ */
+/* $Id: TargetGroup.cc 13888 2009-06-24 21:35:54Z fyodor $ */
 
 #include "TargetGroup.h"
 #include "NmapOps.h"
@@ -122,25 +113,27 @@ void TargetGroup::Initialize() {
 
 /* take the object back to the beginning without  (mdmcl)
  * reinitalizing the data structures */  
-int  TargetGroup::rewind() {
+int TargetGroup::rewind() {
 
   /* For netmasks we must set the current address to the
    * starting address and calculate the ips by distance */
   if (targets_type == IPV4_NETMASK) {
-      currentaddr = startaddr;
-      if (startaddr.s_addr <= endaddr.s_addr) { 
-	ipsleft = endaddr.s_addr - startaddr.s_addr + 1;
-	return 0; 
-      }
-      else
-        assert(0);
+    currentaddr = startaddr;
+    if (startaddr.s_addr <= endaddr.s_addr) { 
+      ipsleft = ((unsigned long long) (endaddr.s_addr - startaddr.s_addr)) + 1;
+      return 0; 
+    }
+    else
+      assert(0);
   }
   /* For ranges, we easily set current to zero and calculate
    * the ips by the number of values in the columns */
   else if (targets_type == IPV4_RANGES) {
     memset((char *)current, 0, sizeof(current));
-    ipsleft = (last[0] + 1) * (last[1] + 1) *
-      (last[2] + 1) * (last[3] + 1);
+    ipsleft = (unsigned long long) (last[0] + 1) *
+              (unsigned long long) (last[1] + 1) *
+              (unsigned long long) (last[2] + 1) *
+              (unsigned long long) (last[3] + 1);
     return 0;
   }
 #if HAVE_IPV6
@@ -167,7 +160,6 @@ int TargetGroup::parse_expr(const char * const target_expr, int af) {
   char *addy[5];
   char *hostexp = strdup(target_expr);
   struct hostent *target;
-  unsigned long longtmp;
   namedhost = 0;
 
   if (targets_type != TYPE_NONE)
@@ -176,7 +168,7 @@ int TargetGroup::parse_expr(const char * const target_expr, int af) {
   ipsleft = 0;
 
   if (af == AF_INET) {
-  
+
     if (strchr(hostexp, ':'))
       fatal("Invalid host expression: %s -- colons only allowed in IPv6 addresses, and then you need the -6 switch", hostexp);
 
@@ -185,44 +177,66 @@ int TargetGroup::parse_expr(const char * const target_expr, int af) {
     addy[0] = r = hostexp;
     /* First we break the expression up into the four parts of the IP address
        + the optional '/mask' */
-    target_net = strtok(hostexp, "/");
-    s = strtok(NULL, "");    /* find the end of the token from hostexp */
-    netmask  = ( s ) ? atoi(s) : 32;
-    if ((int) netmask <= 0 || netmask > 32) {
-      error("Illegal netmask value (%d), must be /1 - /32 .  Assuming /32 (one host)", netmask);
+    target_net = hostexp;
+    s = strchr(hostexp, '/'); /* Find the slash if there is one */
+    if (s) {
+      char *tail;
+      long netmask_long;
+      
+      *s = '\0';  /* Make sure target_net is terminated before the /## */
+      s++;        /* Point s at the netmask */
+      if (!isdigit(*s)) {
+        error("Illegal netmask value, must be /0 - /32 .  Assuming /32 (one host)");
+        netmask = 32;
+      } else {
+        netmask_long = strtol(s, (char**) &tail, 10);
+        if (*tail != '\0' || tail == s || netmask_long < 0 || netmask_long > 32) {
+          error("Illegal netmask value, must be /0 - /32 .  Assuming /32 (one host)");
+          netmask = 32;
+        } else
+          netmask = (u32) netmask_long;
+      }
+    } else
       netmask = 32;
-    }
     for(i=0; *(hostexp + i); i++) 
       if (isupper((int) *(hostexp +i)) || islower((int) *(hostexp +i))) {
-	namedhost = 1;
-	break;
+        namedhost = 1;
+        break;
       }
     if (netmask != 32 || namedhost) {
       targets_type = IPV4_NETMASK;
       if (!inet_pton(AF_INET, target_net, &(startaddr))) {
-	if ((target = gethostbyname(target_net))) {
+        if ((target = gethostbyname(target_net))) {
           int count=0;
 
-	  memcpy(&(startaddr), target->h_addr_list[0], sizeof(struct in_addr));
+          memcpy(&(startaddr), target->h_addr_list[0], sizeof(struct in_addr));
 
           while (target->h_addr_list[count]) count++;
 
           if (count > 1)
              error("Warning: Hostname %s resolves to %d IPs. Using %s.", target_net, count, inet_ntoa(*((struct in_addr *)target->h_addr_list[0])));
-	} else {
-	  error("Failed to resolve given hostname/IP: %s.  Note that you can't use '/mask' AND '1-4,7,100-' style IP ranges", target_net);
-	  free(hostexp);
-	  return 1;
-	}
+        } else {
+          error("Failed to resolve given hostname/IP: %s.  Note that you can't use '/mask' AND '1-4,7,100-' style IP ranges", target_net);
+          free(hostexp);
+          return 1;
+        }
       } 
-      longtmp = ntohl(startaddr.s_addr);
-      startaddr.s_addr = longtmp & (unsigned long) (0 - (1<<(32 - netmask)));
-      endaddr.s_addr = longtmp | (unsigned long)  ((1<<(32 - netmask)) - 1);
+      if (netmask) {
+        unsigned long longtmp = ntohl(startaddr.s_addr);
+        startaddr.s_addr = longtmp & (unsigned long) (0 - (1<<(32 - netmask)));
+        endaddr.s_addr = longtmp | (unsigned long)  ((1<<(32 - netmask)) - 1);
+      } else {
+        /* The above calculations don't work for a /0 netmask, though at first
+         * glance it appears that they would
+         */
+        startaddr.s_addr = 0;
+        endaddr.s_addr = 0xffffffff;
+      }
       currentaddr = startaddr;
       if (startaddr.s_addr <= endaddr.s_addr) { 
-	ipsleft = endaddr.s_addr - startaddr.s_addr + 1;
-	free(hostexp); 
-	return 0; 
+        ipsleft = ((unsigned long long) (endaddr.s_addr - startaddr.s_addr)) + 1;
+        free(hostexp); 
+        return 0; 
       }
       fprintf(stderr, "Host specification invalid");
       free(hostexp);
@@ -232,49 +246,52 @@ int TargetGroup::parse_expr(const char * const target_expr, int af) {
       targets_type = IPV4_RANGES;
       i=0;
 
-      while(*++r) {
-	if (*r == '.' && ++i < 4) {
-	  *r = '\0';
-	  addy[i] = r + 1;
-	}
-	else if (*r != '*' && *r != ',' && *r != '-' && !isdigit((int)*r)) 
-	  fatal("Invalid character in  host specification.  Note in particular that square brackets [] are no longer allowed.  They were redundant and can simply be removed.");
+      while(*r) {
+        if (*r == '.' && ++i < 4) {
+          *r = '\0';
+          addy[i] = r + 1;
+        }
+        else if (*r != '*' && *r != ',' && *r != '-' && !isdigit((int)*r)) 
+          fatal("Invalid character in host specification.  Note in particular that square brackets [] are no longer allowed.  They were redundant and can simply be removed.");
+        *r++;
       }
       if (i != 3) fatal("Invalid target host specification: %s", target_expr);
       
       for(i=0; i < 4; i++) {
-	j=0;
-	do {
-	  s = strchr(addy[i],',');
-	  if (s) *s = '\0';
-	  if (*addy[i] == '*') { start = 0; end = 255; } 
-	  else if (*addy[i] == '-') {
-	    start = 0;
-	    if (!(addy[i] + 1)) end = 255;
-	    else end = atoi(addy[i]+ 1);
-	  }
-	  else {
-	    start = end = atoi(addy[i]);
-	    if ((r = strchr(addy[i],'-')) && *(r+1) ) end = atoi(r + 1);
-	    else if (r && !*(r+1)) end = 255;
-	  }
-	  /*	  if (o.debugging > 2)
-		  log_write(LOG_STDOUT, "The first host is %d, and the last one is %d\n", start, end); */
-	  if (start < 0 || start > end || start > 255 || end > 255)
-	    fatal("Your host specifications are illegal!");
-	  if (j + (end - start) > 255) 
-	    fatal("Your host specifications are illegal!");
-	  for(k=start; k <= end; k++)
-	    addresses[i][j++] = k;
-	  last[i] = j-1;
-	  if (s) addy[i] = s + 1;
-	} while (s);
+        j=0;
+        do {
+          s = strchr(addy[i],',');
+          if (s) *s = '\0';
+          if (*addy[i] == '*') { start = 0; end = 255; } 
+          else if (*addy[i] == '-') {
+            start = 0;
+            if (*(addy[i] + 1) == '\0') end = 255;
+            else end = atoi(addy[i]+ 1);
+          }
+          else {
+            start = end = atoi(addy[i]);
+            if ((r = strchr(addy[i],'-')) && *(r+1) ) end = atoi(r + 1);
+            else if (r && !*(r+1)) end = 255;
+          }
+       /* if (o.debugging > 2)
+        *   log_write(LOG_STDOUT, "The first host is %d, and the last one is %d\n", start, end); */
+          if (start < 0 || start > end || start > 255 || end > 255)
+            fatal("Your host specifications are illegal!");
+          if (j + (end - start) > 255) 
+            fatal("Your host specifications are illegal!");
+          for(k=start; k <= end; k++)
+            addresses[i][j++] = k;
+          last[i] = j-1;
+          if (s) addy[i] = s + 1;
+        } while (s);
       }
     }
-  memset((char *)current, 0, sizeof(current));
-  ipsleft = (last[0] + 1) * (last[1] + 1) *
-    (last[2] + 1) * (last[3] + 1);
-  }
+    memset((char *)current, 0, sizeof(current));
+    ipsleft = (unsigned long long) (last[0] + 1) *
+              (unsigned long long) (last[1] + 1) *
+              (unsigned long long) (last[2] + 1) *
+              (unsigned long long) (last[3] + 1);
+    }
   else {
 #if HAVE_IPV6
     int rc = 0;
@@ -288,7 +305,7 @@ int TargetGroup::parse_expr(const char * const target_expr, int af) {
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = PF_INET6;
     rc = getaddrinfo(hostexp, NULL, &hints, &result);
-    if (rc != 0) {
+    if (rc != 0 || result == NULL) {
       error("Failed to resolve given IPv6 hostname/IP: %s.  Note that you can't use '/mask' or '[1-4,7,100-]' style ranges for IPv6.  Error code %d: %s", hostexp, rc, gai_strerror(rc));
       free(hostexp);
       if (result) freeaddrinfo(result);
@@ -372,7 +389,7 @@ int TargetGroup::get_next_host(struct sockaddr_storage *ss, size_t *sslen) {
   struct sockaddr_in *sin = (struct sockaddr_in *) ss;
   struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) ss;
   startover: /* to handle nmap --resume where I have already
-		scanned many of the IPs */  
+              * scanned many of the IPs */  
   assert(ss);
   assert(sslen);
 
@@ -408,19 +425,19 @@ int TargetGroup::get_next_host(struct sockaddr_storage *ss, size_t *sslen) {
     }
     /* Set the IP to the current value of everything */
     sin->sin_addr.s_addr = htonl(addresses[0][current[0]] << 24 | 
-			addresses[1][current[1]] << 16 |
-			addresses[2][current[2]] << 8 | 
-			addresses[3][current[3]]);
+                                 addresses[1][current[1]] << 16 |
+                                 addresses[2][current[2]] <<  8 | 
+                                 addresses[3][current[3]]);
     
     /* Now we nudge up to the next IP */
     for(octet = 3; octet >= 0; octet--) {
       if (current[octet] < last[octet]) {
-	/* OK, this is the column I have room to nudge upwards */
-	current[octet]++;
-	break;
+        /* OK, this is the column I have room to nudge upwards */
+        current[octet]++;
+        break;
       } else {
-	/* This octet is finished so I reset it to the beginning */
-	current[octet] = 0;
+        /* This octet is finished so I reset it to the beginning */
+        current[octet] = 0;
       }
     }
     if (octet == -1) {
@@ -476,12 +493,12 @@ int TargetGroup::return_last_host() {
   } else if (targets_type == IPV4_RANGES) {
     for(octet = 3; octet >= 0; octet--) {
       if (current[octet] > 0) {
-	/* OK, this is the column I have room to nudge downwards */
-	current[octet]--;
-	break;
+        /* OK, this is the column I have room to nudge downwards */
+        current[octet]--;
+        break;
       } else {
-	/* This octet is already at the beginning, so I set it to the end */
-	current[octet] = last[octet];
+        /* This octet is already at the beginning, so I set it to the end */
+        current[octet] = last[octet];
       }
     }
     assert(octet != -1);
@@ -499,7 +516,7 @@ int TargetGroup::return_last_host() {
    this class instance is used -- the array is NOT copied.
  */
 HostGroupState::HostGroupState(int lookahead, int rnd, 
-			       char *expr[], int numexpr) {
+                               char *expr[], int numexpr) {
   assert(lookahead > 0);
   hostbatch = (Target **) safe_zalloc(sizeof(Target *) * lookahead);
   max_batch_sz = lookahead;

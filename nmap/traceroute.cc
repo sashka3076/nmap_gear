@@ -3,7 +3,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -31,19 +31,10 @@
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
- * works of Nmap.  This list is not exclusive, but is just meant to        *
- * clarify our interpretation of derived works with some common examples.  *
- * These restrictions only apply when you actually redistribute Nmap.  For *
- * example, nothing stops you from writing and selling a proprietary       *
- * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://nmap.org to download Nmap.                                       *
- *                                                                         *
- * We don't consider these to be added restrictions on top of the GPL, but *
- * just a clarification of how we interpret "derived works" as it applies  *
- * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
- * Torvalds has announced his interpretation of how "derived works"        *
- * applies to Linux kernel modules.  Our interpretation refers only to     *
- * Nmap - we don't speak for any other GPL products.                       *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
  *                                                                         *
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
@@ -74,17 +65,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -216,6 +207,9 @@ Traceroute::Traceroute (const char *device_name, devtype type, const scan_lists 
         if (ethsd == NULL)
             fatal ("dnet: Failed to open device %s", device_name);
     } else {
+#ifdef WIN32
+        win32_warn_raw_sockets(device_name);
+#endif
         if ((fd = socket (AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0)
             pfatal ("Traceroute: socket troubles");
         broadcast_socket (fd);
@@ -227,79 +221,6 @@ Traceroute::Traceroute (const char *device_name, devtype type, const scan_lists 
     /* rely on each group using the same device */
     pd = my_pcap_open_live (device_name, 100, o.spoofsource ? 1 : 0, 2);
 
-    scaninfo.initial_proto = IPPROTO_IP;
-    scaninfo.open_response = 0;
-    scaninfo.open_state = PORT_OPEN;
-    scaninfo.closed_state = PORT_CLOSED;
-
-    /* Set up which protocols, tcp flags and responsive
-     * states to use with the current scan type.
-     *
-     * Horribly messy but it is better then peppering
-     * the nmap source code with references to traceroute */
-    if (o.synscan) {
-        scaninfo.scan_flags = TH_SYN;
-        scaninfo.open_response = TH_SYN | TH_ACK;
-        scaninfo.closed_response = TH_RST;
-    } else if (o.ackscan) {
-        scaninfo.scan_flags = TH_ACK;
-        scaninfo.open_response = TH_RST;
-        scaninfo.closed_response = TH_RST;
-        scaninfo.open_state = PORT_UNFILTERED;
-        scaninfo.closed_state = PORT_UNFILTERED;
-    } else if (o.finscan) {
-        scaninfo.scan_flags = TH_FIN;
-        scaninfo.closed_response = TH_RST;
-    } else if (o.xmasscan) {
-        scaninfo.scan_flags = TH_FIN | TH_URG | TH_PUSH;
-        scaninfo.closed_response = TH_RST;
-    } else if (o.nullscan) {
-        scaninfo.scan_flags = 0;
-        scaninfo.closed_response = TH_RST;
-    } else if (o.windowscan) {
-        scaninfo.scan_flags = TH_ACK;
-        scaninfo.open_response = TH_RST;
-        scaninfo.closed_response = TH_RST;
-    } else if (o.maimonscan) {
-        scaninfo.scan_flags = TH_FIN | TH_ACK;
-        scaninfo.open_response = TH_RST;
-        scaninfo.closed_response = TH_RST;
-    }
-
-    if (o.udpscan)
-        scaninfo.initial_proto = IPPROTO_UDP;
-    if (o.synscan || o.finscan || o.xmasscan || o.nullscan ||
-        o.ackscan || o.windowscan || o.maimonscan)
-        scaninfo.initial_proto = IPPROTO_TCP;
-
-    if(o.pingscan) {
-        scaninfo.open_state = HOST_UP;
-        if (o.pingtype & PINGTYPE_TCP_USE_SYN) {
-            scaninfo.scan_flags = TH_SYN;
-            scaninfo.open_response = TH_SYN | TH_ACK;
-            scaninfo.closed_response = TH_RST;
-            scaninfo.initial_proto = IPPROTO_TCP;
-        } else if (o.pingtype & PINGTYPE_TCP_USE_ACK) {
-            scaninfo.scan_flags = TH_ACK;
-            scaninfo.open_response = TH_RST;
-            scaninfo.closed_response = TH_RST;
-            scaninfo.initial_proto = IPPROTO_TCP;
-        } else if (o.pingtype & PINGTYPE_UDP) {
-            scaninfo.initial_proto = IPPROTO_UDP;
-        } else if (o.pingtype & PINGTYPE_ICMP_PING) {
-            scaninfo.initial_proto = IPPROTO_ICMP;
-            scaninfo.icmp_type = ICMP_ECHO;
-        } else if (o.pingtype & PINGTYPE_ICMP_TS) {
-            scaninfo.initial_proto = IPPROTO_ICMP;
-            scaninfo.icmp_type = ICMP_TIMESTAMP;
-        } else if(o.pingtype & PINGTYPE_ICMP_MASK) {
-            scaninfo.initial_proto = IPPROTO_ICMP;
-            scaninfo.icmp_type = ICMP_ADDRESS;
-        }
-    }
-
-    if (o.scanflags != -1)
-        scaninfo.scan_flags = o.scanflags;
     memset (commonPath, 0, sizeof (commonPath));
 }
 
@@ -321,81 +242,28 @@ Traceroute::~Traceroute () {
 
 /* get an open or closed port from the portlist. Traceroute requires a positive response, 
  * positive responses are generated by different port states depending on the type of scan */
-inline int
-Traceroute::getTracePort (u8 proto, Target * t) {
-    u16 open_port = 1;
-    u16 closed_port = 1;
-    u16 filtered_port = 1;
-    u16 port = 0;
-    int state = -1;
-    struct Port *np;
+inline const probespec
+Traceroute::getTraceProbe (Target * t) {
+    struct probespec probe;
 
-    /* Use the first specified port for ping traceroutes */
-    if (o.pingscan) {
-        if (o.pingtype & PINGTYPE_TCP_USE_SYN)
-            return scanlists->syn_ping_ports[0];
-        else if (o.pingtype & PINGTYPE_TCP_USE_ACK)
-            return scanlists->ack_ping_ports[0];
-        else if (o.pingtype & PINGTYPE_UDP)
-            return scanlists->udp_ping_ports[0];
-        else
-            return 0;
-    }
-
-    if (proto == IPPROTO_TCP) {
-        /* can't use filtered ports for tcp */
-        filtered_port = 0;
-        open_port = (!scaninfo.open_response) ? 0 : 1;
-    }
-
-    /* For UDP we try for a closed port, then an open one.  For everything else
-     * we try the opposite.  When all else fails, we try for filtered */
-    if (proto == IPPROTO_UDP) {
-        if (closed_port && t->ports.getStateCounts (proto, scaninfo.closed_state))
-            state = scaninfo.closed_state;
-        else if (open_port && t->ports.getStateCounts (proto, scaninfo.open_state))
-            state = scaninfo.open_state;
-    } else {
-        if (open_port && t->ports.getStateCounts (proto, scaninfo.open_state))
-            state = scaninfo.open_state;
-        else if (closed_port && t->ports.getStateCounts (proto, scaninfo.closed_state))
-            state = scaninfo.closed_state;
-    }
-
-    if (state == -1 && filtered_port &&
-        t->ports.getStateCounts (proto, PORT_FILTERED)) {
-        state = PORT_FILTERED;
-        if (o.verbose)
-            log_write (LOG_PLAIN, "%s: only filtered %s available, results may be incorrect\n",
-                       t->targetipstr (), o.ipprotscan ? "protocols" : "ports");
-    }
-
-    if (state == -1)
-        return -1;
-
-    np = t->ports.nextPort (NULL, proto, state);
-    if (!np)
-      return -1;
-
-    port = np->portno;
-
-    /* If this is a protocol scan traceroute and we are using
-     * one of the major protocols, set up the required information
-     * so we include the correct protocol headers */
-    if (proto == IPPROTO_IP) {
-        if (port == IPPROTO_TCP) {
-            scaninfo.initial_proto = IPPROTO_TCP;
-            scaninfo.scan_flags = TH_ACK;
-            scaninfo.open_response = TH_RST;
-            scaninfo.closed_response = TH_RST;
-        } else if (port == IPPROTO_UDP) {
-            scaninfo.initial_proto = IPPROTO_UDP;
-        } else if (port == IPPROTO_ICMP) {
-            scaninfo.initial_proto = IPPROTO_ICMP;
-            scaninfo.icmp_type = ICMP_ECHO;
+    probe = t->pingprobe;
+    /* If this is an IP protocol probe, fill in some fields for some common
+       protocols. We cheat and store them in the TCP-, UDP-, SCTP- and
+       ICMP-specific fields. Traceroute::sendProbe checks for them there. */
+    if (probe.type == PS_PROTO) {
+        if (probe.proto == IPPROTO_TCP) {
+            probe.pd.tcp.flags = TH_ACK;
+            probe.pd.tcp.dport = get_random_u16();
+        } else if (probe.proto == IPPROTO_UDP) {
+            probe.pd.udp.dport = get_random_u16();
+        } else if (probe.proto == IPPROTO_SCTP) {
+            probe.pd.sctp.dport = get_random_u16();
+        } else if (probe.proto == IPPROTO_ICMP) {
+            probe.pd.icmp.type = ICMP_ECHO;
         }
     }
-    return port;
+
+    return probe;
 }
 
 /* finite state machine that reads all incoming packets
@@ -408,6 +276,7 @@ Traceroute::readTraceResponses () {
     struct icmp *icmp2 = NULL;
     struct tcp_hdr *tcp = NULL;
     struct udp_hdr *udp = NULL;
+    struct sctp_hdr *sctp = NULL;
     struct link_header linkhdr;
     unsigned int bytes;
     struct timeval rcvdtime;
@@ -417,33 +286,46 @@ Traceroute::readTraceResponses () {
     u32 ipaddr;
 
     /* Got to look into readip_pcap's timeout value, perhaps make it dynamic */
-    ip = (struct ip *) readip_pcap (pd, &bytes, 10000, &rcvdtime, &linkhdr);
+    ip = (struct ip *) readip_pcap (pd, &bytes, 10000, &rcvdtime, &linkhdr, true);
 
     if (ip == NULL)
-        return finished ();
-    if ((unsigned) ip->ip_hl * 4 + 20 > bytes)
         return finished ();
 
     switch (ip->ip_p) {
     case IPPROTO_ICMP:
+        if ((unsigned) ip->ip_hl * 4 + 8 > bytes)
+            break;
         icmp = (struct icmp *) ((char *) ip + 4 * ip->ip_hl);
         ipaddr = ip->ip_src.s_addr;
         sport = ntohs(icmp->icmp_id);
 
         /* Process ICMP replies that encapsulate our original probe */
         if (icmp->icmp_type == ICMP_DEST_UNREACH || icmp->icmp_type == ICMP_TIME_EXCEEDED) {
+            if ((unsigned) ip->ip_hl * 4 + 28 > bytes)
+                break;
             ip2 = (struct ip *) (((char *) ip) + 4 * ip->ip_hl + 8);
             if (ip2->ip_p == IPPROTO_TCP) {
                 tcp = (struct tcp_hdr *) ((u8 *) ip2 + ip2->ip_hl * 4);
-                sport = htons (tcp->th_sport);
+                if (ntohs(ip2->ip_len) - (ip2->ip_hl * 4) < 2)
+                    break;
+                sport = ntohs (tcp->th_sport);
             } else if (ip2->ip_p == IPPROTO_UDP) {
                 udp = (struct udp_hdr *) ((u8 *) ip2 + ip2->ip_hl * 4);
-                sport = htons (udp->uh_sport);
+                if (ntohs(ip2->ip_len) - (ip2->ip_hl * 4) < 2)
+                    break;
+                sport = ntohs (udp->uh_sport);
+            } else if (ip2->ip_p == IPPROTO_SCTP) {
+                sctp = (struct sctp_hdr *) ((u8 *) ip2 + ip2->ip_hl * 4);
+                if (ntohs(ip2->ip_len) - (ip2->ip_hl * 4) < 2)
+                    break;
+                sport = ntohs(sctp->sh_sport);
             } else if (ip2->ip_p == IPPROTO_ICMP) {
                 icmp2 = (struct icmp *) ((char *) ip2 + 4 * ip2->ip_hl);
+                if (ntohs(ip2->ip_len) - (ip2->ip_hl * 4) < 8)
+                    break;
                 sport = ntohs(icmp2->icmp_id);
             } else {
-                sport = htons(ip2->ip_id);
+                sport = ntohs(ip2->ip_id);
             }
             ipaddr = ip2->ip_dst.s_addr;
         }
@@ -461,7 +343,7 @@ Traceroute::readTraceResponses () {
         if (tp->ipreplysrc.s_addr)
             break;
 
-        if ((tg->proto == IPPROTO_UDP && (ip2 && ip2->ip_p == IPPROTO_UDP)) ||
+        if ((tg->probe.proto == IPPROTO_UDP && (ip2 && ip2->ip_p == IPPROTO_UDP)) ||
             (icmp->icmp_type == ICMP_DEST_UNREACH)) {
             switch (icmp->icmp_code) {
                 /* reply from a closed port */
@@ -483,7 +365,7 @@ Traceroute::readTraceResponses () {
             }
         }
         /* icmp ping scan replies */
-        else if (tg->proto == IPPROTO_ICMP && (icmp->icmp_type == ICMP_ECHOREPLY ||
+        else if (tg->probe.proto == IPPROTO_ICMP && (icmp->icmp_type == ICMP_ECHOREPLY ||
                 icmp->icmp_type == ICMP_ADDRESSREPLY || icmp->icmp_type == ICMP_TIMESTAMPREPLY)) {
             if (tp->probeType () == PROBE_TTL) {
                 tg->setHopDistance (get_initial_ttl_guess (ip->ip_ttl), ip->ip_ttl);
@@ -524,9 +406,6 @@ Traceroute::readTraceResponses () {
 	}
         break;
     case IPPROTO_TCP:
-        if ((unsigned) ip->ip_hl * 4 + 20 > bytes)
-            break;
-
         tcp = (struct tcp_hdr *) ((char *) ip + 4 * ip->ip_hl);
 
         if (TraceGroups.find (ip->ip_src.s_addr) != TraceGroups.end ())
@@ -534,8 +413,8 @@ Traceroute::readTraceResponses () {
         else
             break;
 
-        if (tg->TraceProbes.find (htons (tcp->th_dport)) != tg->TraceProbes.end ())
-            tp = tg->TraceProbes[htons (tcp->th_dport)];
+        if (tg->TraceProbes.find (ntohs (tcp->th_dport)) != tg->TraceProbes.end ())
+            tp = tg->TraceProbes[ntohs (tcp->th_dport)];
         else
             break;
 
@@ -546,8 +425,8 @@ Traceroute::readTraceResponses () {
 
         /* We have reached the destination host and the 
          * trace can stop for this target */
-        if (tcp->th_flags & scaninfo.open_response || tcp->th_flags & scaninfo.closed_response) {
-
+        if ((tcp->th_flags & TH_RST) == TH_RST
+            || (tcp->th_flags & (TH_SYN | TH_ACK)) == (TH_SYN | TH_ACK)) {
             /* We might have got a late reply */
             if (tp->timing.getState () == P_TIMEDOUT)
                 tp->timing.setState (P_OK);
@@ -569,8 +448,6 @@ Traceroute::readTraceResponses () {
         }
         break;
     case IPPROTO_UDP:
-        if ((unsigned) ip->ip_hl * 4 + 8 > bytes)
-            break;
         udp = (udp_hdr *) ((u8 *) ip + ip->ip_hl * 4);
 
         if (TraceGroups.find (ip->ip_src.s_addr) != TraceGroups.end ())
@@ -578,8 +455,8 @@ Traceroute::readTraceResponses () {
         else
             break;
 
-        if (tg->TraceProbes.find (htons (udp->uh_dport)) != tg->TraceProbes.end ())
-            tp = tg->TraceProbes[htons (udp->uh_dport)];
+        if (tg->TraceProbes.find (ntohs (udp->uh_dport)) != tg->TraceProbes.end ())
+            tp = tg->TraceProbes[ntohs (udp->uh_dport)];
         else
             break;
 
@@ -599,6 +476,43 @@ Traceroute::readTraceResponses () {
         if (tp->probeType () == PROBE_TTL) {
             tg->setHopDistance (get_initial_ttl_guess (ip->ip_ttl), ip->ip_ttl);
             tg->setState (G_OK);
+            tg->start_ttl = tg->ttl = tg->hopDistance;
+        } else {
+            tg->gotReply = true;
+            if (tg->start_ttl < tg->ttl)
+                tg->ttl = tg->start_ttl + 1;
+        }
+        break;
+    case IPPROTO_SCTP:
+        sctp = (struct sctp_hdr *) ((char *) ip + 4 * ip->ip_hl);
+
+        if (TraceGroups.find(ip->ip_src.s_addr) != TraceGroups.end())
+            tg = TraceGroups[ip->ip_src.s_addr];
+        else
+            break;
+
+        if (tg->TraceProbes.find(ntohs(sctp->sh_dport)) != tg->TraceProbes.end())
+            tp = tg->TraceProbes[ntohs(sctp->sh_dport)];
+        else
+            break;
+
+        /* already got the sctp packet for this group,
+         * could be a left over abort or init-ack */
+        if (tp->ipreplysrc.s_addr)
+            break;
+
+        /* We might have got a late reply */
+        if (tp->timing.getState() == P_TIMEDOUT)
+            tp->timing.setState(P_OK);
+        else
+            tg->decRemaining();
+
+        tp->timing.recvTime = rcvdtime;
+        tp->ipreplysrc = ip->ip_src;
+        tg->repliedPackets++;
+        /* The probe was the reply from a ttl guess */
+        if (tp->probeType() == PROBE_TTL) {
+            tg->setHopDistance(get_initial_ttl_guess(ip->ip_ttl), ip->ip_ttl);
             tg->start_ttl = tg->ttl = tg->hopDistance;
         } else {
             tg->gotReply = true;
@@ -629,16 +543,14 @@ Traceroute::readTraceResponses () {
 inline void
 Traceroute::sendTTLProbes (vector < Target * >&Targets, vector < Target * >&valid_targets) {
     Target *t = NULL;
-    long dport = 0;
+    struct probespec probe;
     u16 sport = 0;
-    u8 proto;
     TraceProbe *tp;
     TraceGroup *tg = NULL;
     vector < Target * >::iterator it = Targets.begin ();
 
     for (; it != Targets.end (); ++it) {
         t = *it;
-        proto = scaninfo.initial_proto;
 
         /* No point in tracing directly connected nodes */
         if (t->directlyConnected ())
@@ -651,36 +563,19 @@ Traceroute::sendTTLProbes (vector < Target * >&Targets, vector < Target * >&vali
         }
 
         /* Determine active port to probe */
-        if ((dport = getTracePort (proto, t)) == -1) {
-            /* If we could not find a responsive tcp port then try
-             * to find a responsive udp port */
-            if (o.udpscan && proto != IPPROTO_UDP) {
-                proto = IPPROTO_UDP;
-                dport = getTracePort (proto, t);
-            }
-        }
-
-        if (dport == -1) {
+        probe = getTraceProbe (t);
+        if (probe.type == PS_NONE) {
             if (o.verbose > 1)
                 log_write (LOG_STDOUT, "%s: no responsive %s\n",
-                           t->targetipstr (), o.ipprotscan ? "protocols" : "ports");
+                           t->targetipstr (), "probes");
             continue;
-        }
-
-        /* If this is a protocol scan getTracePort() returns 
-         * a protocol number for so we need a random destination 
-         * port */
-        if (o.ipprotscan) {
-            proto = dport;
-            dport = get_random_u16 ();
-            scaninfo.initial_proto = IPPROTO_IP;
         }
 
         /* start off with a random source port and increment 
          * it for each probes sent. The source port is the
          * distinguishing value used to identify each probe */
         sport = get_random_u16 ();
-        tg = new TraceGroup (t->v4hostip ()->s_addr, sport, dport, proto);
+        tg = new TraceGroup (t->v4hostip ()->s_addr, sport, probe);
         tg->src_mac_addr = t->SrcMACAddress ();
         tg->nxt_mac_addr = t->NextHopMACAddress ();
         tg->sport++;
@@ -691,8 +586,8 @@ Traceroute::sendTTLProbes (vector < Target * >&Targets, vector < Target * >&vali
         if (t->distance != -1) {
             tg->setHopDistance (0, t->distance);
 	    } else {
-            tp = new TraceProbe (proto, t->v4hostip ()->s_addr,
-                                 t->v4sourceip ()->s_addr, sport, dport);
+            tp = new TraceProbe (t->v4hostip ()->s_addr,
+                                 t->v4sourceip ()->s_addr, sport, probe);
             tp->setProbeType (PROBE_TTL);
             tp->ttl = o.ttl;
             tg->TraceProbes[sport] = tp;
@@ -717,9 +612,9 @@ Traceroute::sendProbe (TraceProbe * tp) {
     struct eth_nfo eth;
     struct eth_nfo *ethptr = NULL;
 
-    if (scaninfo.scan_flags & TH_ACK)
+    if (tp->probe.type == PS_TCP && (tp->probe.pd.tcp.flags & TH_ACK) == TH_ACK)
         ack = rand ();
-    if (scaninfo.scan_flags & TH_SYN) {
+    if (tp->probe.type == PS_TCP && (tp->probe.pd.tcp.flags & TH_SYN) == TH_SYN) {
         tcpopts = (u8 *) "\x02\x04\x05\xb4";
         tcpoptslen = 4;
     }
@@ -750,7 +645,6 @@ Traceroute::sendProbe (TraceProbe * tp) {
         }
         tg->sport++;
         tp->ttl = tg->ttl;
-        tp->dport = tg->dport;
         tg->incRemaining ();
     } else {
         /* this probe is a retransmission */
@@ -767,29 +661,50 @@ Traceroute::sendProbe (TraceProbe * tp) {
         else
             source = o.decoys[decoy];
 
-        switch (tp->proto) {
-        case IPPROTO_TCP:
+        /* For TCP, UDP, SCTP and ICMP, also check if the probe is an IP
+           proto probe whose protocol happens to be one of those protocols.
+           The protocol-specific fields will have been filled in by
+           Traceroute::getTraceProbe. */
+        if (tp->probe.type == PS_TCP
+            || (tp->probe.type == PS_PROTO && tp->probe.proto == IPPROTO_TCP)) {
             packet = build_tcp_raw (&source, &tp->ipdst, tp->ttl, get_random_u16 (),
-                                    get_random_u8 (), 0, NULL, 0, tp->sport, tp->dport,
-                                    get_random_u32 (), ack, 0, scaninfo.scan_flags,
+                                    get_random_u8 (), false, NULL, 0, tp->sport, tp->probe.pd.tcp.dport,
+                                    get_random_u32 (), ack, 0, tp->probe.pd.tcp.flags,
                                     get_random_u16 (), 0, tcpopts, tcpoptslen,
                                     o.extra_payload, o.extra_payload_length, &packetlen);
-            break;
-        case IPPROTO_UDP:
+        } else if (tp->probe.type == PS_UDP
+            || (tp->probe.type == PS_PROTO && tp->probe.proto == IPPROTO_UDP)) {
             packet = build_udp_raw (&source, &tp->ipdst, tp->ttl, get_random_u16 (),
                                     get_random_u8 (), false,
                                     NULL, 0, tp->sport,
-                                    tp->dport, o.extra_payload, o.extra_payload_length, &packetlen);
-            break;
-        case IPPROTO_ICMP:
+                                    tp->probe.pd.udp.dport, o.extra_payload, o.extra_payload_length, &packetlen);
+        } else if (tp->probe.type == PS_SCTP
+            || (tp->probe.type == PS_PROTO && tp->probe.proto == IPPROTO_SCTP)) {
+            struct sctp_chunkhdr_init chunk;
+            sctp_pack_chunkhdr_init(&chunk, SCTP_INIT, 0,
+                                    sizeof(struct sctp_chunkhdr_init),
+                                    get_random_u32()/*itag*/,
+                                    32768, 10, 2048,
+                                    get_random_u32()/*itsn*/);
+            packet = build_sctp_raw(&source, &tp->ipdst, tp->ttl,
+                                    get_random_u16(), get_random_u8(),
+                                    false, NULL, 0,
+                                    tp->sport, tp->probe.pd.sctp.dport,
+                                    0UL, (char*)&chunk,
+                                    sizeof(struct sctp_chunkhdr_init),
+                                    o.extra_payload, o.extra_payload_length,
+                                    &packetlen);
+        } else if (tp->probe.type == PS_ICMP
+            || (tp->probe.type == PS_PROTO && tp->probe.proto == IPPROTO_ICMP)) {
             packet = build_icmp_raw (&source, &tp->ipdst, tp->ttl, 0, 0, false,
-                                     NULL, 0, get_random_u16 (), tp->sport, scaninfo.icmp_type, 0,
+                                     NULL, 0, get_random_u16 (), tp->sport, tp->probe.pd.icmp.type, 0,
                                      o.extra_payload, o.extra_payload_length, &packetlen);
-            break;
-        default:
-            packet = build_ip_raw (&source, &tp->ipdst, tp->proto, tp->ttl, tp->sport,
-                                   get_random_u8 (), false, NULL, 0, o.extra_payload,
-                                   o.extra_payload_length, &packetlen);
+        } else if (tp->probe.type == PS_PROTO) {
+            packet = build_ip_raw(&source, &tp->ipdst, tp->probe.proto, tp->ttl,
+              tp->sport, get_random_u8 (), false, NULL, 0,
+              o.extra_payload, o.extra_payload_length, &packetlen);
+        } else {
+            fatal("Unknown probespec type %d in %s\n", tp->probe.type, __func__);
         }
         send_ip_packet (fd, ethptr, packet, packetlen);
         free (packet);
@@ -824,7 +739,7 @@ Traceroute::trace (vector < Target * >&Targets) {
     u16 total_size, total_complete;
 
     if (o.af () == AF_INET6) {
-        error ("Traceroute does not support ipv6\n");
+        error("Traceroute does not support ipv6");
         return;
     }
 
@@ -877,8 +792,8 @@ Traceroute::trace (vector < Target * >&Targets) {
             if (tg->getState () != G_OK || !tg->hopDistance)
                 continue;
 
-            tp = new TraceProbe (tg->proto, t->v4hostip ()->s_addr,
-                                 t->v4sourceip ()->s_addr, tg->sport, 0);
+            tp = new TraceProbe (t->v4hostip ()->s_addr,
+                                 t->v4sourceip ()->s_addr, tg->sport, tg->probe);
             sendProbe (tp);
         }
 
@@ -979,7 +894,6 @@ Traceroute::outputTarget (Target * t) {
     TraceGroup *tg = NULL;
     NmapOutputTable *Tbl = NULL;
 
-    struct protoent *proto;
     bool last_consolidation = false;
     bool common_consolidation = false;
     char row_count = 0;
@@ -1094,11 +1008,16 @@ Traceroute::outputTarget (Target * t) {
     }
 
     /* Traceroute header and footer */
-    proto = nmap_getprotbynum(htons(tg->proto));
-    if(o.ipprotscan || (o.pingscan && !(o.pingtype & PINGTYPE_TCP || o.pingtype & PINGTYPE_UDP))) 
-        log_write(LOG_PLAIN, "\nTRACEROUTE (using proto %d/%s)\n", tg->proto, proto?proto->p_name:"unknown");
-    else 
-        log_write(LOG_PLAIN, "\nTRACEROUTE (using port %d/%s)\n", tg->dport, proto2ascii(tg->proto));
+    if (tg->probe.type == PS_TCP) {
+        log_write(LOG_PLAIN, "\nTRACEROUTE (using port %d/%s)\n", tg->probe.pd.tcp.dport, proto2ascii(tg->probe.proto));
+    } else if (tg->probe.type == PS_UDP) {
+        log_write(LOG_PLAIN, "\nTRACEROUTE (using port %d/%s)\n", tg->probe.pd.udp.dport, proto2ascii(tg->probe.proto));
+    } else if (tg->probe.type == PS_SCTP) {
+        log_write(LOG_PLAIN, "\nTRACEROUTE (using port %d/%s)\n", tg->probe.pd.sctp.dport, proto2ascii(tg->probe.proto));
+    } else if (tg->probe.type == PS_ICMP || tg->probe.type == PS_PROTO) {
+        struct protoent *proto = nmap_getprotbynum(htons(tg->probe.proto));
+        log_write(LOG_PLAIN, "\nTRACEROUTE (using proto %d/%s)\n", tg->probe.proto, proto?proto->p_name:"unknown");
+    }
     log_write (LOG_PLAIN, "%s", Tbl->printableTable(NULL));
 
     if(G_TTL(tg->getState()))
@@ -1116,19 +1035,25 @@ Traceroute::outputXMLTrace(TraceGroup * tg) {
     map < u16, TraceProbe * >::const_iterator it;
     TraceProbe *tp = NULL;
     const char *hostname_tmp = NULL;
-    struct protoent *proto;
     struct in_addr addr;
     long timediff;
     short ttl_count;
 
     /* XML traceroute header */
     log_write(LOG_XML, "<trace ");
-    if ((o.pingscan && (o.pingtype & PINGTYPE_TCP || o.pingtype & PINGTYPE_UDP)) || (!o.ipprotscan && !o.pingscan))
-	log_write(LOG_XML, "port=\"%d\" ", tg->dport);
-    if((proto = nmap_getprotbynum(htons(tg->proto))))
-        log_write(LOG_XML, "proto=\"%s\"", proto->p_name);
-    else
-        log_write(LOG_XML, "proto=\"%d\"", tg->proto);
+    if (tg->probe.type == PS_TCP) {
+	log_write(LOG_XML, "port=\"%d\" ", tg->probe.pd.tcp.dport);
+    } else if (tg->probe.type == PS_UDP) {
+	log_write(LOG_XML, "port=\"%d\" ", tg->probe.pd.udp.dport);
+    } else if (tg->probe.type == PS_SCTP) {
+        log_write(LOG_XML, "port=\"%d\" ", tg->probe.pd.sctp.dport);
+    } else if (tg->probe.type == PS_ICMP || tg->probe.type == PS_PROTO) {
+        struct protoent *proto = nmap_getprotbynum(htons(tg->probe.proto));
+        if (proto == NULL)
+            log_write(LOG_XML, "proto=\"%d\"", tg->probe.proto);
+        else
+            log_write(LOG_XML, "proto=\"%s\"", proto->p_name);
+    }
     log_write(LOG_XML, ">\n");
 
     /* add missing hosts host from the common path */
@@ -1171,11 +1096,10 @@ Traceroute::outputXMLTrace(TraceGroup * tg) {
     log_flush(LOG_XML);
 } 
 
-TraceGroup::TraceGroup (u32 dip, u16 sport, u16 dport, u8 proto) {
+TraceGroup::TraceGroup (u32 dip, u16 sport, struct probespec& probe) {
     this->ipdst = dip;
-    this->dport = dport;
     this->sport = sport;
-    this->proto = proto;
+    this->probe = probe;
     ttl = 0;
     state = G_OK;
     remaining = 0;
@@ -1249,7 +1173,7 @@ TraceGroup::retransmissions (vector < TraceProbe * >&retrans) {
         if (droppedPackets > 10 && (droppedPackets /
                                     ((double) droppedPackets + repliedPackets) > threshold)) {
             if (!scanDelay)
-                scanDelay = (proto == IPPROTO_TCP) ? 5 : 50;
+                scanDelay = (probe.type == PS_TCP || probe.type == PS_SCTP) ? 5 : 50;
             else
                 scanDelay = MIN (scanDelay * 2, MAX (scanDelay, 800));
             droppedPackets = 0;
@@ -1335,10 +1259,9 @@ TraceGroup::setHopDistance (u8 hop_distance, u8 ttl) {
     return this->hopDistance;
 }
 
-TraceProbe::TraceProbe (u8 proto, u32 dip, u32 sip, u16 sport, u16 dport) {
-    this->proto = proto;
+TraceProbe::TraceProbe (u32 dip, u32 sip, u16 sport, struct probespec& probe) {
     this->sport = sport;
-    this->dport = dport;
+    this->probe = probe;
     ipdst.s_addr = dip;
     ipsrc.s_addr = sip;
     ipreplysrc.s_addr = 0;

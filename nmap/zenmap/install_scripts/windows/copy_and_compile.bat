@@ -1,30 +1,19 @@
 @echo off
 
 echo Setting installation variables...
-set PythonEXE=C:\Python25\python.exe
+set PythonEXE=C:\Python26\python.exe
 set DistDir=dist
+set LibraryDir=%DistDir%\py2exe
 set GTKDir=C:\GTK
-set WinInstallDir=install_scripts\windows
 set Output=win_install.log
-set UtilsDir=install_scripts\utils
 
 IF EXIST %PythonEXE% GOTO GGTK
-ECHO No Python 2.5 found!
+ECHO No Python 2.6 found!
 EXIT 1
 
 :GGTK
-IF EXIST %GTKDir% GOTO GWin
+IF EXIST %GTKDir% GOTO GWork
 ECHO No GTK found!
-EXIT 1
-
-:GWin
-IF EXIST %WinInstallDir% GOTO GUtils
-ECHO No Windows install scripts found!
-EXIT 1
-
-:GUtils
-IF EXIST %UtilsDir% GOTO GWork
-ECHO No utils directory found!
 EXIT 1
 
 :GWork
@@ -34,31 +23,22 @@ echo Writing output to %Output%
 echo Removing old compilation...
 IF EXIST %DistDir% rd %DistDir% /s /q > %Output%
 
-echo Creating dist and dist\share directories...
-mkdir %DistDir%\share
-mkdir %DistDir%\share\gtk-2.0
-mkdir %DistDir%\share\gtkthemeselector
-mkdir %DistDir%\share\themes
-mkdir %DistDir%\share\themes\Default
-mkdir %DistDir%\share\themes\MS-Windows
-mkdir %DistDir%\share\xml
+echo Creating dist directory tree...
+mkdir %LibraryDir%\etc
+mkdir %LibraryDir%\share
+mkdir %LibraryDir%\share\themes
+mkdir %LibraryDir%\lib
 
 
-echo Copying GTK's share to dist directory...
-xcopy %GTKDir%\share\gtk-2.0\*.* %DistDir%\share\gtk-2.0\ /S >> %Output%
-xcopy %GTKDir%\share\gtkthemeselector\*.* %DistDir%\share\gtkthemeselector\ /S >> %Output%
-xcopy %GTKDir%\share\themes\Default\*.* %DistDir%\share\themes\Default /S >> %Output%
-xcopy %GTKDir%\share\themes\MS-Windows\*.* %DistDir%\share\themes\MS-Windows /S >> %Output%
-xcopy %GTKDir%\share\xml\*.* %DistDir%\share\xml\ /S >> %Output%
-xcopy %GTKDir%\bin\*.dll %DistDir% /S >> %Output%
+echo Copying GTK files to dist directory...
+xcopy %GTKDir%\bin\*.dll %LibraryDir% /S >> %Output%
+xcopy %GTKDir%\etc %LibraryDir%\etc /S /I >> %Output%
+xcopy %GTKDir%\lib\gtk-2.0 %LibraryDir%\lib\gtk-2.0 /S /I >> %Output%
+xcopy %GTKDir%\share\themes\Default %LibraryDir%\share\themes\Default /S /I >> %Output%
+xcopy %GTKDir%\share\themes\MS-Windows %LibraryDir%\share\themes\MS-Windows /S /I >> %Output%
 
 echo Compiling using py2exe...
-%PythonEXE% -OO setup.py py2exe >> %Output%
-
-echo Copying some more GTK files to dist directory...
-xcopy %GTKDir%\lib %DistDir%\lib /S /I >> %Output%
-xcopy %GTKDir%\etc %DistDir%\etc /S /I >> %Output%
-
+%PythonEXE% setup.py py2exe >> %Output%
 
 echo Removing the build directory...
 rd build /s /q >> %Output%

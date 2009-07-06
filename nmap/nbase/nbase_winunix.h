@@ -4,7 +4,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -32,19 +32,10 @@
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
- * works of Nmap.  This list is not exclusive, but is just meant to        *
- * clarify our interpretation of derived works with some common examples.  *
- * These restrictions only apply when you actually redistribute Nmap.  For *
- * example, nothing stops you from writing and selling a proprietary       *
- * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://nmap.org to download Nmap.                                       *
- *                                                                         *
- * We don't consider these to be added restrictions on top of the GPL, but *
- * just a clarification of how we interpret "derived works" as it applies  *
- * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
- * Torvalds has announced his interpretation of how "derived works"        *
- * applies to Linux kernel modules.  Our interpretation refers only to     *
- * Nmap - we don't speak for any other GPL products.                       *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
  *                                                                         *
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
@@ -75,17 +66,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -96,21 +87,38 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_winunix.h 7641 2008-05-22 20:45:49Z fyodor $ */
+/* $Id: nbase_winunix.h 12956 2009-04-15 00:37:23Z fyodor $ */
 
 #ifndef NBASE_WINUNIX_H
 #define NBASE_WINUNIX_H
 
-#define _INC_ERRNO  /* supress errno.h */
+#include "nbase_winconfig.h"
+
+/* Define the earliest version of Windows we support.  These control
+   what parts of the Windows API are available. The available constants
+   are in <sdkddkver.h>.
+   http://msdn.microsoft.com/en-us/library/aa383745.aspx
+   http://blogs.msdn.com/oldnewthing/archive/2007/04/11/2079137.aspx */
+#undef _WIN32_WINNT
+#define _WIN32_WINNT _WIN32_WINNT_WIN2K
+#undef NTDDI_VERSION
+#define NTDDI_VERSION NTDDI_WIN2KSP4
+
+#define _INC_ERRNO  /* suppress errno.h */
 #define _ERRNO_H_ /* Also for errno.h suppresion */
 
-/* Supress winsock.h */
+/* Suppress winsock.h */
 #define _WINSOCKAPI_
 #define WIN32_LEAN_AND_MEAN
 
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h> /* IPv6 stuff */
+#if HAVE_WSPIAPI_H
+/* <wspiapi.h> is necessary for getaddrinfo before Windows XP, but it isn't
+   available on some platforms like MinGW. */
+#include <wspiapi.h>
+#endif
 #include <time.h>
 #include <iptypes.h>
 #include <stdlib.h>
@@ -124,24 +132,6 @@
 #include <WINCRYPT.H>
 #include <math.h>
 
-#ifndef HAVE_U_INT8_T
-#define HAVE_U_INT8_T
-typedef unsigned char u_int8_t;
-#endif
-
-#ifndef HAVE_U_INT16_T
-#define HAVE_U_INT16_T
-typedef unsigned short u_int16_t;
-#endif
-
-#ifndef HAVE_U_INT32_T
-#define HAVE_U_INT32_T
-typedef unsigned long u_int32_t;
-#endif
-
-#ifndef _SSIZE_T_
-typedef unsigned int ssize_t;
-#endif
 
 #define SIOCGIFCONF     0x8912          /* get iface list */
 
@@ -150,13 +140,7 @@ typedef unsigned int ssize_t;
 
 #endif
 
-/* Disables VC++ warning:
-  "integral size mismatch in argument; conversion supplied".  Perhaps
-  I should try to fix this with casts at some point */
-/* #pragma warning(disable: 4761) */
-
 #define munmap(ptr, len) win32_munmap(ptr, len)
-int nmapwin_isroot();
 
 /* Windows error message names */
 #define ECONNABORTED    WSAECONNABORTED
@@ -164,6 +148,7 @@ int nmapwin_isroot();
 #define ECONNREFUSED    WSAECONNREFUSED
 #undef  EAGAIN
 #define EAGAIN		WSAEWOULDBLOCK
+#define EWOULDBLOCK	WSAEWOULDBLOCK
 #define EHOSTUNREACH	WSAEHOSTUNREACH
 #define ENETDOWN	WSAENETDOWN
 #define ENETUNREACH	WSAENETUNREACH
@@ -190,15 +175,11 @@ int nmapwin_isroot();
 #undef  EIO
 #define EIO             WSASYSCALLFAILURE
 
-#define close(x) my_close(x)
-/* #define read(x,y,z) recv(x,(char*)(y),z,0) */
-
-#ifdef __cplusplus
-  extern "C" int my_close(int sd);
-#else
-  int my_close(int sd);
-#endif
+#define close(x) closesocket(x)
 
 typedef unsigned short u_short_t;
+
+int win_stdin_start_thread(void);
+int win_stdin_ready(void);
 
 #endif /* NBASE_WINUNIX_H */

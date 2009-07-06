@@ -51,12 +51,15 @@ class UmitConfigParser(ConfigParser):
     def save_changes(self):
         if self.filenames:
             filename = None
-            if type(self.filenames) == type(""):
+            if isinstance(self.filenames, basestring):
                 filename = self.filenames
-            elif type(self.filenames) == type([]) and len(self.filenames) == 1:
-                filename = self.filenames[0]
+            elif isinstance(self.filenames, list):
+                if len(self.filenames) == 1:
+                    filename = self.filenames[0]
+                else:
+                    raise ValueError("UmitConfigParser can't handle a list of filenames: %s" % self.filenames)
             else:
-                raise Exception("Wrong filename %s" % self.filenames)
+                raise ValueError("UmitConfigParser can't handle a filename of type %s: %s" % (type(self.filenames), self.filenames))
             self.write(open(filename, 'w'))
         elif self.fp:
             self.write(self.fp)
@@ -90,13 +93,6 @@ def test_umit_conf_content(filename):
 
     # Paths section
     section = "paths"
-    assert exists(get_or_false(parser, section, "config_file") or "")
-    assert exists(get_or_false(parser, section, "locale_dir") or "")
-    assert exists(get_or_false(parser, section, "misc_dir") or "")
-    assert exists(get_or_false(parser, section, "icons_dir") or "")
-    assert exists(get_or_false(parser, section, "pixmaps_dir") or "")
-    assert exists(get_or_false(parser, section, "config_dir") or "")
-    assert exists(get_or_false(parser, section, "docs_dir") or "")
     assert get_or_false(parser, section, "nmap_command_path")
 
 

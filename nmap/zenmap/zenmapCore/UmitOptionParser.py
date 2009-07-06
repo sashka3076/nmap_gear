@@ -23,7 +23,7 @@ import re
 
 from optparse import OptionParser
 from zenmapCore.Name import APP_NAME, NMAP_DISPLAY_NAME
-from zenmapCore.I18N import _
+import zenmapCore.I18N
 
 protocol_re = re.compile("^(%s|scan|nmap)://.*" % re.escape(APP_NAME))
 
@@ -35,7 +35,7 @@ class UmitOptionParser(OptionParser):
 
         ## Open Scan Results (GUI)
         ### Run, opening the specified scan result file, which should be
-        ### a nmap XML output or an usr (Umit Scan Result) xml file.
+        ### a nmap XML output file.
         ### This option should be verified if there is no options, and user
         ### specified some positional arguments, which should be considered as
         ### scan result files.
@@ -89,63 +89,6 @@ used more than once to get even more verbosity"))
             self.options, self.args = self.parse_args(args)
         else:
             self.options, self.args = self.parse_args()
-
-        # The following options were present but not implemented in Umit.
-
-        ## Network Inventory (GUI)
-        ### This option should raise the Network Inventory window 
-        ### with the last used inventory
-        # self.add_option("-i", "--inventory", 
-        #                 default=False,
-        #                 action="store_true",
-        #                 help=_("*NOT IMPLEMENTED* - Begin at the Network Inventory window."))
-
-        ## Compare results in compare mode (GUI)
-        ### Run the diff compare window in compare mode as default
-        # self.add_option("-c", "--compare",
-        #                 action="store",
-        #                 nargs=2,
-        #                 help=_("*NOT IMPLEMENTED* - Open the diff compare \
-        # window, in compare mode comparing the two given scan result files \
-        # (Nmap XML output or usr (Umit Scan Result) file)."))
-
-        ## Compare results in text mode (GUI)
-        ### Run the diff compare window in text mode as default
-        # self.add_option("-e", "--compare-text",
-        #                 action="store",
-        #                 nargs=2,
-        #                 help=_("*NOT IMPLEMENTED* - Open the diff compare \
-        # window, in text mode comparing the two given scan result files (Nmap XML \
-        # output or usr, Umit Scan Result)."))
-
-        ## Compare results showing text diff in terminal (TEXT)
-        ### Doesn't actually run interface. Just take the result files,
-        ### generate the text diff and send it back to terminal
-        # self.add_option("-d", "--diff",
-        #                 action="store",
-        #                 nargs=2,
-        #                 help=_("*NOT IMPLEMENTED* - Take two scan result files \
-        # (Nmap XML output or usr, Umit Scan Result), make a text diff and print it in \
-        # the terminal without opening the graphical interface."))
-
-        ## NSE Facilitator (GUI)
-        ### Opens and go straigh to NSE Facilitator interface.
-        ### If a positional argument is given, it can be an nse script which
-        ### should be opened by the NSE Facilitator interface
-        # self.add_option("-s", "--nse-facilitator",
-        #                 default=False,
-        #                 action="store_true",
-        #                 help=_("*NOT IMPLEMENTED* - Begin at the \
-        # NSE Facilitator Interface. You may specify nse scripts as arguments \
-        # if you want use them."))
-
-        ## Open a give file, showing it at mapper (GUI)
-        ### Specify a scan file result to open at mapper
-        # self.add_option("-m", "--mapper",
-        #                 default=False,
-        #                 action="store",
-        #                 help=_("*NOT IMPLEMENTED* - Open, showing the \
-        # given file in the Mapper"))
 
     def __nmap_callback(self, option, opt_str, value, parser):
         nmap_args = []

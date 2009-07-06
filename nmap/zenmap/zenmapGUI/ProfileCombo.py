@@ -22,7 +22,7 @@
 import gtk
 
 from zenmapCore.UmitConf import CommandProfile
-from zenmapCore.I18N import _
+import zenmapCore.I18N
 
 class ProfileCombo(gtk.ComboBoxEntry, object):
     def __init__(self):

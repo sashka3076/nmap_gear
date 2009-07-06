@@ -11,8 +11,7 @@ Introduction
    for advanced users and easy to be used by newbies. With Zenmap, a
    network admin can create scan profiles for faster and easier network
    scanning and even compare scan results to easily see any changes. New
-   users can also construct powerful scans with Zenmap command creator
-   wizard.
+   users can also construct powerful scans with Zenmap profile editor.
 
 Installation
 
@@ -40,7 +39,6 @@ Default (source) Installation
      * [3]PyGTK 2.6 or higher
      * [4]Nmap itself and its requirements
      * [5]PySQLite2
-     * [10]Psyco (optional)
 
    Zenmap's source package are provided in such a way that, if you have
    all the required software, it will run 'out-of-the-tarball'. To run
@@ -61,4 +59,3 @@ Links:
 [4] Nmap official website - http://nmap.org
 [5] PySQLite2 official website - http://initd.org/tracker/pysqlite
 [7] Umit website - http://umit.sourceforge.net
-[10] Pysco website - http://psyco.sourceforge.net

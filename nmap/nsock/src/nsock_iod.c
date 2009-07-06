@@ -7,7 +7,7 @@
  *                                                                         *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
- * The nsock parallel socket event library is (C) 1999-2008 Insecure.Com   *
+ * The nsock parallel socket event library is (C) 1999-2009 Insecure.Com   *
  * LLC This library is free software; you may redistribute and/or          *
  * modify it under the terms of the GNU General Public License as          *
  * published by the Free Software Foundation; Version 2.  This guarantees  *
@@ -36,17 +36,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
- * insecure.org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * Insecure.Org development mailing lists, it is assumed that you are      *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -56,7 +56,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_iod.c 7327 2008-05-05 04:10:20Z fyodor $ */
+/* $Id: nsock_iod.c 13448 2009-05-29 23:19:07Z david $ */
 
 #include "nsock.h"
 #include "nsock_internal.h"
@@ -81,9 +81,9 @@ nsock_iod nsi_new(nsock_pool nsockp, void *userdata) {
 /* This version allows you to associate an existing sd with the msi
    so that you can read/write it using the nsock infrastructure.  For example,
    you may want to watch for data from STDIN_FILENO at the same time as you
-   read/wrtie various sockets. Ths sd is dup()ed, so you may close or
-   otherwise manipulate your copy.  The duped copy will be destroyed when the
-   nsi is destroyed 
+   read/write various sockets.  STDIN_FILENO is a special case, however. Any
+   other sd is dup()ed, so you may close or otherwise manipulate your copy.
+   The duped copy will be destroyed when the nsi is destroyed
 */
 nsock_iod nsi_new2(nsock_pool nsockp, int sd, void *userdata) {
   mspool *nsp = (mspool *) nsockp;
@@ -97,19 +97,29 @@ nsock_iod nsi_new2(nsock_pool nsockp, int sd, void *userdata) {
   if (sd == -1) {  
     nsi->sd = -1;
     nsi->state = NSIOD_STATE_INITIAL;
+  } else if (sd == STDIN_FILENO) {
+    nsi->sd = STDIN_FILENO;
+    nsi->state = NSIOD_STATE_UNKNOWN;
   } else {
     nsi->sd = dup(sd);
     if (nsi->sd == -1) {
       free(nsi);
       return NULL;
     }
-    nsock_unblock_socket(nsi->sd);
+    unblock_socket(nsi->sd);
     nsi->state = NSIOD_STATE_UNKNOWN;
   }
+
+  nsi->locallen = 0;
     
   nsi->userdata = userdata;
   nsi->nsp = (mspool *) nsockp;
   nsi->events_pending = 0;
+  nsi->readsd_count = 0;
+  nsi->writesd_count = 0;
+
+  nsi->ipopts = NULL;
+  nsi->ipoptslen = 0;
 
 #if HAVE_OPENSSL
   nsi->ssl_session = NULL;
@@ -203,13 +213,16 @@ void nsi_delete(nsock_iod nsockiod, int pending_response) {
   }
 #endif
 
-  if (nsi->sd >= 0) {
+  if (nsi->sd >= 0 && nsi->sd != STDIN_FILENO) {
     close(nsi->sd);
     nsi->sd = -1;
   }
 
   nsi->state = NSIOD_STATE_DELETED;
   nsi->userdata = NULL;
+
+  if (nsi->ipoptslen)
+    free(nsi->ipopts);
 
 #if HAVE_PCAP
   if(nsi->pcap){
@@ -243,6 +256,14 @@ unsigned long nsi_id(nsock_iod nsockiod) {
   return ((msiod *)nsockiod)->id;
 }
 
+/* Returns the SSL object inside an nsock_iod, or NULL if unset. */
+nsock_ssl nsi_getssl(nsock_iod nsockiod) {
+#if HAVE_OPENSSL
+  return ((msiod *)nsockiod)->ssl;
+#else
+  return NULL;
+#endif
+}
 
 /* Returns the SSL_SESSION of an nsock_iod, and increments it's usage count */
 nsock_ssl_session nsi_get1_ssl_session(nsock_iod nsockiod) {
@@ -296,7 +317,8 @@ int nsi_checkssl(nsock_iod nsockiod) {
 /* Returns the remote peer port (or -1 if unavailable).  Note the
    return value is a whole int so that -1 can be distinguished from
    65535.  Port is returned in host byte order. */
-int nsi_peerport(msiod *nsi) {
+int nsi_peerport(nsock_iod nsockiod) {
+  msiod *nsi = (msiod *) nsockiod;
   int fam;
   if (nsi->peerlen <= 0)
     return -1;
@@ -311,6 +333,40 @@ int nsi_peerport(msiod *nsi) {
 #endif
 
   return -1;
+}
+
+/* Sets the local address to bind to before connect() */
+int nsi_set_localaddr(nsock_iod nsi, struct sockaddr_storage *ss, size_t sslen)
+{
+	msiod *iod = (msiod *) nsi;
+
+	assert(iod);
+
+	if (sslen > sizeof(iod->local))
+		return -1;
+
+	memcpy(&iod->local, ss, sslen);
+	iod->locallen = sslen;
+	return 0;
+}
+
+/* Sets IPv4 options to apply before connect().  It makes a copy of the 
+ * options, so you can free() yours if necessary.  This copy is freed
+ * when the iod is destroyed
+ */
+int nsi_set_ipoptions(nsock_iod nsi, void *opts, size_t optslen)
+{
+	msiod *iod = (msiod *) nsi;
+
+	assert(iod);
+
+	if (optslen > 44)
+		return -1;
+
+	iod->ipopts = safe_malloc(optslen);
+	memcpy(iod->ipopts, opts, optslen);
+	iod->ipoptslen = optslen;
+	return 0;
 }
 
 /* I didn't want to do this.  Its an ugly hack, but I suspect it will

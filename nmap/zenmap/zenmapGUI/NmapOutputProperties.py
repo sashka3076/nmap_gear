@@ -23,15 +23,15 @@ import gtk
 import gtk.gdk
 import pango
 
-from zenmapCore.I18N import _
+import zenmapCore.I18N
 from zenmapCore.UmitConf import NmapOutputHighlight
 
-from higwidgets.higdialogs import HIGDialog
-from higwidgets.hignotebooks import HIGNotebook
-from higwidgets.higboxes import HIGVBox
-from higwidgets.higtables import HIGTable
-from higwidgets.higlabels import HIGEntryLabel
-from higwidgets.higbuttons import HIGButton, HIGToggleButton
+from zenmapGUI.higwidgets.higdialogs import HIGDialog
+from zenmapGUI.higwidgets.hignotebooks import HIGNotebook
+from zenmapGUI.higwidgets.higboxes import HIGVBox
+from zenmapGUI.higwidgets.higtables import HIGTable
+from zenmapGUI.higwidgets.higlabels import HIGEntryLabel
+from zenmapGUI.higwidgets.higbuttons import HIGButton, HIGToggleButton
 
 class NmapOutputProperties(HIGDialog):
     def __init__(self, nmap_output_view):

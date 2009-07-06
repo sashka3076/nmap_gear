@@ -19,7 +19,14 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
-import md5
+import sys
+
+try:
+    import hashlib
+    md5 = hashlib.md5
+except ImportError:
+    import md5
+    md5 = md5.new
 
 sqlite = None
 try:
@@ -45,7 +52,7 @@ except:
     import os.path
     from BasePaths import base_paths
     
-    umitdb = os.path.join(Path.config_dir, base_paths["db"])
+    umitdb = os.path.join(Path.user_config_dir, base_paths["db"])
     Path.db = umitdb
 
 
@@ -61,7 +68,28 @@ if not exists(umitdb) or \
     umitdb = ":memory:"
     using_memory = True
 
+if isinstance(umitdb, str):
+    fs_enc = sys.getfilesystemencoding()
+    if fs_enc is None:
+        fs_enc = "UTF-8"
+    umitdb = umitdb.decode(fs_enc)
+
+# pyslite 2.4.0 doesn't handle a unicode database name, though earlier and later
+# versions do. Encode to UTF-8 as pysqlite would do internally anyway.
+umitdb = umitdb.encode("UTF-8")
+
 connection = sqlite.connect(umitdb)
+
+# By default pysqlite will raise an OperationalError when trying to return a
+# TEXT data type that is not UTF-8 (it always tries to decode text in order to
+# return a unicdoe object). We store XML in the database, which may have a
+# different encoding, so instruct pysqlite to return a plain str for TEXT data
+# types, and not to attempt any decoding.
+try:
+    connection.text_factory = str
+except AttributeError:
+    # However, text_factory is available only in pysqlite 2.1.0 and later.
+    pass
 
 class Table(object):
     def __init__(self, table_name):
@@ -186,7 +214,7 @@ class Scans(Table, object):
             if "nmap_xml_output" not in kargs.keys() or not kargs["nmap_xml_output"]:
                 raise Exception("Can't save result without xml output")
 
-            if not self.verify_digest(md5.new(kargs["nmap_xml_output"]).hexdigest()):
+            if not self.verify_digest(md5(kargs["nmap_xml_output"]).hexdigest()):
                 raise Exception("XML output registered already!")
             
             self.scans_id = self.insert(**kargs)
@@ -229,7 +257,7 @@ class Scans(Table, object):
 
     def set_nmap_xml_output(self, nmap_xml_output):
         self.set_item("nmap_xml_output", nmap_xml_output)
-        self.set_item("digest", md5.new(nmap_xml_output).hexdigest())
+        self.set_item("digest", md5(nmap_xml_output).hexdigest())
 
     def get_date(self):
         return self.get_item("date")
@@ -264,8 +292,6 @@ verify_db()
 
 if __name__ == "__main__":
     from pprint import pprint
-    import psyco
-    psyco.profile()
     
     u = UmitDB()
 

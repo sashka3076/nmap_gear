@@ -6,7 +6,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -34,19 +34,10 @@
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
- * works of Nmap.  This list is not exclusive, but is just meant to        *
- * clarify our interpretation of derived works with some common examples.  *
- * These restrictions only apply when you actually redistribute Nmap.  For *
- * example, nothing stops you from writing and selling a proprietary       *
- * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://nmap.org to download Nmap.                                       *
- *                                                                         *
- * We don't consider these to be added restrictions on top of the GPL, but *
- * just a clarification of how we interpret "derived works" as it applies  *
- * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
- * Torvalds has announced his interpretation of how "derived works"        *
- * applies to Linux kernel modules.  Our interpretation refers only to     *
- * Nmap - we don't speak for any other GPL products.                       *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
  *                                                                         *
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
@@ -77,17 +68,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -98,7 +89,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: service_scan.cc 7752 2008-05-29 07:49:37Z michael $ */
+/* $Id: service_scan.cc 13888 2009-06-24 21:35:54Z fyodor $ */
 
 
 #include "service_scan.h"
@@ -107,6 +98,7 @@
 #include "nsock.h"
 #include "Target.h"
 #include "utils.h"
+#include "protocols.h"
 
 #include "nmap_tty.h"
 
@@ -164,10 +156,10 @@ public:
   // is placed in these 6 strings.  Otherwise the string will be 0 length.
   char product_matched[80];
   char version_matched[80];
-  char extrainfo_matched[128];
-  char hostname_matched[128];
-  char ostype_matched[64];
-  char devicetype_matched[64];
+  char extrainfo_matched[256];
+  char hostname_matched[80];
+  char ostype_matched[32];
+  char devicetype_matched[32];
   enum service_tunnel_type tunnel; /* SERVICE_TUNNEL_NONE, SERVICE_TUNNEL_SSL */
   // This stores our SSL session id, which will help speed up subsequent
   // SSL connections.  It's overwritten each time.  void* is used so we don't
@@ -454,7 +446,7 @@ const struct MatchDetails *ServiceProbeMatch::testMatch(const u8 *buf, int bufle
   int i;
   static char product[80];
   static char version[80];
-  static char info[128];
+  static char info[256];  /* We will truncate with ... later */
   static char hostname[80];
   static char ostype[32];
   static char devicetype[32];
@@ -779,8 +771,10 @@ int ServiceProbeMatch::getVersionStr(const u8 *subject, int subjectlen,
   if (product_template) {
     rc = dotmplsubst(subject, subjectlen, ovector, nummatches, product_template, product, productlen);
     if (rc != 0) {
-      error("Warning: Servicescan failed to fill product_template (subjectlen: %d). Too long? Match string was line %d: v/%s/%s/%s", subjectlen, deflineno, (product_template)? product_template : "",
-	    (version_template)? version_template : "", (info_template)? info_template : "");
+      error("Warning: Servicescan failed to fill product_template (subjectlen: %d, productlen: %d). Capture exceeds length? Match string was line %d: v/%s/%s/%s", subjectlen, productlen, deflineno,
+	    (product_template)? product_template : "",
+	    (version_template)? version_template : "",
+	    (info_template)? info_template : "");
       if (productlen > 0) *product = '\0';
       retval = -1;
     }
@@ -789,8 +783,10 @@ int ServiceProbeMatch::getVersionStr(const u8 *subject, int subjectlen,
   if (version_template) {
     rc = dotmplsubst(subject, subjectlen, ovector, nummatches, version_template, version, versionlen);
     if (rc != 0) {
-      error("Warning: Servicescan failed to fill version_template (subjectlen: %d). Too long? Match string was line %d: v/%s/%s/%s", subjectlen, deflineno, (product_template)? product_template : "",
-	    (version_template)? version_template : "", (info_template)? info_template : "");
+      error("Warning: Servicescan failed to fill version_template (subjectlen: %d, versionlen: %d). Capture exceeds length? Match string was line %d: v/%s/%s/%s", subjectlen, versionlen, deflineno,
+	    (product_template)? product_template : "",
+	    (version_template)? version_template : "",
+	    (info_template)? info_template : "");
       if (versionlen > 0) *version = '\0';
       retval = -1;
     }
@@ -799,8 +795,10 @@ int ServiceProbeMatch::getVersionStr(const u8 *subject, int subjectlen,
   if (info_template) {
     rc = dotmplsubst(subject, subjectlen, ovector, nummatches, info_template, info, infolen);
     if (rc != 0) {
-      error("Warning: Servicescan failed to fill info_template (subjectlen: %d). Too long? Match string was line %d: v/%s/%s/%s", subjectlen, deflineno, (product_template)? product_template : "",
-	    (version_template)? version_template : "", (info_template)? info_template : "");
+      error("Warning: Servicescan failed to fill info_template (subjectlen: %d, infolen: %d). Capture exceeds length? Match string was line %d: v/%s/%s/%s", subjectlen, infolen, deflineno,
+	    (product_template)? product_template : "",
+	    (version_template)? version_template : "",
+	    (info_template)? info_template : "");
       if (infolen > 0) *info = '\0';
       retval = -1;
     }
@@ -809,7 +807,8 @@ int ServiceProbeMatch::getVersionStr(const u8 *subject, int subjectlen,
   if (hostname_template) {
     rc = dotmplsubst(subject, subjectlen, ovector, nummatches, hostname_template, hostname, hostnamelen);
     if (rc != 0) {
-      error("Warning: Servicescan failed to fill hostname_template (subjectlen: %d). Too long? Match string was line %d: h/%s/", subjectlen, deflineno, (hostname_template)? hostname_template : "");
+      error("Warning: Servicescan failed to fill hostname_template (subjectlen: %d, hostnamelen: %d). Capture exceeds length? Match string was line %d: h/%s/", subjectlen, hostnamelen, deflineno,
+	    (hostname_template)? hostname_template : "");
       if (hostnamelen > 0) *hostname = '\0';
       retval = -1;
     }
@@ -818,7 +817,8 @@ int ServiceProbeMatch::getVersionStr(const u8 *subject, int subjectlen,
   if (ostype_template) {
     rc = dotmplsubst(subject, subjectlen, ovector, nummatches, ostype_template, ostype, ostypelen);
     if (rc != 0) {
-      error("Warning: Servicescan failed to fill ostype_template (subjectlen: %d). Too long? Match string was line %d: p/%s/", subjectlen, deflineno, (ostype_template)? ostype_template : "");
+      error("Warning: Servicescan failed to fill ostype_template (subjectlen: %d, ostypelen: %d). Capture exceeds length? Match string was line %d: p/%s/", subjectlen, ostypelen, deflineno,
+	    (ostype_template)? ostype_template : "");
       if (ostypelen > 0) *ostype = '\0';
       retval = -1;
     }
@@ -827,7 +827,8 @@ int ServiceProbeMatch::getVersionStr(const u8 *subject, int subjectlen,
   if (devicetype_template) {
     rc = dotmplsubst(subject, subjectlen, ovector, nummatches, devicetype_template, devicetype, devicetypelen);
     if (rc != 0) {
-      error("Warning: Servicescan failed to fill devicetype_template (subjectlen: %d). Too long? Match string was line %d: d/%s/", subjectlen, deflineno, (devicetype_template)? devicetype_template : "");
+      error("Warning: Servicescan failed to fill devicetype_template (subjectlen: %d, devicetypelen: %d). Too long? Match string was line %d: d/%s/", subjectlen, devicetypelen, deflineno,
+	    (devicetype_template)? devicetype_template : "");
       if (devicetypelen > 0) *devicetype = '\0';
       retval = -1;
     }
@@ -1244,6 +1245,9 @@ int AllProbes::isExcluded(unsigned short port, int proto) {
   } else if (proto == IPPROTO_UDP) {
     p = excludedports.udp_ports;
     count = excludedports.udp_count;
+  } else if (proto == IPPROTO_SCTP) {
+    p = excludedports.sctp_ports;
+    count = excludedports.sctp_count;
   } else {
     fatal("Bad proto number (%d) specified in %s", proto, __func__);
   }
@@ -1630,7 +1634,7 @@ ServiceGroup::ServiceGroup(vector<Target *> &Targets, AllProbes *AP) {
       num_hosts_timedout++;
       continue;
     }
-    while((nxtport = Targets[targetno]->ports.nextPort(nxtport, TCPANDUDP, PORT_OPEN))) {
+    while((nxtport = Targets[targetno]->ports.nextPort(nxtport, TCPANDUDPANDSCTP, PORT_OPEN))) {
       svc = new ServiceNFO(AP);
       svc->target = Targets[targetno];
       svc->portno = nxtport->portno;
@@ -1648,7 +1652,7 @@ ServiceGroup::ServiceGroup(vector<Target *> &Targets, AllProbes *AP) {
     if (Targets[targetno]->timedOut(&now)) {
       continue;
     }
-    while((nxtport = Targets[targetno]->ports.nextPort(nxtport, TCPANDUDP, PORT_OPENFILTERED))) {
+    while((nxtport = Targets[targetno]->ports.nextPort(nxtport, TCPANDUDPANDSCTP, PORT_OPENFILTERED))) {
       svc = new ServiceNFO(AP);
       svc->target = Targets[targetno];
       svc->portno = nxtport->portno;
@@ -1663,7 +1667,7 @@ ServiceGroup::ServiceGroup(vector<Target *> &Targets, AllProbes *AP) {
   if (o.timing_level == 3) desired_par = 10;
   if (o.timing_level == 4) desired_par = 15;
   if (o.timing_level >= 5) desired_par = 20;
-  // TODO: Come up with better ways to determine ideal_services
+  // TODO: Come up with better ways to determine ideal_parallelism
   ideal_parallelism = box(o.min_parallelism, o.max_parallelism? o.max_parallelism : 100, desired_par);
 }
 
@@ -1714,6 +1718,11 @@ static void adjustPortStateIfNeccessary(ServiceNFO *svc) {
 			     ServiceProbe *probe) {
     const u8 *probestring;
     int probestringlen;
+
+    // Report data as probes are sent if --version-trace has been requested 
+    if (o.debugging > 1 || o.versionTrace()) {
+      log_write(LOG_PLAIN, "Service scan sending probe %s to %s:%hu (%s)\n", probe->getName(), svc->target->targetipstr(), svc->portno, proto2ascii(svc->proto));
+    }	
 
     assert(probe);
     if (probe->isNullProbe())
@@ -1766,6 +1775,12 @@ static void startNextProbe(nsock_pool nsp, nsock_iod nsi, ServiceGroup *SG,
 	if ((svc->niod = nsi_new(nsp, svc)) == NULL) {
 	  fatal("Failed to allocate Nsock I/O descriptor in %s()", __func__);
 	}
+	if (o.spoofsource) {
+	  o.SourceSockAddr(&ss, &ss_len);
+	  nsi_set_localaddr(svc->niod, &ss, ss_len);
+	}
+	if (o.ipoptionslen)
+	  nsi_set_ipoptions(svc->niod, o.ipoptions, o.ipoptionslen);
 	svc->target->TargetSockAddr(&ss, &ss_len);
 	if (svc->tunnel == SERVICE_TUNNEL_NONE) {
 	  nsock_connect_tcp(nsp, svc->niod, servicescan_connect_handler, 
@@ -1832,7 +1847,7 @@ static int scanThroughTunnel(nsock_pool nsp, nsock_iod nsi, ServiceGroup *SG,
     return 0; // Not SSL
 
   // Alright!  We are going to start the tests over using SSL
-  // printf("DBG: Found SSL service on %s:%hi - starting SSL scan\n", svc->target->NameIP(), svc->portno);
+  // printf("DBG: Found SSL service on %s:%hu - starting SSL scan\n", svc->target->NameIP(), svc->portno);
   svc->tunnel = SERVICE_TUNNEL_SSL;
   svc->probe_matched = NULL;
   svc->product_matched[0] = svc->version_matched[0] = svc->extrainfo_matched[0] = '\0';
@@ -1859,7 +1874,7 @@ static void considerPrintingStats(ServiceGroup *SG) {
   /* Perhaps this should be made more complex, but I suppose it should be
      good enough for now. */
   if (SG->SPM->mayBePrinted(nsock_gettimeofday())) {
-    SG->SPM->printStatsIfNeccessary(SG->services_finished.size() / ((double)SG->services_remaining.size() + SG->services_in_progress.size() + SG->services_finished.size()), nsock_gettimeofday());
+    SG->SPM->printStatsIfNecessary(SG->services_finished.size() / ((double)SG->services_remaining.size() + SG->services_in_progress.size() + SG->services_finished.size()), nsock_gettimeofday());
   }
 }
 
@@ -1962,8 +1977,14 @@ static int launchSomeServiceProbes(nsock_pool nsp, ServiceGroup *SG) {
       fatal("Failed to allocate Nsock I/O descriptor in %s()", __func__);
     }
     if (o.debugging > 1) {
-      log_write(LOG_PLAIN, "Starting probes against new service: %s:%hi (%s)\n", svc->target->targetipstr(), svc->portno, proto2ascii(svc->proto));
+      log_write(LOG_PLAIN, "Starting probes against new service: %s:%hu (%s)\n", svc->target->targetipstr(), svc->portno, proto2ascii(svc->proto));
     }
+    if (o.spoofsource) {
+      o.SourceSockAddr(&ss, &ss_len);
+      nsi_set_localaddr(svc->niod, &ss, ss_len);
+    }
+    if (o.ipoptionslen)
+      nsi_set_ipoptions(svc->niod, o.ipoptions, o.ipoptionslen);
     svc->target->TargetSockAddr(&ss, &ss_len);
     if (svc->proto == IPPROTO_TCP)
       nsock_connect_tcp(nsp, svc->niod, servicescan_connect_handler, 
@@ -2128,20 +2149,20 @@ static void servicescan_read_handler(nsock_pool nsp, nsock_event nse, void *myda
       // WOO HOO!!!!!!  MATCHED!  But might be soft
       if (MD->isSoft && svc->probe_matched) {
 	if (strcmp(svc->probe_matched, MD->serviceName) != 0)
-	  error("WARNING:  service %s:%hi had allready soft-matched %s, but now soft-matched %s; ignoring second value", svc->target->NameIP(), svc->portno, svc->probe_matched, MD->serviceName);
+	  error("WARNING:  service %s:%hu had already soft-matched %s, but now soft-matched %s; ignoring second value", svc->target->NameIP(), svc->portno, svc->probe_matched, MD->serviceName);
 	// No error if its the same - that happens frequently.  For
 	// example, if we read more data for the same probe response
 	// it will probably still match.
       } else {
-	if (o.debugging > 1) {
+	if (o.debugging > 1 || o.versionTrace()) {
 	  if (MD->product || MD->version || MD->info)
-	    log_write(LOG_PLAIN, "Service scan match (Probe %s matched with %s): %s:%hi is %s%s.  Version: |%s|%s|%s|\n",
+	    log_write(LOG_PLAIN, "Service scan match (Probe %s matched with %s): %s:%hu is %s%s.  Version: |%s|%s|%s|\n",
                       probe->getName(), (*probe->fallbacks[fallbackDepth]).getName(),
 		      svc->target->NameIP(), svc->portno, (svc->tunnel == SERVICE_TUNNEL_SSL)? "SSL/" : "", 
 		      MD->serviceName, (MD->product)? MD->product : "", (MD->version)? MD->version : "", 
 		      (MD->info)? MD->info : "");
 	  else
-	    log_write(LOG_PLAIN, "Service scan %s match (Probe %s matched with %s): %s:%hi is %s%s\n",
+	    log_write(LOG_PLAIN, "Service scan %s match (Probe %s matched with %s): %s:%hu is %s%s\n",
                       (MD->isSoft)? "soft" : "hard",
                       probe->getName(), (*probe->fallbacks[fallbackDepth]).getName(),
 		      svc->target->NameIP(), svc->portno, (svc->tunnel == SERVICE_TUNNEL_SSL)? "SSL/" : "", MD->serviceName);
@@ -2298,7 +2319,6 @@ list<ServiceNFO *>::iterator svc;
 					  *(*svc)->devicetype_matched? (*svc)->devicetype_matched : NULL, 
 					  shouldWePrintFingerprint(*svc) ? (*svc)->getServiceFingerprint(NULL) : NULL);
    }  else {
-     if ((*svc)->getServiceFingerprint(NULL))
        (*svc)->port->setServiceProbeResults((*svc)->probe_state, NULL,
 					    (*svc)->tunnel, NULL, NULL, NULL, NULL, NULL, NULL,
 					    (*svc)->getServiceFingerprint(NULL));
@@ -2339,7 +2359,8 @@ static void remove_excluded_ports(AllProbes *AP, ServiceGroup *SG) {
     svc = *i;
     if (AP->isExcluded(svc->portno, svc->proto)) {
 
-      if (o.debugging) log_write(LOG_PLAIN, "EXCLUDING %d/%s\n", svc->portno, svc->proto==IPPROTO_TCP ? "tcp" : "udp");
+      if (o.debugging) log_write(LOG_PLAIN, "EXCLUDING %d/%s\n", svc->portno,
+          IPPROTO2STR(svc->proto));
 
       svc->port->setServiceProbeResults(PROBESTATE_EXCLUDED, NULL, 
 					SERVICE_TUNNEL_NONE,
@@ -2411,8 +2432,13 @@ int service_scan(vector<Target *> &Targets) {
   }
 
   if (o.versionTrace()) {
-    nsp_settrace(nsp, 5, o.getStartTime());
+    nsp_settrace(nsp, NSOCK_TRACE_LEVEL, o.getStartTime());
   }
+
+#if HAVE_OPENSSL
+  /* We don't care about connection security in version detection. */
+  nsp_ssl_init_max_speed(nsp);
+#endif
 
   launchSomeServiceProbes(nsp, SG);
 

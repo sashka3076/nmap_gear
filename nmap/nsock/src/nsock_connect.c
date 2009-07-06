@@ -4,7 +4,7 @@
  * connections from the nsock parallel socket event library                *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
- * The nsock parallel socket event library is (C) 1999-2008 Insecure.Com   *
+ * The nsock parallel socket event library is (C) 1999-2009 Insecure.Com   *
  * LLC This library is free software; you may redistribute and/or          *
  * modify it under the terms of the GNU General Public License as          *
  * published by the Free Software Foundation; Version 2.  This guarantees  *
@@ -33,17 +33,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
- * insecure.org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * Insecure.Org development mailing lists, it is assumed that you are      *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -53,7 +53,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_connect.c 7327 2008-05-05 04:10:20Z fyodor $ */
+/* $Id: nsock_connect.c 13069 2009-04-25 03:24:00Z david $ */
 
 #include "nsock.h"
 #include "nsock_internal.h"
@@ -77,15 +77,17 @@ static void nsock_connect_internal(mspool *ms, msevent *nse, int proto,
 #if HAVE_IPV6
   struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) ss;
 #endif
+  msiod *iod = nse->iod;
 
-/* Now it is time to actually attempt the connection */
-  if ((nse->iod->sd = (int) socket(sin->sin_family, 
-			     (proto == IPPROTO_UDP)? SOCK_DGRAM : SOCK_STREAM, 
-			     proto)) == -1) {
+  /* Now it is time to actually attempt the connection */
+  /* inheritable_socket is from nbase */
+  iod->sd = (int) inheritable_socket(sin->sin_family,
+	            (proto == IPPROTO_UDP) ? SOCK_DGRAM : SOCK_STREAM, proto);
+  if (iod->sd == -1) {
     perror("Socket troubles");
     nse->event_done = 1; nse->status = NSE_STATUS_ERROR; nse->errnum = socket_errno();
   } else { 
-    nsock_unblock_socket(nse->iod->sd);
+    unblock_socket(iod->sd);
     
     if (sin->sin_family == AF_INET) {
       sin->sin_port = htons(port);
@@ -98,12 +100,29 @@ static void nsock_connect_internal(mspool *ms, msevent *nse, int proto,
 #endif
     }
 
-    assert(sslen <= sizeof(nse->iod->peer));
-    memcpy(&nse->iod->peer, ss, sslen);
-    nse->iod->peerlen = sslen;
-    nse->iod->lastproto = proto;
+    assert(sslen <= sizeof(iod->peer));
+    memcpy(&iod->peer, ss, sslen);
+    iod->peerlen = sslen;
+    iod->lastproto = proto;
 
-    if ((res = connect(nse->iod->sd, (struct sockaddr *) ss, sslen)) != -1) {
+    if (iod->locallen) {
+      int one = 1;
+      setsockopt(iod->sd, SOL_SOCKET, SO_REUSEADDR, (const char *) &one, sizeof(one));
+      if (bind(iod->sd, (struct sockaddr *) &iod->local, (int) iod->locallen) == -1) {
+        if (ms->tracelevel > 0)
+          nsock_trace(ms, "Bind to %s failed (IOD #%li) EID %li", 
+                      inet_ntop_ez(&iod->local, iod->locallen), iod->id, nse->id);
+      }
+    }
+
+    if (iod->ipoptslen && ss->ss_family == AF_INET) {
+      if (setsockopt(iod->sd, IPPROTO_IP, IP_OPTIONS, (const char *) iod->ipopts, iod->ipoptslen) == -1) {
+        if (ms->tracelevel > 0)
+          nsock_trace(ms, "Setting of IP options failed (IOD #%li) EID %li", iod->id, nse->id);
+      }
+    }
+
+    if ((res = connect(iod->sd, (struct sockaddr *) ss, sslen)) != -1) {
       nse->event_done = 1;
       nse->status = NSE_STATUS_SUCCESS;
     }
@@ -145,7 +164,7 @@ nsock_event_id nsock_connect_tcp(nsock_pool nsp, nsock_iod ms_iod,
   assert(nse);
   
   if (ms->tracelevel > 0)
-    nsock_trace(ms, "TCP connection requested to %s:%hi (IOD #%li) EID %li", 
+    nsock_trace(ms, "TCP connection requested to %s:%hu (IOD #%li) EID %li", 
 		inet_ntop_ez(ss, sslen), port, nsi->id, nse->id);
   
   /* Do the actual connect() */ 
@@ -178,15 +197,12 @@ nsock_event_id nsock_connect_ssl(nsock_pool nsp, nsock_iod nsiod,
   msiod *nsi = (msiod *) nsiod;
   mspool *ms = (mspool *) nsp;
   msevent *nse;
-  static int ssl_initialized = 0;
 
   /* Just in case someone waits a long time and then does a new connect */
   gettimeofday(&nsock_tod, NULL);
 
-  if (!ssl_initialized) {  
-    Nsock_SSL_Init();
-    ssl_initialized = 1;
-  }
+  if (!ms->sslctx)
+    nsp_ssl_init(ms);
  
   assert(nsi->state == NSIOD_STATE_INITIAL || nsi->state == NSIOD_STATE_UNKNOWN);
   
@@ -198,7 +214,7 @@ nsock_event_id nsock_connect_ssl(nsock_pool nsp, nsock_iod nsiod,
   nsi_set_ssl_session(nsi, (SSL_SESSION *) ssl_session);
   
   if (ms->tracelevel > 0)
-    nsock_trace(ms, "SSL/TCP connection requested to %s:%hi (IOD #%li) EID %li", inet_ntop_ez(ss, sslen), port, nsi->id, nse->id);
+    nsock_trace(ms, "SSL/TCP connection requested to %s:%hu (IOD #%li) EID %li", inet_ntop_ez(ss, sslen), port, nsi->id, nse->id);
   
   /* Do the actual connect() */ 
   nsock_connect_internal(ms, nse, IPPROTO_TCP, ss, sslen, port); 
@@ -225,7 +241,8 @@ nsock_event_id nsock_reconnect_ssl(nsock_pool nsp, nsock_iod nsiod,
   mspool *ms = (mspool *) nsp;
   msevent *nse;
 
-  Nsock_SSL_Init();
+  if (!ms->sslctx)
+    nsp_ssl_init(ms);
 
   nse = msevent_new(ms, NSE_TYPE_CONNECT_SSL, nsi, timeout_msecs, handler, userdata);
   assert(nse);
@@ -280,7 +297,7 @@ nse = msevent_new(ms, NSE_TYPE_CONNECT, nsi, -1, handler, userdata);
 assert(nse);
 
 if (ms->tracelevel > 0)
-  nsock_trace(ms, "UDP connection requested to %s:%hi (IOD #%li) EID %li", inet_ntop_ez(ss, sslen), port, nsi->id, nse->id);
+  nsock_trace(ms, "UDP connection requested to %s:%hu (IOD #%li) EID %li", inet_ntop_ez(ss, sslen), port, nsi->id, nse->id);
 
  nsock_connect_internal(ms, nse, IPPROTO_UDP, ss, sslen, port);
  

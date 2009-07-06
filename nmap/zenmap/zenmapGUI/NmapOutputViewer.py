@@ -21,25 +21,22 @@
 
 import locale
 import sys
+import gobject
 import gtk
 import gtk.gdk
 import pango
 import re
 
-from threading import Thread
-
-from higwidgets.higbuttons import HIGButton
-
-from zenmapCore.I18N import _
+import zenmapCore.I18N
 from zenmapCore.UmitLogging import log
 from zenmapCore.UmitConf import NmapOutputHighlight
 
 from zenmapGUI.NmapOutputProperties import NmapOutputProperties
 
-class NmapOutputViewer (gtk.VPaned):
+class NmapOutputViewer (gtk.VBox):
     def __init__ (self, refresh=1, stop=1):
         self.nmap_highlight = NmapOutputHighlight()
-        gtk.VPaned.__init__ (self)
+        gtk.VBox.__init__ (self)
         
         # Creating widgets
         self.__create_widgets()
@@ -50,31 +47,24 @@ class NmapOutputViewer (gtk.VPaned):
         # Setting text view
         self.__set_text_view()
         
-        # Setting buttons
-        self.__set_buttons()
-        
-        # Getting text buffer
-        self.text_buffer = self.text_view.get_buffer()
-        
+        buffer = self.text_view.get_buffer()
+        # The end mark is used to scroll to the bottom of the display.
+        self.end_mark = buffer.create_mark(None, buffer.get_end_iter(), False)
+
         self.refreshing = True
-        self.thread = Thread()
         
-        # Adding widgets to the VPaned
-        self.pack1(self.scrolled, resize=True, shrink=True)
-        self.pack2(self.hbox_buttons, resize=True, shrink=False)
+        # Adding widgets to the VBox
+        self.pack_start(self.scrolled, expand = True, fill = True)
         
+        # The NmapCommand instance, if any, whose output is shown in this
+        # display.
+        self.command_execution = None
         self.nmap_previous_output = ''
-        self.brazil = True
-        
-    
+
     def __create_widgets (self):
         # Creating widgets
         self.scrolled = gtk.ScrolledWindow ()
         self.text_view = gtk.TextView ()
-        self.btn_refresh = gtk.Button (stock=gtk.STOCK_REFRESH)
-        self.check_enable_color = gtk.CheckButton(_("Enable Nmap output highlight"))
-        self.btn_output_properties = HIGButton(stock=gtk.STOCK_PREFERENCES)
-        self.hbox_buttons = gtk.HBox (spacing=5)
         self.txg_font = gtk.TextTag()
         self.txg_date = gtk.TextTag()
     
@@ -83,7 +73,6 @@ class NmapOutputViewer (gtk.VPaned):
         self.scrolled.set_border_width (5)
         self.scrolled.add(self.text_view)
         self.scrolled.set_policy (gtk.POLICY_AUTOMATIC,gtk.POLICY_AUTOMATIC)
-        self.scrolled.set_size_request (450, 350)
     
     def __set_text_view(self):
         self.text_view.set_wrap_mode(gtk.WRAP_WORD)
@@ -99,22 +88,6 @@ class NmapOutputViewer (gtk.VPaned):
         buff.apply_tag(self.txg_font, buff.get_start_iter(), buff.get_end_iter())
         self.update_output_colors()
         
-    def __set_buttons (self):
-        self.check_enable_color.set_active(self.nmap_highlight.enable)
-        
-        # Connecting events
-        self.btn_refresh.connect('clicked', self.refresh_output)
-        self.btn_output_properties.connect("clicked", self.show_output_properties)
-        self.check_enable_color.connect("toggled", self.enable_color_highlight)
-        
-        # Setting hbox
-        self.hbox_buttons.set_border_width(5)
-        
-        # Packing buttons
-        self.hbox_buttons.pack_start(self.check_enable_color)
-        self.hbox_buttons.pack_start(self.btn_output_properties)
-        self.hbox_buttons.pack_start(self.btn_refresh)
-
     def go_to_host(self, host):
         """Go to host line on nmap output result"""
         buff = self.text_view.get_buffer()
@@ -128,14 +101,6 @@ class NmapOutputViewer (gtk.VPaned):
                 self.text_view.scroll_to_iter(buff.get_iter_at_line(i), 0, True, 0, 0)
                 break
         
-    def enable_color_highlight(self, widget):
-        if widget.get_active():
-            self.nmap_highlight.enable = 1
-        else:
-            self.nmap_highlight.enable = 0
-
-        self.update_output_colors()
-
     def show_output_properties(self, widget):
         nmap_out_prop = NmapOutputProperties(self.text_view)
         #nmap_out_prop.connect("response", self.update_output_colors)
@@ -187,9 +152,7 @@ class NmapOutputViewer (gtk.VPaned):
         if not self.nmap_highlight.enable:
             return        
 
-        text = buff.get_text(start, end)
-        if text:
-            text = text.split("\n")
+        if True:
             properties = ["details",
                           "date",
                           "hostname",
@@ -199,13 +162,20 @@ class NmapOutputViewer (gtk.VPaned):
                           "closed_port",
                           "filtered_port"]
             
-            for pos in xrange(len(text)):
-                if not text[pos]:
+            for pos in xrange(buff.get_line_count()):
+                # Grab the current line.
+                line_start_iter = buff.get_iter_at_line(pos)
+                line_end_iter = line_start_iter.copy()
+                if not line_end_iter.ends_line():
+                    line_end_iter.forward_to_line_end()
+                line = buff.get_text(line_start_iter, line_end_iter)
+
+                if not line:
                     continue
                 
                 for p in xrange(len(properties)):
                     settings = self.nmap_highlight.__getattribute__(properties[p])
-                    match = re.finditer(settings[5], text[pos])
+                    match = re.finditer(settings[5], line)
 
                     # Create tags only if there's a matching for the expression
                     if match:
@@ -244,129 +214,43 @@ gtk.color_selection_palette_to_string([gtk.gdk.Color(*highlight_color),]))
                         except:
                             pass
 
-                    # Brasil-sil-sil!!!
-                    match = re.finditer("Bra[sz]il", text[pos])
-                    for m in match:
-                        tag1 = gtk.TextTag()
-                        tag2 = gtk.TextTag()
-                        tag3 = gtk.TextTag()
-
-                        tag_table.add(tag1)
-                        tag_table.add(tag2)
-                        tag_table.add(tag3)
-
-                        tag1.set_property("foreground", "#EAFF00")
-                        tag1.set_property("background", "#21C800")
-                        tag1.set_property("weight", pango.WEIGHT_HEAVY)
-                    
-                        tag2.set_property("foreground", "#0006FF")
-                        tag2.set_property("background", "#21C800")
-                        tag2.set_property("weight", pango.WEIGHT_HEAVY)
-                        
-                        tag3.set_property("foreground", "#FFFFFF")
-                        tag3.set_property("background", "#21C800")
-                        tag3.set_property("weight", pango.WEIGHT_HEAVY)
-
-                        try:
-                            buff.apply_tag(tag1, buff.get_iter_at_line_offset(pos, m.start()),
-                                           buff.get_iter_at_line_offset(pos, m.end() - 5))
-
-                            buff.apply_tag(tag2, buff.get_iter_at_line_offset(pos, m.start() + 1),
-                                           buff.get_iter_at_line_offset(pos, m.end() -4))
-
-                            buff.apply_tag(tag3, buff.get_iter_at_line_offset(pos, m.start() + 2),
-                                           buff.get_iter_at_line_offset(pos, m.end() - 3))
-                            
-                            buff.apply_tag(tag1, buff.get_iter_at_line_offset(pos, m.start() + 3),
-                                           buff.get_iter_at_line_offset(pos, m.end() - 2))
-
-                            buff.apply_tag(tag2, buff.get_iter_at_line_offset(pos, m.start() + 4),
-                                           buff.get_iter_at_line_offset(pos, m.end() - 1))
-
-                            buff.apply_tag(tag3, buff.get_iter_at_line_offset(pos, m.start() + 5),
-                                           buff.get_iter_at_line_offset(pos, m.end()))
-                        except:
-                            pass
-                    else:
-                        self._brasil_log()
-
-                    
-                    match = re.finditer("BRT", text[pos])
-                    for m in match:
-                        tag1 = gtk.TextTag()
-                        tag2 = gtk.TextTag()
-                        tag3 = gtk.TextTag()
-
-                        tag_table.add(tag1)
-                        tag_table.add(tag2)
-                        tag_table.add(tag3)
-
-                        tag1.set_property("foreground", "#EAFF00")
-                        tag1.set_property("background", "#21C800")
-                        tag1.set_property("weight", pango.WEIGHT_HEAVY)
-                    
-                        tag2.set_property("foreground", "#0006FF")
-                        tag2.set_property("background", "#21C800")
-                        tag2.set_property("weight", pango.WEIGHT_HEAVY)
-                        
-                        tag3.set_property("foreground", "#FFFFFF")
-                        tag3.set_property("background", "#21C800")
-                        tag3.set_property("weight", pango.WEIGHT_HEAVY)
-
-                        try:
-                            buff.apply_tag(tag1, buff.get_iter_at_line_offset(pos, m.start()),
-                                           buff.get_iter_at_line_offset(pos, m.end() - 2))
-
-                            buff.apply_tag(tag2, buff.get_iter_at_line_offset(pos, m.start() + 1),
-                                           buff.get_iter_at_line_offset(pos, m.end() -1))
-
-                            buff.apply_tag(tag3, buff.get_iter_at_line_offset(pos, m.start() + 2),
-                                           buff.get_iter_at_line_offset(pos, m.end()))
-                        except:
-                            pass
-                    else:
-                        self._brasil_log()
-
-    def _brasil_log(self):
-        if self.brazil:
-            log.info("Isto aqui, o o")
-            log.info("E um pouquinho de Brasil, io io")
-            log.info("Deste Brasil que canta e e feliz")
-            log.info("Feliz, feliz")
-            log.info("")
-            log.info("E tambem um pouco de uma raca")
-            log.info("Que nao tem medo de fumaca ai, ai")
-            log.info("E nao se entrega, nao ")
-            log.info("")
-            log.info('Olha o jeito das "cadera"  que ela sabe dar')
-            log.info("Olha o tombo nos quadris que ela sabe dar")
-            log.info("Olha o passe de batuque que ela sabe dar")
-            log.info("Olha so o remelexo que ela sabe dar")
-            log.info("")
-            log.info("Morena boa me faz chorar")
-            log.info("Poe a sandalia de prata")
-            log.info("e vem pro samba sambar")
-            
-            self.brazil = False
+    def show_nmap_output(self, output):
+        """Show the string (or unicode) output in the output display."""
+        self.text_view.get_buffer().set_text(output)
     
-    def show_nmap_output (self, file):
-        self.nmap_output_file = file
+    def set_command_execution(self, command):
+        """Set the live running command whose output is shown by this display.
+        The current output is extracted from the command object."""
+        self.command_execution = command
+        self.nmap_previous_output = None
         self.refresh_output()
-    
-    def refresh_output(self, widget=None):
+
+    def refresh_output(self, widget = None):
+        """Update the output from the latest output of the command associated
+        with this view, as set by set_command_execution. It has no effect if no
+        command has been set."""
         log.debug("Refresh nmap output")
-        nmap_of = open(self.nmap_output_file, "r")
 
-        new_output = nmap_of.read()
+        if self.command_execution is None:
+            return
 
-        if self.nmap_previous_output != new_output:
-            # Decode the output from an encoded byte string to a unicode object
-            # before displaying it.
-            self.text_buffer.set_text(new_output.decode(locale.getpreferredencoding(), 'replace'))
+        new_output = self.command_execution.get_output()
+
+        v_adj = self.scrolled.get_vadjustment()
+        if self.nmap_previous_output != new_output and v_adj is not None:
+            # Find out if the view is already scrolled to the bottom.
+            at_end = (v_adj.value >= v_adj.upper - v_adj.page_size)
+
+            self.show_nmap_output(new_output)
             self.nmap_previous_output = new_output
 
-        nmap_of.close()
-    
+            if at_end:
+                # If we were already scrolled to the bottom, scroll back to the
+                # bottom again. Do it in an idle handler in case the added text
+                # causes a scroll bar to appear and reflow the text, making the
+                # text a bit taller.
+                gobject.idle_add(lambda: self.text_view.scroll_mark_onscreen(self.end_mark))
+
 if __name__ == '__main__':
     w = gtk.Window()
     n = NmapOutputViewer()

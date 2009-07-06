@@ -45,9 +45,6 @@ class RecentScans(object):
         else:
             self.using_file = False
 
-    def __del__(self):
-        self.save()
-
     def save(self):
         if self.using_file:
             recent_file = open(self.recents_scans_file, "w")
@@ -76,7 +73,6 @@ recent_scans = RecentScans()
 if __name__ == "__main__":
     import sys
     from os.path import split
-    Path.set_umit_conf(split(sys.argv[0])[0])
     r = RecentScans()
     print ">>> Getting empty list:", r.get_recent_scans_list()
     print ">>> Adding recent scan bla:", r.add_recent_scan("bla")

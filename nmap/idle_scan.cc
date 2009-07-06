@@ -9,7 +9,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -37,19 +37,10 @@
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
- * works of Nmap.  This list is not exclusive, but is just meant to        *
- * clarify our interpretation of derived works with some common examples.  *
- * These restrictions only apply when you actually redistribute Nmap.  For *
- * example, nothing stops you from writing and selling a proprietary       *
- * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://nmap.org to download Nmap.                                       *
- *                                                                         *
- * We don't consider these to be added restrictions on top of the GPL, but *
- * just a clarification of how we interpret "derived works" as it applies  *
- * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
- * Torvalds has announced his interpretation of how "derived works"        *
- * applies to Linux kernel modules.  Our interpretation refers only to     *
- * Nmap - we don't speak for any other GPL products.                       *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
  *                                                                         *
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
@@ -80,17 +71,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -101,7 +92,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: idle_scan.cc 7752 2008-05-29 07:49:37Z michael $ */
+/* $Id: idle_scan.cc 13888 2009-06-24 21:35:54Z fyodor $ */
 
 #include "idle_scan.h"
 #include "timing.h"
@@ -132,7 +123,7 @@ struct idle_proxy_info {
   u16 probe_port; /* The port we use for probing IP ID infoz */
   u16 max_groupsz; /* We won't test groups larger than this ... */
   u16 min_groupsz; /* We won't allow the group size to fall below this
-		      level.  Affected by --min_parallelism */
+		      level.  Affected by --min-parallelism */
   double current_groupsz; /* Current group size being used ... depends on
                           conditions ... won't be higher than
                           max_groupsz */
@@ -206,7 +197,7 @@ static int ipid_proxy_probe(struct idle_proxy_info *proxy, int *probes_sent,
 
       to_usec = proxy->host.to.timeout - TIMEVAL_SUBTRACT(tv_end, tv_sent[tries-1]);
       if (to_usec < 0) to_usec = 0; // Final no-block poll
-      ip = (struct ip *) readip_pcap(proxy->pd, &bytes, to_usec, &rcvdtime, NULL);      
+      ip = (struct ip *) readip_pcap(proxy->pd, &bytes, to_usec, &rcvdtime, NULL, true);      
       gettimeofday(&tv_end, NULL);
       if (ip) {
 	if (bytes < ( 4 * ip->ip_hl) + 14U)
@@ -226,7 +217,7 @@ static int ipid_proxy_probe(struct idle_proxy_info *proxy, int *probes_sent,
 	    }
 	    else if (o.debugging > 1) {
 	      error("Received unexpected response packet from %s during IP ID zombie probing:", inet_ntoa(ip->ip_src));
-	      readtcppacket( (unsigned char *) ip,ntohs(ip->ip_len));
+	      readtcppacket( (unsigned char *) ip,MIN(ntohs(ip->ip_len), bytes));
 	    }
 	    continue;
 	  }
@@ -391,6 +382,9 @@ static void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
     proxy->rawsd = -1;
     proxy->ethptr = &proxy->eth;
   } else {
+#ifdef WIN32
+    win32_warn_raw_sockets(proxy->host.deviceName());
+#endif
     if ((proxy->rawsd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0 )
       pfatal("socket troubles in %s", __func__);
     unblock_socket(proxy->rawsd);
@@ -445,7 +439,7 @@ static void initialize_idleproxy(struct idle_proxy_info *proxy, char *proxyName,
     while(probes_returned < probes_sent && !timedout) {
 
       to_usec = (probes_sent == NUM_IPID_PROBES)? hardtimeout : 1000;
-      ip = (struct ip *) readip_pcap(proxy->pd, &bytes, to_usec, &rcvdtime, NULL);
+      ip = (struct ip *) readip_pcap(proxy->pd, &bytes, to_usec, &rcvdtime, NULL, true);
 
       gettimeofday(&tmptv, NULL);
       

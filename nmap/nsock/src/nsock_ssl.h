@@ -7,7 +7,7 @@
  *                                                                         *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
- * The nsock parallel socket event library is (C) 1999-2008 Insecure.Com   *
+ * The nsock parallel socket event library is (C) 1999-2009 Insecure.Com   *
  * LLC This library is free software; you may redistribute and/or          *
  * modify it under the terms of the GNU General Public License as          *
  * published by the Free Software Foundation; Version 2.  This guarantees  *
@@ -36,17 +36,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
- * insecure.org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * Insecure.Org development mailing lists, it is assumed that you are      *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -56,7 +56,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_ssl.h 7327 2008-05-05 04:10:20Z fyodor $ */
+/* $Id: nsock_ssl.h 13069 2009-04-25 03:24:00Z david $ */
 
 #ifndef NSOCK_SSL_H
 #define NSOCK_SSL_H
@@ -64,12 +64,12 @@
 #ifdef HAVE_CONFIG_H
 #include "nsock_config.h"
 #endif
+#include "nsock_internal.h"
 
 #if HAVE_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <openssl/rand.h>
-
 
 struct sslinfo {
   /* SSL_ERROR_NONE, SSL_ERROR_WANT_CONNECT, SSL_ERROR_WAINT_READ, or
@@ -77,21 +77,7 @@ struct sslinfo {
   int ssl_desire; 
 };
 
-/* This is the SSL information that is global to nsock and not tied
-   to any particular connection. */
-struct NsockSSLInfo {
-  SSL_CTX *ctx; /* The SSL Context (options and such) */
-};
+int nsi_ssl_post_connect_verify(const nsock_iod nsockiod);
 
-/* Initializes Nsock for low security (fast) SSL connections.
- Eventually it will probably have arguments for various attributes
- (such as whether you want the connection to be fast or secure).  It is
- OK to call it multiple times - only the first one will count.  */
-void Nsock_SSL_Init();
-
-/* This function returns the Nsock Global SSL information.  You should
-   have called Nsock_SSL_Init once before, but this function will take
-   care of it if you haven't. */
-struct NsockSSLInfo *Nsock_SSLGetInfo();
 #endif /* HAVE_OPENSSL */
 #endif /* NSOCK_SSL_H */

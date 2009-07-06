@@ -109,19 +109,31 @@ def split_modules_file_line(line):
         parts.append(current)
     return parts
 
-# Escape a string so it can be read by pango_scan_string. For simplicity this
-# always quotes the string.
-def escape_modules_file_value(value):
-    result = []
+# Since GTK+ 2.16.1 at least, it appears that numeric values must not be quoted
+# or the file will not be read properly.
+def modules_file_value_needs_quoting(value):
+    if value == "":
+        return True
     for c in value:
-        if c == "\n":
-            c = "\\n"
-        elif c == "\"":
-            c = "\\\""
-        elif c == "\\":
-            c = "\\\\"
-        result.append(c)
-    return "\"" + "".join(result) + "\""
+        if not c.isdigit():
+            return True
+    return False
+
+# Escape a string so it can be read by pango_scan_string.
+def escape_modules_file_value(value):
+    if modules_file_value_needs_quoting(value):
+        result = []
+        for c in value:
+            if c == "\n":
+                c = "\\n"
+            elif c == "\"":
+                c = "\\\""
+            elif c == "\\":
+                c = "\\\\"
+            result.append(c)
+        return "\"" + "".join(result) + "\""
+    else:
+        return value
 
 # Substitute a dict of replacements into a line from a modules file, unescaping
 # before the substitution and reescaping afterwards.
@@ -225,6 +237,9 @@ if __name__ == "__main__":
     os.environ["GTK_EXE_PREFIX"] = resourcedir
     os.environ["GTK_PATH"] = resourcedir
     os.environ["FONTCONFIG_PATH"] = os.path.join(resourcedir, "etc", "fonts")
+    # Use the packaged gtkrc only if the user doesn't have a custom one.
+    if not os.path.exists(os.path.expanduser("~/.gtkrc-2.0")):
+        os.environ["GTK2_RC_FILES"] = os.path.join(resourcedir, "etc", "gtk-2.0", "gtkrc")
 
     # The following environment variables refer to files within ~/.zenmap-etc
     # that are automatically generated from templates.

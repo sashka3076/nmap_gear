@@ -4,7 +4,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -32,19 +32,10 @@
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
- * works of Nmap.  This list is not exclusive, but is just meant to        *
- * clarify our interpretation of derived works with some common examples.  *
- * These restrictions only apply when you actually redistribute Nmap.  For *
- * example, nothing stops you from writing and selling a proprietary       *
- * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://nmap.org to download Nmap.                                       *
- *                                                                         *
- * We don't consider these to be added restrictions on top of the GPL, but *
- * just a clarification of how we interpret "derived works" as it applies  *
- * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
- * Torvalds has announced his interpretation of how "derived works"        *
- * applies to Linux kernel modules.  Our interpretation refers only to     *
- * Nmap - we don't speak for any other GPL products.                       *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
  *                                                                         *
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
@@ -75,17 +66,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -172,19 +163,6 @@
 
 class NmapOutputTable;
 
-/* various pieces of scan data used by
- * traceroute to find responsive ports
- * and match probes */
-struct scan_info {
-    u8 initial_proto;
-    u8 icmp_type;
-    u8 scan_flags;
-    u8 open_response;
-    u8 open_state;
-    u8 closed_response;
-    u8 closed_state;
-};
-
 /* Keeps track of each probes timing state */
 class TimeInfo {
   public:
@@ -216,7 +194,7 @@ class TimeInfo {
  * ttl. Traceprobes are stored inside tracegroups. */
 class TraceProbe {
   public:
-    TraceProbe (u8 proto, u32 dip, u32 sip, u16 sport, u16 dport);
+    TraceProbe (u32 dip, u32 sip, u16 sport, struct probespec& probe);
     ~TraceProbe ();
 
     /* Return the ip address and resolved hostname in a string 
@@ -243,9 +221,8 @@ class TraceProbe {
     struct in_addr ipdst;
     struct in_addr ipsrc;
     struct in_addr ipreplysrc;
+    struct probespec probe;
     u16 sport;
-    u16 dport;
-    u8 proto;
     u8 ttl;
     char **hostname;
 
@@ -259,7 +236,7 @@ class TraceProbe {
  * the ip */
 class TraceGroup {
   public:
-    TraceGroup (u32 dip, u16 dport, u16 sport, u8 proto);
+    TraceGroup (u32 dip, u16 sport, struct probespec& probe);
     ~TraceGroup ();
     /* map of all probes sent to this TraceGroups IP address. The map 
      * is keyed by the source port of the probe */
@@ -294,9 +271,8 @@ class TraceGroup {
     u16 repliedPackets;
     u8 consecTimeouts;
     /* protocol information */
-    u8 proto;
+    struct probespec probe;
     u16 sport;
-    u16 dport;
     u32 ipdst;
     /* estimated ttl distance to target */
     u8 hopDistance;
@@ -343,7 +319,6 @@ class Traceroute {
      * the groups destination IP address */
      std::map < u32, TraceGroup * >TraceGroups;
 
-    struct scan_info scaninfo;
     const struct scan_lists * scanlists;
     Target **hops;
     pcap_t *pd;
@@ -354,7 +329,7 @@ class Traceroute {
     /* called by outputTarget to log XML data */
     void outputXMLTrace (TraceGroup * tg);
     /* find a responsive port for t based on scan results */
-    int getTracePort (u8 proto, Target * t);
+    const probespec getTraceProbe (Target * t);
     /* sendTTLProbes() guesses the hop distance to a 
      * target by actively probing the host. */
     void sendTTLProbes (std::vector < Target * >&Targets, std::vector < Target * >&vaild_targets);

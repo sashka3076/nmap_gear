@@ -51,17 +51,11 @@ int getopt_reset(void)
 }
 
 
-/* This function is kinda problematic because most getopt() nowadays
-  seem to use char * const argv[] (they DON'T permute the options list), 
-  but this one does.  So we remove it as long as HAVE_GETOPT is define, so
-  people can use the version from their platform instead */
-
-#ifndef HAVE_GETOPT
 /* this is the plain old UNIX getopt, with GNU-style extensions. */
 /* if you're porting some piece of UNIX software, this is all you need. */
 /* this supports GNU-style permution and optional arguments */
 
-int getopt(int argc, char * argv[], const char *opts)
+static int _getopt(int argc, char * argv[], const char *opts)
 {
   static int charind=0;
   const char *s;
@@ -134,7 +128,7 @@ int getopt(int argc, char * argv[], const char *opts)
       for(i=j=optind; i<argc; i++) if((argv[i][0] == '-') &&
                                         (argv[i][1] != '\0')) {
         optind=i;
-        opt=getopt(argc, argv, opts);
+        opt=_getopt(argc, argv, opts);
         while(i > j) {
           tmp=argv[--i];
           for(k=i; k+1<optind; k++) argv[k]=argv[k+1];
@@ -146,12 +140,11 @@ int getopt(int argc, char * argv[], const char *opts)
     }
   } else {
     charind++;
-    opt = getopt(argc, argv, opts);
+    opt = _getopt(argc, argv, opts);
   }
   if (optind > argc) optind = argc;
   return opt;
 }
-#endif /* HAVE_GETOPT */
 
 /* this is the extended getopt_long{,_only}, with some GNU-like
  * extensions. Implements _getopt_internal in case any programs
@@ -207,7 +200,7 @@ int _getopt_internal(int argc, char * argv[], const char *shortopts,
       break;
     }
   } else if((!long_only) && (argv[optind][1] != '-'))
-    opt = getopt(argc, argv, shortopts);
+    opt = _getopt(argc, argv, shortopts);
   else {
     int charind, offset;
     int found = 0, ind, hits = 0;
@@ -221,7 +214,7 @@ int _getopt_internal(int argc, char * argv[], const char *shortopts,
             ((c == 'W') && (shortopts[ind] == ';'))) &&
            (shortopts[++ind] == ':'))
           ind ++;
-        if(optopt == c) return getopt(argc, argv, shortopts);
+        if(optopt == c) return _getopt(argc, argv, shortopts);
       }
     }
     offset = 2 - (argv[optind][1] != '-');
@@ -266,7 +259,7 @@ int _getopt_internal(int argc, char * argv[], const char *shortopts,
       }
       optind++;
     } else if(!hits) {
-      if(offset == 1) opt = getopt(argc, argv, shortopts);
+      if(offset == 1) opt = _getopt(argc, argv, shortopts);
       else {
         opt = '?';
         if(opterr) fprintf(stderr,
@@ -283,6 +276,18 @@ int _getopt_internal(int argc, char * argv[], const char *shortopts,
   if (optind > argc) optind = argc;
   return opt;
 }
+
+/* This function is kinda problematic because most getopt() nowadays
+  seem to use char * const argv[] (they DON'T permute the options list), 
+  but this one does.  So we remove it as long as HAVE_GETOPT is define, so
+  people can use the version from their platform instead */
+
+#ifndef HAVE_GETOPT
+int getopt(int argc, char * argv[], const char *opts)
+{
+  return _getopt(argc, argv, opts);
+}
+#endif /* HAVE_GETOPT */
 
 int getopt_long(int argc, char * argv[], const char *shortopts,
                 const struct option *longopts, int *longind)

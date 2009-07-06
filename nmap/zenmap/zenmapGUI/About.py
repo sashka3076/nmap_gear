@@ -23,19 +23,19 @@ import gtk
 import os.path
 import webbrowser
 
-from higwidgets.higdialogs import HIGDialog
-from higwidgets.higwindows import HIGWindow
-from higwidgets.higboxes import HIGVBox, HIGHBox, hig_box_space_holder
-from higwidgets.higbuttons import HIGButton
-from higwidgets.hignotebooks import HIGNotebook
-from higwidgets.higscrollers import HIGScrolledWindow
-from higwidgets.higtextviewers import HIGTextView
+from zenmapGUI.higwidgets.higdialogs import HIGDialog
+from zenmapGUI.higwidgets.higwindows import HIGWindow
+from zenmapGUI.higwidgets.higboxes import HIGVBox, HIGHBox, hig_box_space_holder
+from zenmapGUI.higwidgets.higbuttons import HIGButton
+from zenmapGUI.higwidgets.hignotebooks import HIGNotebook
+from zenmapGUI.higwidgets.higscrollers import HIGScrolledWindow
+from zenmapGUI.higwidgets.higtextviewers import HIGTextView
 
 from zenmapCore.Name import APP_DISPLAY_NAME, APP_WEB_SITE, APP_COPYRIGHT, \
     NMAP_DISPLAY_NAME, NMAP_WEB_SITE, UMIT_DISPLAY_NAME, UMIT_WEB_SITE
 from zenmapCore.Version import VERSION
 from zenmapCore.Paths import Path
-from zenmapCore.I18N import _
+import zenmapCore.I18N
 
 # For escaping text in marked-up labels.
 from xml.sax.saxutils import escape
@@ -84,7 +84,7 @@ class About(HIGDialog):
     have roughly the same feel as gtk.AboutDialog."""
     def __init__(self):
         HIGDialog.__init__(self)
-        self.set_title(_("About %s and %s" % (NMAP_DISPLAY_NAME, APP_DISPLAY_NAME)))
+        self.set_title(_("About %s and %s") % (NMAP_DISPLAY_NAME, APP_DISPLAY_NAME))
 
         self.vbox.set_border_width(12)
         self.vbox.set_spacing(12)
@@ -100,21 +100,21 @@ class About(HIGDialog):
 % (escape(APP_COPYRIGHT)))
         self.vbox.pack_start(label)
 
-        entry = _program_entry(NMAP_DISPLAY_NAME, NMAP_WEB_SITE, """\
+        entry = _program_entry(NMAP_DISPLAY_NAME, NMAP_WEB_SITE, _("""\
 %s is a free and open source utility for network exploration and security \
-auditing.""" % NMAP_DISPLAY_NAME)
+auditing.""") % NMAP_DISPLAY_NAME)
         self.vbox.pack_start(entry)
 
-        entry = _program_entry(APP_DISPLAY_NAME, APP_WEB_SITE, """\
+        entry = _program_entry(APP_DISPLAY_NAME, APP_WEB_SITE, _("""\
 %s is a multi-platform graphical %s frontend and results viewer. It was \
-originally derived from %s.""" \
+originally derived from %s.""") \
 % (APP_DISPLAY_NAME, NMAP_DISPLAY_NAME, UMIT_DISPLAY_NAME))
         self.vbox.pack_start(entry)
 
-        entry = _program_entry(UMIT_DISPLAY_NAME, UMIT_WEB_SITE, """\
-%s is an %s GUI created as part of the Nmap/Google Summer of Code program.""" \
+        entry = _program_entry(UMIT_DISPLAY_NAME, UMIT_WEB_SITE, _("""\
+%s is an %s GUI created as part of the Nmap/Google Summer of Code program.""") \
 % (UMIT_DISPLAY_NAME, NMAP_DISPLAY_NAME))
-        button = gtk.Button(_("%s credits" % UMIT_DISPLAY_NAME))
+        button = gtk.Button(_("%s credits") % UMIT_DISPLAY_NAME)
         button.connect("clicked", self._show_umit_credits)
         entry.hbox.pack_start(button, False)
         self.vbox.pack_start(entry)
@@ -154,7 +154,7 @@ originally derived from %s.""" \
 class UmitCredits(HIGWindow):
     def __init__(self):
         HIGWindow.__init__(self)
-        self.set_title(_("%s credits" % UMIT_DISPLAY_NAME))
+        self.set_title(_("%s credits") % UMIT_DISPLAY_NAME)
         self.set_size_request(-1,250)
         self.set_position(gtk.WIN_POS_CENTER)
         

@@ -20,115 +20,192 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
+import imp
 import os
-import os.path
+import signal
 import sys
+import ConfigParser
 
-from zenmapCore.Paths import Path
-from zenmapCore.UmitOptionParser import option_parser
+# Cause an exception if PyGTK can't open a display. Normally this just
+# produces a warning, but the lack of a display eventually causes a
+# segmentation fault. See http://live.gnome.org/PyGTK/WhatsNew210.
+import warnings
+warnings.filterwarnings("error", module = "gtk")
+try:
+    import gtk
+except Exception:
+    # On Mac OS X 10.5, X11 is supposed to be automatically launched on demand.
+    # It works by setting the DISPLAY environment variable to something like
+    # "/tmp/launch-XXXXXX/:0" and intercepting traffic on that socket; see
+    # http://homepage.mac.com/sao1/X11/#four. However this breaks in a strange
+    # way if DISPLAY is set in one of the shell startup files like .profile.
+    # Those files only have an effect on the shell, not the graphical
+    # environment, so X11 starts up as expected, but in doing so it reads the
+    # startup scripts, and for some reason the first connection (the one that
+    # caused the launch) is rejected. But somehow subsequent connections work
+    # fine! So if the import fails, try one more time.
+    import gtk
+warnings.resetwarnings()
+
+from zenmapGUI.higwidgets.higdialogs import HIGAlertDialog
+
+import zenmapCore.UmitConf
+import zenmapCore.Paths
 from zenmapCore.UmitConf import is_maemo
-from zenmapCore.I18N import _
 from zenmapCore.UmitLogging import log
+from zenmapCore.UmitOptionParser import option_parser
+from zenmapCore.Name import APP_DISPLAY_NAME, NMAP_DISPLAY_NAME
+from zenmapCore.UmitConf import SearchConfig
+import zenmapCore.I18N
+from zenmapCore.Paths import Path
+from zenmapCore.Name import APP_DISPLAY_NAME
 
+from zenmapGUI.MainWindow import ScanWindow
+
+from zenmapGUI.higwidgets.higdialogs import HIGAlertDialog
+
+# A global list of open scan windows. When the last one is destroyed, we call
+# gtk.main_quit.
+open_windows = []
+
+def _destroy_callback(window):
+    open_windows.remove(window)
+    if len(open_windows) == 0:
+        gtk.main_quit()
+    try:
+        from zenmapCore.UmitDB import UmitDB
+    except ImportError, e:
+        log.debug(">>> Not cleaning up database: %s." % str(e))
+    else:
+        # Cleaning up data base
+        UmitDB().cleanup(SearchConfig().converted_save_time)
+
+def new_window():
+    w = ScanWindow()
+    w.connect("destroy", _destroy_callback)
+    if is_maemo():
+        import hildon
+        hildon_app = hildon.Program()
+        hildon_app.add_window(w)
+    open_windows.append(w)
+    return w
 
 # Script found at http://www.py2exe.org/index.cgi/HowToDetermineIfRunningFromExe
-import imp
-frozen = (hasattr(sys, "frozen") or # new py2exe
-          hasattr(sys, "importers") # old py2exe
-          or imp.is_frozen("__main__")) # tools/freeze
-del(imp)
-
 def main_is_frozen():
-    return frozen
+    return (hasattr(sys, "frozen") # new py2exe
+            or hasattr(sys, "importers") # old py2exe
+            or imp.is_frozen("__main__")) # tools/freeze
 
+def is_root():
+    return sys.platform == "win32" or os.getuid() == 0 or is_maemo()
 
-class App:
-    """This is the main application class. Zenmap is started by calling the run() method."""
-    def __init__(self, args=sys.argv):
-        pass
+def safe_shutdown(signum, stack):
+    """Kills any active scans/tabs and shuts down the application."""
+    log.debug("\n\n%s\nSAFE SHUTDOWN!\n%s\n" % ("#" * 30, "#" * 30))
+    log.debug("SIGNUM: %s" % signum)
 
-    def __parse_cmd_line(self):
-        pass
+    for window in open_windows:
+        window.scan_interface.kill_all_scans()
 
-    def __create_show_main_window(self):
-        from zenmapGUI.MainWindow import MainWindow
-        self.main_window = MainWindow()
+    sys.exit(signum)
+
+def run():
+    if os.name == "posix":
+        signal.signal(signal.SIGHUP, safe_shutdown)
+    signal.signal(signal.SIGTERM, safe_shutdown)
+    signal.signal(signal.SIGINT, safe_shutdown)
+
+    try:
+        # Create the ~/.zenmap directory by copying from the system-wide
+        # template directory.
+        zenmapCore.Paths.create_user_config_dir(Path.user_config_dir, Path.config_dir)
+    except (IOError, OSError), e:
+        error_dialog = HIGAlertDialog(message_format = _("Error creating the per-user configuration directory"),
+            secondary_text = _("""\
+There was an error creating the directory %s or one of the files in it. \
+The directory is created by copying the contents of %s. \
+The specific error was\n\
+\n\
+%s\n\
+\n\
+%s needs to create this directory to store information such as the list of \
+scan profiles. Check for access to the directory and try again.\
+""") % (repr(Path.user_config_dir), repr(Path.config_dir), repr(str(e)), APP_DISPLAY_NAME))
+        error_dialog.run()
+        error_dialog.destroy()
+        sys.exit(1)
+
+    try:
+        # Read the ~/.zenmap/zenmap.conf configuration file.
+        zenmapCore.UmitConf.config_parser.read(Path.user_config_file)
+    except ConfigParser.ParsingError, e:
+        error_dialog = HIGAlertDialog(message_format = _("Error parsing the configuration file"),
+            secondary_text = _("""\
+There was an error parsing the configuration file %s. \
+The specific error was\n\
+\n\
+%s\n\
+\n\
+%s can continue without this file but any information in it will be ignored \
+until it is repaired.\
+""") % (Path.user_config_file, str(e), APP_DISPLAY_NAME))
+        error_dialog.run()
+        error_dialog.destroy()
+
+    # Display a "you're not root" warning if appropriate.
+    if not is_root():
+        non_root = NonRootWarning()
+        non_root.run()
+        non_root.destroy()
+
+    # Load files given as command-line arguments.
+    filenames = option_parser.get_open_results()
+    if len(filenames) == 0:
+        # Open up a blank window.
+        window = new_window()
+        window.show_all()
+    else:
+        for filename in filenames:
+            window = new_window()
+            if os.path.isdir(filename):
+                window._load_directory(window.scan_interface, filename)
+            else:
+                window._load(window.scan_interface, filename)
+            window.show_all()
+
+    nmap = option_parser.get_nmap()
+    target = option_parser.get_target()
+    profile = option_parser.get_profile()
+
+    if nmap:
+        # Start running a scan if given by the -n option.
+        page = window.get_empty_interface()
+        page.command_toolbar.command = " ".join(nmap)
+        page.start_scan_cb()
+    elif target or profile:
+        # Set up target and profile according to the -t and -p options.
+        page = window.get_empty_interface()
+        if target:
+            page.toolbar.selected_target = target
+        if profile:
+            page.toolbar.selected_profile = profile
+        if target and profile:
+            page.start_scan_cb()
+
+    if main_is_frozen():
+        # This is needed by py2exe
+        gtk.gdk.threads_init()
+        gtk.gdk.threads_enter()
+
+    gtk.main()
+
+    if main_is_frozen():
+        gtk.gdk.threads_leave()
+
+class NonRootWarning (HIGAlertDialog):
+    def __init__(self):
+        warning_text = _('''You are trying to run %s with a non-root user!\n
+Some %s options need root privileges to work.''') % (APP_DISPLAY_NAME, NMAP_DISPLAY_NAME)
         
-        if is_maemo():
-            import hildon
-            self.hildon_app = hildon.Program()
-            self.hildon_app.add_window(self.main_window)
-
-        self.main_window.show_all()
-    
-    def safe_shutdown(self, signum, stack):
-        """Kills any active scans/tabs and shuts down the application."""
-        log.debug("\n\n%s\nSAFE SHUTDOWN!\n%s\n" % ("#" * 30, "#" * 30))
-        log.debug("SIGNUM: %s" % signum)
-
-        try:
-            # Killing all scans
-            scans = self.main_window.scan_notebook.get_children()
-            for scan in scans:
-                log.debug(">>> Killing Scan: %s" % scan.get_tab_label())
-                scan.kill_scan()
-                scan.close_tab()
-                self.main_window.scan_notebook.remove(scan)
-                del(scan)
-        except NameError:
-            pass
-
-        self.main_window._exit_cb()
-        sys.exit(signum)
-
-    def run(self):
-        # Try to load psyco module, saving this information
-        # if we care to use it later (such as in an About Dialog)
-        try:
-            import psyco
-            psyco.profile()
-            self.using_psyco = True
-        except:
-            log.warning(_("RUNNING WITHOUT PSYCO!"))
-            log.warning(_("""Psyco is a module that speeds up the execution \
-of this application. It is not a requirement, \
-but you're encouraged to install it to have a better \
-speed experience. Download it at http://psyco.sf.net/"""))
-            self.using_psyco = False
-
-        self.__run_gui()
-
-    def __run_gui(self):
-        log.info(">>> GUI Mode")
-
-        # Cause an exception if PyGTK can't open a display. Normally this just
-        # produces a warning, but the lack of a display eventually causes a
-        # segmentation fault. See http://live.gnome.org/PyGTK/WhatsNew210.
-        import warnings
-        warnings.filterwarnings("error", module = "gtk")
-        import gtk
-        warnings.resetwarnings()
-
-        import gobject
-
-        # Commented until we decide what to do with the splash screen.
-        # from zenmapGUI.Splash import Splash
-        # if not is_maemo():
-        #     pixmap_d = Path.pixmaps_dir
-        #     if pixmap_d:
-        #         pixmap_file = os.path.join(pixmap_d, 'splash.png')
-        #         self.splash = Splash(pixmap_file, 1400)
-
-        if main_is_frozen():
-            # This is needed by py2exe
-            gtk.gdk.threads_init()
-            gtk.gdk.threads_enter()
-
-        self.__create_show_main_window()
-
-        # Run main loop
-        #gobject.threads_init()
-        gtk.main()
-
-        if main_is_frozen():
-            gtk.gdk.threads_leave()
+        HIGAlertDialog.__init__(self, message_format=_('Non-root user'),
+                                secondary_text=warning_text)
