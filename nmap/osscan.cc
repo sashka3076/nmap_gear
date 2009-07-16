@@ -6,7 +6,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -34,19 +34,10 @@
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
- * works of Nmap.  This list is not exclusive, but is just meant to        *
- * clarify our interpretation of derived works with some common examples.  *
- * These restrictions only apply when you actually redistribute Nmap.  For *
- * example, nothing stops you from writing and selling a proprietary       *
- * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://nmap.org to download Nmap.                                       *
- *                                                                         *
- * We don't consider these to be added restrictions on top of the GPL, but *
- * just a clarification of how we interpret "derived works" as it applies  *
- * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
- * Torvalds has announced his interpretation of how "derived works"        *
- * applies to Linux kernel modules.  Our interpretation refers only to     *
- * Nmap - we don't speak for any other GPL products.                       *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
  *                                                                         *
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
@@ -77,17 +68,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -98,7 +89,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: osscan.cc 7640 2008-05-22 20:45:32Z fyodor $ */
+/* $Id: osscan.cc 13888 2009-06-24 21:35:54Z fyodor $ */
 
 #include "osscan.h"
 #include "timing.h"
@@ -264,8 +255,9 @@ static int AVal_match(struct AVal *reference, struct AVal *fprint, struct AVal *
       if (points) {
 	 current_points = getattrbyname(points, current_ref->attribute);
 	 if (!current_points) fatal("%s: Failed to find point amount for test %s.%s", __func__, testGroupName? testGroupName : "", current_ref->attribute);
+	 errno = 0;
 	 pointsThisTest = strtol(current_points->value, &endptr, 10);
-	 if (pointsThisTest < 1)
+	 if (errno != 0 || *endptr != '\0' || pointsThisTest < 0)
 	   fatal("%s: Got bogus point amount (%s) for test %s.%s", __func__, current_points->value, testGroupName? testGroupName : "", current_ref->attribute);
       }
       subtests += pointsThisTest;
@@ -461,7 +453,7 @@ static void WriteSInfo(char *ostr, int ostrlen, bool isGoodFP,
 				int openTcpPort, int closedTcpPort, int closedUdpPort) {
   struct tm *ltime;
   time_t timep;
-  char dsbuf[8], otbuf[8], ctbuf[8], cubuf[8];
+  char dsbuf[10], otbuf[8], ctbuf[8], cubuf[8];
   char macbuf[16];
   timep = time(NULL);
   ltime = localtime(&timep);
@@ -765,16 +757,9 @@ static char str[2048];
 FingerPrint *current;
 struct AVal *AV;
 char *p = str;
-int len;
 memset(str, 0, sizeof(str));
 
 if (!FP) return "(None)";
-
-if(FP->OS_name && *(FP->OS_name)) {
-  len = Snprintf(str, 128, "FingerPrint  %s\n", FP->OS_name);
-  if (len < 0) fatal("OS name too long");
-  p += len;
-}
 
 for(current = FP; current ; current = current->next) {
   Strncpy(p, current->name, sizeof(str) - (p-str));
@@ -800,108 +785,77 @@ for(current = FP; current ; current = current->next) {
 return str;
 }
 
+/* Return a zero-terminated copy of the substring that starts at p and ends at
+   q, with leading and trailing whitespace stripped. The returned string is
+   allocated with cp_alloc. */
+static char *substrstrip(const char *p, const char *q) {
+  char *s;
+
+  assert(p <= q);
+
+  while (isspace(*p))
+    p++;
+  while (q > p && isspace(*(q - 1)))
+    q--;
+
+  s = (char *) cp_alloc(q - p + 1);
+  memcpy(s, p, q - p);
+  s[q - p] = '\0';
+
+  return s;
+}
+
 /* Parse a 'Class' line found in the fingerprint file into the current
    FP.  Classno is the number of 'class' lines found so far in the
    current fingerprint.  The function quits if there is a parse error */
 static void parse_classline(FingerPrint *FP, char *thisline, int lineno, 
 			    int *classno) {
-  char *p, *q;
+  const char *begin, *end;
+  struct OS_Classification *os_class;
 
-// Wtf????
-  fflush(stdout);
-
-  if (!thisline || strncmp(thisline, "Class ", 6) == 1) {
+  if (!thisline || strncmp(thisline, "Class ", 6) != 0)
     fatal("Bogus line #%d (%s) passed to %s()", lineno, thisline, __func__);
-  }
 
   if (*classno >= MAX_OS_CLASSIFICATIONS_PER_FP)
     fatal("Too many Class lines in fingerprint (line %d: %s), remove some or increase MAX_OS_CLASSIFICATIONS_PER_FP", lineno, thisline);
-  
-  p = thisline + 6;
-  
-  /* First lets get the vendor name */
-  while(*p && isspace(*p)) p++;
-  
-  q = strchr(p, '|');
-  if (!q) {
-    fatal("Parse error on line %d of fingerprint: %s\n", lineno, thisline);
-  }
-  
-  // Trim any trailing whitespace
-  q--;
-  while(isspace(*q)) q--;
-  q++;
-  if (q < p) { fatal("Parse error on line %d of fingerprint: %s\n", lineno, thisline); }
-  FP->OS_class[*classno].OS_Vendor = (char *) cp_alloc(q - p + 1);
-  memcpy(FP->OS_class[*classno].OS_Vendor, p, q - p);
-  FP->OS_class[*classno].OS_Vendor[q - p] = '\0';
-  
-  /* Next comes the OS Family */
-  p = q;
-  while(*p && !isalnum(*p)) p++;
 
-  q = strchr(p, '|');
-  if (!q) {
-    fatal("Parse error on line %d of fingerprint: %s\n", lineno, thisline);
-  }
-  // Trim any trailing whitespace
-  q--;
-  while(isspace(*q)) q--;
-  q++;
-  if (q < p) { fatal("Parse error on line %d of fingerprint: %s\n", lineno, thisline); }
-  FP->OS_class[*classno].OS_Family = (char *) cp_alloc(q - p + 1);
-  memcpy(FP->OS_class[*classno].OS_Family, p, q - p);
-  FP->OS_class[*classno].OS_Family[q - p] = '\0';
-  
-  /* And now the the OS generation, if available */
-  p = q;
-  while(*p && *p != '|') p++;
-  if (*p) p++;
-  while(*p && isspace(*p) && *p != '|') p++;
-  if (*p == '|') {
-    FP->OS_class[*classno].OS_Generation = NULL;
-    q = p;
-  }
-  else {
-    q = strpbrk(p, " |");
-    if (!q) {
-      fatal("Parse error on line %d of fingerprint: %s\n", lineno, thisline);
-    }
-    // Trim any trailing whitespace
-    q--;
-    while(isspace(*q)) q--;
-    q++;
-    if (q < p) { fatal("Parse error on line %d of fingerprint: %s\n", lineno, thisline); }
-    FP->OS_class[*classno].OS_Generation = (char *) cp_alloc(q - p + 1);
-    memcpy(FP->OS_class[*classno].OS_Generation, p, q - p);
-    FP->OS_class[*classno].OS_Generation[q - p] = '\0';
-  }
-  
-  /* And finally the device type */
-  p = q;
-  while(*p && !isalnum(*p)) p++;
-  
-  q = strchr(p, '|');
-  if (!q) {
-    q = p;
-    while(*q) q++;
-  }
-  
-  // Trim any trailing whitespace
-  q--;
-  while(isspace(*q)) q--;
-  q++;
-  if (q < p) { fatal("Parse error on line %d of fingerprint: %s\n", lineno, thisline); }
-  FP->OS_class[*classno].Device_Type = (char *) cp_alloc(q - p + 1);
-  memcpy(FP->OS_class[*classno].Device_Type, p, q - p);
-  FP->OS_class[*classno].Device_Type[q - p] = '\0';
-  
+  os_class = &FP->OS_class[*classno];
 
-  //  printf("Got classification #%d for the OS %s: VFGT: %s * %s * %s * %s\n", *classno, FP->OS_name, FP->OS_class[*classno].OS_Vendor, FP->OS_class[*classno].OS_Family, FP->OS_class[*classno].OS_Generation? FP->OS_class[*classno].OS_Generation : "(null)", FP->OS_class[*classno].Device_Type);
+  /* First let's get the vendor name. */
+  begin = thisline + 6;
+  end = strchr(begin, '|');
+  if (end == NULL)
+    fatal("Parse error on line %d of fingerprint: %s\n", lineno, thisline);
+  os_class->OS_Vendor = substrstrip(begin, end);
+
+  /* Next comes the OS family. */
+  begin = end + 1;
+  end = strchr(begin, '|');
+  if (end == NULL)
+    fatal("Parse error on line %d of fingerprint: %s\n", lineno, thisline);
+  os_class->OS_Family = substrstrip(begin, end);
+
+  /* And now the the OS generation. */
+  begin = end + 1;
+  end = strchr(begin, '|');
+  if (end == NULL)
+    fatal("Parse error on line %d of fingerprint: %s\n", lineno, thisline);
+  /* OS generation is handled specially: instead of an empty string it's
+     supposed to be NULL. */
+  while (isspace(*begin))
+    begin++;
+  if (begin < end)
+    os_class->OS_Generation = substrstrip(begin, end);
+  else
+    os_class->OS_Generation = NULL;
+
+  /* And finally the device type. We look for '\0' instead of '|'. */
+  begin = end + 1;
+  end = strchr(begin, '\0');
+  os_class->Device_Type = substrstrip(begin, end);
 
   (*classno)++;
   FP->num_OS_Classifications++;
-
 }
 
 /* Parses a single fingerprint from the memory region given.  If a
@@ -936,20 +890,20 @@ FingerPrint *parse_single_fingerprint(char *fprint_orig) {
     }
 
     if (strncmp(thisline, "Fingerprint ", 12) == 0) {
-      p = thisline + 12;
-      while(*p && isspace((int) *p)) p++;
+      /* Ignore a second Fingerprint line if it appears. */
+      if (FP->OS_name == NULL) {
+        p = thisline + 12;
+        while(*p && isspace((int) *p)) p++;
 
-      q = strchr(p, '\n');
-      if (!q) q = p + strlen(p);
-      while(isspace(*(--q)))
-	;
+        q = strchr(p, '\n');
+        if (!q) q = p + strlen(p);
+        while(q > p && isspace(*(--q)))
+          ;
 
-      if (q < p) fatal("Parse error on line %d of fingerprint: %s", lineno, nextline);
-
-      FP->OS_name = (char *) cp_alloc(q - p + 2);
-      memcpy(FP->OS_name, p, q - p + 1);
-      FP->OS_name[q - p + 1] = '\0';
-      
+        FP->OS_name = (char *) cp_alloc(q - p + 2);
+        memcpy(FP->OS_name, p, q - p + 1);
+        FP->OS_name[q - p + 1] = '\0';
+      }
     } else if (strncmp(thisline, "Class ", 6) == 0) {
 
       parse_classline(FP, thisline, lineno, &classno);
@@ -1025,12 +979,12 @@ void free_fingerprint_file(FingerPrintDB *DB) {
 }
 
 
-FingerPrintDB *parse_fingerprint_file(char *fname) {
+FingerPrintDB *parse_fingerprint_file(const char *fname) {
 FingerPrintDB *DB = NULL;
 FingerPrint *current;
 FILE *fp;
 int max_records = 4096; 
-char line[512];
+char line[2048];
 int numrecords = 0;
 int lineno = 0;
  bool parsingMatchPoints = false;

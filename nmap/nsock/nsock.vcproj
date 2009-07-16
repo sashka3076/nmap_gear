@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="8,00"
+	Version="9.00"
 	Name="nsock"
 	ProjectGUID="{F8D6D1E3-D4EA-402C-98AA-168E5309BAF4}"
 	RootNamespace="nsock"
 	Keyword="Win32Proj"
+	TargetFrameworkVersion="131072"
 	>
 	<Platforms>
 		<Platform
@@ -49,7 +50,6 @@
 				RuntimeLibrary="1"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
-				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="4"
 				CompileAs="2"
 			/>
@@ -111,10 +111,9 @@
 				AdditionalIncludeDirectories="..\nbase\;include;..\mswin32\pcap-include;..\mswin32;..\;..\mswin32\OpenSSL\include;"
 				PreprocessorDefinitions="WIN32;_LIB"
 				ExceptionHandling="0"
-				RuntimeLibrary="0"
+				RuntimeLibrary="2"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
-				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="3"
 				CompileAs="2"
 			/>

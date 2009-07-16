@@ -4,7 +4,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -32,19 +32,10 @@
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
- * works of Nmap.  This list is not exclusive, but is just meant to        *
- * clarify our interpretation of derived works with some common examples.  *
- * These restrictions only apply when you actually redistribute Nmap.  For *
- * example, nothing stops you from writing and selling a proprietary       *
- * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://nmap.org to download Nmap.                                       *
- *                                                                         *
- * We don't consider these to be added restrictions on top of the GPL, but *
- * just a clarification of how we interpret "derived works" as it applies  *
- * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
- * Torvalds has announced his interpretation of how "derived works"        *
- * applies to Linux kernel modules.  Our interpretation refers only to     *
- * Nmap - we don't speak for any other GPL products.                       *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
  *                                                                         *
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
@@ -75,17 +66,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -96,7 +87,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: portlist.cc 7640 2008-05-22 20:45:32Z fyodor $ */
+/* $Id: portlist.cc 13888 2009-06-24 21:35:54Z fyodor $ */
 
 
 #include "portlist.h"
@@ -104,6 +95,7 @@
 #include "nmap.h"
 #include "NmapOps.h"
 #include "services.h"
+#include "protocols.h"
 #include "nmap_rpc.h"
 #include "tcpip.h"
 
@@ -120,7 +112,7 @@ Port::Port() {
   owner = NULL;
   rpc_status = RPC_STATUS_UNTESTED;
   rpc_program = rpc_lowver = rpc_highver = 0;
-  state = confidence = 0;
+  state = 0;
   next = NULL;
   serviceprobe_results = PROBESTATE_INITIAL;
   serviceprobe_service = NULL;
@@ -156,26 +148,67 @@ Port::~Port() {
 // out sd->fullversion.  If unavailable, it will be set to zero length.
 static void populateFullVersionString(struct serviceDeductions *sd) {
   char *dst = sd->fullversion;
-  unsigned int spaceleft = sizeof(sd->fullversion) - 1;
+  unsigned int spaceleft = sizeof(sd->fullversion) - 1; // Leave room for \0
+  int needpad = 0;  // Do we need to pad a space between the next template?
 
   dst[0] = '\0';
 
-  if (sd->product && spaceleft >= strlen(sd->product)) {
-    strncat(dst, sd->product, spaceleft);
-    spaceleft -= strlen(sd->product);
+  /* Sometimes there is really great product/version/extra information
+   * available that won't quite fit.  Rather than just drop that information
+   * this routine will truncate the string that is too long with "...".
+   * If there are fewer than 8 characters left don't bother and just skip
+   * that bit of information.
+   */
+
+  if (sd->product && spaceleft >= 8) {
+    if (spaceleft < strlen(sd->product)) {
+      strncat(dst, sd->product, spaceleft - 3);  // Leave room for "..."
+      strncat(dst, "...", spaceleft);
+      spaceleft = 0;
+    }
+    else {
+      strncat(dst, sd->product, spaceleft);
+      spaceleft -= strlen(sd->product);
+    }
+    needpad = 1;
   }
 
-  if (sd->version && spaceleft >= (strlen(sd->version) + 1)) {
-    strncat(dst, " ", spaceleft);
-    strncat(dst, sd->version, spaceleft);
-    spaceleft -= strlen(sd->version) + 1;
+  if (sd->version && spaceleft >= 8) {
+    if (needpad) {
+      strncat(dst, " ", spaceleft);
+      spaceleft--;
+    }
+    
+    if (spaceleft < strlen(sd->version)) {
+      strncat(dst, sd->version, spaceleft - 3);
+      strncat(dst, "...", spaceleft);
+      spaceleft = 0;
+    }
+    else {
+      strncat(dst, sd->version, spaceleft);
+      spaceleft -= strlen(sd->version);
+    }
+    needpad = 1;
   }
 
-  if (sd->extrainfo && spaceleft >= (strlen(sd->extrainfo) + 3)) {
-    strncat(dst, " (", spaceleft);
-    strncat(dst, sd->extrainfo, spaceleft);
+  if (sd->extrainfo && spaceleft >= 8) {
+    if (needpad) {
+      strncat(dst, " ", spaceleft);
+      spaceleft--;
+    }
+    // This time we need to trucate inside of the () so we have spaceleft - 2
+    strncat(dst, "(", spaceleft);
+    if (spaceleft - 2 < strlen(sd->extrainfo)) {
+      strncat(dst, sd->extrainfo, spaceleft - 5);
+      strncat(dst, "...", spaceleft - 2);
+      spaceleft = 1;  // Fit the paren
+    }
+    else {
+      strncat(dst, sd->extrainfo, spaceleft);
+      spaceleft -= (strlen(sd->extrainfo) + 2);
+    }
     strncat(dst, ")", spaceleft);
-    spaceleft -= strlen(sd->extrainfo) + 3;
+    spaceleft--;
   }
 
 }
@@ -225,7 +258,7 @@ int Port::getServiceDeductions(struct serviceDeductions *sd) {
     populateFullVersionString(sd);
     return 0;
   } else if (serviceprobe_results == PROBESTATE_EXCLUDED) {
-    service = nmap_getservbyport(htons(portno), (proto == IPPROTO_TCP)? "tcp" : "udp");
+    service = nmap_getservbyport(htons(portno), IPPROTO2STR(proto));
 
     if (service) sd->name = service->s_name;
 
@@ -242,7 +275,7 @@ int Port::getServiceDeductions(struct serviceDeductions *sd) {
   }
 
   // So much for service detection or RPC.  Maybe we can find it in the file
-  service = nmap_getservbyport(htons(portno), (proto == IPPROTO_TCP)? "tcp" : "udp");
+  service = nmap_getservbyport(htons(portno), IPPROTO2STR(proto));
   if (service) {
     sd->dtype = SERVICE_DETECTION_TABLE;
     sd->name = service->s_name;
@@ -305,12 +338,12 @@ void Port::setServiceProbeResults(enum serviceprobestate sres,
 	else 
 		serviceprobe_fp = NULL;
 
-	serviceprobe_product = cstringSanityCheck(product, 64);
-	serviceprobe_version = cstringSanityCheck(version, 64);
-	serviceprobe_extrainfo = cstringSanityCheck(extrainfo, 128);
-	serviceprobe_hostname = cstringSanityCheck(hostname, 64);
-	serviceprobe_ostype = cstringSanityCheck(ostype, 64);
-	serviceprobe_devicetype = cstringSanityCheck(devicetype, 64);
+	serviceprobe_product = cstringSanityCheck(product, 80);
+	serviceprobe_version = cstringSanityCheck(version, 80);
+	serviceprobe_extrainfo = cstringSanityCheck(extrainfo, 256);
+	serviceprobe_hostname = cstringSanityCheck(hostname, 80);
+	serviceprobe_ostype = cstringSanityCheck(ostype, 32);
+	serviceprobe_devicetype = cstringSanityCheck(devicetype, 32);
 }
 
 /* Sets the results of an RPC scan.  if rpc_status is not
@@ -356,6 +389,7 @@ void Port::setRPCProbeResults(int rpcs, unsigned long rpcp,
 #define INPROTO2PORTLISTPROTO(p)		\
   ((p)==IPPROTO_TCP ? PORTLIST_PROTO_TCP :	\
    (p)==IPPROTO_UDP ? PORTLIST_PROTO_UDP :	\
+   (p)==IPPROTO_SCTP ? PORTLIST_PROTO_SCTP :	\
    PORTLIST_PROTO_IP)
 
 
@@ -508,12 +542,12 @@ int PortList::getStateCounts(int state){
    first "afterthisport".  Then supply the most recent returned port
    for each subsequent call.  When no more matching ports remain, NULL
    will be returned.  To restrict returned ports to just one protocol,
-   specify IPPROTO_TCP or IPPROTO_UDP for allowed_protocol. A TCPANDUDP
-   for allowed_protocol matches either. A 0 for allowed_state matches 
-   all possible states. This function returns ports in numeric
-   order from lowest to highest, except that if you ask for both TCP &
-   UDP, every TCP port will be returned before we start returning UDP
-   ports */
+   specify IPPROTO_TCP, IPPROTO_UDP or IPPROTO_SCTP for
+   allowed_protocol. A TCPANDUDPANDSCTP for allowed_protocol matches
+   either. A 0 for allowed_state matches all possible states. This
+   function returns ports in numeric order from lowest to highest,
+   except that if you ask for both TCP, UDP & SCTP, every TCP port
+   will be returned before we start returning UDP and SCTP ports */
 Port *PortList::nextPort(Port *afterthisport, 
 			 int allowed_protocol, int allowed_state) {
   int proto;
@@ -527,8 +561,10 @@ Port *PortList::nextPort(Port *afterthisport,
     mapped_pno = port_map[proto][afterthisport->portno];
     mapped_pno++; //  we're interested in next port after current
   }else { // running for the first time
-    if(allowed_protocol == TCPANDUDP)	// if both protocols, then first search TCP
+    if (allowed_protocol == TCPANDUDPANDSCTP)
       proto = INPROTO2PORTLISTPROTO(IPPROTO_TCP);
+    else if (allowed_protocol == UDPANDSCTP)
+      proto = INPROTO2PORTLISTPROTO(IPPROTO_UDP);
     else
       proto = INPROTO2PORTLISTPROTO(allowed_protocol);
     mapped_pno = 0;
@@ -542,9 +578,15 @@ Port *PortList::nextPort(Port *afterthisport,
     }
   }
   
-  /* if all protocols, than after TCP search UDP */
-  if(allowed_protocol == TCPANDUDP && proto == INPROTO2PORTLISTPROTO(IPPROTO_TCP))
-    return(nextPort(NULL, IPPROTO_UDP, allowed_state));
+  /* if all protocols, than after TCP search UDP & SCTP */
+  if((!afterthisport && allowed_protocol == TCPANDUDPANDSCTP) ||
+      (afterthisport && proto == INPROTO2PORTLISTPROTO(IPPROTO_TCP)))
+    return(nextPort(NULL, UDPANDSCTP, allowed_state));
+
+  /* if all protocols, than after UDP search SCTP */
+  if((!afterthisport && allowed_protocol == UDPANDSCTP) ||
+      (afterthisport && proto == INPROTO2PORTLISTPROTO(IPPROTO_UDP)))
+    return(nextPort(NULL, IPPROTO_SCTP, allowed_state));
   
   return(NULL); 
 }
@@ -692,6 +734,9 @@ bool PortList::isIgnoredState(int state) {
       state == PORT_FRESH)
     return false; /* Cannot be ignored */
 
+  if (state == PORT_OPENFILTERED && (o.verbose > 2 || o.debugging > 2))
+    return false;
+
   /* If openonly, we always ignore states that don't at least have open
      as a possibility. */
   if (o.openOnly() && state != PORT_OPENFILTERED && state != PORT_UNFILTERED 
@@ -706,7 +751,7 @@ bool PortList::isIgnoredState(int state) {
     else
       max_per_state *= (o.verbose + 20 * o.debugging);
   }
-  
+
   if (getStateCounts(state) > max_per_state)
     return true;
 
@@ -757,7 +802,14 @@ void random_port_cheat(u16 *ports, int portcount) {
   int allportidx = 0;
   int popportidx = 0;
   int earlyreplidx = 0;
-  u16 pop_ports[] = { 21, 22, 23, 25, 53, 80, 113, 256, 389, 443, 554, 636, 1723, 3389 };
+  /* Updated 2008-12-19 from nmap-services-all.
+     Top 25 open TCP ports plus 113, 554, and 256 */
+  u16 pop_ports[] = {
+    80, 23, 443, 21, 22, 25, 3389, 110, 445, 139,
+    143, 53, 135, 3306, 8080, 1723, 111, 995, 993, 5900,
+    1025, 587, 8888, 199, 1720,
+    113, 554, 256
+  };
   int num_pop_ports = sizeof(pop_ports) / sizeof(u16);
 
   for(allportidx = 0; allportidx < portcount; allportidx++) {

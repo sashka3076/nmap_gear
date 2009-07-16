@@ -5,7 +5,7 @@
  *                                                                         *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
- * The nsock parallel socket event library is (C) 1999-2008 Insecure.Com   *
+ * The nsock parallel socket event library is (C) 1999-2009 Insecure.Com   *
  * LLC This library is free software; you may redistribute and/or          *
  * modify it under the terms of the GNU General Public License as          *
  * published by the Free Software Foundation; Version 2.  This guarantees  *
@@ -34,17 +34,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
- * insecure.org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * Insecure.Org development mailing lists, it is assumed that you are      *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -54,7 +54,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock.h 7631 2008-05-22 18:14:15Z kris $ */
+/* $Id: nsock.h 13448 2009-05-29 23:19:07Z david $ */
 
 /* Would you like to include pcap support in nsock?
  * Pcap support code is currently unstable, so we give
@@ -118,6 +118,8 @@ typedef unsigned long nsock_event_id;
 
 /* This is used to save SSL sessionids between SSL connections */
 typedef void *nsock_ssl_session;
+typedef void *nsock_ssl_ctx;
+typedef void *nsock_ssl;
 
 /********************   PROTOTYPES *******************/
 
@@ -141,6 +143,8 @@ int nsp_geterrorcode(nsock_pool nsp);
 
 /* Every nsp has an ID that is unique across the program execution */
 unsigned long nsp_getid(nsock_pool nsp);
+
+nsock_ssl nsi_getssl(nsock_iod nsockiod);
 
 /* Note that nsi_get1_ssl_session will increment the usage count
  * of the SSL_SESSION, since nsock does a free when the nsi is
@@ -168,6 +172,16 @@ void *nsp_getud(nsock_pool nsp);
    the difference between the current time and basetime will be used
    (the time program execution starts would be a good candidate) */
 void nsp_settrace(nsock_pool nsp, int tracelevel, const struct timeval *basetime);
+
+/* Initializes an Nsock pool to create SSL connections. This sets an internal
+   SSL_CTX, which is like a template that sets options for all connections that
+   are made from it. Returns the SSL_CTX so you can set your own options. */
+nsock_ssl_ctx nsp_ssl_init(nsock_pool ms_pool);
+
+/* Initializes an Nsock pool to create SSL connections that emphasize speed over
+   security. Insecure ciphers are used when they are faster and no certificate
+   verification is done. Returns the SSL_CTX so you can set your own options. */
+nsock_ssl_ctx nsp_ssl_init_max_speed(nsock_pool ms_pool);
 
 /* And here is how you create an nsock_pool.  This allocates, initializes,
    and returns an nsock_pool event aggregator.  In the case of error,
@@ -270,9 +284,9 @@ nsock_iod nsi_new(nsock_pool nsockp, void *userdata);
 /* This version allows you to associate an existing sd with the msi
    so that you can read/write it using the nsock infrastructure.  For example,
    you may want to watch for data from STDIN_FILENO at the same time as you
-   read/wrtie various sockets. Ths sd is dup()ed, so you may close or
-   otherwise manipulate your copy.  The duped copy will be destroyed when the
-   nsi is destroyed 
+   read/write various sockets.  STDIN_FILENO is a special case, however. Any
+   other sd is dup()ed, so you may close or otherwise manipulate your copy.
+   The duped copy will be destroyed when the nsi is destroyed
 */
 nsock_iod nsi_new2(nsock_pool nsockp, int sd, void *userdata);
 
@@ -314,6 +328,20 @@ unsigned long nsi_id(nsock_iod nsockiod);
 
   /* Returns 1 if an NSI is communicating via SSL, 0 otherwise */
 int nsi_checkssl(nsock_iod nsockiod);
+
+/* Returns the remote peer port (or -1 if unavailable).  Note the
+   return value is a whole int so that -1 can be distinguished from
+   65535.  Port is returned in host byte order. */
+int nsi_peerport(nsock_iod nsiod);
+
+/* Sets the local address to bind to before connect() */
+int nsi_set_localaddr(nsock_iod nsi, struct sockaddr_storage *ss, size_t sslen);
+
+/* Sets IPv4 options to apply before connect().  It makes a copy of the 
+ * options, so you can free() yours if necessary.  This copy is freed
+ * when the iod is destroyed
+ */
+int nsi_set_ipoptions(nsock_iod nsi, void *ipopts, size_t ipoptslen);
 
 /* Returns that host/port/protocol information for the last
    communication (or comm. attempt) this nsi has been involved with.
@@ -529,6 +557,7 @@ int nsi_is_pcap(nsock_iod nsiod);
 #endif
 
 #endif /* NSOCK_H */
+
 
 
 

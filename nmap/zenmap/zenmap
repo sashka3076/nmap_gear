@@ -23,38 +23,20 @@
 
 import os
 import sys
-import signal
-import webbrowser
 from os.path import split
 
 from zenmapCore.Name import APP_NAME, APP_DISPLAY_NAME
-from zenmapCore.UmitOptionParser import option_parser
+from zenmapCore.Version import VERSION
+from zenmapCore.UmitLogging import log
 
 DEVELOPMENT = os.environ.get(APP_NAME.upper() + "_DEVELOPMENT", False)
 
 if not DEVELOPMENT:
-    from tempfile import mktemp
-    # Generating temporary files names
-    stdout_output = mktemp()
-    stderr_output = mktemp()
-
-    old_stdout = sys.stdout
-    old_stderr = sys.stderr
-
-    _stdout = open(stdout_output, "w")
-    _stderr = open(stderr_output, "w")
-
-    sys.stdout = _stdout
-    sys.stderr = _stderr
-
     # This will catch exceptions and send them to bugzilla
     def excepthook(type, value, tb):
-        # We want messages printed to the console in case any exceptions occur
-        # in the exception hook itself (like if PyGTK is not present).
-        sys.stdout = old_stdout
-        sys.stderr = old_stderr
-
         import traceback
+
+        traceback.print_exception(type, value, tb)
 
         # Cause an exception if PyGTK can't open a display. Normally this just
         # produces a warning, but the lack of a display eventually causes a
@@ -64,9 +46,11 @@ if not DEVELOPMENT:
         import gtk
         warnings.resetwarnings()
 
-        from zenmapCore.I18N import _
+        gtk.gdk.threads_enter()
+
+        import zenmapCore.I18N
         from zenmapCore.Version import VERSION
-        from higwidgets.higdialogs import HIGAlertDialog
+        from zenmapGUI.higwidgets.higdialogs import HIGAlertDialog
         from zenmapGUI.CrashReport import CrashReport
 
         if type == ImportError:
@@ -79,32 +63,19 @@ A required module was not found.
             d.run()
             d.destroy()
         else:
-            traceback.print_tb(tb)
-
-            sys.stdout.close()
-            sys.stderr.close()
-
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
-
             hook = "Type: %s\nValue: %s\n" % (type, value)
             outputs = "CRASH REPORTED:\n\
-    SYS.PLATFORM: %s\n\
-    OS.NAME: %s\n\
-    %s Version: %s\n\
-    %s\nSTDOUT\n%s\n\n\
-    %s\nSTDERR\n%s\n\nHOOK:\n%s" % \
+SYS.PLATFORM: %s\n\
+OS.NAME: %s\n\
+%s Version: %s\n\
+TRACEBACK:\n%s" % \
             (sys.platform, os.name,
              APP_DISPLAY_NAME,
-             VERSION, "-"*80,
-             open(stdout_output).read(),
-             "-"*80,
-             open(stderr_output).read(),
-             hook)
+             VERSION,
+             "".join(traceback.format_exception(type, value, tb)))
 
-            report_result = False
             try:
-                c = CrashReport("%s Crash - '%s'" % (APP_DISPLAY_NAME, value), outputs)
+                c = CrashReport("%s: %s" % (VERSION, value), outputs)
                 c.show_all()
                 gtk.main()
             except:
@@ -119,39 +90,17 @@ The following error message was NOT reported:
 %s""") % (APP_DISPLAY_NAME, outputs))
                 d.run()
                 d.destroy()
-            else:
-                # Showing a message on the terminal
-                old_stdout.write("Bug reported!")
-                old_stdout.write("\n")
 
-                # Calling a browser to open the result from bug tracker
-                if report_result:
-                    webbrowser.open("file://%s" % report_result)
+        gtk.gdk.threads_leave()
 
         gtk.main_quit()
 
     sys.excepthook = excepthook
 
 if __name__ == '__main__':
-    ######################################
-    # Setting the home directory
-
-    from zenmapCore.Paths import Path
-    Path.set_umit_conf(split(sys.argv[0])[0])
-
-    ######################################
-
-    from zenmapCore.UmitLogging import log
-    from zenmapGUI.App import App
-    app = App()
-
-    if os.name == "posix":
-        signal.signal(signal.SIGHUP, app.safe_shutdown)
-
-    signal.signal(signal.SIGTERM, app.safe_shutdown)
-    signal.signal(signal.SIGINT, app.safe_shutdown)
+    import zenmapGUI.App
 
     try:
-        app.run()
+        zenmapGUI.App.run()
     except KeyboardInterrupt:
-        sys.exit(signal.SIGINT)
+        sys.exit(1)

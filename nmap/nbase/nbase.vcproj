@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="8.00"
+	Version="9.00"
 	Name="nbase"
 	ProjectGUID="{B630C8F7-3138-43E8-89ED-78742FA2AC5F}"
-        RootNamespace="nbase"
+	RootNamespace="nbase"
 	Keyword="Win32Proj"
+	TargetFrameworkVersion="131072"
 	>
 	<Platforms>
 		<Platform
@@ -47,7 +48,6 @@
 				RuntimeLibrary="1"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
-				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="4"
 			/>
 			<Tool
@@ -104,12 +104,11 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-                                AdditionalOptions="/D &quot;_CRT_SECURE_NO_DEPRECATE&quot;"
+				AdditionalOptions="/D &quot;_CRT_SECURE_NO_DEPRECATE&quot;"
 				PreprocessorDefinitions="WIN32;_LIB"
-				RuntimeLibrary="0"
+				RuntimeLibrary="2"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
-				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="3"
 			/>
 			<Tool
@@ -180,6 +179,10 @@
 			</File>
 			<File
 				RelativePath=".\nbase_time.c"
+				>
+			</File>
+			<File
+				RelativePath=".\nbase_winunix.c"
 				>
 			</File>
 			<File

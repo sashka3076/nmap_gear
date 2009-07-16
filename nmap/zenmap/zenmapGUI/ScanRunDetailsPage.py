@@ -20,23 +20,17 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 import gtk
-from higwidgets.higboxes import HIGVBox, HIGHBox, hig_box_space_holder
-from higwidgets.higtables import HIGTable
-from higwidgets.higlabels import HIGEntryLabel
+from zenmapGUI.higwidgets.higboxes import HIGVBox, HIGHBox, hig_box_space_holder
+from zenmapGUI.higwidgets.higtables import HIGTable
+from zenmapGUI.higwidgets.higlabels import HIGEntryLabel
 
-from zenmapCore.I18N import _
-
+import zenmapCore.I18N
 
 class ScanRunDetailsPage(HIGVBox):
-    def __init__(self):
+    def __init__(self, scan):
         HIGVBox.__init__(self)
-        
-        self.__create_widgets()
-    
-    def __create_widgets(self):
+
         na = _('Not available')
-        self.command_expander = gtk.Expander("<b>"+_("Command Info")+"</b>")
-        self.general_expander = gtk.Expander("<b>"+_("General Info")+"</b>")
         
         # Command info
         self.command_label = HIGEntryLabel(_('Command:'))
@@ -50,9 +44,34 @@ class ScanRunDetailsPage(HIGVBox):
         
         self.debug_label = HIGEntryLabel(_('Debug level:'))
         self.info_debug_label = HIGEntryLabel(na)
+
+        self.command_expander = gtk.Expander("<b>"+_("Command Info")+"</b>")
+        self.command_expander.set_use_markup(True)
         
         self.command_table = HIGTable()
+        self.command_table.set_border_width(5)
+        self.command_table.set_row_spacings(6)
+        self.command_table.set_col_spacings(6)
+
         self.command_hbox = HIGHBox()
+        self.command_hbox._pack_noexpand_nofill(hig_box_space_holder())
+        self.command_hbox._pack_noexpand_nofill(self.command_table)
+        
+        self.command_table.attach(self.command_label,0,1,0,1)
+        self.command_table.attach(self.info_command_label,1,2,0,1)
+        
+        self.command_table.attach(self.nmap_version_label,0,1,1,2)
+        self.command_table.attach(self.info_nmap_version_label,1,2,1,2)
+        
+        self.command_table.attach(self.verbose_label,0,1,2,3)
+        self.command_table.attach(self.info_verbose_label,1,2,2,3)
+        
+        self.command_table.attach(self.debug_label,0,1,3,4)
+        self.command_table.attach(self.info_debug_label,1,2,3,4)
+        
+        self.command_expander.add(self.command_hbox)
+        self._pack_noexpand_nofill(self.command_expander)
+        self.command_expander.set_expanded(True)
         
         # General info:
         self.start_label = HIGEntryLabel(_('Started on:'))
@@ -79,81 +98,15 @@ class ScanRunDetailsPage(HIGVBox):
         self.closed_label = HIGEntryLabel(_('Closed ports:'))
         self.info_closed_label = HIGEntryLabel(na)
         
-        self.general_table = HIGTable()
-        self.general_hbox = HIGHBox()
-    
-    def set_command_info(self, info):
-        # Fix aligment!
-        self.command_expander.set_use_markup(True)
-        self.command_table.set_border_width(5)
-        self.command_table.set_row_spacings(6)
-        self.command_table.set_col_spacings(6)
-        
-        try:self.info_command_label.set_text(info['command'])
-        except:pass
-        
-        try:self.info_nmap_version_label.set_text(info['version'])
-        except:pass
-        
-        try:self.info_verbose_label.set_text(info['verbose'])
-        except:pass
-        
-        try:self.info_debug_label.set_text(info['debug'])
-        except:pass
-        
-        self.command_hbox._pack_noexpand_nofill(hig_box_space_holder())
-        self.command_hbox._pack_noexpand_nofill(self.command_table)
-        
-        self.command_table.attach(self.command_label,0,1,0,1)
-        self.command_table.attach(self.info_command_label,1,2,0,1)
-        
-        self.command_table.attach(self.nmap_version_label,0,1,1,2)
-        self.command_table.attach(self.info_nmap_version_label,1,2,1,2)
-        
-        self.command_table.attach(self.verbose_label,0,1,2,3)
-        self.command_table.attach(self.info_verbose_label,1,2,2,3)
-        
-        self.command_table.attach(self.debug_label,0,1,3,4)
-        self.command_table.attach(self.info_debug_label,1,2,3,4)
-        
-        self.command_expander.add(self.command_hbox)
-        self._pack_noexpand_nofill(self.command_expander)
-        self.command_expander.set_expanded(True)
-    
-    def set_general_info(self, info):
-        # Fix aligment!
+        self.general_expander = gtk.Expander("<b>"+_("General Info")+"</b>")
         self.general_expander.set_use_markup(True)
+
+        self.general_table = HIGTable()
         self.general_table.set_border_width(5)
         self.general_table.set_row_spacings(6)
         self.general_table.set_col_spacings(6)
-        
-        try:self.info_start_label.set_text(info['start'])
-        except:pass
-        
-        try:self.info_finished_label.set_text(info['finish'])
-        except:pass
-        
-        try:self.info_hosts_up_label.set_text(info['hosts_up'])
-        except:pass
-        
-        try:self.info_hosts_down_label.set_text(info['hosts_down'])
-        except:pass
-        
-        try:self.info_hosts_scanned_label.set_text(info['hosts_scanned'])
-        except:pass
-        
-        #try:
-        self.info_open_label.set_text(info['open_ports'])
-        #except:pass
-        
-        #try:
-        self.info_filtered_label.set_text(info['filtered_ports'])
-        #except:pass
-        
-        #try:
-        self.info_closed_label.set_text(info['closed_ports'])
-        #except:pass
-        
+
+        self.general_hbox = HIGHBox()
         self.general_hbox._pack_noexpand_nofill(hig_box_space_holder())
         self.general_hbox._pack_noexpand_nofill(self.general_table)
         
@@ -185,39 +138,81 @@ class ScanRunDetailsPage(HIGVBox):
         self._pack_noexpand_nofill(self.general_expander)
         self.general_expander.set_expanded(True)
 
-    def set_scan_infos(self, scan_info):
-        for scan in scan_info:
-            exp = gtk.Expander('<b>%s - %s</b>' % (_('Scan Info'), scan['type'].capitalize()))
-            exp.set_use_markup(True)
-            hbox = HIGHBox()
-            table = HIGTable()
-            table.set_border_width(5)
-            table.set_row_spacings(6)
-            table.set_col_spacings(6)
-            
-            table.attach(HIGEntryLabel(_('Scan type:')),0,1,0,1)
-            table.attach(HIGEntryLabel(scan['type']),1,2,0,1)
-            
-            table.attach(HIGEntryLabel(_('Protocol:')),0,1,1,2)
-            table.attach(HIGEntryLabel(scan['protocol']),1,2,1,2)
-            
-            table.attach(HIGEntryLabel(_('# scanned ports:')),0,1,2,3)
-            table.attach(HIGEntryLabel(scan['numservices']),1,2,2,3)
-            
-            table.attach(HIGEntryLabel(_('Services:')),0,1,3,4)
-            table.attach(self.get_service_view(scan['services'].split(',')),\
-                                               1,2,3,4)
-            
-            hbox._pack_noexpand_nofill(hig_box_space_holder())
-            hbox._pack_noexpand_nofill(table)
-            
-            exp.add (hbox)
-            self._pack_noexpand_nofill(exp)
+        self._set_from_scan(scan)
     
-    def get_service_view(self, services):
+    def _set_from_scan(self, scan):
+        """Initialize the display from a parsed scan."""
+        # Command info.
+        self.info_command_label.set_text(scan.get_nmap_command())
+        self.info_nmap_version_label.set_text(scan.get_scanner_version())
+        self.info_verbose_label.set_text(scan.get_verbose_level())
+        self.info_debug_label.set_text(scan.get_debugging_level())
+
+        # General info.
+        self.info_start_label.set_text(scan.get_formated_date())
+        self.info_finished_label.set_text(scan.get_formated_finish_date())
+        self.info_hosts_up_label.set_text(str(scan.get_hosts_up()))
+        self.info_hosts_down_label.set_text(str(scan.get_hosts_down()))
+        self.info_hosts_scanned_label.set_text(str(scan.get_hosts_scanned()))
+        self.info_open_label.set_text(str(scan.get_open_ports()))
+        self.info_filtered_label.set_text(str(scan.get_filtered_ports()))
+        self.info_closed_label.set_text(str(scan.get_closed_ports()))
+
+        for scaninfo in scan.get_scaninfo():
+            exp = gtk.Expander('<b>%s - %s</b>' % (_('Scan Info'), scaninfo['type'].capitalize()))
+            exp.set_use_markup(True)
+            
+            display = self.make_scaninfo_display(scaninfo)
+
+            exp.add(display)
+            self._pack_noexpand_nofill(exp)
+             
+    def make_scaninfo_display(self, scaninfo):
+        """Return a widget displaying a scan's "scaninfo" information: type,
+        protocol, number of scanned ports, and list of services."""
+        hbox = HIGHBox()
+        table = HIGTable()
+        table.set_border_width(5)
+        table.set_row_spacings(6)
+        table.set_col_spacings(6)
+        
+        table.attach(HIGEntryLabel(_('Scan type:')),0,1,0,1)
+        table.attach(HIGEntryLabel(scaninfo['type']),1,2,0,1)
+        
+        table.attach(HIGEntryLabel(_('Protocol:')),0,1,1,2)
+        table.attach(HIGEntryLabel(scaninfo['protocol']),1,2,1,2)
+        
+        table.attach(HIGEntryLabel(_('# scanned ports:')),0,1,2,3)
+        table.attach(HIGEntryLabel(scaninfo['numservices']),1,2,2,3)
+        
+        table.attach(HIGEntryLabel(_('Services:')),0,1,3,4)
+        table.attach(self.make_services_display(scaninfo['services']),1,2,3,4)
+        
+        hbox._pack_noexpand_nofill(hig_box_space_holder())
+        hbox._pack_noexpand_nofill(table)
+
+        return hbox
+
+    def make_services_display(self, services):
+        """Return a widget displaying a list of services like
+        1-1027,1029-1033,1040,1043,1050,1058-1059,1067-1068,1076,1080"""
         combo = gtk.combo_box_new_text()
         
-        for i in services:
+        for i in services.split(","):
             combo.append_text(i)
         
         return combo
+
+if __name__ == "__main__":
+    import sys
+    from zenmapCore.NmapParser import NmapParser
+
+    filename = sys.argv[1]
+    parsed = NmapParser()
+    parsed.parse_file(filename)
+    run_details = ScanRunDetailsPage(parsed)
+    window = gtk.Window()
+    window.add(run_details)
+    window.connect("delete-event", lambda *args: gtk.main_quit())
+    window.show_all()
+    gtk.main()

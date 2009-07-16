@@ -5,7 +5,7 @@
  *                                                                         *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
- * The nsock parallel socket event library is (C) 1999-2008 Insecure.Com   *
+ * The nsock parallel socket event library is (C) 1999-2009 Insecure.Com   *
  * LLC This library is free software; you may redistribute and/or          *
  * modify it under the terms of the GNU General Public License as          *
  * published by the Free Software Foundation; Version 2.  This guarantees  *
@@ -34,17 +34,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
- * insecure.org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * Insecure.Org development mailing lists, it is assumed that you are      *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -54,8 +54,9 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: filespace.c 7327 2008-05-05 04:10:20Z fyodor $ */
+/* $Id: filespace.c 12956 2009-04-15 00:37:23Z fyodor $ */
 
+#include "nsock_internal.h"
 #include "filespace.h"
 
 #include <string.h>
@@ -67,8 +68,7 @@ int filespace_init(struct filespace *fs, int initial_size) {
   if (initial_size == 0)
     initial_size = 1024;
   fs->current_alloc = initial_size;
-  fs->str = (char *) malloc(fs->current_alloc);
-  if (!fs->str) return -1;
+  fs->str = (char *) safe_malloc(fs->current_alloc);
   fs->str[0] = '\0';
   fs->pos = fs->str;
   return 0;
@@ -102,9 +102,7 @@ if (len == 0) return 0;
   if (fs->current_alloc - fs->current_size < len + 2) {
     fs->current_alloc = (int) (fs->current_alloc * 1.4 + 1 );
     fs->current_alloc += 100 + len;
-    tmpstr = (char *) malloc(fs->current_alloc);
-    if (!tmpstr)
-      return -1;
+    tmpstr = (char *) safe_malloc(fs->current_alloc);
     memcpy(tmpstr, fs->str, fs->current_size);
     fs->pos = (fs->pos - fs->str) + tmpstr;
     if (fs->str) free(fs->str);

@@ -5,7 +5,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -33,19 +33,10 @@
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
- * works of Nmap.  This list is not exclusive, but is just meant to        *
- * clarify our interpretation of derived works with some common examples.  *
- * These restrictions only apply when you actually redistribute Nmap.  For *
- * example, nothing stops you from writing and selling a proprietary       *
- * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://nmap.org to download Nmap.                                       *
- *                                                                         *
- * We don't consider these to be added restrictions on top of the GPL, but *
- * just a clarification of how we interpret "derived works" as it applies  *
- * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
- * Torvalds has announced his interpretation of how "derived works"        *
- * applies to Linux kernel modules.  Our interpretation refers only to     *
- * Nmap - we don't speak for any other GPL products.                       *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
  *                                                                         *
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
@@ -76,17 +67,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -97,7 +88,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOps.cc 7752 2008-05-29 07:49:37Z michael $ */
+/* $Id: NmapOps.cc 13888 2009-06-24 21:35:54Z fyodor $ */
 #include "nmap.h"
 #include "nbase.h"
 #include "NmapOps.h"
@@ -175,6 +166,34 @@ int NmapOps::TimeSinceStartMS(struct timeval *now) {
   return TIMEVAL_MSEC_SUBTRACT(tv, start_time);
 }
 
+// Convert a filename to a file:// URL. The return value must be freed.
+static char *filename_to_url(const char *filename) {
+  std::string url(filename);
+  char percent_buffer[10];
+
+#if WIN32
+  for (std::string::iterator p = url.begin(); p != url.end(); p++) {
+    if (*p == '\\')
+      *p = '/';
+  }
+  /* Put a pseudo-root directory before "C:/" or whatever. */
+  url = "/" + url;
+#endif
+
+  /* Percent-encode any troublesome characters. */
+  std::string::size_type i = 0;
+  /* See RFC 3986, section 3.3 "Path" for allowed characters. */
+  while ((i = url.find_first_of("?#[]%", i)) != std::string::npos) {
+    Snprintf(percent_buffer, sizeof(percent_buffer), "%%%02X", url[i]);
+    url.replace(i, 1, percent_buffer);
+    i += strlen(percent_buffer);
+  }
+
+  url = "file://" + url;
+
+  return strdup(url.c_str());
+}
+
 void NmapOps::Initialize() {
   char tmpxsl[MAXPATHLEN];
 
@@ -189,9 +208,12 @@ void NmapOps::Initialize() {
   else
     isr00t = !(geteuid());
 #endif
+  have_pcap = true;
   debugging = 0;
   verbose = 0;
   min_packet_send_rate = 0.0; /* Unset. */
+  max_packet_send_rate = 0.0; /* Unset. */
+  stats_interval = 0.0; /* Unset. */
   randomize_hosts = 0;
   sendpref = PACKET_SEND_NOPREF;
   spoofsource = 0;
@@ -199,6 +221,7 @@ void NmapOps::Initialize() {
   device[0] = '\0';
   interactivemode = 0;
   ping_group_sz = PING_GROUP_SZ;
+  nogcc = 0;
   generate_random_ips = 0;
   reference_FPs = NULL;
   magic_port = 33000 + (get_random_uint() % 31000);
@@ -215,6 +238,7 @@ void NmapOps::Initialize() {
   max_host_group_sz = 100000; // don't want to be restrictive unless user sets
   max_tcp_scan_delay = MAX_TCP_SCAN_DELAY;
   max_udp_scan_delay = MAX_UDP_SCAN_DELAY;
+  max_sctp_scan_delay = MAX_SCTP_SCAN_DELAY;
   max_ips_to_scan = 0;
   extra_payload_length = 0;
   extra_payload = NULL;
@@ -235,6 +259,8 @@ void NmapOps::Initialize() {
   listscan = pingscan = allowall = ackscan = bouncescan = connectscan = 0;
   rpcscan = nullscan = xmasscan = fragscan = synscan = windowscan = 0;
   maimonscan = idlescan = finscan = udpscan = ipprotscan = noresolve = 0;
+  sctpinitscan = 0;
+  sctpcookieechoscan = 0;
   append_output = 0;
   memset(logfd, 0, sizeof(FILE *) * LOG_NUM_FILES);
   ttl = -1;
@@ -243,15 +269,23 @@ void NmapOps::Initialize() {
   gettimeofday(&start_time, NULL);
   pTrace = vTrace = false;
   reason = false;
+  adler32 = false;
   if (datadir) free(datadir);
   datadir = NULL;
-#if WIN32
-  Strncpy(tmpxsl, "nmap.xsl", sizeof(tmpxsl));
-#else
-  Snprintf(tmpxsl, sizeof(tmpxsl), "%s/nmap.xsl", NMAPDATADIR);
-#endif
   if (xsl_stylesheet) free(xsl_stylesheet);
-  xsl_stylesheet = strdup(tmpxsl);
+  if (nmap_fetchfile(tmpxsl, sizeof(tmpxsl), "nmap.xsl") == 1) {
+    xsl_stylesheet = filename_to_url(tmpxsl);
+  } else {
+#if WIN32
+    /* Use a relative URL on Windows if nmap_fetchfile failed. It won't work,
+       but it gives a clue that there is an nmap.xsl somewhere. */
+    Strncpy(tmpxsl, "nmap.xsl", sizeof(tmpxsl));
+    xsl_stylesheet = strdup(tmpxsl);
+#else
+    Snprintf(tmpxsl, sizeof(tmpxsl), "%s/nmap.xsl", NMAPDATADIR);
+    xsl_stylesheet = filename_to_url(tmpxsl);
+#endif
+  }
   spoof_mac_set = false;
   mass_dns = true;
   log_errors = false;
@@ -271,6 +305,12 @@ void NmapOps::Initialize() {
   scripttrace = 0;
   scriptupdatedb = 0;
 #endif
+  memset(&sourcesock, 0, sizeof(sourcesock));
+  sourcesocklen = 0;
+}
+
+bool NmapOps::SCTPScan() {
+  return sctpinitscan|sctpcookieechoscan;
 }
 
 bool NmapOps::TCPScan() {
@@ -281,14 +321,14 @@ bool NmapOps::UDPScan() {
   return udpscan;
 }
 
-  /* this function does not currently cover cases such as TCP SYN ping
-     scan which can go either way based on whether the user is root or
-     IPv6 is being used.  It will return false in those cases where a
-     RawScan is not neccessarily used. */
 bool NmapOps::RawScan() {
-  if (ackscan|finscan|idlescan|ipprotscan|maimonscan|nullscan|osscan|synscan|udpscan|windowscan|xmasscan)
+  if (ackscan|finscan|idlescan|ipprotscan|maimonscan|nullscan|osscan|synscan|udpscan|windowscan|xmasscan|sctpinitscan|sctpcookieechoscan)
     return true;
-  if (pingtype & (PINGTYPE_ICMP_PING|PINGTYPE_ICMP_MASK|PINGTYPE_ICMP_TS|PINGTYPE_TCP_USE_ACK|PINGTYPE_UDP))
+  if (pingtype & (PINGTYPE_ICMP_PING|PINGTYPE_ICMP_MASK|PINGTYPE_ICMP_TS|PINGTYPE_TCP_USE_ACK|PINGTYPE_UDP|PINGTYPE_SCTP_INIT))
+    return true;
+  /* A SYN scan will only generate raw packets if nmap is running as root and is
+     not issuing IPv6 packets.  Otherwise, it becomes a connect scan. */
+  if ((pingtype & PINGTYPE_TCP_USE_SYN) && (af() == AF_INET) && isr00t)
     return true;
 
    return false; 
@@ -296,19 +336,19 @@ bool NmapOps::RawScan() {
 
 
 void NmapOps::ValidateOptions() {
-#ifdef WIN32
-	const char *privreq = "that WinPcap version 3.1 or higher and iphlpapi.dll be installed. You seem to be missing one or both of these.  Winpcap is available from http://www.winpcap.org.  iphlpapi.dll comes with Win98 and later operating sytems and NT 4.0 with SP4 or greater.  For previous windows versions, you may be able to take iphlpapi.dll from another system and place it in your system32 dir (e.g. c:\\windows\\system32)";
-#else
 	const char *privreq = "root privileges";
+#ifdef WIN32
+	if (!o.have_pcap)
+		privreq = "that WinPcap version 3.1 or higher and iphlpapi.dll be installed. You seem to be missing one or both of these.  Winpcap is available from http://www.winpcap.org.  iphlpapi.dll comes with Win98 and later operating sytems and NT 4.0 with SP4 or greater.  For previous windows versions, you may be able to take iphlpapi.dll from another system and place it in your system32 dir (e.g. c:\\windows\\system32)";
 #endif
 
 
   /* Insure that at least one scantype is selected */
-  if (TCPScan() + UDPScan() + ipprotscan + listscan + pingscan == 0) {
+  if (TCPScan() + UDPScan() + SCTPScan() + ipprotscan + listscan + pingscan == 0) {
     if (isr00t && af() == AF_INET)
       synscan++;
     else connectscan++;
-    //    if (verbose) error("No tcp, udp, or ICMP scantype specified, assuming %s scan. Use -sP if you really don't want to portscan (and just want to see what hosts are up).", synscan? "SYN Stealth" : "vanilla tcp connect()");
+    //    if (verbose) error("No TCP, UDP, SCTP or ICMP scantype specified, assuming %s scan. Use -sP if you really don't want to portscan (and just want to see what hosts are up).", synscan? "SYN Stealth" : "vanilla tcp connect()");
   }
 
   if (pingtype != PINGTYPE_NONE && spoofsource) {
@@ -332,11 +372,15 @@ void NmapOps::ValidateOptions() {
    fatal("Sorry, UDP Ping (-PU) only works if you are root (because we need to read raw responses off the wire) and only for IPv4 (cause fyodor is too lazy right now to add IPv6 support and nobody has sent a patch)");
  }
 
+ if ((pingtype & PINGTYPE_SCTP_INIT) && (!isr00t || af() != AF_INET)) {
+   fatal("Sorry, SCTP INIT Ping (-PY) only works if you are root (because we need to read raw responses off the wire) and only for IPv4 (cause fyodor is too lazy right now to add IPv6 support and nobody has sent a patch)");
+  }
+
  if ((pingtype & PINGTYPE_PROTO) && (!isr00t || af() != AF_INET)) {
    fatal("Sorry, IPProto Ping (-PO) only works if you are root (because we need to read raw responses off the wire) and only for IPv4");
  }
 
- if (ipprotscan + (TCPScan() || UDPScan()) + listscan + pingscan > 1) {
+ if (ipprotscan + (TCPScan() || UDPScan() || SCTPScan()) + listscan + pingscan > 1) {
    fatal("Sorry, the IPProtoscan, Listscan, and Pingscan (-sO, -sL, -sP) must currently be used alone rather than combined with other scan types.");
  }
 
@@ -344,7 +388,7 @@ void NmapOps::ValidateOptions() {
     fatal("-PN (skip ping) is incompatable with -sP (ping scan).  If you only want to enumerate hosts, try list scan (-sL)");
   }
 
- if (pingscan && (TCPScan() || UDPScan() || ipprotscan || listscan)) {
+ if (pingscan && (TCPScan() || UDPScan() || SCTPScan() || ipprotscan || listscan)) {
    fatal("Ping scan is not valid with any other scan types (the other ones all include a ping scan");
  }
 
@@ -362,7 +406,7 @@ void NmapOps::ValidateOptions() {
 /* We start with stuff users should not do if they are not root */
   if (!isr00t) {
     
-    if (ackscan|finscan|idlescan|ipprotscan|maimonscan|nullscan|synscan|udpscan|windowscan|xmasscan) {
+    if (ackscan|finscan|idlescan|ipprotscan|maimonscan|nullscan|synscan|udpscan|windowscan|xmasscan|sctpinitscan|sctpcookieechoscan) {
       fatal("You requested a scan type which requires %s.", privreq);
     }
     
@@ -377,9 +421,6 @@ void NmapOps::ValidateOptions() {
     if (osscan) {
       fatal("TCP/IP fingerprinting (for OS scan) requires %s.", privreq);
     }
-
-    if (ipoptionslen)
-      fatal("Sorry, using ip options requires %s.", privreq);
   }
   
   
@@ -443,12 +484,14 @@ void NmapOps::ValidateOptions() {
   if (max_parallelism && min_parallelism && (min_parallelism > max_parallelism)) {
     fatal("--min-parallelism=%i must be less than or equal to --max-parallelism=%i",min_parallelism,max_parallelism);
   }
-  
-  if (af() == AF_INET6 && (numdecoys|osscan|bouncescan|fragscan|ackscan|finscan|idlescan|ipprotscan|maimonscan|nullscan|synscan|udpscan|windowscan|xmasscan)) {
-    fatal("Sorry -- IPv6 support is currently only available for connect() scan (-sT), ping scan (-sP), and list scan (-sL).  OS detection and decoys are also not supported with IPv6.  Further support is under consideration.");
-  }
 
-  if (af() != AF_INET) mass_dns = false;
+  if (min_packet_send_rate != 0.0 && max_packet_send_rate != 0.0 && min_packet_send_rate > max_packet_send_rate) {
+    fatal("--min-rate=%g must be less than or equal to --max-rate=%g", min_packet_send_rate, max_packet_send_rate);
+  }
+  
+  if (af() == AF_INET6 && (generate_random_ips|numdecoys|osscan|bouncescan|fragscan|ackscan|finscan|idlescan|ipprotscan|maimonscan|nullscan|synscan|udpscan|windowscan|xmasscan|sctpinitscan|sctpcookieechoscan)) {
+    fatal("Sorry -- IPv6 support is currently only available for connect() scan (-sT), ping scan (-sP), and list scan (-sL).  OS detection, random targets and decoys are also not supported with IPv6.  Further support is under consideration.");
+  }
 
   /* Prevent performance values from getting out of whack */
   if (min_parallelism > max_parallelism)
@@ -456,7 +499,12 @@ void NmapOps::ValidateOptions() {
 
   if(ipoptions && osscan)
     error("WARNING: Ip options are NOT used while OS scanning!");
-    
+
+#ifndef NOLUA
+  /* Make sure nmap.registry.args is available (even if it's empty) */
+  if (!scriptargs)
+    scriptargs = strdup("");
+#endif
 }
 
 void NmapOps::setMaxOSTries(int mot) {
@@ -527,12 +575,17 @@ void NmapOps::setSpoofMACAddress(u8 *mac_data) {
 
 #ifndef NOLUA
 void NmapOps::chooseScripts(char* argument) {
-	char *ap;
+	char *p;
 
-	ap = strtok(argument, ",");
-	while(ap != NULL) {
-		chosenScripts.push_back(std::string(ap));
-		ap = strtok(NULL, ",");
+	for (;;) {
+		p = strchr(argument, ',');
+		if (p == NULL) {
+			chosenScripts.push_back(std::string(argument));
+			break;
+		} else {
+			chosenScripts.push_back(std::string(argument, p - argument));
+			argument = p + 1;
+		}
 	}
 }
 #endif

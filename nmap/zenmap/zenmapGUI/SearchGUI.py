@@ -21,419 +21,400 @@
 
 import gtk
 import os.path
+import re
 
-from higwidgets.higwindows import HIGWindow
-from higwidgets.higboxes import HIGVBox
-from higwidgets.higbuttons import HIGButton
-from higwidgets.higboxes import HIGVBox, HIGHBox, HIGSpacer, hig_box_space_holder
-from higwidgets.higlabels import HIGSectionLabel, HIGEntryLabel
-from higwidgets.higtables import HIGTable
-from higwidgets.higdialogs import HIGAlertDialog
+from zenmapGUI.higwidgets.higwindows import HIGWindow
+from zenmapGUI.higwidgets.higboxes import HIGVBox
+from zenmapGUI.higwidgets.higbuttons import HIGButton, HIGToggleButton
+from zenmapGUI.higwidgets.higboxes import HIGVBox, HIGHBox, HIGSpacer, hig_box_space_holder
+from zenmapGUI.higwidgets.higlabels import HIGSectionLabel, HIGEntryLabel, HintWindow
+from zenmapGUI.higwidgets.higtables import HIGTable
+from zenmapGUI.higwidgets.higdialogs import HIGAlertDialog
 
-from time import localtime
+from threading import Timer
 from types import StringTypes
+import datetime
 
 from zenmapCore.Name import APP_DISPLAY_NAME
-from zenmapCore.I18N import _
+import zenmapCore.I18N
 from zenmapCore.UmitLogging import log
-from zenmapCore.NmapParser import months
-from zenmapCore.SearchResult import SearchDir, SearchDB, SearchTabs
+from zenmapCore.NmapCommand import split_quoted
+from zenmapCore.SearchResult import SearchDir, SearchDB, SearchDummy
+from zenmapCore.UmitConf import is_maemo
 from zenmapCore.UmitConf import SearchConfig
 
 from zenmapGUI.FileChoosers import DirectoryChooserDialog
-from zenmapGUI.ProfileCombo import ProfileCombo
-from zenmapGUI.TargetCombo import TargetCombo
-from zenmapGUI.OptionCombo import OptionCombo
-from zenmapGUI.ServiceCombo import ServiceCombo
-from zenmapGUI.OSCombo import OSClassCombo, OSMatchCombo
 
 search_config = SearchConfig()
 
-class SearchGUI(gtk.HPaned, object):
-    def __init__(self, notebook):
-        gtk.HPaned.__init__(self)
+
+class SearchParser(object):
+    """This class is responsible for parsing the search string, and updating
+    the search dictionary (which is, in turn, passed to classes that perform
+    the actual search). It holds a reference to the SearchGUI object, which is
+    used to access its search_dict dictionary, so that all dictionary handling
+    is performed here. It is also responsible for adding additional directories
+    to the SearchGUI object via the 'dir:' operator."""
+    
+    def __init__(self, search_gui):
+        self.search_gui = search_gui
+        self.search_dict = search_gui.search_dict
+        
+        # We need to make an operator->searchkey mapping, since the search entry
+        # field and the search classes have different syntax.
+        #
+        # NOTE: if you want to add a new search key not handled by the SearchResult
+        # class, you should add a new method match_CRITERIANAME to the SearchResult class.
+        # For example, if you'd like a "noodles" criteria, you need to create the method
+        # SearchResult.match_noodles(self, noodles_string). To see how searches are
+        # actually performed, start reading from the SearchResult.search() method.
+        self.ops2keys = dict()
+        self.ops2keys["keyword"] = "keyword"
+        self.ops2keys["profile"] = "profile"
+        self.ops2keys["pr"] = "profile"
+        self.ops2keys["target"] = "target"
+        self.ops2keys["t"] = "target"
+        self.ops2keys["option"] = "option"
+        self.ops2keys["o"] = "option"
+        self.ops2keys["date"] = "date"
+        self.ops2keys["d"] = "date"
+        self.ops2keys["after"] = "after"
+        self.ops2keys["a"] = "after"
+        self.ops2keys["before"] = "before"
+        self.ops2keys["b"] = "before"
+        self.ops2keys["os"] = "os"
+        self.ops2keys["scanned"] = "scanned"
+        self.ops2keys["sp"] = "scanned"
+        self.ops2keys["open"] = "open"
+        self.ops2keys["op"] = "open"
+        self.ops2keys["closed"] = "closed"
+        self.ops2keys["cp"] = "closed"
+        self.ops2keys["filtered"] = "filtered"
+        self.ops2keys["fp"] = "filtered"
+        self.ops2keys["unfiltered"] = "unfiltered"
+        self.ops2keys["ufp"] = "unfiltered"
+        self.ops2keys["open|filtered"] = "open_filtered"
+        self.ops2keys["ofp"] = "open_filtered"
+        self.ops2keys["closed|filtered"] = "closed_filtered"
+        self.ops2keys["cfp"] = "closed_filtered"
+        self.ops2keys["service"] = "service"
+        self.ops2keys["s"] = "service"
+        self.ops2keys["inroute"] = "in_route"
+        self.ops2keys["ir"] = "in_route"
+        
+        # This is not really an operator (see below)
+        self.ops2keys["dir"] = "dir"
+        
+    def update(self, search):
+        """Updates the search dictionary by parsing the input string."""
+        
+        # Kill leftover keys and parse again. SLOW? Not really.
+        self.search_dict.clear()
+        
+        for word in split_quoted(search):
+            if word.find(":") != -1:
+                # We have an operator in our word, so we make the part left of
+                # the semicolon a key, and the part on the right a value
+                op, arg = word.split(":", 1)
+                if op in self.ops2keys:
+                    key = self.ops2keys[op]
+                    if key in self.search_dict:
+                        self.search_dict[key].append(arg)
+                    else:
+                        self.search_dict[key] = [arg]
+            else:
+                # Just a simple keyword
+                if "keyword" in self.search_dict:
+                    self.search_dict["keyword"].append(word)
+                else:
+                    self.search_dict["keyword"] = [word]
+        
+        # Check if we have any dir: operators in our map, and if so, add them to the
+        # search_gui object and remove them from the map. The dir: operator isn't a real
+        # operator, in a sense that it doesn't need to be processed by the
+        # SearchResult.search() function. It is needed only to create a new SearchDir
+        # object, which is then used to perform the actual search().
+        if "dir" in self.search_dict:
+            self.search_gui.init_search_dirs(self.search_dict["dir"])  
+        else:
+            self.search_gui.init_search_dirs([])
+
+class SearchGUI(gtk.VBox, object):
+    """This class is a VBox that holds the search entry field and buttons on
+    top, and the results list on the bottom. The "Cancel" and "Open" buttons
+    are a part of the SearchWindow class, not SearchGUI."""
+    def __init__(self, search_window):
+        gtk.VBox.__init__(self)
 
         self._create_widgets()
         self._pack_widgets()
         self._connect_events()
 
-        self.any_profile = _("Any profile")
-        self.any_option = _("Any option")
-        self.any_target = _("Any target")
-        self.any_service = _("Any service")
-        self.any_product = _("Any product")
-        self.any_osclass = _("Any os class")
-        self.any_osmatch = _("Any os match")
-        self.any = _("Any")
-
-        # Setting default values
-        self.port_open = True
-        self.port_filtered = True
-        self.port_closed = True
-        self.profile = self.any_profile
-        self.option = self.any_option
-        self.target = self.any_target
-        self.service = self.any_service
-        self.product = self.any_product
-        self.osclass = self.any_osclass
-        self.osmatch = self.any_osmatch
-
         # Search options
-        self.directory = search_config.directory
-        self.file_extension = search_config.file_extension
-        self.save_time = search_config.save_time
-        self.save = search_config.store_results
-        self.search_db = search_config.search_db
-
+        self.options = {}
+        self.options["file_extension"] = search_config.file_extension
+        self.options["directory"] = search_config.directory
+        self.options["search_db"] = search_config.search_db
+        
         self.parsed_results = {}
         self._set_result_view()
-        self.scan_num = 1
         self.id = 0
-        self.notebook = notebook
-
+        self.search_window = search_window
+        
+        # The Search* objects are created once per Search Window invocation, so that
+        # they get a list of scans only once, not whenever the search conditions change
+        if self.options["search_db"]:
+            try:
+                self.search_db = SearchDB()
+            except ImportError, e:
+                self.search_db = SearchDummy()
+                self.no_db_warning.show()
+                self.no_db_warning.set_text("""\
+Warning: The database of saved scans is not available. (%s.) Use \
+"Include Directory" under "Expressions" to search a directory.\
+""" % str(e))
+        
+        # Search directories can be added via the "dir:" operator, so it needs to be a map
+        self.search_dirs = {}
+        self.init_search_dirs()
+        
+        # We create an empty search dictionary, since SearchParser will fill it
+        # with keywords as it encounters different operators in the search string.
+        self.search_dict = dict()
+        self.search_parser = SearchParser(self)
+        
+        # This list holds the (operator, argument) tuples, parsed from the GUI criteria rows
+        self.gui_criteria_list = []
+        
+        # Do an initial "empty" search, so that the results window initially holds
+        # all scans in the database
+        self.search_parser.update("")
+        self.start_search()
+    
+    def init_search_dirs(self, dirs = []):
+        # Start fresh
+        self.search_dirs.clear()
+        
+        # If specified, add the search directory from the Zenmap config file to the map
+        conf_dir = self.options["directory"]
+        if conf_dir:
+            self.search_dirs[conf_dir] = SearchDir(conf_dir, self.options["file_extension"])
+        
+        # Process any other dirs (as added by the dir: operator)
+        for dir in dirs:
+            self.search_dirs[dir] = SearchDir(dir, self.options["file_extension"])
+    
     def _create_widgets(self):
-        # Main widgets
-        self.hpaned = gtk.HPaned()
-        self.main_vbox = HIGVBox()
-
+        # Search box and buttons
+        self.search_top_hbox = HIGHBox()
+        self.search_label = HIGSectionLabel(_("Search:"))
+        self.search_entry = gtk.Entry()
+        self.expressions_btn = HIGToggleButton(_("Expressions "), gtk.STOCK_EDIT)
+        
+        # The quick reference tooltip button
+        self.search_tooltip_btn = HIGButton(" ", gtk.STOCK_INFO)
+        
+        # The expression VBox. This is only visible once the user clicks on "Expressions"
+        self.expr_vbox = gtk.VBox()
+        
         # Results section
-        self.result_section = HIGSectionLabel(_("Results"))
-        self.result_vbox = HIGVBox()
-        self.result_hbox = HIGHBox()
         self.result_list = gtk.ListStore(str, str, int) # title, date, id
         self.result_view = gtk.TreeView(self.result_list)
         self.result_scrolled = gtk.ScrolledWindow()
         self.result_title_column = gtk.TreeViewColumn(_("Scan"))
         self.result_date_column = gtk.TreeViewColumn(_("Date"))
 
-        # Search notebook
-        self.search_vbox = HIGVBox()
-        self.search_notebook = gtk.Notebook()
-        self.search_button = HIGButton(stock=gtk.STOCK_FIND)
-
-        # General page
-        self.general_vbox = HIGVBox()
-        self.general_hbox = HIGHBox()
-        #self.general_start_hbox = HIGHBox()
-        #self.general_finish_hbox = HIGHBox()
+        self.no_db_warning = gtk.Label()
+        self.no_db_warning.set_line_wrap(True)
+        self.no_db_warning.set_no_show_all(True)
         
-        self.general_section = HIGSectionLabel(_("General search parameters"))
-        #self.general_start_section = HIGSectionLabel(_("Scan started in range"))
-        #self.general_finish_section = HIGSectionLabel(_("Scan finished in range"))
-        
-        self.general_table = HIGTable()
-
-        self.general_option_label = HIGEntryLabel(_("Option"))
-        self.general_profile_label = HIGEntryLabel(_("Profile"))
-        #self.general_finished_label = HIGEntryLabel(_("Finished"))
-        #self.general_started_label = HIGEntryLabel(_("Started"))
-        self.general_keyword_label = HIGEntryLabel(_("Keyword"))
-
-        self.general_keyword_entry = gtk.Entry()
-        self.general_option_combo = OptionCombo()
-        self.general_profile_combo = ProfileCombo()
-        #self.general_started_range = DateRange()
-        #self.general_finished_range = DateRange()
-
-        # Host page
-        self.host_vbox = HIGVBox()
-        self.host_hbox = HIGHBox()
-        #self.host_uptime_hbox = HIGHBox()
-        #self.host_lastboot_hbox = HIGHBox()
-        
-        self.host_section = HIGSectionLabel(_("Host search parameters"))
-        #self.host_uptime_section = HIGSectionLabel(_("Hosts with uptime in range"))
-        #self.host_lastboot_section = HIGSectionLabel(_("Hosts with lastboot in range"))
-        
-        self.host_table = HIGTable()
-
-        self.host_target_label = HIGEntryLabel(_("Target"))
-        self.host_mac_label = HIGEntryLabel(_("MAC"))
-        self.host_ipv4_label = HIGEntryLabel(_("IPv4"))
-        self.host_ipv6_label = HIGEntryLabel(_("IPv6"))
-        #self.host_uptime_label = HIGEntryLabel(_("Uptime"))
-        #self.host_lastboot_label = HIGEntryLabel(_("Last boot"))
-
-        self.host_target_combo = TargetCombo()
-        self.host_mac_entry = gtk.Entry()
-        self.host_ipv4_entry = gtk.Entry()
-        self.host_ipv6_entry = gtk.Entry()
-        #self.host_uptime_range = DateRange()
-        #self.host_lastboot_range = DateRange()
-
-
-        # Service
-        self.serv_vbox = HIGVBox()
-        self.serv_hbox = HIGHBox()
-        self.serv_section = HIGSectionLabel(_("Service search parameters"))
-        self.serv_table = HIGTable()
-
-        self.serv_port_label = HIGEntryLabel(_("Port number"))
-        self.serv_service_label = HIGEntryLabel(_("Service"))
-        self.serv_product_label = HIGEntryLabel(_("Product"))
-        self.serv_portstate_label = HIGEntryLabel(_("Port state"))
-        
-        self.serv_port_entry = gtk.Entry()
-        self.serv_service_combo = ServiceCombo()
-        self.serv_product_entry = gtk.Entry()
-        self.serv_portstate_check = PortState()
-
-
-        # OS
-        self.os_vbox = HIGVBox()
-        self.os_hbox = HIGHBox()
-        self.os_section = HIGSectionLabel(_("Operating System search parameters"))
-        self.os_table = HIGTable()
-        
-        self.os_osclass_label = HIGEntryLabel(_("OS class"))
-        self.os_osmatch_label = HIGEntryLabel(_("OS match"))
-        
-        self.os_osclass_combo = OSClassCombo()
-        self.os_osmatch_combo = OSMatchCombo()
-
-
-        # Search options page
-        self.opt_vbox = HIGVBox()
-        self.opt_local_hbox = HIGHBox()
-        self.opt_base_hbox = HIGHBox()
-        self.opt_local_section = HIGSectionLabel(_("Local files"))
-        self.opt_local_table = HIGTable()
-        self.opt_base_section = HIGSectionLabel(_("Data base"))
-        self.opt_base_table = HIGTable()
-
-        self.opt_path_label = HIGEntryLabel(_("Directory"))
-        self.opt_extension_label = HIGEntryLabel(_("File extension"))
-        self.opt_savetime_label = HIGEntryLabel(_("Save results for"))
-
-        self.opt_path_entry = PathEntry()
-        self.opt_extension_entry = gtk.Entry()
-        self.opt_savetime_entry = SaveTime()
-        self.opt_save_check = gtk.CheckButton(_("Save scan results in data base for \
-latter search"))
-        self.opt_search_check = gtk.CheckButton(_("Search saved scan results in data base"))
-
+        self.expr_window = None
         
     def _pack_widgets(self):
-        # Packing result section
-        self.result_vbox.set_border_width(12)
-        self.result_vbox._pack_noexpand_nofill(self.result_section)
-        self.result_vbox._pack_expand_fill(self.result_hbox)
-
-        self.result_scrolled.set_size_request(185, -1)
+        # Packing label, search box and buttons
+        self.search_top_hbox.set_spacing(4)
+        self.search_top_hbox.pack_start(self.search_label, False)
+        self.search_top_hbox.pack_start(self.search_entry, True)
+        self.search_top_hbox.pack_start(self.expressions_btn, False)
+        self.search_top_hbox.pack_start(self.search_tooltip_btn, False)
+        
+        # The expressions (if any) should be tightly packed so that they don't take
+        # too much screen real-estate
+        self.expr_vbox.set_spacing(0)
+        
+        # Packing the result section
         self.result_scrolled.add(self.result_view)
         self.result_scrolled.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        self.result_hbox._pack_noexpand_nofill(hig_box_space_holder())
-        self.result_hbox._pack_expand_fill(self.result_scrolled)
-
-        ## Search Notebook
-        self.search_vbox._pack_expand_fill(self.search_notebook)
-        self.search_vbox._pack_expand_fill(self.search_button)
-
-        self.search_notebook.set_border_width(1)
-        self.search_vbox.set_border_width(12)
         
-        # General page
-        self.general_vbox.set_border_width(12)
-        self.general_vbox._pack_noexpand_nofill(self.general_section)
-        self.general_vbox._pack_noexpand_nofill(self.general_hbox)
+        # Packing it all together
+        self.set_spacing(4)
+        self.pack_start(self.search_top_hbox, False)
+        self.pack_start(self.expr_vbox, False)
+        self.pack_start(self.result_scrolled, True)
+        self.pack_start(self.no_db_warning, False)
         
-        #self.general_vbox._pack_noexpand_nofill(self.general_start_section)
-        #self.general_vbox._pack_noexpand_nofill(self.general_start_hbox)
-        
-        #self.general_vbox._pack_noexpand_nofill(self.general_finish_section)
-        #self.general_vbox._pack_noexpand_nofill(self.general_finish_hbox)
-        
-        self.general_hbox._pack_noexpand_nofill(hig_box_space_holder())
-        self.general_hbox._pack_expand_fill(self.general_table)
-
-        #self.general_start_hbox._pack_noexpand_nofill(hig_box_space_holder())
-        #self.general_start_hbox._pack_noexpand_nofill(self.general_started_range)
-
-        #self.general_finish_hbox._pack_noexpand_nofill(hig_box_space_holder())
-        #self.general_finish_hbox._pack_expand_fill(self.general_finished_range)
-        
-
-        self.general_table.attach_label(self.general_keyword_label, 0, 1, 0, 1)
-        self.general_table.attach_label(self.general_profile_label, 0, 1, 1, 2)
-        self.general_table.attach_label(self.general_option_label, 0, 1, 2, 3)
-
-        self.general_table.attach_entry(self.general_keyword_entry, 1, 2, 0, 1)
-        self.general_table.attach_entry(self.general_profile_combo, 1, 2, 1, 2)
-        self.general_table.attach_entry(self.general_option_combo, 1, 2, 2, 3)
-        
-        self.search_notebook.append_page(self.general_vbox, gtk.Label(_("General")))
-
-        # Host page
-        self.host_vbox.set_border_width(12)
-        self.host_vbox._pack_noexpand_nofill(self.host_section)
-        self.host_vbox._pack_noexpand_nofill(self.host_hbox)
-        
-        #self.host_vbox._pack_noexpand_nofill(self.host_uptime_section)
-        #self.host_vbox._pack_noexpand_nofill(self.host_uptime_hbox)
-
-        #self.host_vbox._pack_noexpand_nofill(self.host_lastboot_section)
-        #self.host_vbox._pack_noexpand_nofill(self.host_lastboot_hbox)
-        
-        self.host_hbox._pack_noexpand_nofill(hig_box_space_holder())
-        self.host_hbox._pack_expand_fill(self.host_table)
-
-        #self.host_uptime_hbox._pack_noexpand_nofill(hig_box_space_holder())
-        #self.host_uptime_hbox._pack_noexpand_nofill(self.host_uptime_range)
-
-        #self.host_lastboot_hbox._pack_noexpand_nofill(hig_box_space_holder())
-        #self.host_lastboot_hbox._pack_expand_fill(self.host_lastboot_range)
-
-        self.host_table.attach_label(self.host_target_label, 0, 1, 0, 1)
-        self.host_table.attach_label(self.host_mac_label, 0, 1, 1, 2)
-        self.host_table.attach_label(self.host_ipv4_label, 0, 1, 2, 3)
-        self.host_table.attach_label(self.host_ipv6_label, 0, 1, 3, 4)
-
-        self.host_table.attach_entry(self.host_target_combo, 1, 2, 0, 1)
-        self.host_table.attach_entry(self.host_mac_entry, 1, 2, 1, 2)
-        self.host_table.attach_entry(self.host_ipv4_entry, 1, 2, 2, 3)
-        self.host_table.attach_entry(self.host_ipv6_entry, 1, 2, 3, 4)
-        
-        self.search_notebook.append_page(self.host_vbox, gtk.Label(_("Host")))
-
-        # Service page
-        self.serv_vbox.set_border_width(12)
-        self.serv_vbox._pack_noexpand_nofill(self.serv_section)
-        self.serv_vbox._pack_noexpand_nofill(self.serv_hbox)
-        
-        self.serv_hbox._pack_noexpand_nofill(hig_box_space_holder())
-        self.serv_hbox._pack_expand_fill(self.serv_table)
-
-        self.serv_table.attach_label(self.serv_port_label, 0, 1, 0, 1)
-        self.serv_table.attach_label(self.serv_portstate_label, 0, 1, 1, 2)
-        self.serv_table.attach_label(self.serv_product_label, 0, 1, 2, 3)
-        self.serv_table.attach_label(self.serv_service_label, 0, 1, 3, 4)
-
-        self.serv_table.attach_entry(self.serv_port_entry, 1, 2, 0, 1)
-        self.serv_table.attach_entry(self.serv_portstate_check, 1, 2, 1, 2)
-        self.serv_table.attach_entry(self.serv_product_entry, 1, 2, 2, 3)
-        self.serv_table.attach_entry(self.serv_service_combo, 1, 2, 3, 4)
-        
-        self.search_notebook.append_page(self.serv_vbox, gtk.Label(_("Service")))
-
-        # OS page
-        self.os_vbox.set_border_width(12)
-        self.os_vbox._pack_noexpand_nofill(self.os_section)
-        self.os_vbox._pack_noexpand_nofill(self.os_hbox)
-
-        self.os_hbox._pack_noexpand_nofill(hig_box_space_holder())
-        self.os_hbox._pack_expand_fill(self.os_table)
-
-        self.os_table.attach_label(self.os_osclass_label, 0, 1, 0, 1)
-        self.os_table.attach_label(self.os_osmatch_label, 0, 1, 1, 2)
-
-        self.os_table.attach_entry(self.os_osclass_combo, 1, 2, 0, 1)
-        self.os_table.attach_entry(self.os_osmatch_combo, 1, 2, 1, 2)
-
-        self.search_notebook.append_page(self.os_vbox, gtk.Label(_("OS")))
-
-        # Search options page
-        self.opt_vbox.set_border_width(12)
-        self.opt_vbox._pack_noexpand_nofill(self.opt_local_section)
-        self.opt_vbox._pack_noexpand_nofill(self.opt_local_hbox)
-        
-        self.opt_vbox._pack_noexpand_nofill(self.opt_base_section)
-        self.opt_vbox._pack_noexpand_nofill(self.opt_base_hbox)
-
-        self.opt_local_hbox._pack_noexpand_nofill(hig_box_space_holder())
-        self.opt_local_hbox._pack_expand_fill(self.opt_local_table)
-
-        self.opt_base_hbox._pack_noexpand_nofill(hig_box_space_holder())
-        self.opt_base_hbox._pack_expand_fill(self.opt_base_table)
-
-        self.opt_local_table.attach_label(self.opt_path_label, 0, 1, 0, 1)
-        self.opt_local_table.attach_label(self.opt_extension_label, 0, 1, 1, 2)
-        
-        self.opt_local_table.attach_entry(self.opt_path_entry, 1, 2, 0, 1)
-        self.opt_local_table.attach_entry(self.opt_extension_entry, 1, 2, 1, 2)
-
-        self.opt_base_table.attach_label(self.opt_savetime_label, 0, 1, 0, 1)
-        self.opt_base_table.attach_label(self.opt_save_check, 0, 2, 1, 2)
-        self.opt_base_table.attach_label(self.opt_search_check, 0, 2, 2, 3)
-
-        self.opt_base_table.attach_entry(self.opt_savetime_entry, 1, 2, 0, 1)
-
-
-        self.search_notebook.append_page(self.opt_vbox, gtk.Label(_("Search options")))
-
-        self.pack1(self.search_vbox, True, False)
-        self.pack2(self.result_vbox, True, False)
-
     def _connect_events(self):
-        self.os_osclass_combo.connect("changed", self.update_osmatch)
-        self.search_button.connect("clicked", self.start_search)
+        self.search_entry.connect("changed", self.update_search_entry)
+        self.search_tooltip_btn.connect("clicked", self.show_quick_help)
+        self.expressions_btn.connect("toggled", self.expressions_clicked)
+    
+    def show_quick_help(self, widget=None, extra=None):
+        quick_help = _("""Entering the text into the search performs a <b>keyword search</b> - \
+the search string is matched against the entire output of each scan.
 
-        self.opt_extension_entry.connect("focus-out-event", self.update_extension_entry)
-        self.opt_save_check.connect("toggled", self.update_save_check)
-        self.opt_search_check.connect("toggled", self.update_search_check)
-        self.opt_path_entry.connect_entry_change(self.update_path_entry)
-        self.opt_savetime_entry.connect_entry_change(self.update_savetime_entry)
+To refine the search, you can use <b>operators</b> to search only within a specific part of \
+a scan. Operators can be added to the search interactively if you click on the \
+<b>Expressions</b> button, or you can enter them manually into the search field. \
+You can also use <b>operator aliases</b> if you're an experienced user who likes to \
+type in his searches quickly.
+
+<b>profile: (pr:)</b> - Profile used.
+<b>target: (t:)</b> - User-supplied target, or a rDNS result.
+<b>option: (o:)</b> - Scan options.
+<b>date: (d:)</b> - The date when scan was performed. Fuzzy matching is possible using the \
+"~" suffix. Each "~" broadens the search by one day on "each side" of the date. In addition, \
+it is possible to use the \"date:-n\" notation which means "n days ago".
+<b>after: (a:)</b> - Matches scans made after the supplied date (<i>YYYY-MM-DD</i> or <i>-n</i>).
+<b>before (b:)</b> - Matches scans made before the supplied date(<i>YYYY-MM-DD</i> or <i>-n</i>).
+<b>os:</b> - All OS-related fields.
+<b>scanned: (sp:)</b> - Matches a port if it was among those scanned.
+<b>open: (op:)</b> - Open ports discovered in a scan.
+<b>closed: (cp:)</b> - Closed ports discovered in a scan.
+<b>filtered: (fp:)</b> - Filtered ports discovered in scan.
+<b>unfiltered: (ufp:)</b> - Unfiltered ports found in a scan (using, for example, an ACK scan).
+<b>open|filtered: (ofp:)</b> - Ports in the \"open|filtered\" state.
+<b>closed|filtered: (cfp:)</b> - Ports in the \"closed|filtered\" state.
+<b>service: (s:)</b> - All service-related fields.
+<b>inroute: (ir:)</b> - Matches a router in the scan's traceroute output.
+""")
+        hint_window = HintWindow(quick_help)
+        hint_window.show_all()
+    
+    def expressions_clicked(self, widget=None, extra=None):
+        if len(self.expr_vbox.get_children()) == 0 and self.search_entry.get_text() == "":
+            # This is the first time the user has clicked on "Show Expressions"
+            # and the search entry box is empty, so we add a single Criterion row
+            self.expr_vbox.pack_start(Criterion(self))
         
+        if self.expressions_btn.get_active():
+            # The Expressions GUI is about to be displayed. It needs to reflect all the
+            # conditions in the search entry field, so a comparison between the entry field
+            # and the GUI needs to be performed.
+            
+            # Make the search entry field insensitive while expressions are visible
+            self.search_entry.set_sensitive(False)
+            
+            # Get a map of operator => argument from the Expressions GUI so that
+            # we can compare them with the ones in the search entry field
+            gui_ops = {}
+            for criterion in self.expr_vbox.get_children():
+                if criterion.operator in gui_ops:
+                    gui_ops[criterion.operator].append(criterion.argument)
+                else:
+                    gui_ops[criterion.operator] = [criterion.argument]
+            
+            # We compare the search entry field to the Expressions GUI. Every
+            # (operator, value) pair must be present in the GUI after this loop is done.
+            for op, args in self.search_dict.iteritems():
+                for arg in args:
+                    if (op not in gui_ops) or (arg not in gui_ops[op]):
+                        # We need to add this pair to the GUI
+                        self.expr_vbox.pack_start(Criterion(self, op, arg), False)
+            
+            # Now we check if there are any leftover criterion rows that aren't present
+            # in the search_dict (for example, if a user has deleted something from the
+            # search entry field)
+            for criterion in self.expr_vbox.get_children():
+                if criterion.operator not in self.search_dict or \
+                   criterion.argument not in self.search_dict[criterion.operator]:
+                    criterion.destroy()
+            # If we have deleted all rows, add an empty one
+            if len(self.expr_vbox.get_children()) == 0:
+                self.expr_vbox.pack_start(Criterion(self))
+            
+            # Display all elements
+            self.expr_vbox.show_all()
+        else:
+            # The Expressions GUI is about to be hidden. No updates to the search entry field
+            # are necessary, since it gets updated on every change in one of the criterion rows.
+            self.expr_vbox.hide_all()
+            self.search_entry.set_sensitive(True)
+    
+    def close(self):
+        if self.expr_window != None:
+            self.expr_window.close()
+    
+    def add_criterion(self, caller):
+        # We need to find where the caller (Criteria object) is located among
+        # all the rows, so that we can insert the new row after it
+        caller_index = self.expr_vbox.get_children().index(caller)
+        
+        # Make a new Criteria row and insert it after the calling row
+        criteria = Criterion(self, "keyword")
+        self.expr_vbox.pack_start(criteria, False)
+        self.expr_vbox.reorder_child(criteria, caller_index + 1)
+        criteria.show_all()
+    
+    def remove_criterion(self, c):
+        if len(self.expr_vbox.get_children()) > 1:
+            c.destroy()
+            self.criterion_changed()
+    
+    def criterion_changed(self):
+        # We go through all criteria rows and make a new search string
+        search_string = ""
+        for criterion in self.expr_vbox.get_children():
+            if criterion.operator != "keyword":
+                search_string += criterion.operator + ":"
+            search_string += criterion.argument.replace(" ", "") + " "
+        
+        self.search_entry.set_text(search_string.strip())
+        
+        self.search_parser.update(self.search_entry.get_text())
+        self.start_search()
+    
+    def add_search_dir(self, dir):
+        if dir not in self.search_dirs:
+            self.search_dirs[dir] = SearchDir(dir, self.options["file_extension"])
+    
+    def update_search_entry(self, widget, extra=None):
+        """Called when the search entry field is modified."""
+        self.search_parser.update(widget.get_text())
+        self.start_search()
 
-    def update_path_entry(self, widget, extra=None):
-        search_config.directory = widget.get_text()
-
-    def update_savetime_entry(self, widget, extra=None):
-        search_config.save_time = self.opt_savetime_entry.time
-
-    def update_extension_entry(self, widget, extra=None):
-        search_config.file_extension = widget.get_text()
-
-    def update_save_check(self, widget):
-        search_config.store_results = widget.get_active()
-
-    def update_search_check(self, widget):
-        search_config.search_db = widget.get_active()
-
-    def start_search(self, widget):
-        if not self.search_db and \
-           not self.directory:
-            self.search_notebook.set_current_page(-1)
+    def start_search(self):
+        if not self.options["search_db"] and not self.options["directory"]:
             d = HIGAlertDialog(message_format=_("No search method selected!"),
                                secondary_text=_("%s can search results on directories or \
 inside it's own database. Please, select a method by choosing a directory or by checking \
-the search data base option at the 'Search options' tab before start the search" % APP_DISPLAY_NAME))
+the search data base option at the 'Search options' tab before start the search") % APP_DISPLAY_NAME)
             d.run()
             d.destroy()
             return
-        
-        search_dict = dict(keyword=self.keyword,
-                           profile=self.profile,
-                           option=self.option,
-                           target=self.target,
-                           mac=self.mac,
-                           ipv4=self.ipv4,
-                           ipv6=self.ipv6,
-                           port=self.port,
-                           port_open=self.port_open,
-                           port_filtered=self.port_filtered,
-                           port_closed=self.port_closed,
-                           service=self.service,
-                           osclass=self.osclass,
-                           osmatch=self.osmatch,
-                           product=self.product)
 
         self.clear_result_list()
         
-        if self.search_db:
-            search_db = SearchDB()
-
-            for result in search_db.search(**search_dict):
+        matched = 0
+        total = 0
+        if self.options["search_db"]:
+            total += len(self.search_db.get_scan_results())
+            for result in self.search_db.search(**self.search_dict):
                 self.append_result(result)
+                matched += 1
 
-        if self.directory:
-            search_dir = SearchDir(self.directory, self.file_extension)
-
-            for result in search_dir.search(**search_dict):
+        for search_dir in self.search_dirs.itervalues():
+            total += len(search_dir.get_scan_results())
+            for result in search_dir.search(**self.search_dict):
                 self.append_result(result)
-
-        search_tabs = SearchTabs(self.notebook)
-        for result in search_tabs.search(**search_dict):
-            self.append_result(result)  
+                matched += 1
+        
+        #total += len(self.search_tabs.get_scan_results())
+        #for result in self.search_tabs.search(**self.search_dict):
+        #    self.append_result(result)
+        #    matched += 1
+        
+        self.search_window.set_label_text("Matched <b>%s</b> out of <b>%s</b> scans." % \
+                                         (str(matched), str(total)))
 
     def clear_result_list(self):
         for i in range(len(self.result_list)):
@@ -444,17 +425,16 @@ the search data base option at the 'Search options' tab before start the search"
         title = ""
         if parsed_result.scan_name:
             title = parsed_result.scan_name
-        elif parsed_result.nmap_xml_file:
-            title = os.path.split(parsed_result.nmap_xml_file)[-1]
+        elif parsed_result.filename:
+            title = os.path.split(parsed_result.filename)[-1]
         elif parsed_result.profile_name and parsed_result.target:
             title = "%s on %s" % (parsed_result.profile_name, parsed_result.target)
         else:
-            title = "Scan %s" % (self.scan_num)
-            self.scan_num += 1
+            title = parsed_result.get_nmap_command()
 
         try:
-            date = localtime(float(parsed_result.start))
-            date_field = "%02d %s %04d" % (date[2], months[date[1]][:3], date[0])
+            date = datetime.datetime.fromtimestamp(float(parsed_result.start))
+            date_field = date.strftime("%Y-%m-%d %H:%M")
         except ValueError:
             date_field = _("Unknown")
 
@@ -462,157 +442,7 @@ the search data base option at the 'Search options' tab before start the search"
         self.parsed_results[self.id] = [title, parsed_result]
         self.result_list.append([title, date_field, self.id])
         self.id += 1
-
-    def update_osmatch(self, widegt):
-        self.os_osmatch_combo.update(self.os_osclass_combo.selected_osclass)
-
-    def get_keyword(self):
-        return self.general_keyword_entry.get_text()
-
-    def set_keyword(self, keyword):
-        self.general_keyword_entry.set_text(keyword)
-
-    def get_profile(self):
-        if self.general_profile_combo.selected_profile == self.any_profile or \
-           self.general_profile_combo.selected_profile == self.any:
-            return "*"
-        return self.general_profile_combo.selected_profile
-
-    def set_profile(self, profile):
-        self.general_profile_combo.selected_profile = profile
-
-    def get_option(self):
-        if self.general_option_combo.selected_option == self.any_option or \
-           self.general_option_combo.selected_option == self.any:
-            return "*"
-        return self.general_option_combo.selected_option
-
-    def set_option(self, option):
-        self.general_option_combo.selected_option = option
-
-    def get_target(self):
-        if self.host_target_combo.selected_target == self.any_target or \
-           self.host_target_combo.selected_target == self.any:
-            return "*"
-        return self.host_target_combo.selected_target
-
-    def set_target(self, target):
-        self.host_target_combo.selected_target = target
-
-    def get_mac(self):
-        return self.host_mac_entry.get_text()
-
-    def set_mac(self, mac):
-        self.host_mac_entry.set_text(mac)
-
-    def get_ipv4(self):
-        return self.host_ipv4_entry.get_text()
-
-    def set_ipv4(self, ipv4):
-        self.host_ipv4_entry.set_text(ipv4)
-
-    def get_ipv6(self):
-        return self.host_ipv6_entry.get_text()
-
-    def set_ipv6(self, ipv6):
-        self.host_ipv6_entry.set_text(ipv6)
-
-    def get_port(self):
-        return self.serv_port_entry.get_text().split(";")
-
-    def set_port(self, port):
-        if type(port) in StringTypes:
-            self.serv_port_entry.set_text(port)
-        elif type(port) == type([]):
-            self.serv_port_entry.set_text(";".join(port))
-
-    def get_port_open(self):
-        return self.serv_portstate_check.open
-
-    def set_port_open(self, open):
-        self.serv_portstate_check.open = open
-
-    def get_port_filtered(self):
-        return self.serv_portstate_check.filtered
-
-    def set_port_filtered(self, filtered):
-        self.serv_portstate_check.filtered = filtered
-
-    def get_port_closed(self):
-        return self.serv_portstate_check.closed
-
-    def set_port_closed(self, closed):
-        self.serv_portstate_check.closed = closed
-
-    def get_service(self):
-        if self.serv_service_combo.selected_service == self.any_service or \
-           self.serv_service_combo.selected_service == self.any:
-            return "*"
-        return self.serv_service_combo.selected_service
-
-    def set_service(self, service):
-        self.serv_service_combo.selected_service = service
-
-    def get_osclass(self):
-        if self.os_osclass_combo.selected_osclass == self.any_osclass or \
-           self.os_osclass_combo.selected_osclass == self.any:
-            return "*"
-        return self.os_osclass_combo.selected_osclass
-
-    def set_osclass(self, osclass):
-        self.os_osclass_combo.selected_osclass = osclass
-
-    def get_osmatch(self):
-        if self.os_osmatch_combo.selected_osmatch == self.any_osmatch or \
-           self.os_osmatch_combo.selected_osmatch == self.any:
-            return "*"
-        return self.os_osmatch_combo.selected_osmatch
-
-    def set_osmatch(self, osmatch):
-        self.os_osmatch_combo.selected_osmatch = osmatch
-
-    def get_product(self):
-        if self.serv_product_entry.get_text() == self.any_product or \
-           self.serv_product_entry.get_text() == self.any:
-            return "*"
-        return self.serv_product_entry.get_text()
-
-    def set_product(self, product):
-        self.serv_product_entry.set_text(product)
-
-    def get_directory(self):
-        return self.opt_path_entry.path
-
-    def set_directory(self, directory):
-        self.opt_path_entry.path = directory
-
-    def get_file_extension(self):
-        return self.opt_extension_entry.get_text().split(";")
-
-    def set_file_extension(self, file_extension):
-        if type(file_extension) == type([]):
-            self.opt_extension_entry.set_text(";".join(file_extension))
-        elif type(file_extension) in StringTypes:
-            self.opt_extension_entry.set_text(file_extension)
-
-    def get_save_time(self):
-        return self.opt_savetime_entry.time
-
-    def set_save_time(self, save_time):
-        self.opt_savetime_entry.time = save_time
-
-    def get_save(self):
-        return self.opt_save_check.get_active()
-
-    def set_save(self, save):
-        self.opt_save_check.set_active(save)
-
-    def get_search_db(self):
-        return self.opt_search_check.get_active()
-
-    def set_search_db(self, search_db):
-        self.opt_search_check.set_active(search_db)
-
+        
     def get_selected_results(self):
         selection = self.result_view.get_selection()
         rows = selection.get_selected_rows()
@@ -636,6 +466,7 @@ the search data base option at the 'Search options' tab before start the search"
         self.result_view.append_column(self.result_date_column)
         
         self.result_title_column.set_resizable(True)
+        self.result_title_column.set_min_width(200)
         self.result_date_column.set_resizable(True)
         
         self.result_title_column.set_sort_column_id(0)
@@ -652,99 +483,352 @@ the search data base option at the 'Search options' tab before start the search"
         self.result_title_column.set_attributes(cell, text=0)
         self.result_date_column.set_attributes(cell, text=1)
         
-
-    keyword = property(get_keyword, set_keyword)
-    profile = property(get_profile, set_profile)
-    option = property(get_option, set_option)
-    target = property(get_target, set_target)
-    mac = property(get_mac, set_mac)
-    ipv4 = property(get_ipv4, set_ipv4)
-    ipv6 = property(get_ipv6, set_ipv6)
-    port = property(get_port, set_port)
-    port_open = property(get_port_open, set_port_open)
-    port_filtered = property(get_port_filtered, set_port_filtered)
-    port_closed = property(get_port_closed, set_port_closed)
-    service = property(get_service, set_service)
-    product = property(get_product, set_product)
-    osclass = property(get_osclass, set_osclass)
-    osmatch = property(get_osmatch, set_osmatch)
-    directory = property(get_directory, set_directory)
-    file_extension = property(get_file_extension, set_file_extension)
-    save_time = property(get_save_time, set_save_time)
-    save = property(get_save, set_save)
-    search_db = property(get_search_db, set_search_db)
     selected_results = property(get_selected_results)
+    
 
-class Date(gtk.HBox, object):
+class Criterion(gtk.HBox):
+    """This class holds one criterion row, represented as an HBox.
+    It holds a ComboBox and a Subcriterion's subclass instance, depending on the
+    selected entry in the ComboBox. For example, when the 'Target' option is
+    selected, a SimpleSubcriterion widget is displayed, but when the 'Date'
+    operator is selected, a DateSubcriterion widget is displayed."""
+    
+    def __init__(self, search_window, operator="keyword", argument=""):
+        """A reference to the search window is passed so that we can call
+        add_criterion and remove_criterion."""
+        gtk.HBox.__init__(self)
+         
+        self.search_window = search_window
+        self.default_operator = operator
+        self.default_argument = argument
+        
+        # We need this as a map, so that we can pass the operator into
+        # the SimpleSubcriterion instance
+        self.combo_entries = {"Keyword" : ["keyword"],
+                              "Profile Name" : ["profile"],
+                              "Target" : ["target"],
+                              "Options" : ["option"],
+                              "Date" : ["date", "after", "before"],
+                              "Operating System" : ["os"],
+                              "Port" : ["open", "scanned", "closed", "filtered",
+                                        "unfiltered", "open_filtered", "closed_filtered"],
+                              "Service" : ["service"],
+                              "Host In Route" : ["inroute"],
+                              "Include Directory" : ["dir"]}
+        
+        self._create_widgets()
+        self._pack_widgets()
+        self._connect_events()
+    
+    def _create_widgets(self):
+        # A ComboBox containing the list of operators
+        self.operator_combo = gtk.combo_box_new_text()
+        
+        # Sort all the keys from combo_entries and make an entry for each of them
+        sorted_entries = self.combo_entries.keys()
+        sorted_entries.sort()
+        for name in sorted_entries:
+            self.operator_combo.append_text(name)
+        
+        # Select the default operator
+        for entry, operators in self.combo_entries.iteritems():
+            for operator in operators:
+                if operator == self.default_operator:
+                    self.operator_combo.set_active(sorted_entries.index(entry))
+                    break
+        
+        # Create a subcriterion
+        self.subcriterion = self.new_subcriterion(self.default_operator, self.default_argument)
+        
+        # The "add" and "remove" buttons
+        self.add_btn = HIGButton(" ", gtk.STOCK_ADD)
+        self.remove_btn = HIGButton(" ", gtk.STOCK_REMOVE)
+    
+    def _pack_widgets(self):
+        self.pack_start(self.operator_combo, False)
+        self.pack_start(self.subcriterion, True, True)
+        self.pack_start(self.add_btn, False)
+        self.pack_start(self.remove_btn, False)
+    
+    def _connect_events(self):
+        self.operator_combo.connect("changed", self.operator_changed)
+        self.add_btn.connect("clicked", self.add_clicked)
+        self.remove_btn.connect("clicked", self.remove_clicked)
+    
+    def get_operator(self):
+        return self.subcriterion.operator
+    
+    def get_argument(self):
+        return self.subcriterion.argument
+    
+    def add_clicked(self, widget=None, extra=None):
+        self.search_window.add_criterion(self)
+    
+    def remove_clicked(self, widget=None, extra=None):
+        self.search_window.remove_criterion(self)
+    
+    def value_changed(self, op, arg):
+        """Subcriterion instances call this method when something changes
+        inside of them."""
+        # We let the search window know about the change
+        self.search_window.criterion_changed()
+    
+    def new_subcriterion(self, operator="keyword", argument=""):
+        if operator in self.combo_entries["Date"]:
+            return DateSubcriterion(operator, argument)
+        elif operator in self.combo_entries["Port"]:
+            return PortSubcriterion(operator, argument)
+        elif operator == "dir":
+            return DirSubcriterion(operator, argument)
+        else:
+            return SimpleSubcriterion(operator, argument)
+    
+    def operator_changed(self, widget=None, extra=None):
+        """This function is called when the user selects a different entry in
+        the Criterion's ComboBox."""
+        # Destroy the previous subcriterion
+        self.subcriterion.destroy()
+        
+        # Create a new subcriterion depending on the selected operator
+        selected = self.operator_combo.get_active_text()
+        operator = self.combo_entries[selected][0]
+        self.subcriterion = self.new_subcriterion(operator)
+        
+        # Pack it, and place it on the right side of the ComboBox
+        self.pack_start(self.subcriterion, True, True)
+        self.reorder_child(self.subcriterion, 1)
+        
+        # Notify the search window about the change
+        self.search_window.criterion_changed()
+        
+        # Good to go
+        self.subcriterion.show_all()
+    
+    operator = property(get_operator)
+    argument = property(get_argument)
+
+class Subcriterion(gtk.HBox):
+    """This class is a base class for all subcriterion types. Depending on the
+    criterion selected in the Criterion's ComboBox, a subclass of Subcriterion
+    is created to display the appropriate GUI."""
     def __init__(self):
         gtk.HBox.__init__(self)
-        self._create_widgets()
-        self._connect_widgets()
-        self._pack_widgets()
+        
+        self.operator = ""
+        self.argument = ""
+    
+    def value_changed(self):
+        """Propagates the operator and the argument up to the Criterion parent."""
+        self.get_parent().value_changed(self.operator, self.argument)
 
-        self.date = localtime()[:3]
+class SimpleSubcriterion(Subcriterion):
+    """This class represents all 'simple' criterion types that need only an
+    entry box in order to define the criterion."""
+    def __init__(self, operator="keyword", argument=""):
+        Subcriterion.__init__(self)
+        
+        self.operator = operator
+        self.argument = argument
+        
+        self._create_widgets()
+        self._pack_widgets()
+        self._connect_widgets()
+    
+    def _create_widgets(self):
+        self.entry = gtk.Entry()
+        if self.argument:
+            self.entry.set_text(self.argument)
+    
+    def _pack_widgets(self):
+        self.pack_start(self.entry, True)
+    
+    def _connect_widgets(self):
+        self.entry.connect("changed", self.entry_changed)
+    
+    def entry_changed(self, widget=None, extra=None):
+        self.argument = widget.get_text()
+        self.value_changed()
+
+class PortSubcriterion(Subcriterion):
+    """This class shows the port criterion GUI."""
+    def __init__(self, operator="open", argument=""):
+        Subcriterion.__init__(self)
+        
+        self.operator = operator
+        self.argument = argument
+        
+        self._create_widgets()
+        self._pack_widgets()
+        self._connect_widgets()
+    
+    def _create_widgets(self):
+        self.entry = gtk.Entry()
+        if self.argument:
+            self.entry.set_text(self.argument)
+        
+        self.label = gtk.Label("  is  ")
+        
+        self.port_state_combo = gtk.combo_box_new_text()
+        states = ["open", "scanned", "closed", "filtered", "unfiltered", "open|filtered",
+                  "closed|filtered"]
+        for state in states:
+            self.port_state_combo.append_text(state)
+        self.port_state_combo.set_active(states.index(self.operator.replace("_", "|")))
+    
+    def _pack_widgets(self):
+        self.pack_start(self.entry, True)
+        self.pack_start(self.label, False)
+        self.pack_start(self.port_state_combo, False)
+    
+    def _connect_widgets(self):
+        self.entry.connect("changed", self.entry_changed)
+        self.port_state_combo.connect("changed", self.port_criterion_changed)
+    
+    def entry_changed(self, widget=None, extra=None):
+        self.argument = widget.get_text()
+        self.value_changed()
+    
+    def port_criterion_changed(self, widget=None, extra=None):
+        self.operator = widget.get_active_text()
+        self.value_changed()
+
+class DirSubcriterion(Subcriterion):
+    def __init__(self, operator="dir", argument=""):
+        Subcriterion.__init__(self)
+        
+        self.operator = operator
+        self.argument = argument
+        
+        self._create_widgets()
+        self._pack_widgets()
+        self._connect_widgets()
+    
+    def _create_widgets(self):
+        self.dir_entry = gtk.Entry()
+        if self.argument:
+            self.dir_entry.set_text(self.argument)
+        self.chooser_btn = HIGButton("Choose...", gtk.STOCK_OPEN)
+        
+    def _pack_widgets(self):
+        self.pack_start(self.dir_entry, True)
+        self.pack_start(self.chooser_btn, False)
+    
+    def _connect_widgets(self):
+        self.chooser_btn.connect("clicked", self.choose_clicked)
+        self.dir_entry.connect("changed", self.dir_entry_changed)
+    
+    def choose_clicked(self, widget=None, extra=None):
+        # Display a directory chooser dialog
+        chooser_dlg = DirectoryChooserDialog("Include folder in search")
+        
+        if chooser_dlg.run() == gtk.RESPONSE_OK:
+            self.dir_entry.set_text(chooser_dlg.get_filename())
+        
+        chooser_dlg.destroy()
+    
+    def dir_entry_changed(self, widget=None, extra=None):
+        self.argument = widget.get_text()
+        self.value_changed()
+
+class DateSubcriterion(Subcriterion):
+    def __init__(self, operator="date", argument=""):
+        Subcriterion.__init__(self)
+        
+        self.text2op = {"is" : "date",
+                        "after" : "after",
+                        "before" : "before"}
+        
+        self.operator = operator
+        
+        self._create_widgets()
+        self._pack_widgets()
+        self._connect_widgets()
+        
+        # Count the fuzzy operators, so that we can append them to the argument later
+        self.fuzzies = argument.count("~")
+        argument = argument.replace("~", "")
+        self.minus_notation = False
+        if re.match("\d\d\d\d-\d\d-\d\d$", argument) != None:
+            year, month, day = argument.split("-")
+            self.date = datetime.date(int(year), int(month), int(day))
+            self.argument = argument
+        elif re.match("[-|\+]\d+$", argument) != None:
+            # Convert the date from the "-n" notation into YYYY-MM-DD
+            parsed_date = datetime.date.fromordinal(datetime.date.today().toordinal() + int(argument))
+            self.argument = argument
+            self.date = (parsed_date.year, parsed_date.month, parsed_date.day)
+            
+            self.minus_notation = True
+        else:
+            self.date = datetime.date.today()
+            self.argument = self.date.isoformat()
+        
+        # Append fuzzy operators, if any
+        self.argument += "~" * self.fuzzies
 
     def _create_widgets(self):
-        t = localtime()
+        self.date_criterion_combo = gtk.combo_box_new_text()
+        self.date_criterion_combo.append_text("is")
+        self.date_criterion_combo.append_text("after")
+        self.date_criterion_combo.append_text("before")
+        if self.operator == "date":
+            self.date_criterion_combo.set_active(0)
+        elif self.operator == "after":
+            self.date_criterion_combo.set_active(1)
+        else:
+            self.date_criterion_combo.set_active(2)
         self.date_button = HIGButton()
-        self.date_sep = gtk.Label(", ")
-        self.hour = gtk.SpinButton(gtk.Adjustment(value=t[3],
-                                                  lower=0,
-                                                  upper=23,
-                                                  step_incr=1), 1)
-        self.hour_sep = gtk.Label(":")
-        self.minute = gtk.SpinButton(gtk.Adjustment(value=t[4],
-                                                  lower=0,
-                                                  upper=59,
-                                                  step_incr=1), 1)
-
-    def _connect_widgets(self):
-        self.date_button.connect("clicked", self.show_calendar)
-
-    def _pack_widgets(self):
-        self.hour.set_width_chars(2)
-        self.minute.set_width_chars(2)
         
-        self.pack_start(self.date_button, False, False)
-        self.pack_start(self.date_sep, False, False)
-        self.pack_start(self.hour, False, False)
-        self.pack_start(self.hour_sep, False, False)
-        self.pack_start(self.minute, False, False)
-
+    def _pack_widgets(self):
+        self.pack_start(self.date_criterion_combo, False)
+        self.pack_start(self.date_button, True)
+    
+    def _connect_widgets(self):
+        self.date_criterion_combo.connect("changed", self.date_criterion_changed)
+        self.date_button.connect("clicked", self.show_calendar)
+    
+    def date_criterion_changed(self, widget=None, extra=None):
+        self.operator = self.text2op[widget.get_active_text()]
+        
+        # Let the parent know that the operator has changed
+        self.value_changed()
+    
     def show_calendar(self, widget):
         calendar = DateCalendar()
         calendar.connect_calendar(self.update_button)
         calendar.show_all()
 
     def update_button(self, widget):
-        date = list(widget.get_date())
-        date[1] += 1 # Add 1 to month, because calendar date is zero-based
-        self.date = tuple(date)
+        cal_date = widget.get_date()
+        # Add 1 to month because gtk.Calendar date is zero-based.
+        self.date = datetime.date(cal_date[0], cal_date[1] + 1, cal_date[2])
+        
+        # Set the argument, using the search format
+        if self.minus_notation:
+            # We need to calculate the date's offset from today, so that we can
+            # represent the date in the "-n" notation
+            today = datetime.date.today()
+            offset = self.date.toordinal() - today.toordinal()
+            if offset > 0:
+                self.argument = "+" + str(offset)
+            else:
+                self.argument = str(offset)
+        else:
+            self.argument = self.date.isoformat()
+        self.argument += "~" * self.fuzzies
+        
+        # Let the parent know about the change
+        self.value_changed()
 
     def set_date(self, date):
-        # Localtime Format: (year, month, day)
-        self.date_button.set_label("%02d %s %04d" % (date[2], months[date[1]][:3], date[0]))
+        self.date_button.set_label(date.strftime("%d %b %Y"))
         self._date = date
 
     def get_date(self):
         return self._date
 
-    def get_time(self):
-        return (self.hour.get_value_as_int(), self.minute.get_value_as_int())
-
-    def set_time(self, time):
-        print time
-        if type(time) == type([]):
-            self.hour.set_value(time[0])
-            self.minute.set_value(time[1])
-        elif type(time) in StringTypes:
-            time = time.split(";")
-            self.hour.set_value(time[0])
-            self.minute.set_value(time[1])
-
     date = property(get_date, set_date)
-    time = property(get_time, set_time)
-    _date = localtime()[:3]
+    _date = datetime.date.today()
 
 class DateCalendar(gtk.Window, object):
     def __init__(self):
@@ -754,201 +838,10 @@ class DateCalendar(gtk.Window, object):
         self.calendar = gtk.Calendar()
         self.add(self.calendar)
 
-    def connect_calendar(self, method):
-        self.calendar.connect("day-selected-double-click", self.kill_calendar, method)
+    def connect_calendar(self, update_button_cb):
+        self.calendar.connect("day-selected-double-click", \
+                              self.kill_calendar, update_button_cb)
 
     def kill_calendar(self, widget, method):
         method(widget)
         self.destroy()
-
-class DateRange(gtk.HBox, object):
-    def __init__(self):
-        gtk.HBox.__init__(self)
-
-        self._create_widgets()
-        self._pack_widgets()
-
-    def _create_widgets(self):
-        self.label2 = gtk.Label("<b> %s </b>" % _("/"))
-        
-        self.entry1 = Date()
-        self.entry2 = Date()
-
-    def _pack_widgets(self):
-        self.label2.set_use_markup(True)
-
-        self.pack_start(self.entry1, False, False)
-        self.pack_start(self.label2, False, False)
-        self.pack_start(self.entry2, False, False)
-        
-    def get_start(self):
-        return self.entry1.date + self.entry1.time
-
-    def set_start(self, start):
-        self.entry1.date = start[:3]
-        self.entry1.time = start[3:]
-
-    def get_end(self):
-        return self.entry2.date +self.entry2.time
-
-    def set_end(self, end):
-        self.entry2.date = end[:3]
-        self.entry2.time = end[3:]
-
-    start = property(get_start, set_start)
-    end = property(get_end, set_end)
-
-class PortState(gtk.VBox, object):
-    def __init__(self):
-        gtk.VBox.__init__(self)
-        self.open_check = gtk.CheckButton(_("Open"))
-        self.filtered_check = gtk.CheckButton(_("Filtered"))
-        self.closed_check = gtk.CheckButton(_("Closed"))
-
-        self.pack_start(self.open_check, False, False)
-        self.pack_start(self.filtered_check, False, False)
-        self.pack_start(self.closed_check, False, False)
-
-    def get_open(self):
-        return self.open_check.get_active()
-
-    def set_open(self, open):
-        self.open_check.set_active(open)
-
-    def get_filtered(self):
-        return self.filtered_check.get_active()
-
-    def set_filtered(self, filtered):
-        self.filtered_check.set_active(filtered)
-
-    def get_closed(self):
-        return self.closed_check.get_active()
-
-    def set_closed(self, closed):
-        self.closed_check.set_active(closed)
-
-
-    open = property(get_open, set_open)
-    filtered = property(get_filtered, set_filtered)
-    closed = property(get_closed, set_closed)
-
-class PathEntry(HIGHBox, object):
-    def __init__(self):
-        HIGHBox.__init__(self)
-        self.entry = gtk.Entry()
-        self.button = HIGButton(stock=gtk.STOCK_OPEN)
-
-        self.entry.set_width_chars(20)
-        self.button.connect("clicked", self.open_dialog)
-        
-        self._pack_expand_fill(self.entry)
-        self._pack_noexpand_nofill(self.button)
-
-    def connect_entry_change(self, method):
-        self.entry.connect("focus-out-event", method)
-
-    def open_dialog(self, widget):
-        dialog = DirectoryChooserDialog(title=_("Choose the path to search in"))
-        dialog.run()
-        self.path = dialog.get_filename()
-        self.entry.grab_focus()
-        dialog.destroy()
-
-    def get_path(self):
-        return self.entry.get_text()
-
-    def set_path(self, path):
-        self.entry.set_text(path)
-
-    path = property(get_path, set_path)
-
-class SaveTime(HIGHBox, object):
-    def __init__(self):
-        HIGHBox.__init__(self)
-        self.entry = gtk.SpinButton(gtk.Adjustment(value=30,
-                                                   lower=0,
-                                                   upper=9999,
-                                                   step_incr=1), 1)
-        self.time_list = gtk.ListStore(str)
-        self.time_combo = gtk.ComboBoxEntry(self.time_list, 0)
-
-        self.entry.set_width_chars(4)
-
-        for i in SearchConfig().time_list.keys():
-            self.time_list.append([i])
-
-        self._pack_noexpand_nofill(self.entry)
-        self._pack_expand_fill(self.time_combo)
-
-    def get_time(self):
-        # Format: [self.entry.get_text(), self.time_combo.child.get_text()]
-        # Format: ["10", "days"]
-        return [self.entry.get_text(), self.time_combo.child.get_text()]
-
-    def connect_entry_change(self, method):
-        self.entry.connect("focus-out-event", method)
-        self.time_combo.connect("changed", method)
-
-    def set_time(self, time):
-        self.entry.set_value(int(time[0]))
-        self.time_combo.child.set_text(time[1])
-
-    time = property(get_time, set_time)
-
-if __name__ == "__main__":
-    def quit(x, y):
-        print "keyword", s.keyword
-        print "profile", s.profile
-        print "option", s.option
-        print "target", s.target
-        print "mac", s.mac
-        print "ipv4", s.ipv4
-        print "ipv6", s.ipv6
-        print "port", s.port
-        print "port_open", s.port_open
-        print "port_filtered", s.port_filtered
-        print "port_closed", s.port_closed
-        print "service", s.service
-        print "product", s.product
-        print "osclass", s.osclass
-        print "osmatch", s.osmatch
-        print "directory", s.directory
-        print "file_extension", s.file_extension
-        print "save_time", s.save_time
-        print "save", s.save
-        print "search_db", s.search_db
-        print "selected_results", s.selected_results
-            
-        gtk.main_quit()
-
-
-    s = SearchGUI()
-    s.keyword = "Testing Keyword"
-    s.profile = "Testing Profile"
-    s.option = "Testing Option"
-    s.target = "www.microsoft.com"
-    s.mac = "MAC Address"
-    s.ipv4 = "IPv4 Address"
-    s.ipv6 = "IPv6 Address"
-    s.port = "20"
-    s.port_open = True
-    s.port_filtered = True
-    s.port_closed = True
-    s.service = "ssh"
-    s.osclass = "Any class"
-    s.osmatch = "Any match"
-    s.product = "OpenSSH"
-    s.directory = "/home/adriano"
-    s.file_extension = "usr;txt;nmap"
-    s.save_time = ["30", "Years"]
-    s.save = True
-    s.search_db = True
-    
-    w = gtk.Window()
-    w.set_size_request(700, 420)
-    w.connect("delete-event", quit)
-    w.add(s)
-    
-    w.show_all()
-
-    gtk.main()

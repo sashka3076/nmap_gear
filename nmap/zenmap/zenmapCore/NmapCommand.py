@@ -19,17 +19,20 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
-# This file contains the definitions of two main classes:
-# NmapCommand represents and runs an Nmap command line. CommandConstructor
-# builds a command line string from textual option descriptions.
+# This file contains the definitions of the NmapCommand class, which represents
+# and runs an Nmap command line.
 
+import codecs
+import errno
+import locale
 import sys
 import os
 import re
-import threading
+import tempfile
 import unittest
 
-from tempfile import mktemp
+import zenmapCore.I18N
+
 from types import StringTypes
 try:
     from subprocess import Popen, PIPE
@@ -37,11 +40,11 @@ except ImportError, e:
     raise ImportError(str(e) + ".\n" + _("Python 2.4 or later is required."))
 
 import zenmapCore.Paths
+from zenmapCore.Paths import Path
 from zenmapCore.NmapOptions import NmapOptions
-from zenmapCore.OptionsConf import options_file
 from zenmapCore.UmitLogging import log
-from zenmapCore.I18N import _
 from zenmapCore.UmitConf import PathsConfig
+from zenmapCore.Name import APP_NAME
 
 # This variable is used in the call to Popen. It determines whether the
 # subprocess invocation uses the shell or not. If it is False on Unix, the nmap
@@ -54,140 +57,143 @@ from zenmapCore.UmitConf import PathsConfig
 # command basically the same way regardless of shell_state.
 shell_state = (sys.platform == "win32")
 
-# The path to the nmap executable as used by Popen.
-# Find the value from configuation file paths nmap_command_path
-# to use for the location of the nmap executable.
-# (The bug that nmap_command_path is not used from zenmap.conf has been resolved.)
-
-nmap_paths = PathsConfig()
-nmap_command_path = nmap_paths.nmap_command_path
+# The [paths] configuration from zenmap.conf, used to get nmap_command_path.
+paths_config = PathsConfig()
 
 log.debug(">>> Platform: %s" % sys.platform)
-log.debug(">>> Nmap command path: %s" % nmap_command_path)
 
 def split_quoted(s):
     """Like str.split, except that no splits occur inside quoted strings, and
     quoted strings are unquoted."""
     return [x.replace("\"", "") for x in re.findall('((?:"[^"]*"|[^"\s]+)+)', s)]
 
+def wrap_file_in_preferred_encoding(f):
+    """Wrap an open file to automatically decode its contents when reading from
+    the encoding given by locale.getpreferredencoding, or just return the file
+    if that doesn't work.
+
+    The nmap executable will write its output in whatever the system encoding
+    is. Nmap's output is usually all ASCII, but time zone it prints can be in a
+    different encoding. If it is not decoded correctly it will be displayed as
+    garbage characters. This function assists in reading the Nmap output. We
+    don't know for sure what the encoding used is, but we take a best guess and
+    decode the output into a proper unicode object so that the screen display
+    and XML writer interpret it correctly."""
+
+    try:
+        preferredencoding = locale.getpreferredencoding()
+    except locale.Error:
+        # This can happen if the LANG environment variable is set to something
+        # weird.
+        preferredencoding = None
+
+    if preferredencoding is not None:
+        try:
+            reader = codecs.getreader(preferredencoding)
+            return reader(f, "replace")
+        except LookupError:
+            # The lookup failed. This can happen if the preferred encoding is
+            # unknown ("X-MAC-KOREAN" has been observed). Ignore it and return
+            # the unwrapped file.
+            log.debug("Unknown encoding \"%s\"." % preferredencoding)
+
+    return f
+
+def escape_nmap_filename(filename):
+    """Escape '%' characters so they are not interpreted as strftime format
+    specifiers, which are not supported by Zenmap."""
+    return filename.replace("%", "%%")
+
 class NmapCommand(object):
     """This class represents an Nmap command line. It is responsible for
     starting, stopping, and returning the results from a command-line scan. A
-    command line is represented as a backing string in the variable command but
-    it is split into a list of arguments in the variable _command for
-    execution."""
+    command line is represented as a string but it is split into a list of
+    arguments for execution."""
 
-    def __init__(self, command=None):
+    def __init__(self, command):
         """Initialize an Nmap command. This creates temporary files for
         redirecting the various types of output and sets the backing
         command-line string."""
-        self.xml_output = mktemp()
-        self.normal_output = mktemp()
-        self.stdout_output = mktemp()
-        self.stderr_output = mktemp()
-
-        log.debug(">>> Created temporary files:")
-        log.debug(">>> XML OUTPUT: %s" % self.xml_output)
-        log.debug(">>> NORMAL OUTPUT: %s" % self.normal_output)
-        log.debug(">>> STDOUT OUTPUT: %s" % self.stdout_output)
-        log.debug(">>> STDERR OUTPUT: %s" % self.stderr_output)
-
-        # Pre-create the output files. This had the comment "Avoid troubles
-        # while running at Windows" but it is unnecessary.
-        open(self.xml_output,'w').close()
-        open(self.normal_output,'w').close()
-        open(self.stdout_output,'w').close()
-        open(self.stderr_output,'w').close()
-
+        self.command = command
         self.command_process = None
-        self.command_buffer = ""
-        self.command_stderr = ""
 
-        if command:
-            self.command = command
+        self._stdout_file = None
 
-    def get_command(self):
-        """command is a property of this class; this is the getter. It returns
-        the list self._command."""
-        # FIXME: don't allow self._command to be a string.
-        if type(self._command) == type(""):
-            return self._command.split()
-        return self._command
+        # Get the command as a list of options
+        self.command_list = self._get_sanitized_command_list()
+        
+        # Go through the list and look for -oX or -oA, because that means the
+        # user has specified an XML output file. When we find one, we escape '%'
+        # characters to avoid strftime expansion and insert it back into the
+        # command. We also escape the arguments to -oG, -oN, and -oS for
+        # uniformity although we don't use the file names. If we find a -oX or
+        # -oA option, set self.xml_is_temp to False and don't delete the file
+        # after we're done. Otherwise, generate a random output file name and
+        # delete it when the scan is finished.
+        self.xml_is_temp = True
+        self.xml_output_filename = None
+        i = 0
+        while i < len(self.command_list):
+            if self.command_list[i] == "-oX":
+                self.xml_is_temp = False
+                if i == len(self.command_list) - 1:
+                    break
+                self.xml_output_filename = self.command_list[i + 1]
+                escaped_xml_output_filename = escape_nmap_filename(self.xml_output_filename)
+                self.command_list[i + 1] = escaped_xml_output_filename
+                i += 1
+            elif self.command_list[i] == "-oA":
+                self.xml_is_temp = False
+                if i == len(self.command_list) - 1:
+                    break
+                xml_output_prefix = self.command_list[i + 1]
+                self.xml_output_filename = xml_output_prefix + ".xml"
+                escaped_xml_output_prefix = escape_nmap_filename(xml_output_prefix)
+                self.command_list[i + 1] = escaped_xml_output_prefix
+                i += 1
+            elif self.command_list[i] in ("-oG", "-oN", "-oS"):
+                if i == len(self.command_list) - 1:
+                    break
+                escaped_filename = escape_nmap_filename(self.command_list[i + 1])
+                self.command_list[i + 1] = escaped_filename
+            i += 1
 
-    def set_command(self, command):
-        """command is a property of this class; this is the setter. It calls
-        _verify to split the command line into the list self._command."""
-        self._command = self._verify(command)
+        if self.xml_is_temp:
+            self.xml_output_filename = tempfile.mktemp(prefix = APP_NAME + "-", suffix = ".xml")
+            escaped_xml_output_filename = escape_nmap_filename(self.xml_output_filename)
+            self.command_list.append("-oX")
+            self.command_list.append("%s" % escaped_xml_output_filename)
 
-    def _verify(self, command):
-        """This misnamed method sanitizes command and splits it into a list
-        suitable for execution."""
-        command = self._remove_double_space(command)
-        command = self._verify_output_options(command)
-        command[0] = nmap_command_path
+        log.debug(">>> Temporary files:")
+        log.debug(">>> XML OUTPUT: %s" % self.xml_output_filename)
 
-        return command
+    def _get_sanitized_command_list(self):
+        """Remove comments from the command, add output options, and return the
+        command split up into a list ready for execution."""
+        command = self.command
 
-    def _verify_output_options(self, command):
-        """Remove comments from command, add output options, and return the
-        command split up into a list."""
-        # FIXME: don't allow command to be a list.
-        if type(command) == type([]):
-            command = " ".join(command)
-
-        # Removing comments from command
-        for comment in re.findall('(#.*)', command):
-            command = command.replace(comment, '')
-
-        # Removing output options that user may have set away from command
-        found = re.findall('(-o[XGASN]{1}) {0,1}', command)
+        # Remove comments from command.
+        command = re.sub('#.*', '', command)
 
         # Split back into individual options, honoring double quotes.
-        splited = split_quoted(command)
+        command_list = split_quoted(command)        
 
-        if found:
-            for option in found:
-                pos = splited.index(option)
-                del(splited[pos+1])
-                del(splited[pos])
+        # Replace the executable name with the value of nmap_command_path.
+        if len(command_list) == 0:
+            command_list.append(None)
+        command_list[0] = paths_config.nmap_command_path
 
-        # Saving the XML output to a temporary file
-        splited.append('-oX')
-        splited.append('%s' % self.xml_output)
-
-        # Saving the Normal output to a temporary file
-        splited.append('-oN')
-        splited.append('%s' % self.normal_output)
-
-        # Disable runtime interaction feature
-        #splited.append("--noninteractive")
-
-
-        # Redirecting output
-        #splited.append('>')
-        #splited.append('%s' % self.stdout_output)
-
-        return splited
-
-    def _remove_double_space(self, command):
-        """Coalesce multiple space characters in command into single spaces."""
-        # FIXME: Don't allow command to be a list.
-        if type(command) == type([]):
-            command = " ".join(command)
-
-        # The first join + split ensures to remove double spaces on lists like this:
-        # ["nmap    ", "-T4", ...]
-        # And them, we must return a list of the command, that's why we have the second split
-        return " ".join(command.split()).split()
+        return command_list
 
     def close(self):
         """Close and remove temporary output files used by the command."""
-        self._stdout_handler.close()
-        self._stderr_handler.close()
-
-        os.remove(self.xml_output)
-        os.remove(self.normal_output)
-        os.remove(self.stdout_output)
+        self._stdout_file.close()
+        if self.xml_is_temp:
+            try:
+                os.remove(self.xml_output_filename)
+            except OSError, e:
+                if e.errno != errno.ENOENT:
+                    raise
 
     def kill(self):
         """Kill the nmap subprocess."""
@@ -225,30 +231,25 @@ class NmapCommand(object):
         return os.pathsep.join(search_paths)
 
     def run_scan(self):
-        """Run the command that has been set."""
-        if not self.command:
-            raise Exception("You have no command to run! Please, set the command \
-before trying to start scan!")
+        """Run the command represented by this class."""
 
-        #self.command_process = Popen(self.command, bufsize=1, stdin=PIPE,
-        #                             stdout=PIPE, stderr=PIPE)
-        
-        # Because of problems with Windows, I passed only the file descriptors to \
-        # Popen and set stdin to PIPE
-        # Python problems... Cross-platform execution of process should be improved
-        
-        self._stdout_handler = open(self.stdout_output, "w+")
-        self._stderr_handler = open(self.stderr_output, "w+")
-        
+        # We don't need a file name for stdout output, just a handle. A
+        # TemporaryFile is deleted as soon as it is closed, and in Unix is
+        # unlinked immediately after creation so it's not even visible.
+        f = tempfile.TemporaryFile(mode = "rb", prefix = APP_NAME + "-stdout-")
+        self._stdout_file = wrap_file_in_preferred_encoding(f)
+
         search_paths = self.get_path()
         env = dict(os.environ)
         env["PATH"] = search_paths
         log.debug("PATH=%s" % env["PATH"])
 
-        self.command_process = Popen(self.command, bufsize=1,
+        log.debug("Running command: %s" % repr(self.command_list))
+
+        self.command_process = Popen(self.command_list, bufsize=1,
                                      stdin=PIPE,
-                                     stdout=self._stdout_handler.fileno(),
-                                     stderr=self._stderr_handler.fileno(),
+                                     stdout=f.fileno(),
+                                     stderr=f.fileno(),
                                      shell=shell_state,
                                      env=env)
 
@@ -268,196 +269,21 @@ before trying to start scan!")
         elif state == 0:
             return False # False means that the process had a successful exit
         else:
-            self.command_stderr = self.get_error()
-            
-            log.critical("An error occurred during the scan execution!")
-            log.critical('%s' % self.command_stderr)
-            log.critical("Command that raised the exception: '%s'" % " ".join(self.command))
-            
-            raise Exception("An error occurred during the scan execution!\n'%s'" % \
-                            self.command_stderr)
+            log.warning("An error occurred during the scan execution!")
+            log.warning("Command that raised the exception: '%s'" %
+                         " ".join(self.command_list))
+            log.warning("Scan output:\n%s" % self.get_output())
 
-    def scan_progress(self):
-        """Should return a tuple with the stage and status of the scan execution
-        progress. Will work only when the runtime interaction problem is solved.
-        """
-        pass
-
-    def get_raw_output(self):
-        """Return the stdout of the nmap subprocess. This is the same as
-        get_output."""
-        raw_desc = open(self.stdout_output, "r")
-        raw_output = raw_desc.readlines()
-        
-        raw_desc.close()
-        return "".join(raw_output)
+            raise Exception("An error occurred during the scan execution!\n\n'%s'" % self.get_output())
 
     def get_output(self):
-        """Return the stdout of the nmap subprocess. This is the same as
-        get_raw_output."""
-        output_desc = open(self.stdout_output, "r")
-        output = output_desc.read()
+        """Return the stdout of the nmap subprocess."""
+        self._stdout_file.seek(0)
+        return self._stdout_file.read()
 
-        output_desc.close()
-        return output
-
-    def get_output_file(self):
-        """Return the name of the stdout output file."""
-        return self.stdout_output
-
-    def get_normal_output(self):
-        """Return the normal (-oN) output of the nmap subprocess."""
-        normal_desc = open(self.normal_output, "r")
-        normal = normal_desc.read()
-
-        normal_desc.close()
-        return normal
-
-    def get_normal_output_file(self):
-        """Return the name of the normal (-oN) output file."""
-        return self.normal_output
-
-    def get_xml_output(self):
-        """Return the XML (-oX) output of the nmap subprocess."""
-        xml_desc = open(self.xml_output, "r")
-        xml = xml_desc.read()
-
-        xml_desc.close()
-        return xml
-
-    def get_xml_output_file(self):
+    def get_xml_output_filename(self):
         """Return the name of the XML (-oX) output file."""
-        return self.xml_output
-
-    def get_error(self):
-        """Return the stderr output of the nmap subprocess."""
-        error_desc = open(self.stderr_output, "r")
-        error = error_desc.read()
-
-        error_desc.close()
-        return error
-
-    command = property(get_command, set_command)
-    # FIXME: This is a class-level variable but it should be an instance
-    # variable. Is it used?
-    _command = None
-
-class CommandConstructor:
-    """This class builds a string representing an Nmap command line from textual
-    option descriptions such as 'Aggressive Options' or 'UDP Scan'
-    (corresponding to -A and -sU respectively). The name-to-option mapping is
-    done by the NmapOptions class. Options are stored in a dict that maps the
-    option name to a tuple containing its arguments and "level." The level is
-    the degree of repetition for options like -v that can be given more than
-    once."""
-
-    def __init__(self, options = {}):
-        """Initialize a command line using the given options. The options are
-        given as a dict mapping option names to arguments."""
-        self.options = {}
-        self.option_profile = NmapOptions(options_file)
-        for k, v in options.items():
-            self.add_option(k, v, False)
-
-    def add_option(self, option_name, args=[], level=False):
-        """Add an option to the command line. Only one of args and level can be
-        defined. If both are defined, level takes precedence and args is
-        ignored."""
-        self.options[option_name] = (args, level)
-
-    def remove_option(self, option_name):
-        """Remove an option from the command line."""
-        if option_name in self.options.keys():
-            del(self.options[option_name])
-
-    def get_command(self, target):
-        """Return the contructed command line as a plain string."""
-        splited = ['%s' % nmap_command_path]
-
-        for option_name in self.options:
-            option = self.option_profile.get_option(option_name)
-            args, level = self.options[option_name]
-
-            if type(args) in StringTypes:
-                args = [args]
-
-            if level:
-                splited.append((option['option']+' ')*level)
-            elif args:
-                args = tuple (args)
-                splited.append(option['option'] % args[0])
-            else:
-                splited.append(option['option'])
-            
-        splited.append(target)
-        return ' '.join(splited)
-
-    def get_options(self):
-        """Return the options used in the command line, as a dict mapping
-        options names to arguments. The level, if any, is discarded."""
-        return dict([(k, v[0]) for k, v in self.options.items()])
-
-# FIXME: This class is unused. Delete it.
-class CommandThread(threading.Thread):
-    def __init__(self, command):
-        self._stop_event = threading.Event()
-        self._sleep = 1.0
-        threading.Thread.__init__(self)
-        self.command = command
-
-    def run(self):
-        #self.command_result = os.popen3(self.command)
-        self.command_result = os.system(self.command)
-
-    def join(self, timeout=None):
-        self._stop_event.set()
-        threading.Thread.join(self, timeout)
-
-
-##############
-# Exceptions #
-##############
-
-# FIXME: All these exceptions are unused. Delete them.
-
-class WrongCommandType(Exception):
-    def __init__(self, command):
-        self.command = command
-
-    def __str__(self):
-        print "Command must be of type string! Got %s instead." % str(type(self.command))
-
-class OptionDependency(Exception):
-    def __init__(self, option, dependency):
-        self.option = option
-        self.dependency = dependency
-    
-    def __str__(self):
-        return "The given option '%s' has a dependency not commited: %s" %\
-               (self.option, self.dependency)
-
-class OptionConflict(Exception):
-    def __init__(self, option, option_conflict):
-        self.option = option
-        self.option_conflict = option_conflict
-    
-    def __str__(self):
-        return "The given option '%s' is conflicting with '%s'" %\
-               (self.option, self.option_conflict)
-
-class NmapCommandError(Exception):
-    def __init__(self, command, error):
-        self.error = error
-        self.command = command
-    
-    def __str__(self):
-        return """An error occouried while trying to execute nmap command.
-
-ERROR: %s
-COMMAND: %s
-""" % (self.error, self.command)
-
-
+        return self.xml_output_filename
 
 class SplitQuotedTest(unittest.TestCase):
     """A unittest class that tests the split_quoted function."""
@@ -473,36 +299,5 @@ class SplitQuotedTest(unittest.TestCase):
         self.assertEqual(split_quoted('a "b c""d e"'), ['a', 'b cd e'])
         self.assertEqual(split_quoted('a "b c"z"d e"'), ['a', 'b czd e'])
 
-# Testing module functionality! ;-)
 if __name__ == '__main__':
-    #command = CommandConstructor ('option_profile.uop')
-    #print 'Aggressive options:', command.add_option ('Aggressive Options')
-    #print 'UDP Scan:', command.add_option ('Version Detection')
-    #print 'UDP Scan:', command.add_option ('UDP Scan')
-    #command.add_option ('Idle Scan', ['10.0.0.138'])
-    #command.add_option ('UDP Scan')
-    #command.add_option ('ACK scan')
-    #command.remove_option ('Idle Scannn')
-    
-    #print command.get_command ('localhost')
-    #print command.get_command ('localhost')
-    #print command.get_command ('localhost')
-    
-    #from time import sleep
-    
-    #nmap = NmapCommand (command)
-    #executando = nmap.execute_nmap_command ()
-    #print nmap.command
-    #while executando[0].isAlive ():
-    #    print open(executando[3]).read()
-    #    sleep (1)
-    #print open(executando[3]).read()
-
     unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(SplitQuotedTest))
-
-    scan = NmapCommand('%s -T4 -iL "/home/adriano/umit/test/targets\ teste"' % nmap_command_path)
-    scan.run_scan()
-
-    while scan.scan_state():
-        print ">>>", scan.get_normal_output()
-    print "Scan is finished!"

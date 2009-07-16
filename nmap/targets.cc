@@ -6,7 +6,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -34,19 +34,10 @@
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
- * works of Nmap.  This list is not exclusive, but is just meant to        *
- * clarify our interpretation of derived works with some common examples.  *
- * These restrictions only apply when you actually redistribute Nmap.  For *
- * example, nothing stops you from writing and selling a proprietary       *
- * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://nmap.org to download Nmap.                                       *
- *                                                                         *
- * We don't consider these to be added restrictions on top of the GPL, but *
- * just a clarification of how we interpret "derived works" as it applies  *
- * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
- * Torvalds has announced his interpretation of how "derived works"        *
- * applies to Linux kernel modules.  Our interpretation refers only to     *
- * Nmap - we don't speak for any other GPL products.                       *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
  *                                                                         *
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
@@ -77,17 +68,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -98,7 +89,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: targets.cc 7757 2008-05-29 18:20:33Z david $ */
+/* $Id: targets.cc 13888 2009-06-24 21:35:54Z fyodor $ */
 
 
 #include "targets.h"
@@ -113,8 +104,6 @@
 
 using namespace std;
 extern NmapOps o;
-enum pingstyle { pingstyle_unknown, pingstyle_rawtcp, pingstyle_rawudp, pingstyle_connecttcp, 
-		 pingstyle_icmp };
 
 /* Gets the host number (index) of target in the hostbatch array of
  pointers.  Note that the target MUST EXIST in the array or all
@@ -128,20 +117,6 @@ static inline int gethostnum(Target *hostbatch[], Target *target) {
 
   fatal("fluxx0red");
   return 0; // Unreached
-}
-
-const char *readhoststate(int state) {
-  switch(state) {
-  case HOST_UP:
-    return "HOST_UP";
-  case HOST_DOWN:
-    return "HOST_DOWN";
-  case HOST_FIREWALLED:
-    return "HOST_FIREWALLED";
-  default:
-    return "UNKNOWN/COMBO";
-  }
-  return NULL;
 }
 
 /* Conducts an ARP ping sweep of the given hosts to determine which ones
@@ -163,15 +138,13 @@ static void arpping(Target *hostbatch[], int num_hosts) {
 	log_write(LOG_STDOUT|LOG_NORMAL, 
 		  "ARP ping: Considering %s UP because it is a local IP, despite no MAC address for device %s\n",
 		  hostbatch[targetno]->NameIP(), hostbatch[targetno]->deviceName());
-	hostbatch[targetno]->flags &= ~(HOST_DOWN|HOST_FIREWALLED);
-	hostbatch[targetno]->flags |= HOST_UP;
+	hostbatch[targetno]->flags = HOST_UP;
       } else {
 	log_write(LOG_STDOUT|LOG_NORMAL, 
 		  "ARP ping: Considering %s DOWN because no MAC address found for device %s.\n",
 		  hostbatch[targetno]->NameIP(), 
 		  hostbatch[targetno]->deviceName());
-	hostbatch[targetno]->flags &= ~HOST_FIREWALLED;
-	hostbatch[targetno]->flags |= HOST_DOWN;
+	hostbatch[targetno]->flags = HOST_DOWN;
       }
       continue;
     }
@@ -299,7 +272,8 @@ TargetGroup* load_exclude(FILE *fExclude, char *szExclude) {
    * in the file, and reset the file */
   if (1 == b_file) {
     while ((char *)0 != fgets(acBuf,sizeof(acBuf), fExclude)) {
-      if ((char *)0 == strchr(acBuf, '\n')) {
+      /* the last line can contain no newline, then we have to check for EOF */
+      if ((char *)0 == strchr(acBuf, '\n') && !feof(fExclude)) {
         fatal("Exclude file line %d was too long to read.  Exiting.", iLine);
       }
       pc=strtok(acBuf, "\t\n ");	
@@ -333,7 +307,7 @@ TargetGroup* load_exclude(FILE *fExclude, char *szExclude) {
     /* If we are parsing a file load the exclude list from that */
     while ((char *)0 != fgets(acBuf, sizeof(acBuf), fExclude)) {
       ++iLine;
-      if ((char *)0 == strchr(acBuf, '\n')) {
+      if ((char *)0 == strchr(acBuf, '\n') && !feof(fExclude)) {
         fatal("Exclude file line %d was too long to read.  Exiting.", iLine);
       }
   
@@ -360,22 +334,10 @@ TargetGroup* load_exclude(FILE *fExclude, char *szExclude) {
           error("Loaded exclude target of: %s", pc);
         ++i;
       } 
-
-      /* This is a totally cheezy hack, but since I can't use strtok_r...
-       * If you can think of a better way to do this, feel free to change.
-       * As for now, we will reset strtok each time we leave parse_expr */
-      {
-	int hack_i;
-	char *hack_c = strdup(szExclude);
-
-	pc=strtok(hack_c, ",");
-
-        for (hack_i = 0; hack_i < i; hack_i++) 
-          pc=strtok(NULL, ",");
-
-	free(hack_c);
-      }
-    } 
+      pc=strtok(NULL, ",");
+    }
+    free(p_acBuf);
+    p_acBuf = NULL;
   }
   return excludelist;
 }
@@ -509,7 +471,7 @@ do {
 	 3) We are doing a raw-mode portscan or osscan OR
 	 4) We are on windows and doing ICMP ping */
       if (o.isr00t && o.af() == AF_INET && 
-	  ((pingtype & (PINGTYPE_TCP|PINGTYPE_UDP|PINGTYPE_PROTO|PINGTYPE_ARP)) || o.RawScan()
+	  ((pingtype & (PINGTYPE_TCP|PINGTYPE_UDP|PINGTYPE_SCTP_INIT|PINGTYPE_PROTO|PINGTYPE_ARP)) || o.RawScan()
 #ifdef WIN32
 	   || (pingtype & (PINGTYPE_ICMP_PING|PINGTYPE_ICMP_MASK|PINGTYPE_ICMP_TS))
 #endif // WIN32
@@ -606,7 +568,10 @@ if (hs->randomize) {
      if (!hs->hostbatch[i]->timedOut(&now)) {
        initialize_timeout_info(&hs->hostbatch[i]->to);
        hs->hostbatch[i]->flags |= HOST_UP; /*hostbatch[i].up = 1;*/
-	   hs->hostbatch[i]->reason.reason_id = ER_LOCALHOST;
+       if(pingtype == PINGTYPE_NONE && !arpping_done)
+         hs->hostbatch[i]->reason.reason_id = ER_USER;
+       else
+         hs->hostbatch[i]->reason.reason_id = ER_LOCALHOST;
      }
    }
  } else if (!arpping_done) {

@@ -1,7 +1,7 @@
 <!--
     nmap.dtd
-    This is the DTD for nmap's XML output (-oX) format.
-    $Id: nmap.dtd 7474 2008-05-12 15:54:14Z david $
+    This is the DTD for Nmap's XML output (-oX) format.
+    $Id: nmap.dtd 13888 2009-06-24 21:35:54Z fyodor $
 
     Originally written by:
     William McVey <wam@cisco.com> <wam+nmap@wamber.net>
@@ -12,7 +12,7 @@
     <!DOCTYPE nmaprun SYSTEM "nmap.dtd">
     to the nmap output immediately below the prologue (the first line).  This
     should allow you to run a validating parser against the output (so long
-    as the dtd is in your parser's dtd search path).
+    as the DTD is in your parser's DTD search path).
 
     Bugs:
     Most of the elements are "locked" into the specific order that nmap
@@ -21,7 +21,7 @@
     specify "one each of this list of elements, in any order".  If there
     is a construct similar to SGML's '&' operator, please let me know.
 
-    Portions Copyright (c) 2001-2007 Insecure.Com LLC
+    Portions Copyright (c) 2001-2008 Insecure.Com LLC
     Portions Copyright (c) 2001 by Cisco systems, Inc.
  
     Permission to use, copy, modify, and distribute modified and
@@ -58,11 +58,11 @@
 <!ENTITY % hostname_types "(PTR)" >
 
 <!-- see output.c:output_xml_scaninfo_records for scan types -->
-<!ENTITY % scan_types "(syn|ack|bounce|connect|null|xmas|window|maimon|fin|udp|ipproto)" >
+<!ENTITY % scan_types "(syn|ack|bounce|connect|null|xmas|window|maimon|fin|udp|sctpinit|sctpcookieecho|ipproto)" >
 
 <!-- <!ENTITY % ip_versions "(ipv4)" > -->
 
-<!ENTITY % port_protocols "(ip|tcp|udp)" >
+<!ENTITY % port_protocols "(ip|tcp|udp|sctp)" >
 
 <!-- I don't know exactly what these are, but the values were enumerated via:
      grep "conf=" *
@@ -72,23 +72,27 @@
 <!-- This element was started in nmap.c:nmap_main().
      It represents to the topmost element of the output document.
 -->
-<!ELEMENT nmaprun      (scaninfo*, verbose, debugging, ((taskbegin, taskprogress*, taskend) | host)*, runstats) >
+<!ELEMENT nmaprun      (scaninfo*, verbose, debugging,
+                        ((taskbegin, taskprogress*, taskend) | host | output)*,
+                        runstats) >
 <!ATTLIST nmaprun
 			scanner		(nmap)		#REQUIRED
 			args		CDATA		#IMPLIED
 			start		%attr_numeric;	#IMPLIED
 			startstr	CDATA	        #IMPLIED
 			version		CDATA		#REQUIRED
-			xmloutputversion (1.02)		#REQUIRED
+			profile_name	CDATA		#IMPLIED
+			xmloutputversion CDATA		#REQUIRED
 >
 
 <!-- this element is written in output.c:doscaninfo() -->
 <!ELEMENT scaninfo	EMPTY >
 <!ATTLIST scaninfo
-			type		%scan_types;	#REQUIRED
+			type		%scan_types;	 #REQUIRED
+			scanflags	CDATA		 #IMPLIED
 			protocol	%port_protocols; #REQUIRED
-			numservices	%attr_numeric;	#REQUIRED
-			services	CDATA		#REQUIRED
+			numservices	%attr_numeric;	 #REQUIRED
+			services	CDATA		 #REQUIRED
 >
 
 <!-- these elements are written in nmap.c:nmap_main() -->
@@ -137,6 +141,7 @@
 <!ATTLIST host
 			starttime	%attr_numeric;	#IMPLIED
 			endtime		%attr_numeric;	#IMPLIED
+			comment		CDATA		#IMPLIED
 >
 
 <!-- these elements are written by output.c:write_xml_initial_hostinfo() -->
@@ -201,7 +206,7 @@
 <!ATTLIST service
 			name		CDATA		#REQUIRED
 			conf		%service_confs;	#REQUIRED
-                        method          (table|detection|probed) #REQUIRED
+                        method          (table|probed)  #REQUIRED
                         version         CDATA           #IMPLIED
                         product         CDATA           #IMPLIED
                         extrainfo       CDATA           #IMPLIED
@@ -308,12 +313,17 @@
 	to	CDATA	#REQUIRED
 >
 
+<!-- For embedding another type of output (screen output) like Zenmap does. -->
+<!ELEMENT output (#PCDATA)>
+<!ATTLIST output type  (interactive)  #IMPLIED>
+
 <!-- these elements are generated in output.c:printfinaloutput() -->
 <!ELEMENT runstats	(finished, hosts) >
 
 <!ELEMENT finished	EMPTY >
 <!ATTLIST finished	time		%attr_numeric;	#REQUIRED 
                         timestr		CDATA	        #IMPLIED
+			elapsed		%attr_numeric;	#REQUIRED
 >
 
 <!ELEMENT hosts		EMPTY >

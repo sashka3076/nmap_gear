@@ -21,10 +21,11 @@
 
 import gtk
 
-from higwidgets.higboxes import HIGHBox
-from higwidgets.higlabels import HIGEntryLabel
+from zenmapGUI.higwidgets.higboxes import HIGHBox
+from zenmapGUI.higwidgets.higbuttons import HIGButton
+from zenmapGUI.higwidgets.higlabels import HIGEntryLabel
 
-from zenmapCore.I18N import _
+import zenmapCore.I18N
 
 from zenmapGUI.ProfileCombo import ProfileCombo
 from zenmapGUI.TargetCombo import TargetCombo
@@ -44,7 +45,7 @@ class ScanCommandToolbar(HIGHBox):
         
     def get_command(self):
         """Retrieve command entry"""
-        return self.command_entry.get_text()
+        return self.command_entry.get_text().decode("UTF-8")
 
     def set_command(self, command):
         """Set a command entry"""
@@ -69,6 +70,9 @@ class ScanToolbar(HIGHBox):
         self._create_profile()
 
         self.scan_button = gtk.Button(_("Scan"))
+        #self.scan_button = HIGButton(_("Scan "), gtk.STOCK_MEDIA_PLAY)
+        self.cancel_button = gtk.Button(_("Cancel"))
+        #self.cancel_button = HIGButton(_("Cancel "), gtk.STOCK_CANCEL)
 
         self._pack_noexpand_nofill(self.target_label)
         self._pack_expand_fill(self.target_entry)
@@ -77,6 +81,7 @@ class ScanToolbar(HIGHBox):
         self._pack_expand_fill(self.profile_entry)
         
         self._pack_noexpand_nofill(self.scan_button)
+        self._pack_noexpand_nofill(self.cancel_button)
 
         # Skip over the dropdown arrow so you can tab to the profile entry.
         self.target_entry.set_focus_chain((self.target_entry.child,))
@@ -99,14 +104,6 @@ class ScanToolbar(HIGHBox):
         self.profile_entry = ProfileCombo()
         
         self.update()
-
-    def get_target(self):
-        """Return the text of given target entry"""
-        return self.target_entry.get_child().get_text()
-
-    def get_profile_name(self):
-        """Return the text of given profile entry"""
-        return self.profile_entry.get_child().get_text()
 
     def update_target_list(self):
         self.target_entry.update()

@@ -22,8 +22,7 @@
 
 # This script relies on having an installation of MacPorts in $(LIBPREFIX),
 # configured as you wish. You need to have installed the packages py25-gtk,
-# py25-macholib-devel (from macports-1.7.0-universal.diff), py25-py2app-devel,
-# py25-sqlite3, and py25-zlib.
+# py25-macholib-devel, py25-py2app-devel, py25-sqlite3, and py25-zlib.
 
 LIBPREFIX=/opt/local-universal-10.4
 PYTHON=$LIBPREFIX/bin/python2.5
@@ -54,6 +53,8 @@ cp -R $LIBPREFIX/lib/gtk-2.0/$gtk_version/* $BASE/Resources/lib/gtk-2.0/$gtk_ver
 mkdir -p $BASE/Resources/etc/gtk-2.0
 sed -e "s|$LIBPREFIX|\${RESOURCES}|g" $LIBPREFIX/etc/gtk-2.0/gdk-pixbuf.loaders >> $BASE/Resources/etc/gtk-2.0/gdk-pixbuf.loaders.in
 sed -e "s|$LIBPREFIX|\${RESOURCES}|g" $LIBPREFIX/etc/gtk-2.0/gtk.immodules >> $BASE/Resources/etc/gtk-2.0/gtk.immodules.in
+
+cp $SCRIPT_DIR/gtkrc $BASE/Resources/etc/gtk-2.0/
 
 pango_version=`$PKG_CONFIG --variable=pango_module_version pango`
 echo "Copying Pango $pango_version files."

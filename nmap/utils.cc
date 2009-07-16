@@ -5,7 +5,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -33,19 +33,10 @@
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
- * works of Nmap.  This list is not exclusive, but is just meant to        *
- * clarify our interpretation of derived works with some common examples.  *
- * These restrictions only apply when you actually redistribute Nmap.  For *
- * example, nothing stops you from writing and selling a proprietary       *
- * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://nmap.org to download Nmap.                                       *
- *                                                                         *
- * We don't consider these to be added restrictions on top of the GPL, but *
- * just a clarification of how we interpret "derived works" as it applies  *
- * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
- * Torvalds has announced his interpretation of how "derived works"        *
- * applies to Linux kernel modules.  Our interpretation refers only to     *
- * Nmap - we don't speak for any other GPL products.                       *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
  *                                                                         *
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
@@ -76,17 +67,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -97,7 +88,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: utils.cc 7640 2008-05-22 20:45:32Z fyodor $ */
+/* $Id: utils.cc 13888 2009-06-24 21:35:54Z fyodor $ */
 
 #include "nmap.h"
 #include "utils.h"
@@ -317,9 +308,11 @@ iptr = (unsigned int *) bytes;
      pos = *iptr; iptr++;
    }
    pos %= i+1;
-   memcpy(tmp, arr + elem_sz * i, elem_sz);
-   memcpy(arr + elem_sz * i, arr + elem_sz * pos, elem_sz);
-   memcpy(arr + elem_sz * pos, tmp, elem_sz);
+   if ((unsigned) i != pos) { /* memcpy is undefined when source and dest overlap. */
+     memcpy(tmp, arr + elem_sz * i, elem_sz);
+     memcpy(arr + elem_sz * i, arr + elem_sz * pos, elem_sz);
+     memcpy(arr + elem_sz * pos, tmp, elem_sz);
+   }
  }
  free(bytes);
  free(tmp);
@@ -351,7 +344,7 @@ int Send(int sd, const void *msg, size_t len, int flags) {
   unsigned int sentlen = 0;
 
   do {
-    res = send(sd,(char *) msg + sentlen, len - sentlen, 0);
+    res = send(sd,(char *) msg + sentlen, len - sentlen, flags);
     if (res > 0)
       sentlen += res;
   } while(sentlen < len && (res != -1 || socket_errno() == EINTR));
@@ -447,28 +440,6 @@ void arg_parse_free(char **argv) {
     current++;
   }
   free(argv);
-}
-
-/* Converts an Nmap time specification string into milliseconds.  If
-   the string is a plain non-negative number, it is considered to
-   already be in milliseconds and is returned.  If it is a number
-   followed by 's' (for seconds), 'm' (minutes), or 'h' (hours), the
-   number is converted to milliseconds and returned.  If Nmap cannot
-   parse the string, it is returned instead. */
-long tval2msecs(char *tspec) {
-  long l;
-  char *endptr = NULL;
-  l = strtol(tspec, &endptr, 10);
-  if (l < 0 || !endptr) return -1;
-  if (*endptr == '\0') return l;
-  if (*endptr == 's' || *endptr == 'S') return l * 1000;
-  if ((*endptr == 'm' || *endptr == 'M')) {
-    if (*(endptr + 1) == 's' || *(endptr + 1) == 'S') 
-      return l;
-    return l * 60000;
-  }
-  if (*endptr == 'h' || *endptr == 'H') return l * 3600000;
-  return -1;
 }
 
 // A simple function to form a character from 2 hex digits in ASCII form

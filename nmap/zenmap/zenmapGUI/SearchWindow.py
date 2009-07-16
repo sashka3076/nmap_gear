@@ -23,11 +23,11 @@ import gtk
 
 from zenmapGUI.SearchGUI import SearchGUI
 
-from zenmapCore.I18N import _
+import zenmapCore.I18N
 from zenmapCore.UmitConf import is_maemo
 
-from higwidgets.higboxes import HIGVBox
-from higwidgets.higbuttons import HIGButton
+from zenmapGUI.higwidgets.higboxes import HIGVBox
+from zenmapGUI.higwidgets.higbuttons import HIGButton
 
 BaseSearchWindow = None
 hildon = None
@@ -44,18 +44,20 @@ else:
     class BaseSearchWindow(gtk.Window):
         def __init__(self):
             gtk.Window.__init__(self)
-            self.set_title(_("Search Window"))
+            self.set_title(_("Search Scans"))
             self.set_position(gtk.WIN_POS_CENTER)
 
         def _pack_widgets(self):
-            self.vbox.set_border_width(6)
+            self.vbox.set_border_width(4)
 
 class SearchWindow(BaseSearchWindow, object):
-    def __init__(self, load_method, notebook):
+    def __init__(self, load_method, append_method):
         BaseSearchWindow.__init__(self)
+        
+        self.set_default_size(600, 400)
 
         self.load_method = load_method
-        self.notebook = notebook
+        self.append_method = append_method
 
         self._create_widgets()
         self._pack_widgets()
@@ -63,20 +65,36 @@ class SearchWindow(BaseSearchWindow, object):
 
     def _create_widgets(self):
         self.vbox = HIGVBox()
+        
+        self.bottom_hbox = gtk.HBox()
+        self.bottom_label = gtk.Label()
         self.btn_box = gtk.HButtonBox()
         self.btn_open = HIGButton(stock=gtk.STOCK_OPEN)
+        self.btn_append = HIGButton(_("Append"), gtk.STOCK_ADD)
         self.btn_close = HIGButton(stock=gtk.STOCK_CLOSE)
-        self.search_gui = SearchGUI(self.notebook)
+        
+        self.search_gui = SearchGUI(self)
 
     def _pack_widgets(self):
-        BaseSearchWindow._pack_widgets(self)        
-        self.vbox.pack_start(self.search_gui)
-        self.vbox.pack_start(self.btn_box)
-
+        BaseSearchWindow._pack_widgets(self)
+        
         self.btn_box.set_layout(gtk.BUTTONBOX_END)
-        self.btn_box.set_spacing(6)
+        self.btn_box.set_spacing(4)
         self.btn_box.pack_start(self.btn_close)
+        self.btn_box.pack_start(self.btn_append)
         self.btn_box.pack_start(self.btn_open)
+        
+        self.bottom_label.set_alignment(0.0, 0.5)
+        self.bottom_label.set_use_markup(True)
+        
+        self.bottom_hbox.set_spacing(4)
+        self.bottom_hbox.pack_start(self.bottom_label, True)
+        self.bottom_hbox.pack_start(self.btn_box, False)
+        
+        self.vbox.set_spacing(4)
+        self.vbox.pack_start(self.search_gui, True, True)
+        self.vbox.pack_start(self.bottom_hbox, False)
+        
         self.add(self.vbox)
 
     def _connect_widgets(self):
@@ -84,15 +102,27 @@ class SearchWindow(BaseSearchWindow, object):
         self.search_gui.result_view.connect("row-activated", self.open_selected)
         
         self.btn_open.connect("clicked", self.open_selected)
+        self.btn_append.connect("clicked", self.append_selected)
         self.btn_close.connect("clicked", self.close)
         self.connect("delete-event", self.close)
 
     def close(self, widget=None, event=None):
+        self.search_gui.close()
         self.destroy()
-
+    
+    def set_label_text(self, text):
+        self.bottom_label.set_label(text)
+    
     def open_selected(self, widget=None, path=None, view_column=None, extra=None):
-        # Open selected results!
+        # Open selected results
         self.load_method(self.results)
+
+        # Close Search Window
+        self.close()
+    
+    def append_selected(self, widget=None, path=None, view_column=None, extra=None):
+        # Append selected results
+        self.append_method(self.results)
 
         # Close Search Window
         self.close()

@@ -216,7 +216,7 @@
 #define HAVE_UNISTD_H 1
 
 /* Define if you have the <winsock2.h> header file. */
-/* #undef HAVE_WINSOCK2_H */
+#define HAVE_WINSOCK2_H
 
 /* Name of package */
 #define PACKAGE "libdnet"
@@ -225,10 +225,10 @@
 #define STDC_HEADERS 1
 
 /* Version number of package */
-#define VERSION "1.10"
+#define VERSION "1.12"
 
 /* Define for faster code generation. */
-/* #undef WIN32_LEAN_AND_MEAN */
+#define WIN32_LEAN_AND_MEAN
 
 /* Define to empty if `const' does not conform to ANSI C. */
 /* #undef const */
@@ -261,10 +261,6 @@
 # define _SOCKADDR_LEN	1
 #endif
 
-#ifndef HAVE_INET_PTON
-int	inet_pton(int, const char *, void *);
-#endif
-
 #ifndef HAVE_STRLCAT
 int	strlcat(char *, const char *, int);
 #endif
@@ -276,6 +272,8 @@ int	strlcpy(char *, const char *, int);
 #ifndef HAVE_STRSEP
 char	*strsep(char **, const char *);
 #endif
+
+#define snprintf _snprintf
 
 /* Without this, Windows will give us all sorts of crap about using functions
    like strcpy() even if they are done safely */

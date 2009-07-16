@@ -22,10 +22,11 @@
 import gtk
 
 from types import StringTypes
-from higwidgets.higboxes import HIGVBox
-from zenmapCore.I18N import _
+from zenmapGUI.higwidgets.higboxes import HIGVBox
+import zenmapCore.I18N
 
 SCANNING = _("Scanning")
+CANCELLED = _("Cancelled")
 
 class ScanHostsView(HIGVBox, object):
     def __init__(self, hosts={}, services={}):

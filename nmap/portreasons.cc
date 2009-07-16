@@ -3,7 +3,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -31,19 +31,10 @@
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
- * works of Nmap.  This list is not exclusive, but is just meant to        *
- * clarify our interpretation of derived works with some common examples.  *
- * These restrictions only apply when you actually redistribute Nmap.  For *
- * example, nothing stops you from writing and selling a proprietary       *
- * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://nmap.org to download Nmap.                                       *
- *                                                                         *
- * We don't consider these to be added restrictions on top of the GPL, but *
- * just a clarification of how we interpret "derived works" as it applies  *
- * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
- * Torvalds has announced his interpretation of how "derived works"        *
- * applies to Linux kernel modules.  Our interpretation refers only to     *
- * Nmap - we don't speak for any other GPL products.                       *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
  *                                                                         *
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
@@ -74,17 +65,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -122,7 +113,8 @@ const char *reason_text[ER_MAX+1]={
         "unknown", "admin-prohibited", "unknown", "time-exceeded", "unknown", "unknown",
         "timestamp-reply", "unknown", "unknown", "unknown", "addressmask-reply",
         "no-ipid-change", "ipid-change", "arp-response", "tcp-response",
-        "no-response", "localhost-response", "script-set", "unknown-response"
+        "no-response", "init-ack", "abort",
+        "localhost-response", "script-set", "unknown-response","user-set"
 };
 
 const char *reason_pl_text[ER_MAX+1]={ 
@@ -134,7 +126,8 @@ const char *reason_pl_text[ER_MAX+1]={
         "unknowns", "admin-prohibiteds", "unknowns", "time-exceededs", "unknowns",
         "unknowns", "timestamp-replies", "unknowns", "unknowns", "unknowns", 
         "addressmask-replies", "no-ipid-changes", "ipid-changes", "arp-responses",
-        "tcp-responses", "no-responses", "localhost-response", "script-set", "unknown-responses"
+        "tcp-responses", "no-responses", "init-acks", "aborts",
+        "localhost-response", "script-set", "unknown-responses"
 };
 
 static void state_reason_summary_init(state_reason_summary_t *r) {
@@ -237,12 +230,9 @@ static int update_state_summary(state_reason_summary_t *head, reason_t reason_id
 		}
 
 		if(tmp->next == NULL) {
-			if((tmp->next = (state_reason_summary_t *)malloc(sizeof(state_reason_summary_t))) == NULL) {
-				perror("malloc() -> Cannot allocate state reason structures");
-				return -1;
-			}
-			tmp = tmp->next;
-			break;
+		  tmp->next = (state_reason_summary_t *)safe_malloc(sizeof(state_reason_summary_t));
+		  tmp = tmp->next;
+		  break;
 		}
 		tmp = tmp->next;
 	}
@@ -258,7 +248,7 @@ static unsigned int get_state_summary(state_reason_summary_t *head, PortList *Po
 	Port *current = NULL;
 	state_reason_summary_t *reason;
 	unsigned int total = 0;
-	unsigned short proto = (o.ipprotscan) ? IPPROTO_IP : TCPANDUDP;
+	unsigned short proto = (o.ipprotscan) ? IPPROTO_IP : TCPANDUDPANDSCTP;
 
 	if(head == NULL)
 		return 0;
@@ -277,10 +267,7 @@ static unsigned int get_state_summary(state_reason_summary_t *head, PortList *Po
 static state_reason_summary_t *print_state_summary_internal(PortList *Ports, int state) {
 	state_reason_summary_t *reason_head;
 
-	if((reason_head = (state_reason_summary_t *)malloc(sizeof(state_reason_summary_t))) == NULL)  {
-		perror("malloc() -> Cannot allocate state reason structures");
-		return NULL;
-	}
+	reason_head = (state_reason_summary_t *)safe_malloc(sizeof(state_reason_summary_t));
 
 	state_reason_summary_init(reason_head);
 
@@ -371,7 +358,7 @@ char *target_reason_str(Target *t) {
 	static char reason[128];
 	memset(reason,'\0', 128);
 	assert(t->reason.reason_id != ER_NORESPONSE);
-	Snprintf(reason, 128, ", received %s",reason_str(t->reason.reason_id, SINGULAR)); 
+	Snprintf(reason, 128, "received %s", reason_str(t->reason.reason_id, SINGULAR)); 
 	return reason;
 }
 

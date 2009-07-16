@@ -1,110 +1,160 @@
--- See nmaps COPYING for licence
+--- Standard Nmap Scripting Engine functions.
+--
+-- This module contains various handy functions that are too small to justify
+-- modules of their own.
+-- @copyright Same as Nmap--See http://nmap.org/book/man-legal.html
 
-module(..., package.seeall)
+local assert = assert;
+local error = error;
+local pairs = pairs
+local tonumber = tonumber;
+local type = type
 
-print_debug = function(...)
-	local verbosity = 1;
-	if ((#arg > 1) and (tonumber(arg[1]))) then
-		verbosity = table.remove(arg, 1);
-	end
-	
-	nmap.print_debug_unformatted(verbosity, string.format(unpack(arg, start)));
+local ceil = math.ceil
+local max = math.max
+local format = string.format;
+local concat = table.concat;
+
+local nmap = require "nmap";
+
+local c_funcs = require "stdnse.c";
+
+local EMPTY = {}; -- Empty constant table
+
+module(... or "stdnse");
+
+-- Load C functions from stdnse.c into this namespace.
+for k, v in pairs(c_funcs) do
+  _M[k] = v
 end
+-- Remove visibility of the stdnse.c table.
+c = nil
 
--- Concat the contents of the parameter list,
--- separated by the string delimiter (just like in perl)
--- example: strjoin(", ", {"Anna", "Bob", "Charlie", "Dolores"})
-function strjoin(delimiter, list)
-	return table.concat(list, delimiter);
-end
-
--- Split text into a list consisting of the strings in text,
--- separated by strings matching delimiter (which may be a pattern). 
--- example: strsplit(",%s*", "Anna, Bob, Charlie,Dolores")
-function strsplit(delimiter, text)
-	local list = {}
-	local pos = 1
-
-	if string.find("", delimiter, 1) then -- this would result in endless loops
-		error("delimiter matches empty string!")
-	end
-
-	while true do
-		local first, last = string.find(text, delimiter, pos)
-		if first then -- found?
-			table.insert(list, string.sub(text, pos, first-1))
-			pos = last+1
-		else
-			table.insert(list, string.sub(text, pos))
-			break
-		end
-	end
-
-	return list
-end
-
-
--- Generic buffer implementation using lexical closures
+--- Sleeps for a given amount of time.
 --
--- Pass make_buffer a socket and a separator lua pattern [1].
---
--- Returns a function bound to your provided socket with behaviour identical
--- to receive_lines() except it will return AT LEAST ONE [2] and AT MOST ONE
--- "line" at a time.
---
--- [1] Use the pattern "\r?\n" for regular newlines
--- [2] Except where there is trailing "left over" data not terminated by a
---     pattern (in which case you get the data anyways)
--- [3] The data is returned WITHOUT the pattern/newline on the end.
--- [4] Empty "lines" are returned as "". With the pattern in [1] you will
---     receive a "" for each newline in the stream.
--- [5] Errors/EOFs are delayed until all "lines" have been processed.
---
--- -Doug, June, 2007
+-- This causes the program to yield control and not regain it until the time
+-- period has elapsed. The time may have a fractional part. Internally, the
+-- timer provides millisecond resolution.
+-- @name sleep
+-- @class function
+-- @param t Time to sleep, in seconds.
+-- @usage stdnse.sleep(1.5)
 
-make_buffer = function(sd, sep)
-  local self, result
-  local buf = ""
+-- sleep is a C function defined in nse_nmaplib.cc.
 
-  self = function()
-    local i, j, status, value
-
-    i, j = string.find(buf, sep)
-
-    if i then
-      if i == 1 then  -- empty line
-        buf = string.sub(buf, j+1, -1)
-        --return self() -- skip empty, tail
-        return true, "" -- return empty
-      else
-        value = string.sub(buf, 1, i-1)
-        buf = string.sub(buf, j+1, -1)
-        return true, value
-      end
-    end
-
-    if result then
-      if string.len(buf) > 0 then  -- left over data with no terminating pattern
-        value = buf
-        buf = ""
-        return true, value
-      end
-      return nil, result
-    end
-
-    status, value = sd:receive()
-
-    if status then
-      buf = buf .. value
-    else
-      result = value
-    end
-
-    return self() -- tail
+--- Prints a formatted debug message if the current verbosity level is greater
+-- than or equal to a given level.
+-- 
+-- This is a convenience wrapper around
+-- <code>nmap.log_write</code>. The first optional numeric
+-- argument, <code>level</code>, is used as the debugging level necessary
+-- to print the message (it defaults to 1 if omitted). All remaining arguments
+-- are processed with Lua's <code>string.format</code> function.
+-- @param level Optional debugging level.
+-- @param fmt Format string.
+-- @param ... Arguments to format.
+print_debug = function(level, fmt, ...)
+  local l, d = tonumber(level), nmap.debugging();
+  if l and l <= d then
+    nmap.log_write("stdout", format(fmt, ...));
+  elseif not l and 1 <= d then
+    nmap.log_write("stdout", format(level, fmt, ...));
   end
-
-  return self
 end
+
+--- Join a list of strings with a separator string.
+-- 
+-- This is Lua's <code>table.concat</code> function with the parameters
+-- swapped for coherence.
+-- @usage
+-- stdnse.strjoin(", ", {"Anna", "Bob", "Charlie", "Dolores"})
+-- --> "Anna, Bob, Charlie, Dolores"
+-- @param delimiter String to delimit each element of the list.
+-- @param list Array of strings to concatenate.
+-- @return Concatenated string.
+function strjoin(delimiter, list)
+  assert(type(delimiter) == "string" or type(delimiter) == nil, "delimiter is of the wrong type! (did you get the parameters backward?)")
+    
+  return concat(list, delimiter);
+end
+
+--- Split a string at a given delimiter, which may be a pattern.
+-- @usage
+-- stdnse.strsplit(",%s*", "Anna, Bob, Charlie, Dolores")
+-- --> { "Anna", "Bob", "Charlie", "Dolores" }
+-- @param pattern Pattern that separates the desired strings.
+-- @param text String to split.
+-- @return Array of substrings without the separating pattern.
+function strsplit(pattern, text)
+  local list, pos = {}, 1;
+
+  assert(pattern ~= "", "delimiter matches empty string!");
+
+  while true do
+    local first, last, match = text:find(pattern, pos);
+    if first then -- found?
+      list[#list+1] = text:sub(pos, first-1);
+      pos = last+1;
+    else
+      list[#list+1] = text:sub(pos);
+      break;
+    end
+  end
+  return list;
+end
+
+--- Return a wrapper closure around a socket that buffers socket reads into
+-- chunks separated by a pattern.
+-- 
+-- This function operates on a socket attempting to read data. It separates the
+-- data by <code>sep</code> and, for each invocation, returns a piece of the
+-- separated data. Typically this is used to iterate over the lines of data
+-- received from a socket (<code>sep = "\r?\n"</code>). The returned string
+-- does not include the separator. It will return the final data even if it is
+-- not followed by the separator. Once an error or EOF is reached, it returns
+-- <code>nil, msg</code>. <code>msg</code> is what is returned by
+-- <code>nmap.receive_lines</code>.
+-- @param socket Socket for the buffer.
+-- @param sep Separator for the buffered reads.
+-- @return Data from socket reads or <code>nil</code> on EOF or error.
+-- @return Error message, as with <code>receive_lines</code>.
+function make_buffer(socket, sep)
+  local point, left, buffer, done, msg = 1, "";
+  local function self()
+    if done then
+      return nil, msg; -- must be nil for stdnse.lines (below)
+    elseif not buffer then
+      local status, str = socket:receive_lines(1);
+      if not status then
+        if #left > 0 then
+          done, msg = not status, str;
+          return left;
+        else
+          return status, str;
+        end
+      else
+        buffer = left..str;
+        return self();
+      end
+    else
+      local i, j = buffer:find(sep, point);
+      if i then
+        local ret = buffer:sub(point, i-1);
+        point = j + 1;
+        return ret;
+      else
+        point, left, buffer = 1, buffer:sub(point), nil;
+        return self();
+      end
+    end
+  end
+  return self;
+end
+
+--[[ This function may be usable in Lua 5.2
+function lines(socket)
+  return make_buffer(socket, "\r?\n"), nil, nil;
+end --]]
 
 do
   local t = {
@@ -126,18 +176,86 @@ do
     f = "1111"
   };
 
+--- Converts the given number, n, to a string in a binary number format (12
+-- becomes "1100").
+-- @param n Number to convert.
+-- @return String in binary format.
   function tobinary(n)
     assert(tonumber(n), "number expected");
     return (("%x"):format(n):gsub("%w", t):gsub("^0*", ""));
   end
 end
 
+--- Converts the given number, n, to a string in an octal number format (12
+-- becomes "14").
+-- @param n Number to convert.
+-- @return String in octal format.
 function tooctal(n)
   assert(tonumber(n), "number expected");
   return ("%o"):format(n)
 end
 
-function tohex(n)
-  assert(tonumber(n), "number expected");
-  return ("%x"):format(n);
+--- Encode a string or number in hexadecimal (12 becomes "c", "AB" becomes
+-- "4142").
+--
+-- An optional second argument is a table with formatting options. The possible
+-- fields in this table are
+-- * <code>separator</code>: A string to use to separate groups of digits.
+-- * <code>group</code>: The size of each group of digits between separators. Defaults to 2, but has no effect if <code>separator</code> is not also given.
+-- @usage
+-- stdnse.tohex("abc") --> "616263"
+-- stdnse.tohex("abc", {separator = ":"}) --> "61:62:63"
+-- stdnse.tohex("abc", {separator = ":", group = 4}) --> "61:6263"
+-- stdnse.tohex(123456) --> "1e240"
+-- stdnse.tohex(123456, {separator = ":"}) --> "1:e2:40"
+-- stdnse.tohex(123456, {separator = ":", group = 4}) --> "1:e240"
+-- @param s String or number to be encoded.
+-- @param options Table specifiying formatting options.
+-- @return String in hexadecimal format.
+function tohex( s, options ) 
+  options = options or EMPTY
+  local separator = options.separator
+  local hex
+
+  if type( s ) == "number" then
+    hex = ("%x"):format(s)
+  elseif type( s ) == 'string' then
+    hex = ("%02x"):rep(#s):format(s:byte(1,#s))
+  else
+    error( "Type not supported in tohex(): " .. type(s), 2 )
+  end
+
+  -- format hex if we got a separator
+  if separator then
+    local group = options.group or 2
+    local fmt_table = {}
+    -- split hex in group-size chunks
+    for i=#hex,1,-group do
+      -- table index must be consecutive otherwise table.concat won't work
+      fmt_table[ceil(i/group)] = hex:sub(max(i-group+1,1),i)
+    end
+
+    hex = concat( fmt_table, separator )
+  end
+
+  return hex
 end
+
+---Either return the string itself, or return "<blank>" (or the value of the second parameter) if the string
+-- was blank or nil.
+--
+--@param string The base string.
+--@param blank  The string to return if <code>string</code> was blank
+--@return Either <code>string</code> or, if it was blank, <code>blank</code>
+function string_or_blank(string, blank)
+  if(string == nil or string == "") then
+    if(blank == nil) then
+      return "<blank>"
+    else
+      return blank
+    end
+  else
+    return string
+  end
+end
+

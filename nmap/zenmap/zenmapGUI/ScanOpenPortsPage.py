@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2005 Insecure.Com LLC.
+# Copyright (C) 2005,2008 Insecure.Com LLC.
 #
 # Author: Adriano Monteiro Marques <py.adriano@gmail.com>
+# Modified: Jurand Nogiec <jurand@jurand.net>, 2008
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,11 +22,11 @@
 
 import gtk
 
-from higwidgets.higboxes import HIGVBox, HIGHBox
-from higwidgets.higtables import HIGTable
+from zenmapGUI.higwidgets.higboxes import HIGVBox, HIGHBox
+from zenmapGUI.higwidgets.higtables import HIGTable
 
 from zenmapCore.UmitLogging import log
-from zenmapCore.I18N import _
+import zenmapCore.I18N
 
 class ScanOpenPortsPage(gtk.ScrolledWindow):
     def __init__(self):
@@ -69,8 +70,8 @@ class HostOpenPorts(HIGVBox):
 
         # Host services view
         self.host_columns = {}
-        self.host_list = gtk.ListStore(str, str, str, int, str, str, str, str)
-        self.host_tree = gtk.TreeStore(str, str, str, int, str, str, str, str)
+        self.host_list = gtk.ListStore(str, str, str, int, str, str, str)
+        self.host_tree = gtk.TreeStore(str, str, str, int, str, str, str)
         
         self.host_view = gtk.TreeView(self.host_list)
         
@@ -83,7 +84,6 @@ class HostOpenPorts(HIGVBox):
         self.host_columns['protocol'] = gtk.TreeViewColumn(_('Protocol'))
         self.host_columns['port_number'] = gtk.TreeViewColumn(_('Port'))
         self.host_columns['state'] = gtk.TreeViewColumn(_('State'))
-        self.host_columns['server'] = gtk.TreeViewColumn(_('Server product'))
         self.host_columns['version'] = gtk.TreeViewColumn(_('Version'))
         
         self.scroll_ports_hosts = gtk.ScrolledWindow()
@@ -105,7 +105,7 @@ class HostOpenPorts(HIGVBox):
         selection.set_mode(gtk.SELECTION_MULTIPLE)
 
         columns = ["service", "icon", "hostname", "port_number",
-                   "protocol", "state", "server", "version"]
+                   "protocol", "state", "version"]
         
         for c in columns:
             self.host_view.append_column(self.host_columns[c])
@@ -118,8 +118,7 @@ class HostOpenPorts(HIGVBox):
         self.host_columns['port_number'].connect('clicked', self.set_host_search_cb, 3)
         self.host_columns['protocol'].connect('clicked', self.set_host_search_cb, 4)
         self.host_columns['state'].connect('clicked', self.set_host_search_cb, 5)
-        self.host_columns['server'].connect('clicked', self.set_host_search_cb, 6)
-        self.host_columns['version'].connect('clicked', self.set_host_search_cb, 7)
+        self.host_columns['version'].connect('clicked', self.set_host_search_cb, 6)
 
         self.host_columns['service'].set_sort_column_id(0)
         self.host_columns['icon'].set_min_width(35)
@@ -128,8 +127,7 @@ class HostOpenPorts(HIGVBox):
         self.host_columns['port_number'].set_sort_column_id(3)
         self.host_columns['protocol'].set_sort_column_id(4)
         self.host_columns['state'].set_sort_column_id(5)
-        self.host_columns['server'].set_sort_column_id(6)
-        self.host_columns['version'].set_sort_column_id(7)
+        self.host_columns['version'].set_sort_column_id(6)
 
         self.host_columns['service'].pack_start(self.cell_port, True)
         self.host_columns['icon'].pack_start(self.cell_host_icon, True)
@@ -138,7 +136,6 @@ class HostOpenPorts(HIGVBox):
         self.host_columns['protocol'].pack_start(self.cell_port, True)
         self.host_columns['version'].pack_start(self.cell_port, True)
         self.host_columns['state'].pack_start(self.cell_port, True)
-        self.host_columns['server'].pack_start(self.cell_port, True)
         
         self.host_columns['service'].set_attributes(self.cell_port, text=0)
         self.host_columns['icon'].set_attributes(self.cell_host_icon, stock_id=1)
@@ -146,8 +143,7 @@ class HostOpenPorts(HIGVBox):
         self.host_columns['port_number'].set_attributes(self.cell_port, text=3)
         self.host_columns['protocol'].set_attributes(self.cell_port, text=4)
         self.host_columns['state'].set_attributes(self.cell_port, text=5)
-        self.host_columns['server'].set_attributes(self.cell_port, text=6)
-        self.host_columns['version'].set_attributes(self.cell_port, text=7)
+        self.host_columns['version'].set_attributes(self.cell_port, text=6)
         
         self.host_columns['service'].set_visible(False)
         
@@ -216,7 +212,8 @@ class HostOpenPorts(HIGVBox):
     def port_mode(self):
         child = self.scroll_ports_hosts.get_child()
         if id(child) != id(self.port_view):
-            self.scroll_ports_hosts.remove(child)
+            if child is not None:
+                self.scroll_ports_hosts.remove(child)
             self.scroll_ports_hosts.add(self.port_view)
             self.port_view.show_all()
             self.host_view.hide()
@@ -224,7 +221,8 @@ class HostOpenPorts(HIGVBox):
     def host_mode(self):
         child = self.scroll_ports_hosts.get_child()
         if id(child) != id(self.host_view):
-            self.scroll_ports_hosts.remove(child)
+            if child is not None:
+                self.scroll_ports_hosts.remove(child)
             self.scroll_ports_hosts.add(self.host_view)
             self.host_view.show_all()
             self.port_view.hide()

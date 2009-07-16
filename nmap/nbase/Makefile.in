@@ -10,6 +10,8 @@ AR = ar
 RANLIB = @RANLIB@
 CCOPT = 
 DEFS = @DEFS@
+# With GCC, add extra security checks to source code.
+DEFS += -D_FORTIFY_SOURCE=2
 CPPFLAGS = @CPPFLAGS@
 CFLAGS = @CFLAGS@ $(CCOPT) $(GLIB_CFLAGS) $(DEFS) $(INCLS)
 STATIC = 
@@ -21,7 +23,7 @@ MAKEDEPEND = @MAKEDEPEND@
 
 TARGET = libnbase.a
 
-DEPS = getopt.h nbase.h nbase_winconfig.h nbase_config.h nbase_ipv6.h nbase_winunix.h
+DEPS = getopt.h nbase.h nbase_winconfig.h nbase_config.h nbase_ipv6.h nbase_winunix.h nbase_crc32ct.h
 OBJS = @LIBOBJS@
 
 all: $(TARGET) 

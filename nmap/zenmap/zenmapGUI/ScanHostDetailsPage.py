@@ -21,12 +21,12 @@
 
 import gtk
 
-from higwidgets.higexpanders import HIGExpander
-from higwidgets.higboxes import HIGVBox, HIGHBox, hig_box_space_holder
-from higwidgets.higlabels import HIGEntryLabel
-from higwidgets.higtables import HIGTable
+from zenmapGUI.higwidgets.higexpanders import HIGExpander
+from zenmapGUI.higwidgets.higboxes import HIGVBox, HIGHBox, hig_box_space_holder
+from zenmapGUI.higwidgets.higlabels import HIGEntryLabel
+from zenmapGUI.higwidgets.higtables import HIGTable
 
-from zenmapCore.I18N import _
+import zenmapCore.I18N
 
 na = _('Not available')
 

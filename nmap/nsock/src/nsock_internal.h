@@ -6,7 +6,7 @@
  *                                                                         *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
- * The nsock parallel socket event library is (C) 1999-2008 Insecure.Com   *
+ * The nsock parallel socket event library is (C) 1999-2009 Insecure.Com   *
  * LLC This library is free software; you may redistribute and/or          *
  * modify it under the terms of the GNU General Public License as          *
  * published by the Free Software Foundation; Version 2.  This guarantees  *
@@ -35,17 +35,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
- * insecure.org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * Insecure.Org development mailing lists, it is assumed that you are      *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -55,7 +55,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_internal.h 7327 2008-05-05 04:10:20Z fyodor $ */
+/* $Id: nsock_internal.h 13448 2009-05-29 23:19:07Z david $ */
 
 #ifndef NSOCK_INTERNAL_H
 #define NSOCK_INTERNAL_H
@@ -161,8 +161,6 @@ struct writeinfo {
   int written_so_far; /* Number of bytes successfully written */
 };
 
-/* struct sslinfo defined in nsock_ssl.h */
-
 /* remember that callers of this library should NOT be accessing these 
    fields directly */
 typedef struct  {
@@ -184,6 +182,9 @@ typedef struct  {
 		     stdout */
   /* This time is subtracted from the current time for trace reports */
   struct timeval tracebasetime; 
+#if HAVE_OPENSSL
+  SSL_CTX *sslctx; /* The SSL Context (options and such) */
+#endif
 } mspool;
 
 
@@ -195,6 +196,8 @@ enum msiod_state { NSIOD_STATE_DELETED, NSIOD_STATE_INITIAL,
 		   NSIOD_STATE_UNKNOWN /* sd was provided to us in nsi_new2 */,
 		   NSIOD_STATE_CONNECTED_TCP, NSIOD_STATE_CONNECTED_UDP };
 
+/* struct sslinfo defined in nsock_ssl.h */
+
 /* typedef struct msiod msiod; */
 
 /* nsock_iod is like a "file descriptor" for the nsock library.  You
@@ -202,14 +205,20 @@ enum msiod_state { NSIOD_STATE_DELETED, NSIOD_STATE_INITIAL,
 struct msiod {
   int sd; /* The socket descriptor related to the event */
   int events_pending; /* Number of pending events on this iod */
+  /* These are counts of how many events are waiting to read from or write to
+     the socket. When they are 0 we stop watching the socket for readability or
+     writability. */
+  int readsd_count;
+  int writesd_count;
   mspool *nsp; /* The mspool used to create the iod (used for deletion) */
   enum msiod_state state;
   struct sockaddr_storage peer; /* The host and port we are connected to
 				   using sd (saves a call to getpeername) */
+  struct sockaddr_storage local; /* The host and port to bind to with sd */
 
-/* The length of peer actualy used (sizeof(sockadd_in) or
-   sizeof(sockaddr_in6), or 0 if peer has not been filled in */
-  size_t peerlen; 
+/* The length of peer/local actually used (sizeof(sockaddr_in) or
+   sizeof(sockaddr_in6), or 0 if peer/local has not been filled in */
+  size_t locallen, peerlen; 
   int lastproto; /* -1 if none yet, otherwise IPPROTO_TCP, etc. */
   gh_list_elem *entry_in_nsp_active_iods; /* The mspool keeps track of
 					     msiods that have been
@@ -229,6 +238,10 @@ struct msiod {
   unsigned long id; /* Every iod has an id which is always unique for the
 		       same nspool (unless you create billions of them) */
   void *userdata;
+
+  /* IP options to set on socket before connect() */
+  void *ipopts;
+  int ipoptslen;
   
   void *pcap;	   /* Pointer to mspcap struct (used only if pcap support is included) */
 };
@@ -337,11 +350,6 @@ void nsock_trace(mspool *ms, char *fmt, ...)
 /* An event has been completed and the handler is about to be called.  This function
    writes out tracing data about the event if neccessary */
 void nsock_trace_handler_callback(mspool *ms, msevent *nse);
-
-/* Returns the remote peer port (or -1 if unavailable).  Note the
-   return value is a whole int so that -1 can be distinguished from
-   65535.  Port is returned in host byte order. */
-int nsi_peerport(msiod *nsi);
 
 #if HAVE_OPENSSL
 /* sets the ssl session of an nsock_iod, increments usage count.  The

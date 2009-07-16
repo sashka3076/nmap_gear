@@ -106,6 +106,7 @@ char* nsock_pcap_open(nsock_pool nsp, nsock_iod nsiod,
 	#else
 	mp->pcap_desc = -1;
 	#endif
+	mp->readsd_count = 0;
 
 	/* Set device non-blocking */
 	if(pcap_setnonblock(mp->pt, 1, err0r) < 0){

@@ -39,7 +39,6 @@ icon_names = (
     'macosx',
     'openbsd',
     'redhat',
-    'shadow_man',
     'solaris',
     'ubuntu',
     'unknown',
@@ -56,7 +55,6 @@ if pixmap_path:
     # This is a generator that returns file names for pixmaps in the order they
     # should be tried.
     def get_pixmap_file_names(icon_name, size):
-        yield '%s.svg' % icon_name
         yield '%s_%s.png' % (icon_name, size)
 
     iconfactory = gtk.IconFactory()
@@ -80,58 +78,68 @@ if pixmap_path:
             log.debug('Register %s icon name for file %s' % (key, file_path))
     iconfactory.add_default()
 
-def get_os_icon(os_match):
-    return get_os(os_match, 'icon')
+def get_os_icon(host):
+    if not host:
+        return get_os('','','icon')
 
-def get_os_logo(os_match):
-    return get_os(os_match, 'logo')
+    osfamily = host.get_best_osclass()['osfamily']
+    osmatch = host.get_best_osmatch()['name']
 
-def get_os(os_match, type):
-    if os_match:
-        if re.findall('[rR][eE][dD][ ]+[hH][aA][tT]', os_match):
-            # Linux icon
-            return 'redhat_%s'%type
-        elif re.findall('[uU][bB][uU][nN][tT][uU]', os_match):
-            # Linux icon
-            return 'ubuntu_%s'%type
-        elif re.findall('[lL][iI][nN][uU][xX]', os_match):
-            # Linux icon
-            return 'linux_%s'%type
-        elif re.findall('[wW][iI][nN][dD][oO][wW][sS]', os_match):
-            #print '>>> Match windows!'
+    return get_os(osfamily, osmatch, 'icon')
+
+def get_os_logo(host):
+    if not host:
+        return get_os('','','logo')
+
+    osfamily = host.get_best_osclass()['osfamily']
+    osmatch = host.get_best_osmatch()['name']
+
+    return get_os(osfamily, osmatch, 'logo')
+
+def get_os(osfamily, osmatch, type):
+    if osfamily:
+        if osfamily == 'Linux':
+            if re.findall("ubuntu", osmatch.lower()):
+                # Ubuntu icon
+                return 'ubuntu_%s'%type
+            elif re.findall("red hat", osmatch.lower()):
+                # RedHat icon
+                return 'redhat_%s'%type
+            else:
+                # Generic Linux icon
+                return 'linux_%s'%type
+        elif osfamily == 'Windows':
             # Windows icon
             return 'win_%s'%type
-        elif re.findall('[oO][pP][eE][nN][bB][sS][dD]', os_match):
+        elif osfamily == 'OpenBSD':
             # OpenBSD icon
             return 'openbsd_%s'%type
-        elif re.findall('[fF][rR][eE][eE][bB][sS][dD]', os_match):
+        elif osfamily == 'FreeBSD':
             # FreeBSD icon
             return 'freebsd_%s'%type
-        elif re.findall('[nN][eE][tT][bB][sS][dD]', os_match):
+        elif osfamily == 'NetBSD':
             # NetBSD icon
             return 'default_%s'%type
-        elif re.findall('[sS][oO][lL][aA][rR][iI][sS]',os_match):
+        elif osfamily == 'Solaris':
             # Solaris icon
             return 'solaris_%s'%type
-        elif re.findall('[oO][pP][eE][nN].*[sS][oO][lL][aA][rR][iI][sS]',\
-                        os_match):
+        elif osfamily == 'OpenSolaris':
             # OpenSolaris icon
             return 'solaris_%s'%type
-        elif re.findall('[iI][rR][iI][xX]',os_match):
+        elif osfamily == 'IRIX':
             # Irix icon
             return 'irix_%s'%type
-        elif re.findall('[mM][aA][cC].*[oO][sS].*[xX]',os_match):
+        elif osfamily == 'Mac OS X':
             # Mac OS X icon
             return 'macosx_%s'%type
-        elif re.findall('[mM][aA][cC].*[oO][sS]',os_match):
+        elif osfamily == 'Mac OS':
             # Mac OS icon
             return 'macosx_%s'%type
         else:
             # Default OS icon
             return 'default_%s'%type
     else:
-        # This is the icon for unkown OS
-        # Can't be a scary icon, like stop, cancel, etc.
+        # Unknown OS icon
         return 'unknown_%s'%type
 
 def get_vulnerability_logo(open_ports):

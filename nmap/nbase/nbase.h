@@ -9,7 +9,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -37,19 +37,10 @@
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
- * works of Nmap.  This list is not exclusive, but is just meant to        *
- * clarify our interpretation of derived works with some common examples.  *
- * These restrictions only apply when you actually redistribute Nmap.  For *
- * example, nothing stops you from writing and selling a proprietary       *
- * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://nmap.org to download Nmap.                                       *
- *                                                                         *
- * We don't consider these to be added restrictions on top of the GPL, but *
- * just a clarification of how we interpret "derived works" as it applies  *
- * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
- * Torvalds has announced his interpretation of how "derived works"        *
- * applies to Linux kernel modules.  Our interpretation refers only to     *
- * Nmap - we don't speak for any other GPL products.                       *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
  *                                                                         *
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
@@ -80,17 +71,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -101,7 +92,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase.h 7641 2008-05-22 20:45:49Z fyodor $ */
+/* $Id: nbase.h 12974 2009-04-16 09:38:13Z daniel $ */
 
 #ifndef NBASE_H
 #define NBASE_H
@@ -171,6 +162,10 @@
 #include <netdb.h>  
 #endif
 
+#if HAVE_INTTYPES_H
+#include <inttypes.h>
+#endif
+
 #ifndef MAXHOSTNAMELEN
 #define MAXHOSTNAMELEN 64
 #endif
@@ -188,37 +183,15 @@
 /* Keep assert() defined for security reasons */
 #undef NDEBUG
 
-/* Integer widths */
-#if (SIZEOF_CHAR == 1)
-typedef unsigned char u8;
-#else
-typedef u_int8_t u8;
-#endif
-
-#if (SIZEOF_SHORT == 2)
-typedef unsigned short u16;
-typedef short s16;
-#elif (SIZEOF_CHAR == 2)
-typedef unsigned char u16;
-typedef char s16;
-#else
-typedef u_int16_t u16;
+/* Integer types */
+typedef uint8_t u8;
+typedef int8_t s8;
+typedef uint16_t u16;
 typedef int16_t s16;
-#endif
-
-#if (SIZEOF_SHORT == 4)
-typedef unsigned short u32;
-typedef short s32;
-#elif (SIZEOF_INT == 4)
-typedef unsigned int u32;
-typedef int s32;
-#elif (SIZEOF_LONG == 4)
-typedef unsigned long u32;
-typedef long s32;
-#else
-typedef u_int32_t u32;
+typedef uint32_t u32;
 typedef int32_t s32;
-#endif
+typedef uint64_t u64;
+typedef int64_t s64;
 
 /* Mathematicial MIN/MAX/ABS (absolute value) macros */
 #ifndef MAX
@@ -228,7 +201,7 @@ typedef int32_t s32;
 #define MIN(x,y) (((x)<(y))?(x):(y))
 #endif
 #ifndef ABS
-#define ABS(x) (((x) >= 0)?(x):(-x)) 
+#define ABS(x) (((x) >= 0)?(x):-(x)) 
 #endif
 
 
@@ -302,8 +275,9 @@ extern "C" int vsnprintf (char *, size_t, const char *, va_list);
 #define R_OK 04
 #endif
 
+/* wtf was ms thinking? */
 #define access _access
-#define stat _stat /* wtf was ms thinking? */
+#define stat _stat
 #define execve _execve
 #define getpid _getpid
 #define dup _dup
@@ -316,7 +290,6 @@ extern "C" int vsnprintf (char *, size_t, const char *, va_list);
 
 #if !defined(__GNUC__)
 #define snprintf _snprintf
-#define vsnprintf _vsnprintf
 #endif
 
 #define strcasecmp _stricmp
@@ -347,6 +320,13 @@ extern "C" {
      with their closest Windows equivalents.  So you can use EMSGSIZE
      or EINTR. */
 int socket_errno();
+
+/* We can't just use strerror to get socket errors on Windows because it has
+   its own set of error codes: WSACONNRESET not ECONNRESET for example. This
+   function will do the right thing on Windows. Call it like
+     socket_strerror(socket_errno())
+*/
+char *socket_strerror(int errnum);
 
 /* The usleep() function is important as well */
 #ifndef HAVE_USLEEP
@@ -416,8 +396,22 @@ u32 get_random_u32();
 u16 get_random_u16();
 u8 get_random_u8();
 
-/* CRC16 Cyclic Redundancy Check  */
-unsigned long crc16(unsigned char *buf, int len);
+/* Create a new socket inheritable by subprocesses. On non-Windows systems it's
+   just a normal socket. */
+int inheritable_socket(int af, int style, int protocol);
+int unblock_socket(int sd);
+int block_socket(int sd);
+
+/* CRC32 Cyclic Redundancy Check */
+unsigned long nbase_crc32(unsigned char *buf, int len);
+/* CRC32C Cyclic Redundancy Check (Castagnoli) */
+unsigned long nbase_crc32c(unsigned char *buf, int len);
+/* Adler32 Checksum */
+unsigned long nbase_adler32(unsigned char *buf, int len);
+
+long tval2msecs(char *tspec);
+
+int fselect(int s, fd_set *rmaster, fd_set *wmaster, fd_set *emaster, struct timeval *tv);
 
 #ifndef STDIN_FILENO
 #define STDIN_FILENO 0

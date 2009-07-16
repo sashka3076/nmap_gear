@@ -6,7 +6,7 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2008 Insecure.Com LLC. Nmap is    *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
  * also a registered trademark of Insecure.Com LLC.  This program is free  *
  * software; you may redistribute and/or modify it under the terms of the  *
  * GNU General Public License as published by the Free Software            *
@@ -34,19 +34,10 @@
  * o Links to a library or executes a program that does any of the above   *
  *                                                                         *
  * The term "Nmap" should be taken to also include any portions or derived *
- * works of Nmap.  This list is not exclusive, but is just meant to        *
- * clarify our interpretation of derived works with some common examples.  *
- * These restrictions only apply when you actually redistribute Nmap.  For *
- * example, nothing stops you from writing and selling a proprietary       *
- * front-end to Nmap.  Just distribute it by itself, and point people to   *
- * http://nmap.org to download Nmap.                                       *
- *                                                                         *
- * We don't consider these to be added restrictions on top of the GPL, but *
- * just a clarification of how we interpret "derived works" as it applies  *
- * to our GPL-licensed Nmap product.  This is similar to the way Linus     *
- * Torvalds has announced his interpretation of how "derived works"        *
- * applies to Linux kernel modules.  Our interpretation refers only to     *
- * Nmap - we don't speak for any other GPL products.                       *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
  *                                                                         *
  * If you have any questions about the GPL licensing restrictions on using *
  * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
@@ -77,17 +68,17 @@
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to fyodor@insecure.org for possible incorporation into the main         *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
  * distribution.  By sending these changes to Fyodor or one of the         *
  * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering Fyodor and Insecure.Com LLC the unlimited, non-exclusive right *
- * to reuse, modify, and relicense the code.  Nmap will always be          *
- * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
- * projects (such as KDE and NASM).  We also occasionally relicense the    *
- * code to third parties as discussed above.  If you wish to specify       *
- * special license conditions of your contributions, just say so when you  *
- * send them.                                                              *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -98,7 +89,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.h 7817M 2008-06-01 03:58:19Z (local) $ */
+/* $Id: nmap.h 13897 2009-06-25 00:23:03Z fyodor $ */
 
 #ifndef NMAP_H
 #define NMAP_H
@@ -227,6 +218,11 @@ void *realloc();
 #include <arpa/inet.h>
 #endif
 
+/* For systems without SCTP in netinet/in.h, such as MacOS X */
+#ifndef IPPROTO_SCTP
+#define IPPROTO_SCTP 132
+#endif
+
 /* Keep assert() defined for security reasons */
 #undef NDEBUG
 
@@ -256,8 +252,8 @@ void *realloc();
 #ifndef NMAP_VERSION
 /* Edit this definition only within the quotes, because it is read from this
    file by the makefiles. */
-#define NMAP_VERSION "4.65"
-#define NMAP_NUM_VERSION "4.65.0.0"
+#define NMAP_VERSION "5.00"
+#define NMAP_NUM_VERSION "5.0.0.0"
 #endif
 
 /* User configurable #defines: */
@@ -275,18 +271,23 @@ void *realloc();
 #define MAX_TIMEOUTS MAX_SOCKETS   /* How many timed out connection attempts 
 				      in a row before we decide the host is 
 				      dead? */
-#define DEFAULT_TCP_PROBE_PORT_SPEC "80" /* The ports TCP probes go to if
+#define DEFAULT_TCP_PROBE_PORT_SPEC "80" /* The ports TCP ping probes go to if
                                             unspecified by user -- uber hackers
                                             change this to 113 */
-#define DEFAULT_UDP_PROBE_PORT_SPEC "31338" /* The port UDP probes (esp. "ping"
-                                               probes) go to if unspecified by
-                                               user */
+#define DEFAULT_UDP_PROBE_PORT_SPEC "40125" /* The port UDP ping probes go to
+                                               if unspecified by user */
+#define DEFAULT_SCTP_PROBE_PORT_SPEC "80" /* The port SCTP probes go to
+                                             if unspecified by
+                                             user */
 #define DEFAULT_PROTO_PROBE_PORT_SPEC "1,2,4" /* The IPProto ping probes to use
                                                  if unspecified by user */
 
 #define MAX_DECOYS 128 /* How many decoys are allowed? */
 
 #define MAXFALLBACKS 20 /* How many comma separated fallbacks are allowed in the service-probes file? */
+
+/* The trace level to give to nsp_settrace with --packet-trace et al. */
+#define NSOCK_TRACE_LEVEL 2
 
 /* Default maximum send delay between probes to the same host */
 #ifndef MAX_TCP_SCAN_DELAY
@@ -295,6 +296,10 @@ void *realloc();
 
 #ifndef MAX_UDP_SCAN_DELAY
 #define MAX_UDP_SCAN_DELAY 1000
+#endif
+
+#ifndef MAX_SCTP_SCAN_DELAY
+#define MAX_SCTP_SCAN_DELAY 1000
 #endif
 
 /* Maximum number of extra hostnames, OSs, and devices, we
@@ -332,8 +337,6 @@ void *realloc();
 #define HOST_UNKNOWN 0
 #define HOST_UP 1
 #define HOST_DOWN 2 
-#define HOST_FIREWALLED 4 
-#define HOST_BROADCAST 8 /* use the wierd_responses member of hoststruct instead */
 
 #define PINGTYPE_UNKNOWN 0
 #define PINGTYPE_NONE 1
@@ -348,8 +351,20 @@ void *realloc();
 #define PINGTYPE_UDP  512
 #define PINGTYPE_ARP 1024
 #define PINGTYPE_PROTO 2048
+#define PINGTYPE_SCTP_INIT 4096
 
-#define DEFAULT_PING_TYPES PINGTYPE_TCP|PINGTYPE_TCP_USE_ACK|PINGTYPE_ICMP_PING
+/* Empirically determined optimum combinations of different numbers of probes:
+     -PE
+     -PE -PA80
+     -PE -PA80 -PS443
+     -PE -PA80 -PS443 -PP
+     -PE -PA80 -PS443 -PP -PU40125
+   We use the four-probe combination. */
+#define DEFAULT_PING_TYPES (PINGTYPE_ICMP_PING|PINGTYPE_TCP|PINGTYPE_TCP_USE_ACK|PINGTYPE_TCP_USE_SYN|PINGTYPE_ICMP_TS)
+#define DEFAULT_PING_ACK_PORT_SPEC "80"
+#define DEFAULT_PING_SYN_PORT_SPEC "443"
+/* For nonroot. */
+#define DEFAULT_PING_CONNECT_PORT_SPEC "80,443"
 
 /* OS scan */
 #define OS_SCAN_DEFAULT 9
@@ -418,21 +433,17 @@ int nmap_main(int argc, char *argv[]);
 void nmap_free_mem();
 
 /* general helper functions */
-int parse_targets(struct targets *targets, char *h);
 const char *statenum2str(int state);
 const char *scantype2str(stype scantype);
 void sigdie(int signo);
 void reaper(int signo);
 char *seqreport(struct seq_info *seq);
-char *seqreport1(struct seq_info *seq);
-const char *seqclass2ascii(int clas);
 const char *ipidclass2ascii(int seqclass);
 const char *tsseqclass2ascii(int seqclass);
 
 /* Convert a TCP sequence prediction difficulty index like 1264386
    into a difficulty string like "Worthy Challenge */
 const char *seqidx2difficultystr(unsigned long idx);
-const char *seqidx2difficultystr1(unsigned long idx);
 int nmap_fetchfile(char *filename_returned, int bufferlen, const char *file);
 int nmap_fileexistsandisreadable(const char* pathname);
 int gather_logfile_resumption_state(char *fname, int *myargc, char ***myargv);

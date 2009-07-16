@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2002 Dug Song <dugsong@monkey.org>
  *
- * $Id: intf-win32.c,v 1.24 2005/02/15 06:37:06 dugsong Exp $
+ * $Id: intf-win32.c 632 2006-08-10 04:36:52Z dugsong $
  */
 
 #ifdef _WIN32
@@ -12,18 +12,15 @@
 #include "config.h"
 #endif
 
-#include <winsock2.h>
-#include <windows.h>
 #include <iphlpapi.h>
 
-#include <dnet.h>
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "pcap.h"
+#include "dnet.h"
 
 struct ifcombo {
 	DWORD		*idx;
@@ -31,7 +28,9 @@ struct ifcombo {
 	int		 max;
 };
 
-#define MIB_IF_TYPE_MAX		MAX_IF_TYPE	/* XXX - ipifcons.h */
+/* XXX - ipifcons.h incomplete, use IANA ifTypes MIB */
+#define MIB_IF_TYPE_TUNNEL	131
+#define MIB_IF_TYPE_MAX		MAX_IF_TYPE
 
 struct intf_handle {
 	struct ifcombo	 ifcombo[MIB_IF_TYPE_MAX];
@@ -42,14 +41,9 @@ struct intf_handle {
 static char *
 _ifcombo_name(int type)
 {
-	/* Unknown interface types get the prefix "net". */
-	char *name = "net";
+	char *name = "eth";	/* XXX */
 	
-	if (type == MIB_IF_TYPE_ETHERNET || type == IF_TYPE_IEEE80211) {
-		/* INTF_TYPE_IEEE80211 is used for wireless devices on
-		   Windows Vista. */
-		name = "eth";
-	} else if (type == MIB_IF_TYPE_TOKENRING) {
+	if (type == MIB_IF_TYPE_TOKENRING) {
 		name = "tr";
 	} else if (type == MIB_IF_TYPE_FDDI) {
 		name = "fddi";
@@ -59,16 +53,15 @@ _ifcombo_name(int type)
 		name = "lo";
 	} else if (type == MIB_IF_TYPE_SLIP) {
 		name = "sl";
+	} else if (type == MIB_IF_TYPE_TUNNEL) {
+		name = "tun";
 	}
 	return (name);
 }
 
-/* Return a canonical internal interface type number for the given
- * device string. */
 static int
 _ifcombo_type(const char *device)
 {
-	/* Unknown device names (like "net") get mapped to INTF_TYPE_OTHER. */
 	int type = INTF_TYPE_OTHER;
 	
 	if (strncmp(device, "eth", 3) == 0) {
@@ -83,22 +76,10 @@ _ifcombo_type(const char *device)
 		type = INTF_TYPE_LOOPBACK;
 	} else if (strncmp(device, "sl", 2) == 0) {
 		type = INTF_TYPE_SLIP;
+	} else if (strncmp(device, "tun", 3) == 0) {
+		type = INTF_TYPE_TUN;
 	}
 	return (type);
-}
-
-/* Map an MIB_IFROW.dwType interface type into an internal interface
-   type. The internal types are never exposed to users of this library;
-   they exist only for the sake of ordering interface types within an
-   intf_handle, which has an array of ifcombo structures ordered by
-   type. Entries in an intf_handle must not be stored or accessed by a
-   raw MIB_IFROW.dwType number because they will not be able to be found
-   by a device name such as "net0" if the device name does not map
-   exactly to the dwType. */
-static int
-_if_type_canonicalize(int type)
-{
-	return _ifcombo_type(_ifcombo_name(type));
 }
 
 static void
@@ -117,6 +98,20 @@ _ifcombo_add(struct ifcombo *ifc, DWORD idx)
 	ifc->idx[ifc->cnt++] = idx;
 }
 
+/* Map an MIB_IFROW.dwType interface type into an internal interface
+   type. The internal types are never exposed to users of this library;
+   they exist only for the sake of ordering interface types within an
+   intf_handle, which has an array of ifcombo structures ordered by
+   type. Entries in an intf_handle must not be stored or accessed by a
+   raw MIB_IFROW.dwType number because they will not be able to be found
+   by a device name such as "net0" if the device name does not map
+   exactly to the dwType. */
+static int
+_if_type_canonicalize(int type)
+{
+       return _ifcombo_type(_ifcombo_name(type));
+}
+
 static void
 _ifrow_to_entry(intf_t *intf, MIB_IFROW *ifrow, struct intf_entry *entry)
 {
@@ -124,11 +119,10 @@ _ifrow_to_entry(intf_t *intf, MIB_IFROW *ifrow, struct intf_entry *entry)
 	int i;
 	int type;
 	
-	/* The total length of the entry may be passed in inside entry.
-	   Remember it and clear the entry. */
+	/* The total length of the entry may be passed inside entry.
+           Remember it and clear the entry. */
 	u_int intf_len = entry->intf_len;
 	memset(entry, 0, sizeof(*entry));
-	/* Restore the length. */
 	entry->intf_len = intf_len;
 
 	type = _if_type_canonicalize(ifrow->dwType);
@@ -143,8 +137,8 @@ _ifrow_to_entry(intf_t *intf, MIB_IFROW *ifrow, struct intf_entry *entry)
 	
 	/* Get interface flags. */
 	entry->intf_flags = 0;
-	if (ifrow->dwAdminStatus == MIB_IF_ADMIN_STATUS_UP && 
-	    (ifrow->dwOperStatus == MIB_IF_OPER_STATUS_OPERATIONAL || 
+	if (ifrow->dwAdminStatus == MIB_IF_ADMIN_STATUS_UP &&
+	    (ifrow->dwOperStatus == MIB_IF_OPER_STATUS_OPERATIONAL ||
 	     ifrow->dwOperStatus == MIB_IF_OPER_STATUS_CONNECTED))
 		entry->intf_flags |= INTF_FLAG_UP;
 	if (ifrow->dwType == MIB_IF_TYPE_LOOPBACK)
@@ -186,7 +180,7 @@ _ifrow_to_entry(intf_t *intf, MIB_IFROW *ifrow, struct intf_entry *entry)
 			}
 		}
 	}
-	entry->intf_len = (unsigned int) ((u_char *)ap - (u_char *)entry);
+	entry->intf_len = (u_int) ((u_char *)ap - (u_char *)entry);
 }
 
 static int
@@ -227,8 +221,7 @@ _refresh_tables(intf_t *intf)
 		ifrow = &intf->iftable->table[i];
 		type = _if_type_canonicalize(ifrow->dwType);
 		if (type < MIB_IF_TYPE_MAX) {
-			_ifcombo_add(&intf->ifcombo[type],
-			    ifrow->dwIndex);
+			_ifcombo_add(&intf->ifcombo[type], ifrow->dwIndex);
 		} else
 			return (-1);
 	}
@@ -270,94 +263,6 @@ intf_get(intf_t *intf, struct intf_entry *entry)
 	
 	return (0);
 }
-
-/* XXX - gross hack required by eth-win32:eth_open() */
-const char *
-intf_get_desc(intf_t *intf, const char *name)
-{
-	static char desc[MAXLEN_IFDESCR + 1];
-	MIB_IFROW ifrow;
-	
-	if (_refresh_tables(intf) < 0)
-		return (NULL);
-	
-	ifrow.dwIndex = _find_ifindex(intf, name);
-	
-	if (GetIfEntry(&ifrow) != NO_ERROR)
-		return (NULL);
-
-	
-	return (desc);
-}
-
-/* Converts a dnet interface name (ifname) to its pcap equivalent, which is stored in
-pcapdev (up to a length of pcapdevlen).  Returns 0 and fills in pcapdev if successful. */
-int intf_get_pcap_devname(const char *ifname, char *pcapdev, int pcapdevlen) {
-	int i;
-	intf_t *intf;
-	struct intf_entry ie;
-	pcap_if_t *pcapdevs;
-	pcap_if_t *pdev;
-	char pname[128];
-	struct sockaddr_in devip;
-	pcap_addr_t *pa;
-
-	if ((intf = intf_open()) == NULL)
-		return -1;
-	
-	pname[0] = '\0';
-	memset(&ie, 0, sizeof(ie));
-	strlcpy(ie.intf_name, ifname, sizeof(ie.intf_name));
-	if (intf_get(intf, &ie) != 0) {
-		intf_close(intf);
-		return -1;
-	}
-	intf_close(intf);
-	
-	/* Find the first IPv4 address for ie */
-	if (ie.intf_addr.addr_type == ADDR_TYPE_IP) {
-		addr_ntos(&ie.intf_addr, (struct sockaddr *) &devip);
-	} else {
-		for(i=0; i < (int) ie.intf_alias_num; i++) {
-			if (ie.intf_alias_addrs[i].addr_type == ADDR_TYPE_IP) {
-				addr_ntos(&ie.intf_alias_addrs[i], (struct sockaddr *) &devip);
-				break;
-			}
-		}
-		if (i == ie.intf_alias_num)
-			return -1; // Failed to find IPv4 address, which is currently a requirement
-	}
-
-	/* Next we must find the pcap device name corresponding to the device.
-	   The device description used to be compared with those from PacketGetAdapterNames(), but
-	   that was unrelaible because dnet and pcap sometimes give different descriptions.  For example, 
-	   dnet gave me "AMD PCNET Family PCI Ethernet Adapter - Packet Scheduler Miniport" for one of my 
-	   adapters (in vmware), while pcap described it as "VMware Accelerated AMD PCNet Adapter (Microsoft's
-	   Packet Scheduler)". Plus,  Packet* functions aren't really supported for external use by the 
-	   WinPcap folks.  So I have rewritten this to compare interface addresses (which has its own 
-	   problems -- what if you want to listen an an interface with no IP address set?) --Fyodor */
-	if (pcap_findalldevs(&pcapdevs, NULL) == -1)
-		return -1;
-
-	for(pdev=pcapdevs; pdev && !pname[0]; pdev = pdev->next) {
-		for (pa=pdev->addresses; pa && !pname[0]; pa = pa->next) {
-			if (pa->addr->sa_family != AF_INET)
-				continue;
-			if (((struct sockaddr_in *)pa->addr)->sin_addr.s_addr == devip.sin_addr.s_addr) {
-				strlcpy(pname, pdev->name, sizeof(pname)); /* Found it -- Yay! */
-			break;
-	}
-		}
-	}
-
-	pcap_freealldevs(pcapdevs);
-	if (pname[0]) {
-		strlcpy(pcapdev, pname, pcapdevlen);
-		return 0;
-	}
-	return -1;
-}
-
 
 int
 intf_get_src(intf_t *intf, struct intf_entry *entry, struct addr *src)

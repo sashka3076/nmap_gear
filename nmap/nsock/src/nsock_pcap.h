@@ -5,7 +5,6 @@
 #ifdef HAVE_PCAP
 
 #ifdef WIN32
-#include "mswin32\winclude.h"
 #include "pcap-int.h"
 #endif
 
@@ -65,6 +64,9 @@
 typedef struct{
 	pcap_t *pt;
 	int pcap_desc;
+	/* Like the corresponding member in msiod, when this reaches 0 we stop
+	   watching the socket for readability. */
+	int readsd_count;
 	int datalink;
 	int l3_offset;
 	int snaplen;

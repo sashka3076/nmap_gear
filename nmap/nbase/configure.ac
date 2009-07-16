@@ -2,7 +2,7 @@ dnl # -*- mode: fundamental; -*-
 dnl # Autoconf configuration file for Nbase
 dnl #
 dnl # Process this file with autoconf to produce a configure script.
-dnl # $Id: configure.ac 7632 2008-05-22 18:14:30Z kris $
+dnl # $Id: configure.ac 10569 2008-10-08 23:17:11Z david $
 
 # Because nbase is usually distributed with Nmap, the necessary files
 # config.guess, config.guess, and install-sh are not distributed with
@@ -70,7 +70,7 @@ esac
 
 dnl Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS( string.h getopt.h strings.h sys/param.h sys/time.h unistd.h errno.h sys/types.h sys/socket.h netinet/in.h arpa/inet.h sys/stat.h net/if.h netdb.h sys/wait.h fcntl.h sys/resource.h)
+AC_CHECK_HEADERS( string.h getopt.h strings.h sys/param.h sys/time.h unistd.h errno.h sys/types.h sys/socket.h netinet/in.h arpa/inet.h sys/stat.h net/if.h netdb.h sys/wait.h fcntl.h sys/resource.h inttypes.h)
 AC_HEADER_TIME
 
 AC_MSG_CHECKING(for __attribute__)
@@ -104,11 +104,15 @@ AC_SUBST(CFLAGS)
 dnl check endedness
 AC_C_BIGENDIAN
 
-dnl determine integer widths so nbase can export u32, u16, etc.
-AC_CHECK_SIZEOF(char, 1)
-AC_CHECK_SIZEOF(short, 2)
-AC_CHECK_SIZEOF(int, 4)
-AC_CHECK_SIZEOF(long, 4)
+dnl determine types so nbase can export u32, u16, etc.
+AC_TYPE_INT8_T
+AC_TYPE_INT16_T
+AC_TYPE_INT32_T
+AC_TYPE_INT64_T
+AC_TYPE_UINT8_T
+AC_TYPE_UINT16_T
+AC_TYPE_UINT32_T
+AC_TYPE_UINT64_T
 
 dnl Checks for library functions.
 AC_CHECK_FUNCS( snprintf vsnprintf nanosleep strerror strcasestr strcasecmp strncasecmp )
@@ -152,6 +156,8 @@ AC_SEARCH_LIBS(getnameinfo, [inet6 socket])
 AC_CHECK_FUNCS(gai_strerror)
 AC_REPLACE_FUNCS(inet_ntop inet_pton)
 APR_CHECK_WORKING_GETADDRINFO
+# The inet_addr function is used by APR_CHECK_WORKING_GETNAMEINFO.
+AC_SEARCH_LIBS(inet_addr, [nsl])
 APR_CHECK_WORKING_GETNAMEINFO
 APR_CHECK_SOCKADDR_IN6
 APR_CHECK_SOCKADDR_STORAGE

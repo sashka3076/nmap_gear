@@ -43,6 +43,8 @@ AC_C_INLINE
 dnl Checks for programs.
 AC_PROG_CC
 AC_PROG_CXX
+AC_PROG_INSTALL
+
  if test -n "$GXX"; then
       CXXFLAGS="$CXXFLAGS -Wall "
  fi
@@ -134,6 +136,11 @@ case "$host" in
     # on HP-UX 11.11 (other versions?) Mikhail Zakharov (zmey20000@yahoo.com)
     AC_CHECK_LIB(nm, open_mib)
     ;;
+  *-aix*)
+    # use some AIX specific libraries
+    AC_CHECK_LIB(odm, odm_initialize)	
+    AC_CHECK_LIB(cfg, _system_configuration)
+    ;;
   *-solaris2.0*)  
     AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
     AC_DEFINE(SOLARIS)
@@ -170,7 +177,6 @@ case "$host" in
     ;;
   *-linux*)
     AC_DEFINE(LINUX)
-    AC_DEFINE(PCAP_TIMEOUT_IGNORED)  # libpcap doesn't even LOOK at the timeout you give it under Linux
     LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
     ;;
   *-apple-darwin*)
@@ -190,6 +196,34 @@ AC_CHECK_HEADERS(pwd.h termios.h sys/sockio.h)
 dnl If any socket libraries needed
 AC_SEARCH_LIBS(setsockopt, socket)
 AC_SEARCH_LIBS(gethostbyname, nsl)
+
+# Do they want Ndiff?
+AC_ARG_WITH(ndiff, AC_HELP_STRING([--without-ndiff], [Skip installation of the Ndiff utility]), [], [with_ndiff=check])
+
+if test "$with_ndiff" != "no"; then
+  AM_PATH_PYTHON([2.4], [],
+  [if test "$with_ndiff" = "check"; then
+     AC_MSG_WARN([Not building Ndiff because Python 2.4 or later was not found])
+   else
+     AC_MSG_FAILURE([--with-ndiff requires Python 2.4 or later])
+   fi
+   with_ndiff=no])
+fi
+if test "$with_ndiff" = "no"; then
+  BUILDNDIFF=""
+  INSTALLNDIFF=""
+  NDIFF_CLEAN=""
+  NDIFF_DIST_CLEAN=""
+else
+  BUILDNDIFF=build-ndiff
+  INSTALLNDIFF=install-ndiff
+  NDIFF_CLEAN=ndiff_clean
+  NDIFF_DIST_CLEAN=ndiff_dist_clean
+fi
+AC_SUBST(BUILDNDIFF)
+AC_SUBST(INSTALLNDIFF)
+AC_SUBST(NDIFF_CLEAN)
+AC_SUBST(NDIFF_DIST_CLEAN)
 
 # Do they want Zenmap?
 AC_ARG_WITH(zenmap, AC_HELP_STRING([--without-zenmap], [Skip installation of the Zenmap graphical frontend]), [], [with_zenmap=check])
@@ -245,20 +279,31 @@ AC_HELP_STRING([--with-openssl=DIR],[Use optional openssl libs and includes from
 if test "$use_openssl" = "yes" -a -z "$specialssldir"; then
   AC_CHECK_HEADER(openssl/ssl.h,,
   [ use_openssl="no"
-    AC_MSG_WARN([Failed to find openssl/ssl.h so OpenSSL will not be used. If it is installed you can try the --with-openssl=DIR argument]) ])
+    if test "$with_openssl" = "yes"; then
+      AC_MSG_ERROR([OpenSSL was explicitly requested but openssl/ssl.h was not found. Try the --with-openssl=DIR argument to give the location of OpenSSL or run configure with --without-openssl.])
+    fi
+    AC_MSG_WARN([Failed to find openssl/ssl.h so OpenSSL will not be used. If it is installed you can try the --with-openssl=DIR argument])
+  ])
 
 # use_openssl="yes" given explicitly in next 2 rules to avoid adding lib to $LIBS
  if test "$use_openssl" = "yes"; then
    AC_CHECK_LIB(crypto, BIO_int_ctrl,
     [ use_openssl="yes"],
     [ use_openssl="no"
-    AC_MSG_WARN([Failed to find libcrypto so OpenSSL will not be used. If it is installed you can try the --with-openssl=DIR argument]) ])
+    if test "$with_openssl" = "yes"; then
+      AC_MSG_ERROR([OpenSSL was explicitly requested but libcrypto was not found. Try the --with-openssl=DIR argument to give the location of OpenSSL or run configure with --without-openssl.])
+    fi
+    AC_MSG_WARN([Failed to find libcrypto so OpenSSL will not be used. If it is installed you can try the --with-openssl=DIR argument])
+   ])
  fi
 
  if test "$use_openssl" = "yes"; then
    AC_CHECK_LIB(ssl, SSL_new,
     [ use_openssl="yes" ],
     [ use_openssl="no"
+    if test "$with_openssl" = "yes"; then
+      AC_MSG_ERROR([OpenSSL was explicitly requested but libssl was not found. Try the --with-openssl=DIR argument to give the location of OpenSSL or run configure with --without-openssl.])
+    fi
     AC_MSG_WARN([Failed to find libssl so OpenSSL will not be used. If it is installed you can try the --with-openssl=DIR argument]) ],
     [ -lcrypto ])
  fi
@@ -517,9 +562,12 @@ AC_HELP_STRING([--without-liblua], [Compile without lua (this will exclude all o
   esac]
 )
 
+# OpenSSL and NSE C modules can require dlopen
+AC_SEARCH_LIBS(dlopen, dl)
+
 # They don't want lua
 if test "$no_lua" = "yes"; then
-  CXXFLAGS="-DNOLUA $CXXFLAGS"
+  CPPFLAGS="-DNOLUA $CPPFLAGS"
   LIBLUA_LIBS=""
   LUA_DEPENDS=""
   LUA_BUILD=""
@@ -528,13 +576,13 @@ if test "$no_lua" = "yes"; then
   INSTALLNSE=""
 
 else 
-  # NSE C modules are loaded with dlopen.
-  AC_SEARCH_LIBS(dlopen, dl)
 
   # If they didn't specify it, we try to find it
   if test $have_lua != yes; then
-    AC_CHECK_HEADERS(lua.h lua/lua.h,
-      AC_CHECK_LIB(lua, lua_call, [have_lua=yes; break],, [-lm]))
+    AC_CHECK_HEADERS([lua.h lua/lua.h lua5.1/lua.h],
+      AC_CHECK_LIB(lua, lua_call, [have_lua=yes; LIBLUA_LIBS="-llua"; CPPFLAGS="-I/usr/include/lua $CPPFLAGS"; break],, [-lm])
+      AC_CHECK_LIB(lua5.1, lua_call, [have_lua=yes; LIBLUA_LIBS="-llua5.1"; CPPFLAGS="-I/usr/include/lua5.1 $CPPFLAGS"; break],, [-lm])
+    )
 
     AC_LANG_PUSH(C++)
     AC_MSG_CHECKING([for lua version >= 501])
@@ -544,7 +592,6 @@ else
     	have_lua=yes, have_lua=no)
     AC_LANG_POP(C++)
   
-    LIBLUA_LIBS="-llua"
     LUA_DEPENDS=""
     LUA_BUILD=""
     LUA_CLEAN=""
@@ -567,12 +614,6 @@ else
   INSTALLNSE="install-nse"
 fi
 
-if test $no_lua != yes; then
-	AC_CONFIG_SUBDIRS( nselib-bin )
-	NSELIB_CLEAN=nselib_clean
-	NSELIB_DIST_CLEAN=nselib_dist_clean
-fi
-
 AC_SUBST(LIBLUA_LIBS)
 AC_SUBST(LIBLUADIR)
 AC_SUBST(LUA_DEPENDS)
@@ -580,8 +621,6 @@ AC_SUBST(LUA_BUILD)
 AC_SUBST(LUA_CLEAN)
 AC_SUBST(LUA_DIST_CLEAN)
 AC_SUBST(INSTALLNSE)
-AC_SUBST(NSELIB_CLEAN)
-AC_SUBST(NSELIB_DIST_CLEAN)
 AC_SUBST(CXXFLAGS)
 
 dnl This test is from the configure.in of Unix Network Programming second
@@ -718,6 +757,33 @@ AC_SUBST(NSOCK_BUILD)
 AC_SUBST(LIBNSOCK_LIBS)
 
 AC_CONFIG_SUBDIRS(nsock/src)
+
+NCATDIR="ncat"
+
+AC_ARG_WITH(ncat,
+	AC_HELP_STRING([--without-ncat], [Skip build and installation of Ncat]), [], [with_ncat=check])
+
+if test "$with_ncat" = "no"; then
+  NCAT_BUILD=""
+  NCAT_INSTALL=""
+  NCAT_UNINSTALL=""
+  NCAT_CLEAN=""
+  NCAT_DIST_CLEAN=""
+else
+  NCAT_BUILD="ncat_build"
+  NCAT_INSTALL="install-ncat"
+  NCAT_UNINSTALL="uninstall-ncat"
+  NCAT_CLEAN="ncat_clean"
+  NCAT_DIST_CLEAN="ncat_dist_clean"
+  AC_CONFIG_SUBDIRS(ncat)
+fi
+
+AC_SUBST(NCATDIR)
+AC_SUBST(NCAT_BUILD)
+AC_SUBST(NCAT_INSTALL)
+AC_SUBST(NCAT_UNINSTALL)
+AC_SUBST(NCAT_CLEAN)
+AC_SUBST(NCAT_DIST_CLEAN)
 
 AC_OUTPUT(Makefile)
 # Krad ASCII ART#!#@$!@#$

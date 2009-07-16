@@ -25,73 +25,40 @@ import sys
 
 from zenmapCore.Name import APP_NAME
 
-######################
-# Platform recognition
-PLATFORM = sys.platform
-HOME = os.path.expanduser("~")
-#HOME = os.environ.get('HOME', '')
-CURRENT_DIR = os.getcwd()
+def fs_dec(s):
+    """Decode s from the filesystem decoding, handling various possible
+    errors."""
+    enc = sys.getfilesystemencoding()
+    if enc is None:
+        enc = "UTF-8"
+    return s.decode(enc)
 
+def fs_enc(u):
+    """Encode u to the filesystem decoding, handling various possible
+    errors."""
+    enc = sys.getfilesystemencoding()
+    if enc is None:
+        enc = "UTF-8"
+    return u.encode(enc)
 
-base_paths = dict(config_file = APP_NAME + '.conf',
-                  config_dir = '.' + APP_NAME,
+# We can't just use os.path.expanduser(u"~") to get a unicode version of the
+# home directory, because os.path.expanduser doesn't properly decode the raw
+# byte string from the file system encoding. You get a UnicodeDecodeError on
+# systems like Windows where the file system encoding is different from the
+# result of sys.getdefaultencoding(). So we call os.path.expanduser with a plain
+HOME = fs_dec(os.path.expanduser("~"))
+
+# The base_paths dict in this file gives symbolic names to various files. For
+# example, use base_paths.target_list instead of 'target_list.txt'.
+
+base_paths = dict(user_config_file = APP_NAME + '.conf',
+                  user_config_dir = '.' + APP_NAME,
                   user_dir = os.path.join(HOME, '.' + APP_NAME),
                   scan_profile = 'scan_profile.usp',
                   profile_editor = 'profile_editor.xml',
                   recent_scans = 'recent_scans.txt',
                   target_list = 'target_list.txt',
-                  wizard = 'wizard.xml',
                   options = 'options.xml',
-                  pixmaps_dir = os.path.join('share', 'pixmaps'),
-                  i18n_dir = os.path.join('share','locale'),
-                  i18n_message_file = APP_NAME + '.mo',
-                  scan_results_extension = 'usr',  # comes from umit scan result
-                  scan_profile_extension = 'usp',  # comes from umit scan profile
                   user_home = HOME,
-                  basic_search_sequence = [HOME, CURRENT_DIR],
-                  config_search_sequence = [HOME, CURRENT_DIR],
-                  pixmaps_search_sequence = [os.path.join(CURRENT_DIR, 'share', 'pixmaps'),
-                                             HOME],
-                  i18n_search_sequence = [os.path.join(CURRENT_DIR, 'share', 'locale'), HOME],
                   db = APP_NAME + ".db",
-                  services = "nmap-services",
-                  services_dump = "services.dmp",
-                  os_db = "nmap-os-db",
-                  os_dump = "os_db.dmp",
                   version = APP_NAME + "_version")
-
-
-if PLATFORM == 'linux2' or PLATFORM == 'linux1':
-    base_paths.update(dict(user_home = HOME,
-                           basic_search_sequence = [os.path.join(HOME, base_paths['config_dir']),
-                                                    '/opt/' + APP_NAME, HOME, CURRENT_DIR],
-                           config_search_sequence = [os.path.join(HOME, base_paths['config_dir']),
-                                                     CURRENT_DIR, '/etc'],
-                           pixmaps_search_sequence = [os.path.join(CURRENT_DIR,
-                                                                   'share',
-                                                                   'pixmaps'),
-                                                      '/usr/share/pixmaps',
-                                                      '/opt/' + APP_NAME, HOME],
-                           i18n_search_sequence = [os.path.join(CURRENT_DIR, 'share', 'locale'),
-                                                   '/usr/share/locale',
-                                                   HOME, CURRENT_DIR]))
-elif PLATFORM == 'win32':
-    PROGRAM_FILES = os.environ.get("PROGRAMFILES", "\\")
-    APP_DIR = os.path.join(PROGRAM_FILES, APP_NAME)
-    PIXMAPS_DIR = os.path.join(APP_DIR, 'share', 'pixmaps')
-    
-    base_paths.update(dict(\
-        basic_search_sequence = [APP_DIR, PROGRAM_FILES, HOME, CURRENT_DIR],
-        config_search_sequence = [APP_DIR, PROGRAM_FILES, HOME, CURRENT_DIR],
-        pixmaps_search_sequence = [PIXMAPS_DIR, PROGRAM_FILES,
-                                   os.path.join(CURRENT_DIR, 'share', 'pixmaps'),
-                                   HOME],
-        i18n_search_sequence = [APP_DIR, PROGRAM_FILES,
-                                os.path.join(CURRENT_DIR, 'share', 'locale'), HOME],))
-
-elif PLATFORM == 'darwin':
-    base_paths.update(dict(user_home = HOME,
-                           basic_search_sequence = [os.path.join(HOME, 'Applications'),
-                                                    '/Local', '/Network',
-                                                    '/System/Library', HOME]))
-

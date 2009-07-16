@@ -1,56 +1,40 @@
-[Intense Scan]
-description = 
-hint = 
-options = Version detection,Operating system detection,Aggressive, Verbose
-command = nmap -T Aggressive -A -v %s
-annotation = 
+[Intense scan]
+command = nmap -T4 -A -v -PE -PS22,25,80 -PA21,23,80,3389
+description = An intense, comprehensive scan. The -A option enables OS detection (-O), version detection (-sV), script scanning (-sC), and traceroute (--traceroute). Without root privileges only version detection and script scanning are run. This is considered an intrusive scan.
 
-[Operating System Detection]
-description = 
-hint = 
-options = Operating system detection,Verbose
-command = nmap -O -v %s
-annotation = 
+[Intense scan plus UDP]
+command = nmap -sS -sU -T4 -A -v -PE -PS22,25,80 -PA21,23,80,3389
+description = Does OS detection (-O), version detection (-sV), script scanning (-sC), and traceroute (--traceroute) in addition to scanning TCP and UDP ports.
 
-[Quick Full version Detection Scan]
-description = 
-hint = 
-options = Aggressive,Version detection,Operating system detection,Disable reverse DNS resolution,Verbose
-command = nmap -T Aggressive -sV -n -O -v %s
-annotation = 
+[Intense scan, all TCP ports]
+command = nmap -p 1-65535 -T4 -A -v -PE -PS22,25,80 -PA21,23,80,3389
+description = Scans all TCP ports, then does OS detection (-O), version detection (-sV), script scanning (-sC), and traceroute (--traceroute).
 
-[Quick Operating System detection]
-description = 
-hint = 
-options = Operating system detection,Aggressive,Verbose
-command = nmap -T Aggressive -O -v %s
-annotation = 
+[Intense scan, no ping]
+command = nmap -T4 -A -v -PN
+description = Does an intense scan without checking to see if targets are up first. This can be useful when a target seems to ignore the usual host discovery probes.
 
-[Quick Scan]
-description = 
-hint = 
-options = Disable reverse DNS resolution,Aggressive,Verbose
-command = nmap -T Aggressive -v -n %s
-annotation = 
+[Ping scan]
+command = nmap -sP -PE -PA21,23,80,3389
+description = This scan only finds which targets are up and does not port scan them.
 
-[Quick Services version detection]
-description = 
-hint = 
-options = Version detection,Aggressive,Verbose
-command = nmap -T Aggressive -sV -v %s
-annotation = 
+[Quick scan]
+command = nmap -T4 -F
+description = This scan is faster than a normal scan because it uses the aggressive timing template and scans fewer ports.
 
-[Quick and verbose scan]
-description = 
-hint = 
-options = Watch packets,Verbose,Debug,Aggressive,Disable reverse DNS resolution
-command = nmap -d -T Aggressive --packet_trace -v -n %s
-annotation = 
+[Quick scan plus]
+command = nmap -sV -T4 -O -F --version-light
+description = A quick scan plus OS and version detection.
 
-[Regular Scan]
-description = 
-hint = 
-options = Verbose
-command = nmap -v %s
-annotation = 
+[Quick traceroute]
+command = nmap -sP -PE -PS22,25,80 -PA21,23,80,3389 -PU -PO --traceroute
+description = Traces the paths to targets without doing a full port scan on them.
+
+[Regular scan]
+command = nmap
+description = A basic port scan with no extra options.
+
+[Slow comprehensive scan]
+command = nmap -sS -sU -T4 -A -v -PE -PP -PS21,22,23,25,80,113,31339 -PA80,113,443,10042 -PO --script all
+description = This is a comprehensive, slow scan. Every TCP and UDP port is scanned. OS detection (-O), version detection (-sV), script scanning (-sC), and traceroute (--traceroute) are all enabled. Many probes are sent for host discovery. This is a highly intrusive scan.
 

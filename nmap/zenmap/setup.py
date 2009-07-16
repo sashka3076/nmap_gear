@@ -43,13 +43,15 @@ INSTALLED_FILES_NAME = "INSTALLED_FILES"
 # Directories for POSIX operating systems
 # These are created after a "install" or "py2exe" command
 # These directories are relative to the installation or dist directory
-pixmaps_dir = os.path.join('share', 'pixmaps')
-icons_dir = os.path.join('share', 'icons')
 data_dir = os.path.join('share', APP_NAME)
+pixmaps_dir = os.path.join(data_dir, 'pixmaps')
 locale_dir = os.path.join(data_dir, 'locale')
 config_dir = os.path.join(data_dir, 'config')
 docs_dir = os.path.join(data_dir, 'docs')
 misc_dir = os.path.join(data_dir, 'misc')
+
+# Where to install .desktop files.
+desktop_dir = os.path.join('share', 'applications')
 
 def mo_find(result, dirname, fnames):
     files = []
@@ -64,18 +66,17 @@ def mo_find(result, dirname, fnames):
 ################################################################################
 # Installation variables
 
-data_files = [ (pixmaps_dir, glob(os.path.join(pixmaps_dir, '*.svg')) +
+data_files = [ (pixmaps_dir, glob(os.path.join(pixmaps_dir, '*.gif')) +
                              glob(os.path.join(pixmaps_dir, '*.png'))),
+
+               (os.path.join(pixmaps_dir, "radialnet"),
+                             glob(os.path.join(pixmaps_dir, "radialnet", '*.png'))),
 
                (config_dir, [os.path.join(config_dir, APP_NAME + '.conf')] +
                             [os.path.join(config_dir, 'scan_profile.usp')] +
                             [os.path.join(config_dir, APP_NAME + '_version')]),
 
-               (misc_dir, glob(os.path.join(misc_dir, '*.dmp')) +
-                          glob(os.path.join(misc_dir, '*.xml'))), 
-
-               (icons_dir, glob(os.path.join('share', 'icons', '*.ico'))+
-                           glob(os.path.join('share', 'icons', '*.png'))),
+               (misc_dir, glob(os.path.join(misc_dir, '*.xml'))), 
 
                (docs_dir, [os.path.join(docs_dir, 'help.html')])]
 
@@ -138,7 +139,8 @@ class my_install(install):
         doesn't come from distutils so it may be incomplete."""
         installed_files = self.get_outputs()
         for package in self.distribution.packages:
-            installed_files.append(os.path.join(self.install_lib, package))
+            dir = package.replace(".", "/")
+            installed_files.append(os.path.join(self.install_lib, dir))
         # Recursively include all the directories in data_dir (share/zenmap).
         # This is mainly for convenience in listing locale directories.
         installed_files.append(os.path.join(self.install_data, data_dir))
@@ -153,7 +155,7 @@ class my_install(install):
 
         uninstaller = """\
 #!/usr/bin/env python
-import os, os.path, sys
+import errno, os, os.path, sys
 
 print 'Uninstall %(name)s %(version)s'
 
@@ -256,7 +258,7 @@ for dir in dirs:
         ufile.close()
 
     def set_perms(self):
-        re_bin = re.compile("(bin)")
+        re_bin = re.compile("(bin|\.sh)")
         for output in self.get_installed_files():
             if re_bin.findall(output):
                 continue
@@ -280,8 +282,7 @@ for dir in dirs:
                              "DOCS_DIR": os.path.join(self.prefix, docs_dir),
                              "LOCALE_DIR": os.path.join(self.prefix, locale_dir),
                              "MISC_DIR": os.path.join(self.prefix, misc_dir),
-                             "PIXMAPS_DIR": os.path.join(self.prefix, pixmaps_dir),
-                             "ICONS_DIR": os.path.join(self.prefix, icons_dir)}
+                             "PIXMAPS_DIR": os.path.join(self.prefix, pixmaps_dir)}
 
         # Find and read the Paths.py file.
         pcontent = ""
@@ -305,6 +306,42 @@ for dir in dirs:
         pf = open(paths_file, "w")
         pf.write(pcontent)
         pf.close()
+
+        # Rewrite the zenmap.desktop and zenmap-root.desktop files to point to
+        # the installed locations of the su-to-zenmap.sh script and application
+        # icon.
+        su_filename = os.path.join(self.prefix, data_dir, "su-to-zenmap.sh")
+        icon_filename = os.path.join(self.prefix, pixmaps_dir, "zenmap.png")
+
+        desktop_filename = None
+        root_desktop_filename = None
+        for f in installed_files:
+            if re.search("%s$" % re.escape("zenmap-root.desktop"), f):
+                root_desktop_filename = f
+            elif re.search("%s$" % re.escape("zenmap.desktop"), f):
+                desktop_filename = f
+
+        if desktop_filename is not None:
+            df = open(desktop_filename, "r")
+            dcontent = df.read()
+            df.close()
+            regex = re.compile("^(Icon *= *).*$", re.MULTILINE)
+            dcontent = regex.sub("\\1%s" % icon_filename, dcontent)
+            df = open(desktop_filename, "w")
+            df.write(dcontent)
+            df.close()
+
+        if root_desktop_filename is not None:
+            df = open(root_desktop_filename, "r")
+            dcontent = df.read()
+            df.close()
+            regex = re.compile("^((?:Exec|TryExec) *= *).*su-to-zenmap.sh(.*)$", re.MULTILINE)
+            dcontent = regex.sub("\\1%s\\2" % su_filename, dcontent)
+            regex = re.compile("^(Icon *= *).*$", re.MULTILINE)
+            dcontent = regex.sub("\\1%s" % icon_filename, dcontent)
+            df = open(root_desktop_filename, "w")
+            df.write(dcontent)
+            df.close()
 
     def write_installed_files(self):
         """Write a list of installed files for use by the uninstall command.
@@ -390,15 +427,15 @@ COMMON_SETUP_ARGS = {
     'author_email': 'py.adriano@gmail.com, cleber@globalred.com.br',
     'maintainer': 'Adriano Monteiro',
     'maintainer_email': 'py.adriano@gmail.com',
-    'description': """\
-%s is the %s frontend.""" % (APP_DISPLAY_NAME, NMAP_DISPLAY_NAME),
+    'description': "%s frontend and results viewer" % NMAP_DISPLAY_NAME,
     'long_description': """\
 %s is an %s frontend \
 that is really useful for advanced users and easy to be used by newbies.""" \
 % (APP_DISPLAY_NAME, NMAP_DISPLAY_NAME),
     'version': VERSION,
     'scripts': [APP_NAME],
-    'packages': ['zenmapCore', 'zenmapGUI', 'higwidgets'],
+    'packages': ['zenmapCore', 'zenmapGUI', 'zenmapGUI.higwidgets',
+                 'radialnet', 'radialnet.bestwidgets', 'radialnet.core', 'radialnet.gui', 'radialnet.util'],
     'data_files': data_files,
 }
 
@@ -411,9 +448,13 @@ if 'py2exe' in sys.argv:
     import py2exe
 
     WINDOWS_SETUP_ARGS = {
-        'zipfile': None,
+        'zipfile': 'py2exe/library.zip',
+        'name': APP_NAME,
         'windows': [{"script": APP_NAME,
-                     "icon_resources": [(1, os.path.join("share", "icons", "nmap-eye.ico"))]}],
+                     "icon_resources": [(1, "install_scripts/windows/nmap-eye.ico")]}],
+        # On Windows we build Ndiff here in Zenmap's setup.py so the two Python
+        # programs will share a common runtime.
+        'console': [{"script": "../ndiff/ndiff", "description": "Nmap scan comparison tool"}],
         'options': {"py2exe": {
             "compressed": 1,
             "optimize":2,
@@ -428,8 +469,7 @@ encodings,\
 encodings.*,\
 cairo,\
 pangocairo,\
-atk,\
-psyco\
+atk\
 "}}
     }
 
@@ -446,7 +486,7 @@ elif 'py2app' in sys.argv:
     MACOSX_SETUP_ARGS = {
         'app': [extended_app_name],
         'options': {"py2app": {
-            "packages": ["gobject", "gtk", "cairo"],
+            "packages": ["gio", "gobject", "gtk", "cairo"],
             "includes": ["atk", "pango", "pangocairo"],
             "argv_emulation": True,
             "compressed": True,
@@ -461,7 +501,12 @@ else:
     DEFAULT_SETUP_ARGS = {
         'cmdclass': {'install': my_install, 'uninstall': my_uninstall},
     }
-
     setup_args.update(DEFAULT_SETUP_ARGS)
+
+    data_files = [
+        (desktop_dir, glob('install_scripts/unix/*.desktop')),
+        (data_dir, ['install_scripts/unix/su-to-zenmap.sh'])
+    ]
+    setup_args["data_files"].extend(data_files)
 
 setup(**setup_args)
