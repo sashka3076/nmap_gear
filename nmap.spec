@@ -1,5 +1,5 @@
 Name: nmap
-Version: 4.65
+Version: 5.00
 Release: alt1
 Epoch: 20020501
 
@@ -12,17 +12,29 @@ Packager: Dmitry V. Levin <ldv@altlinux.org>
 %define srcname nmap-%version
 Source: %url/dist/%srcname.tar
 
-Patch1: nmap-4.65-owl-warnings.patch
-Patch2: nmap-4.65-owl-nse-ldflags.patch
-Patch3: nmap-4.65-alt-owl-autoheader.patch
-Patch4: nmap-4.65-alt-owl-drop-priv.patch
-Patch5: nmap-4.65-alt-owl-dot-dir.patch
-Patch6: nmap-4.65-alt-owl-fileexistsandisreadable.patch
-Patch7: nmap-4.65-alt-libdnet.patch
+Patch1: nmap-5.00-up-20090711-ncat-error-reporting.patch
+Patch2: nmap-5.00-up-20090718-open_nse.patch
+Patch3: nmap-5.00-owl-format.patch
+Patch4: nmap-5.00-owl-nse-ldflags.patch
+Patch5: nmap-5.00-alt-owl-autoheader.patch
+Patch6: nmap-5.00-alt-owl-drop-priv.patch
+Patch7: nmap-5.00-alt-owl-dot-dir.patch
+Patch8: nmap-5.00-alt-owl-fileexistsandisreadable.patch
+Patch9: nmap-5.00-owl-include.patch
+Patch10: nmap-5.00-owl-ncat-makefile.patch
+Patch11: nmap-5.00-alt-ncat-certs.patch
+Patch12: nmap-5.00-alt-libdnet.patch
 
-Requires: chrooted-resolv, libdnet >= 0:1.11-alt4
-BuildRequires: gcc-c++, libcap-devel, libdnet-devel
+%def_with liblua
+%def_with ncat
+%def_with ndiff
+%def_without zenmap
+
+Requires: chrooted-resolv
+BuildRequires: gcc-c++, libcap-devel
 BuildRequires: libpcap-devel >= 2:0.8, libpcre-devel, libssl-devel
+%{?_with_liblua:BuildRequires: liblua5-devel}
+%{?_with_ndiff:BuildRequires: python-devel}
 
 %description
 Nmap is an utility for network exploration or security auditing.
@@ -42,6 +54,11 @@ and more.
 %patch5 -p1
 %patch6 -p1
 %patch7 -p1
+%patch8 -p1
+%patch9 -p1
+%patch10 -p1
+%patch11 -p1
+%patch12 -p1
 bzip2 -9 CHANGELOG
 
 %build
@@ -51,9 +68,10 @@ autoconf
 
 export ac_cv_header_libiberty_h=no
 %configure \
-	--with-libdnet=/usr \
-	--without-liblua \
-	--without-zenmap \
+	%{subst_with liblua} \
+	%{subst_with ncat} \
+	%{subst_with ndiff} \
+	%{subst_with zenmap} \
 	--with-user=nmapuser \
 	--with-chroot-empty=/var/empty \
 	--with-chroot-resolv=/var/resolv \
@@ -61,7 +79,7 @@ export ac_cv_header_libiberty_h=no
 %make_build
 
 %install
-%make_install install DESTDIR=%buildroot
+%makeinstall_std
 
 %pre
 /usr/sbin/groupadd -r -f nmapuser
@@ -71,9 +89,21 @@ export ac_cv_header_libiberty_h=no
 %_bindir/nmap
 %_datadir/nmap
 %_man1dir/nmap.*
-%doc COPYING* CHANGELOG.bz2 docs/{README,*.txt}
+%if_with ncat
+%_bindir/ncat
+%_man1dir/ncat.*
+%endif
+%if_with ndiff
+%_bindir/ndiff
+%_man1dir/ndiff.*
+%endif
+%doc COPYING* CHANGELOG.bz2 docs/{README,nmap*.txt}
 
 %changelog
+* Thu Jul 16 2009 Dmitry V. Levin <ldv@altlinux.org> 20020501:5.00-alt1
+- Updated to 5.00.
+- Synced with nmap-5.00-owl4.
+
 * Sun Jun 01 2008 Dmitry V. Levin <ldv@altlinux.org> 20020501:4.65-alt1
 - Updated to 4.65.
 

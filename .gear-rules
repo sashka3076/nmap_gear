@@ -1,3 +1,2 @@
 copy: *.patch
-copy: *.png
 tar: nmap

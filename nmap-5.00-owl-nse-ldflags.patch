@@ -1,6 +1,6 @@
---- nmap-4.65/configure.ac
-+++ nmap-4.65/configure.ac
-@@ -105,6 +105,7 @@ AC_PATH_TOOL([STRIP], [strip], [/bin/true])
+--- nmap/configure.ac
++++ nmap/configure.ac
+@@ -107,6 +107,7 @@ AC_PATH_TOOL([STRIP], [strip], [/bin/true])
  needs_cpp_precomp=no
  
  LUA_CFLAGS="-DLUA_USE_POSIX -DLUA_USE_DLOPEN"
@@ -8,39 +8,39 @@
  
  case "$host" in
    *alpha-dec-osf*)
-@@ -112,15 +113,15 @@ case "$host" in
+@@ -114,15 +115,15 @@ case "$host" in
      ;;
    *-netbsd* | *-knetbsd*-gnu)
      AC_DEFINE(NETBSD)
 -    LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
-+    NSE_LDFLAGS="-Wl,-E" # needed for nse-C-module support
++    NSE_LDFLAGS="-Wl,-E"
      ;;
    *-openbsd*)
      AC_DEFINE(OPENBSD)
 -    LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
-+    NSE_LDFLAGS="-Wl,-E" # needed for nse-C-module support
++    NSE_LDFLAGS="-Wl,-E"
      ;;
    *-freebsd* | *-kfreebsd*-gnu | *-dragonfly*)
      AC_DEFINE(FREEBSD)
 -    LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
-+    NSE_LDFLAGS="-Wl,-E" # needed for nse-C-module support
++    NSE_LDFLAGS="-Wl,-E"
      ;;
    *-bsdi*)
      AC_DEFINE(BSDI)
-@@ -171,7 +172,7 @@ case "$host" in
+@@ -177,7 +178,7 @@ case "$host" in
+     ;;
    *-linux*)
      AC_DEFINE(LINUX)
-     AC_DEFINE(PCAP_TIMEOUT_IGNORED)  # libpcap doesn't even LOOK at the timeout you give it under Linux
 -    LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
-+    NSE_LDFLAGS="-Wl,-E" # needed for nse-C-module support
++    NSE_LDFLAGS="-Wl,-E"
      ;;
    *-apple-darwin*)
      AC_DEFINE(MACOSX)
-@@ -564,6 +565,7 @@ else
-     AC_MSG_RESULT(yes) 
+@@ -612,6 +613,7 @@ else
    fi
  
-+  LDFLAGS="$NSE_LDFLAGS $LDFLAGS"
    INSTALLNSE="install-nse"
++  LDFLAGS="$NSE_LDFLAGS $LDFLAGS"
  fi
  
+ AC_SUBST(LIBLUA_LIBS)

@@ -1,6 +1,6 @@
---- nmap-4.65/configure.ac
-+++ nmap-4.65/configure.ac
-@@ -475,6 +475,9 @@ AC_HELP_STRING([--with-libdnet=included], [Use the libdnet version included with
+--- nmap/configure.ac
++++ nmap/configure.ac
+@@ -520,6 +520,9 @@ AC_HELP_STRING([--with-libdnet=included], [Use the libdnet version included with
      ;;
    included)
      ;;

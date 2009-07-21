@@ -1,6 +1,6 @@
---- nmap-4.65/nmap.cc
-+++ nmap-4.65/nmap.cc
-@@ -2683,8 +2683,6 @@ int nmap_fetchfile(char *filename_returned, int bufferlen, const char *file) {
+--- nmap/nmap.cc
++++ nmap/nmap.cc
+@@ -2844,8 +2844,6 @@ int nmap_fetchfile(char *filename_returned, int bufferlen, const char *file) {
    int res;
    int foundsomething = 0;
    struct passwd *pw;
@@ -9,7 +9,7 @@
    std::map<std::string, std::string>::iterator iter;
  
    /* First, check the map of requested data file names. If there's an entry for
-@@ -2776,6 +2774,9 @@ int nmap_fetchfile(char *filename_returned, int bufferlen, const char *file) {
+@@ -2926,6 +2924,9 @@ int nmap_fetchfile(char *filename_returned, int bufferlen, const char *file) {
      }
    }
  
@@ -19,7 +19,7 @@
    if (foundsomething && (*filename_returned != '.')) {    
      res = Snprintf(dot_buffer, sizeof(dot_buffer), "./%s", file);
      if (res > 0 && res < bufferlen) {
-@@ -2796,6 +2797,7 @@ int nmap_fetchfile(char *filename_returned, int bufferlen, const char *file) {
+@@ -2946,6 +2947,7 @@ int nmap_fetchfile(char *filename_returned, int bufferlen, const char *file) {
        foundsomething = fileexistsandisreadable(filename_returned);
      }
    }
