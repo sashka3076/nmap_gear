@@ -22,8 +22,9 @@ Patch7: nmap-5.00-alt-owl-dot-dir.patch
 Patch8: nmap-5.00-alt-owl-fileexistsandisreadable.patch
 Patch9: nmap-5.00-owl-include.patch
 Patch10: nmap-5.00-owl-ncat-makefile.patch
-Patch11: nmap-5.00-alt-ncat-certs.patch
-Patch12: nmap-5.00-alt-libdnet.patch
+Patch11: nmap-5.00-owl-route.patch
+Patch12: nmap-5.00-alt-ncat-certs.patch
+Patch13: nmap-5.00-alt-libdnet.patch
 
 %def_with liblua
 %def_with ncat
@@ -59,6 +60,7 @@ and more.
 %patch10 -p1
 %patch11 -p1
 %patch12 -p1
+%patch13 -p1
 bzip2 -9 CHANGELOG
 
 %build
