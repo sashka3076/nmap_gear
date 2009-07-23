@@ -1,6 +1,6 @@
 Name: nmap
 Version: 5.00
-Release: alt1
+Release: alt2
 Epoch: 20020501
 
 Summary: Network exploration tool and security scanner
@@ -103,6 +103,10 @@ export ac_cv_header_libiberty_h=no
 %doc COPYING* CHANGELOG.bz2 docs/{README,nmap*.txt}
 
 %changelog
+* Thu Jul 23 2009 Dmitry V. Levin <ldv@altlinux.org> 20020501:5.00-alt2
+- Synced with nmap-5.00-owl5.
+- Built with system libdnet again.
+
 * Thu Jul 16 2009 Dmitry V. Levin <ldv@altlinux.org> 20020501:5.00-alt1
 - Updated to 5.00.
 - Synced with nmap-5.00-owl4.
