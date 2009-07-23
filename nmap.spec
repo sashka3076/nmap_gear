@@ -31,8 +31,8 @@ Patch13: nmap-5.00-alt-libdnet.patch
 %def_with ndiff
 %def_without zenmap
 
-Requires: chrooted-resolv
-BuildRequires: gcc-c++, libcap-devel
+Requires: chrooted-resolv, libdnet >= 0:1.12-alt1
+BuildRequires: gcc-c++, libcap-devel, libdnet-devel >= 0:1.12-alt1
 BuildRequires: libpcap-devel >= 2:0.8, libpcre-devel, libssl-devel
 %{?_with_liblua:BuildRequires: liblua5-devel}
 %{?_with_ndiff:BuildRequires: python-devel}
@@ -74,6 +74,7 @@ export ac_cv_header_libiberty_h=no
 	%{subst_with ncat} \
 	%{subst_with ndiff} \
 	%{subst_with zenmap} \
+	--with-libdnet=/usr \
 	--with-user=nmapuser \
 	--with-chroot-empty=/var/empty \
 	--with-chroot-resolv=/var/resolv \
