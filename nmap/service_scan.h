@@ -89,7 +89,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: service_scan.h 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: service_scan.h 16298 2009-12-19 08:30:18Z david $ */
 
 #ifndef SERVICE_SCAN_H
 #define SERVICE_SCAN_H
@@ -123,6 +123,9 @@ struct MatchDetails {
 
   // The service that was matched (Or NULL) zero-terminated.
   const char *serviceName;
+
+  // The line number of this match in nmap-service-probes.
+  int lineno;
 
   // The product/verson/info for the service that was matched (Or NULL)
   // zero-terminated.
@@ -276,7 +279,7 @@ class ServiceProbe {
   void addMatch(const char *match, int lineno);
 
   // If the buf (of length buflen) matches one of the regexes in this
-  // ServiceProbe, returns the details of the match (service name,
+  // ServiceProbe, returns the details of the nth match (service name,
   // version number if applicable, and whether this is a "soft" match.
   // If the buf doesn't match, the serviceName field in the structure
   // will be NULL.  The MatchDetails returned is only valid until the
@@ -284,7 +287,7 @@ class ServiceProbe {
   // serviceName field can be saved throughought program execution.  If
   // no version matched, that field will be NULL. This function may
   // return NULL if there are no match lines at all in this probe.
-  const struct MatchDetails *testMatch(const u8 *buf, int buflen);
+  const struct MatchDetails *testMatch(const u8 *buf, int buflen, int n);
 
   char *fallbackStr;
   ServiceProbe *fallbacks[MAXFALLBACKS+1];

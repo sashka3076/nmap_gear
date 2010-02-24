@@ -89,7 +89,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: service_scan.cc 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: service_scan.cc 16313 2009-12-20 03:22:19Z david $ */
 
 
 #include "service_scan.h"
@@ -149,7 +149,6 @@ public:
 
   // Note that the next 2 members are for convenience and are not destroyed w/the ServiceNFO
   Target *target; // the port belongs to this target host
-  Port *port; // The Port that this service represents (this copy is taken from inside Target)
   // if a match is found, it is placed here.  Otherwise NULL
   const char *probe_matched;
   // If a match is found, any product/version/info/hostname/ostype/devicetype
@@ -302,7 +301,7 @@ void ServiceProbeMatch::InitMatch(const char *matchtext, int lineno) {
   isInitialized = true;
 
   deflineno = lineno;
-  while(isspace(*matchtext)) matchtext++;
+  while(isspace((int) (unsigned char) *matchtext)) matchtext++;
 
   // first we find whether this is a "soft" or normal match
   if (strncmp(matchtext, "softmatch ", 10) == 0) {
@@ -330,7 +329,7 @@ void ServiceProbeMatch::InitMatch(const char *matchtext, int lineno) {
   // options. ('i' means "case insensitive", 's' means that . matches
   // newlines (both are just as in perl)
   matchtext = p;
-  while(isspace(*matchtext)) matchtext++;
+  while(isspace((int) (unsigned char) *matchtext)) matchtext++;
   if (*matchtext == 'm') {
     if (!*(matchtext+1))
       fatal("%s: parse error on line %d of nmap-service-probes: matchtext must begin with 'm'", __func__, lineno);
@@ -347,7 +346,7 @@ void ServiceProbeMatch::InitMatch(const char *matchtext, int lineno) {
     
     matchtext = p + 1; // skip past the delim
     // any options?
-    while(*matchtext && !isspace(*matchtext)) {
+    while(*matchtext && !isspace((int) (unsigned char) *matchtext)) {
       if (*matchtext == 'i')
 	matchops_ignorecase = true;
       else if (*matchtext == 's')
@@ -384,7 +383,7 @@ void ServiceProbeMatch::InitMatch(const char *matchtext, int lineno) {
    * delimiter character and ... is a template */
 
   while(1) {
-  while(isspace(*matchtext)) matchtext++;
+  while(isspace((int) (unsigned char) *matchtext)) matchtext++;
     if (*matchtext == '\0' || *matchtext == '\r' || *matchtext == '\n') break;
 
     modechar = *(matchtext++);
@@ -484,6 +483,7 @@ const struct MatchDetails *ServiceProbeMatch::testMatch(const u8 *buf, int bufle
     if (*devicetype) MD_return.devicetype = devicetype;
   
     MD_return.serviceName = servicename;
+    MD_return.lineno = getLineNo();
   }
 
   return &MD_return;
@@ -507,7 +507,7 @@ static int getsubstcommandargs(struct substargs *args, char *args_start,
 
   while(*args_start && *args_start != ')') {
     // Find the next argument.
-    while(isspace(*args_start)) args_start++;
+    while(isspace((int) (unsigned char) *args_start)) args_start++;
     if (*args_start == ')')
       break;
     else if (*args_start == '"') {
@@ -556,9 +556,9 @@ static int getsubstcommandargs(struct substargs *args, char *args_start,
 }
 
 // This function does the actual substitution of a placeholder like $2
-// or $U(4) into the given buffer.  It returns the number of chars
+// or $P(4) into the given buffer.  It returns the number of chars
 // written, or -1 if it fails.  tmplvar is a template variable, such
-// as "$U(2)".  We determine the appropriate string representing that,
+// as "$P(2)".  We determine the appropriate string representing that,
 // and place it in newstr (as long as it doesn't exceed newstrlen).
 // We then set *tmplvarend to the character after the
 // variable. subject, subjectlen, ovector, and nummatches mean the
@@ -566,7 +566,6 @@ static int getsubstcommandargs(struct substargs *args, char *args_start,
 static int substvar(char *tmplvar, char **tmplvarend, char *newstr, 
 	     int newstrlen, const u8 *subject, int subjectlen, int *ovector,
 	     int nummatches) {
-
   char substcommand[16];
   char *p = NULL;
   char *p_end;
@@ -581,7 +580,8 @@ static int substvar(char *tmplvar, char **tmplvarend, char *newstr,
   if (*tmplvar != '$') return -1;
   tmplvar++;
 
-  if (!isdigit(*tmplvar)) {
+  if (!isdigit((int) (unsigned char) *tmplvar)) {
+    /* This is a command like $P(1). */
     p = strchr(tmplvar, '(');
     if (!p) return -1;
     len = p - tmplvar;
@@ -595,6 +595,7 @@ static int substvar(char *tmplvar, char **tmplvarend, char *newstr,
     if (rc <= 0) return -1;
     tmplvar = p_end;
   } else {
+    /* This is a placeholder like $2. */
     substcommand[0] = '\0';
     subnum = *tmplvar - '0';
     tmplvar++;
@@ -603,6 +604,7 @@ static int substvar(char *tmplvar, char **tmplvarend, char *newstr,
   if (tmplvarend) *tmplvarend = tmplvar;
 
   if (!*substcommand) {
+    /* Handler for a placeholder like $2. */
     if (subnum > 9 || subnum <= 0) return -1;
     if (subnum >= nummatches) return -1;
     offstart = ovector[subnum * 2];
@@ -616,8 +618,10 @@ static int substvar(char *tmplvar, char **tmplvarend, char *newstr,
     memcpy(newstr, subject + offstart, len);
     byteswritten = len;
   } else if (strcmp(substcommand, "P") == 0) {
-    if (command_args.arg_types[0] != SUBSTARGS_ARGTYPE_INT)
+    if (command_args.num_args != 1 ||
+        command_args.arg_types[0] != SUBSTARGS_ARGTYPE_INT) {
       return -1;
+    }
     subnum = command_args.int_args[0];
     if (subnum > 9 || subnum <= 0) return -1;
     if (subnum >= nummatches) return -1;
@@ -637,8 +641,12 @@ static int substvar(char *tmplvar, char **tmplvarend, char *newstr,
   } else if (strcmp(substcommand, "SUBST") == 0) {
     char *findstr, *replstr;
     int findstrlen, replstrlen;
-   if (command_args.arg_types[0] != SUBSTARGS_ARGTYPE_INT)
+    if (command_args.num_args != 3 ||
+        command_args.arg_types[0] != SUBSTARGS_ARGTYPE_INT ||
+        command_args.arg_types[1] != SUBSTARGS_ARGTYPE_STRING ||
+	command_args.arg_types[2] != SUBSTARGS_ARGTYPE_STRING) {
       return -1;
+    }
     subnum = command_args.int_args[0];
     if (subnum > 9 || subnum <= 0) return -1;
     if (subnum >= nummatches) return -1;
@@ -646,9 +654,6 @@ static int substvar(char *tmplvar, char **tmplvarend, char *newstr,
     offend = ovector[subnum * 2 + 1];
     assert(offstart >= 0 && offstart < subjectlen);
     assert(offend >= 0 && offend <= subjectlen);
-    if (command_args.arg_types[1] != SUBSTARGS_ARGTYPE_STRING ||
-	command_args.arg_types[2] != SUBSTARGS_ARGTYPE_STRING)
-      return -1;
     findstr = command_args.str_args[1];
     findstrlen = command_args.str_args_len[1];
     replstr = command_args.str_args[2];
@@ -707,7 +712,7 @@ static int dotmplsubst(const u8 *subject, int subjectlen,
       }
       *dst = '\0';
       while (--dst >= newstr) {
-	if (isspace(*dst) || *dst == ',') 
+	if (isspace((int) (unsigned char) *dst) || *dst == ',') 
 	  *dst = '\0';
 	else break;
       }
@@ -734,7 +739,7 @@ static int dotmplsubst(const u8 *subject, int subjectlen,
     return -1;
   *dst = '\0';
   while (--dst >= newstr) {
-    if (isspace(*dst) || *dst == ',') 
+    if (isspace((int) (unsigned char) *dst) || *dst == ',') 
       *dst = '\0';
     else break;
   }
@@ -887,7 +892,7 @@ void ServiceProbe::setProbeDetails(char *pd, int lineno) {
   pd += 4;
 
   // Next the service name
-  if (!isalnum(*pd)) fatal("Parse error on line %d of nmap-service-probes - bad probe name", lineno);
+  if (!isalnum((int) (unsigned char) *pd)) fatal("Parse error on line %d of nmap-service-probes - bad probe name", lineno);
   p = strchr(pd, ' ');
   if (!p) fatal("Parse error on line %d of nmap-service-probes - nothing after probe name", lineno);
   len = p - pd;
@@ -928,14 +933,14 @@ void ServiceProbe::setPortVector(vector<u16> *portv, const char *portstr,
   current_range = portstr;
 
   do {
-    while(*current_range && isspace(*current_range)) current_range++;
-    if (isdigit((int) *current_range)) {
+    while(*current_range && isspace((int) (unsigned char) *current_range)) current_range++;
+    if (isdigit((int) (unsigned char) *current_range)) {
       rangestart = strtol(current_range, &endptr, 10);
       if (rangestart < 0 || rangestart > 65535) {
 	fatal("Parse error on line %d of nmap-service-probes: Ports must be between 0 and 65535 inclusive", lineno);
       }
       current_range = endptr;
-      while(isspace((int) *current_range)) current_range++;
+      while(isspace((int) (unsigned char) *current_range)) current_range++;
     } else {
       fatal("Parse error on line %d of nmap-service-probes: An example of proper portlist form is \"21-25,53,80\"", lineno);
     }
@@ -946,7 +951,7 @@ void ServiceProbe::setPortVector(vector<u16> *portv, const char *portstr,
       rangeend = rangestart;
     } else if (*current_range == '-') {
       current_range++;
-      if (isdigit((int) *current_range)) {
+      if (isdigit((int) (unsigned char) *current_range)) {
 	rangeend = strtol(current_range, &endptr, 10);
 	if (rangeend < 0 || rangeend > 65535 || rangeend < rangestart) {
 	  fatal("Parse error on line %d of nmap-service-probes: Ports must be between 0 and 65535 inclusive", lineno);
@@ -966,7 +971,7 @@ void ServiceProbe::setPortVector(vector<u16> *portv, const char *portstr,
     }
     
     /* Find the next range */
-    while(isspace((int) *current_range)) current_range++;
+    while(isspace((int) (unsigned char) *current_range)) current_range++;
     if (*current_range && *current_range != ',') {
       fatal("Parse error on line %d of nmap-service-probes: An example of proper portlist form is \"21-25,53,80\"", lineno);
     }
@@ -1121,14 +1126,14 @@ void parse_nmap_service_probe_file(AllProbes *AP, char *filename) {
     }
   }
 
-  assert(newProbe);
-  if (newProbe->isNullProbe()) {
-    assert(!AP->nullProbe);
-    AP->nullProbe = newProbe;
-  } else {
-    AP->probes.push_back(newProbe);
+  if (newProbe != NULL) {
+    if (newProbe->isNullProbe()) {
+      assert(!AP->nullProbe);
+      AP->nullProbe = newProbe;
+    } else {
+      AP->probes.push_back(newProbe);
+    }
   }
-  
   fclose(fp);
 
   AP->compileFallbacks();
@@ -1169,7 +1174,7 @@ void AllProbes::service_scan_free(void)
 
 
 // If the buf (of length buflen) matches one of the regexes in this
-// ServiceProbe, returns the details of the match (service name,
+// ServiceProbe, returns the details of nth match (service name,
 // version number if applicable, and whether this is a "soft" match.
 // If the buf doesn't match, the serviceName field in the structure
 // will be NULL.  The MatchDetails returned is only valid until the
@@ -1177,14 +1182,17 @@ void AllProbes::service_scan_free(void)
 // serviceName field can be saved throughought program execution.  If
 // no version matched, that field will be NULL. This function may
 // return NULL if there are no match lines at all in this probe.
-const struct MatchDetails *ServiceProbe::testMatch(const u8 *buf, int buflen) {
+const struct MatchDetails *ServiceProbe::testMatch(const u8 *buf, int buflen, int n = 0) {
   vector<ServiceProbeMatch *>::iterator vi;
   const struct MatchDetails *MD;
 
   for(vi = matches.begin(); vi != matches.end(); vi++) {
     MD = (*vi)->testMatch(buf, buflen);
-    if (MD->serviceName)
-      return MD;
+    if (MD->serviceName) {
+      if (n == 0)
+        return MD;
+      n--;
+    }
   }
 
   return NULL;
@@ -1275,7 +1283,8 @@ void AllProbes::compileFallbacks() {
   curr = probes.begin();
 
   // The NULL probe is a special case:
-  nullProbe->fallbacks[0] = nullProbe;
+  if (nullProbe != NULL)
+    nullProbe->fallbacks[0] = nullProbe;
 
   while (curr != probes.end()) {
 
@@ -1329,7 +1338,6 @@ ServiceNFO::ServiceNFO(AllProbes *newAP) {
   AP = newAP;
   currentresp = NULL; 
   currentresplen = 0;
-  port = NULL;
   product_matched[0] = version_matched[0] = extrainfo_matched[0] = '\0';
   hostname_matched[0] = ostype_matched[0] = devicetype_matched[0] = '\0';
   tunnel = SERVICE_TUNNEL_NONE;
@@ -1430,7 +1438,7 @@ void ServiceNFO::addToServiceFingerprint(const char *probeName, const u8 *resp,
     else if (resp[srcidx] == '\0') {
       /* We need to be careful with this, because if it is followed by
 	 an ASCII number, PCRE will treat it differently. */
-      if (srcidx + 1 >= respused || !isdigit(resp[srcidx + 1]))
+      if (srcidx + 1 >= respused || !isdigit((int) resp[srcidx + 1]))
 	addServiceString("\\0", servicewrap);
       else addServiceString("\\x00", servicewrap);
     } else if (strchr("\\?\"[]().*+$^|", resp[srcidx])) {
@@ -1623,6 +1631,7 @@ ServiceGroup::ServiceGroup(vector<Target *> &Targets, AllProbes *AP) {
   unsigned int targetno;
   ServiceNFO *svc;
   Port *nxtport;
+  Port port;
   int desired_par;
   struct timeval now;
   num_hosts_timedout = 0;
@@ -1634,12 +1643,11 @@ ServiceGroup::ServiceGroup(vector<Target *> &Targets, AllProbes *AP) {
       num_hosts_timedout++;
       continue;
     }
-    while((nxtport = Targets[targetno]->ports.nextPort(nxtport, TCPANDUDPANDSCTP, PORT_OPEN))) {
+    while((nxtport = Targets[targetno]->ports.nextPort(nxtport, &port, TCPANDUDPANDSCTP, PORT_OPEN))) {
       svc = new ServiceNFO(AP);
       svc->target = Targets[targetno];
       svc->portno = nxtport->portno;
       svc->proto = nxtport->proto;
-      svc->port = nxtport;
       services_remaining.push_back(svc);
     }
   }
@@ -1652,21 +1660,20 @@ ServiceGroup::ServiceGroup(vector<Target *> &Targets, AllProbes *AP) {
     if (Targets[targetno]->timedOut(&now)) {
       continue;
     }
-    while((nxtport = Targets[targetno]->ports.nextPort(nxtport, TCPANDUDPANDSCTP, PORT_OPENFILTERED))) {
+    while((nxtport = Targets[targetno]->ports.nextPort(nxtport, &port, TCPANDUDPANDSCTP, PORT_OPENFILTERED))) {
       svc = new ServiceNFO(AP);
       svc->target = Targets[targetno];
       svc->portno = nxtport->portno;
       svc->proto = nxtport->proto;
-      svc->port = nxtport;
       services_remaining.push_back(svc);
     }
   }
 
   SPM = new ScanProgressMeter("Service scan");
   desired_par = 1;
-  if (o.timing_level == 3) desired_par = 10;
-  if (o.timing_level == 4) desired_par = 15;
-  if (o.timing_level >= 5) desired_par = 20;
+  if (o.timing_level == 3) desired_par = 20;
+  if (o.timing_level == 4) desired_par = 30;
+  if (o.timing_level >= 5) desired_par = 40;
   // TODO: Come up with better ways to determine ideal_parallelism
   ideal_parallelism = box(o.min_parallelism, o.max_parallelism? o.max_parallelism : 100, desired_par);
 }
@@ -1693,8 +1700,8 @@ static void adjustPortStateIfNeccessary(ServiceNFO *svc) {
 
   char host[128];
 
-  if (svc->port->state == PORT_OPENFILTERED) {
-    svc->target->ports.addPort(svc->portno, svc->proto, NULL, PORT_OPEN);
+  if (svc->target->ports.getPortState(svc->portno, svc->proto) == PORT_OPENFILTERED) {
+    svc->target->ports.setPortState(svc->portno, svc->proto, PORT_OPEN);
     if (svc->proto == IPPROTO_TCP) 
         svc->target->ports.setStateReason(svc->portno, svc->proto, ER_TCPRESPONSE, 0, 0);
     if (svc->proto == IPPROTO_UDP)
@@ -1792,7 +1799,7 @@ static void startNextProbe(nsock_pool nsp, nsock_iod nsi, ServiceGroup *SG,
 	  nsock_connect_ssl(nsp, svc->niod, servicescan_connect_handler, 
 			    DEFAULT_CONNECT_SSL_TIMEOUT, svc, 
 			    (struct sockaddr *) &ss,
-			    ss_len, svc->portno, svc->ssl_session);
+			    ss_len, svc->proto, svc->portno, svc->ssl_session);
 	}
       } else {
 	assert(svc->proto == IPPROTO_UDP);
@@ -1829,7 +1836,7 @@ static void startNextProbe(nsock_pool nsp, nsock_iod nsi, ServiceGroup *SG,
 static int scanThroughTunnel(nsock_pool nsp, nsock_iod nsi, ServiceGroup *SG, 
 			     ServiceNFO *svc) {
 
-  if (strncmp(svc->probe_matched, "ssl/", 4) == 0) {
+  if (svc->probe_matched && strncmp(svc->probe_matched, "ssl/", 4) == 0) {
     /* The service has been detected without having to make an SSL connection */
     svc->tunnel = SERVICE_TUNNEL_SSL;
     svc->probe_matched += 4;
@@ -2308,7 +2315,8 @@ list<ServiceNFO *>::iterator svc;
 
  for(svc = SG->services_finished.begin(); svc != SG->services_finished.end(); svc++) {
    if ((*svc)->probe_state != PROBESTATE_FINISHED_NOMATCH) {
-     (*svc)->port->setServiceProbeResults((*svc)->probe_state, 
+     (*svc)->target->ports.setServiceProbeResults((*svc)->portno, (*svc)->proto,
+					  (*svc)->probe_state, 
 					  (*svc)->probe_matched,
 					  (*svc)->tunnel,
 					  *(*svc)->product_matched? (*svc)->product_matched : NULL, 
@@ -2319,7 +2327,8 @@ list<ServiceNFO *>::iterator svc;
 					  *(*svc)->devicetype_matched? (*svc)->devicetype_matched : NULL, 
 					  shouldWePrintFingerprint(*svc) ? (*svc)->getServiceFingerprint(NULL) : NULL);
    }  else {
-       (*svc)->port->setServiceProbeResults((*svc)->probe_state, NULL,
+       (*svc)->target->ports.setServiceProbeResults((*svc)->portno, (*svc)->proto,
+					    (*svc)->probe_state, NULL,
 					    (*svc)->tunnel, NULL, NULL, NULL, NULL, NULL, NULL,
 					    (*svc)->getServiceFingerprint(NULL));
    }
@@ -2362,7 +2371,8 @@ static void remove_excluded_ports(AllProbes *AP, ServiceGroup *SG) {
       if (o.debugging) log_write(LOG_PLAIN, "EXCLUDING %d/%s\n", svc->portno,
           IPPROTO2STR(svc->proto));
 
-      svc->port->setServiceProbeResults(PROBESTATE_EXCLUDED, NULL, 
+      svc->target->ports.setServiceProbeResults(svc->portno, svc->proto,
+					PROBESTATE_EXCLUDED, NULL, 
 					SERVICE_TUNNEL_NONE,
                                         "Excluded from version scan", NULL,
 					NULL, NULL, NULL, NULL, NULL);

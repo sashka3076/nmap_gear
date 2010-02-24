@@ -2,7 +2,7 @@ dnl # -*- mode: fundamental; -*-
 dnl # Autoconf configuration file for Nbase
 dnl #
 dnl # Process this file with autoconf to produce a configure script.
-dnl # $Id: configure.ac 10569 2008-10-08 23:17:11Z david $
+dnl # $Id: configure.ac 15005 2009-08-13 21:54:55Z fyodor $
 
 # Because nbase is usually distributed with Nmap, the necessary files
 # config.guess, config.guess, and install-sh are not distributed with
@@ -115,7 +115,7 @@ AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 
 dnl Checks for library functions.
-AC_CHECK_FUNCS( snprintf vsnprintf nanosleep strerror strcasestr strcasecmp strncasecmp )
+AC_CHECK_FUNCS( snprintf vsnprintf nanosleep strerror strcasestr strcasecmp strncasecmp signal )
 
 needsnprintf=no
 AC_CHECK_FUNCS(vsnprintf snprintf asprintf asnprintf vasprintf vasnprintf,,

@@ -92,7 +92,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase.h 12974 2009-04-16 09:38:13Z daniel $ */
+/* $Id: nbase.h 15804 2009-10-10 03:10:21Z david $ */
 
 #ifndef NBASE_H
 #define NBASE_H
@@ -203,6 +203,24 @@ typedef int64_t s64;
 #ifndef ABS
 #define ABS(x) (((x) >= 0)?(x):-(x)) 
 #endif
+
+/* Timeval subtraction in microseconds */
+#define TIMEVAL_SUBTRACT(a,b) (((a).tv_sec - (b).tv_sec) * 1000000 + (a).tv_usec - (b).tv_usec)
+/* Timeval subtract in milliseconds */
+#define TIMEVAL_MSEC_SUBTRACT(a,b) ((((a).tv_sec - (b).tv_sec) * 1000) + ((a).tv_usec - (b).tv_usec) / 1000)
+/* Timeval subtract in seconds; truncate towards zero */
+#define TIMEVAL_SEC_SUBTRACT(a,b) ((a).tv_sec - (b).tv_sec + (((a).tv_usec < (b).tv_usec) ? - 1 : 0))
+
+/* assign one timeval to another timeval plus some msecs: a = b + msecs */
+#define TIMEVAL_MSEC_ADD(a, b, msecs) { (a).tv_sec = (b).tv_sec + ((msecs) / 1000); (a).tv_usec = (b).tv_usec + ((msecs) % 1000) * 1000; (a).tv_sec += (a).tv_usec / 1000000; (a).tv_usec %= 1000000; }
+#define TIMEVAL_ADD(a, b, usecs) { (a).tv_sec = (b).tv_sec + ((usecs) / 1000000); (a).tv_usec = (b).tv_usec + ((usecs) % 1000000); (a).tv_sec += (a).tv_usec / 1000000; (a).tv_usec %= 1000000; }
+
+/* Find our if one timeval is before or after another, avoiding the integer
+   overflow that can result when doing a TIMEVAL_SUBTRACT on two widely spaced
+   timevals. */
+#define TIMEVAL_BEFORE(a, b) (((a).tv_sec < (b).tv_sec) || ((a).tv_sec == (b).tv_sec && (a).tv_usec < (b).tv_usec))
+#define TIMEVAL_AFTER(a, b) (((a).tv_sec > (b).tv_sec) || ((a).tv_sec == (b).tv_sec && (a).tv_usec > (b).tv_usec))
+
 
 
 /* sprintf family */
@@ -395,10 +413,14 @@ unsigned int get_random_uint();
 u32 get_random_u32();
 u16 get_random_u16();
 u8 get_random_u8();
+u32 get_random_unique_u32();
 
 /* Create a new socket inheritable by subprocesses. On non-Windows systems it's
    just a normal socket. */
 int inheritable_socket(int af, int style, int protocol);
+/* The dup function on Windows works only on file descriptors, not socket
+   handles. This function accomplishes the same thing for sockets. */
+int dup_socket(int sd);
 int unblock_socket(int sd);
 int block_socket(int sd);
 
@@ -412,6 +434,8 @@ unsigned long nbase_adler32(unsigned char *buf, int len);
 long tval2msecs(char *tspec);
 
 int fselect(int s, fd_set *rmaster, fd_set *wmaster, fd_set *emaster, struct timeval *tv);
+
+char *hexdump(const u8 *cp, u32 length);
 
 #ifndef STDIN_FILENO
 #define STDIN_FILENO 0

@@ -94,7 +94,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_rnd.c 12956 2009-04-15 00:37:23Z fyodor $ */
+/* $Id: nbase_rnd.c 15396 2009-09-02 02:03:22Z bmenrigh $ */
 
 #include "nbase.h"
 #include <errno.h>
@@ -258,4 +258,126 @@ unsigned short get_random_ushort() {
   unsigned short s;
   get_random_bytes(&s, sizeof(unsigned short));
   return s;
+}
+
+
+/* This function is magic ;-)
+ * 
+ * Sometimes Nmap wants to generate IPs that look random
+ * but don't have any duplicates.  The strong RC4 generator
+ * can't be used for this purpose because it can generate duplicates
+ * if you get enough IPs (birthday paradox).
+ *
+ * This routine exploits the fact that a LCG won't repeat for the
+ * entire duration of it's period.  An LCG has some pretty bad
+ * properties though so this routine does extra work to try to
+ * tweak the LCG output so that is has very good statistics but
+ * doesn't repeat.  The tweak used was mostly made up on the spot
+ * but is generally based on good ideas and has been moderately
+ * tested.  See links and reasoning below.
+ */
+u32 get_random_unique_u32() {
+  static u32 state, tweak1, tweak2, tweak3;
+  static int state_init = 0;
+  u32 output;
+  
+  /* Initialize if we need to */
+  if (!state_init) {
+    get_random_bytes(&state, sizeof(state));
+    get_random_bytes(&tweak1, sizeof(tweak1));
+    get_random_bytes(&tweak2, sizeof(tweak2));
+    get_random_bytes(&tweak3, sizeof(tweak3));
+
+    state_init = 1;
+  }
+
+  /* What is this math crap?
+   *
+   * The whole idea behind this generator is that an LCG can be constructed
+   * with a period of exactly 2^32.  As long as the LCG is fed back onto
+   * itself the period will be 2^32.  The tweak after the LCG is just
+   * a good permutation in GF(2^32).
+   *
+   * To accomplish the tweak the notion of rounds and round keys from
+   * block ciphers has been borrowed.  The only special aspect of this
+   * block cipher is that the first round short-circuits the LCG.
+   *
+   * This block cipher uses three rounds.  Each round is as follows:
+   *
+   * 1) Affine transform in GF(2^32)
+   * 2) Rotate left by round constant
+   * 3) XOR with round key
+   *
+   * For round one the affine transform is used as an LCG.
+   */
+
+  /* Reasoning:
+   *
+   * Affine transforms were chosen both to make a LCG and also
+   * to try to introduce non-linearity.
+   *
+   * The rotate up each round was borrowed from SHA-1 and was introduced
+   * to help obscure the obvious short cycles when you truncate an LCG with
+   * a power-of-two period like the one used.
+   *
+   * The XOR with the round key was borrowed from several different
+   * published functions (but see Xorshift)
+   * and provides a different sequence for the full LCG.
+   * There are 3 32 bit round keys.  This generator can
+   * generate 2^96 different sequences of period 2^32.
+   *
+   * This generator was tested with Dieharder.  It did not fail any test.
+   */
+
+  /* See:
+   *
+   * http://en.wikipedia.org/wiki/Galois_field
+   * http://en.wikipedia.org/wiki/Affine_cipher
+   * http://en.wikipedia.org/wiki/Linear_congruential_generator
+   * http://en.wikipedia.org/wiki/Xorshift
+   * http://en.wikipedia.org/wiki/Sha-1
+   *
+   * http://seclists.org/nmap-dev/2009/q3/0695.html
+   */
+
+
+  /* First off, we need to evolve the state with our LCG
+   * We'll use the LCG from Numerical Recipes (m=2^32,
+   * a=1664525, c=1013904223).  All by itself this generator
+   * pretty bad.  We're going to try to fix that without causing
+   * duplicates.
+   */
+  state = (((state * 1664525) & 0xFFFFFFFF) + 1013904223) & 0xFFFFFFFF;
+ 
+  output = state;
+
+  /* With a normal LCG, we would just output the state.
+   * In this case, though, we are going to try to destroy the
+   * linear correlation between IPs by approximating a random permutation
+   * in GF(2^32) (collision-free)
+   */
+
+  /* Then rotate and XOR */
+  output = ((output << 7) | (output >> (32 - 7)));
+  output = output ^ tweak1; /* This is the round key */
+
+  /* End round 1, start round 2 */
+
+  /* Then put it through an affine transform (glibc constants) */
+  output = (((output * 1103515245) & 0xFFFFFFFF) + 12345) & 0xFFFFFFFF;
+
+  /* Then rotate and XOR some more */
+  output = ((output << 15) | (output >> (32 - 15)));
+  output = output ^ tweak2;
+
+  /* End round 2, start round 3 */
+
+  /* Then put it through another affine transform (Quick C/C++ constants) */
+  output = (((output * 214013) & 0xFFFFFFFF) + 2531011) & 0xFFFFFFFF;
+
+  /* Then rotate and XOR some more */
+  output = ((output << 5) | (output >> (32 - 5)));
+  output = output ^ tweak3;
+
+  return output;
 }

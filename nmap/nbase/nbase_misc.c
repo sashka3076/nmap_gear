@@ -88,7 +88,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_misc.c 13660 2009-06-10 18:45:47Z david $ */
+/* $Id: nbase_misc.c 15804 2009-10-10 03:10:21Z david $ */
 
 #include "nbase.h"
 
@@ -101,6 +101,7 @@ extern int errno;
 #include <winsock2.h>
 #endif
 
+#include <stdio.h>
 #include "nbase_ipv6.h"
 #include "nbase_crc32ct.h"
 
@@ -137,7 +138,9 @@ char *socket_strerror(int errnum) {
 #ifdef WIN32
 	static char buffer[128];
 
-	FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+	FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM |
+		FORMAT_MESSAGE_IGNORE_INSERTS |
+		FORMAT_MESSAGE_MAX_WIDTH_MASK,
 		0, errnum, 0, buffer, sizeof(buffer), NULL);
 
 	return buffer;
@@ -146,17 +149,46 @@ char *socket_strerror(int errnum) {
 #endif
 }
 
+/* Compares two sockaddr_storage structures with a return value like strcmp.
+   First the address families are compared, then the addresses if the families
+   are equal. The structures must be real full-length sockaddr_storage
+   structures, not something shorter like sockaddr_in. */
+int sockaddr_storage_cmp(const struct sockaddr_storage *a,
+  const struct sockaddr_storage *b) {
+  if (a->ss_family < b->ss_family)
+    return -1;
+  else if (a->ss_family < b->ss_family)
+    return 1;
+  if (a->ss_family == AF_INET) {
+    struct sockaddr_in *sin_a = (struct sockaddr_in *) a;
+    struct sockaddr_in *sin_b = (struct sockaddr_in *) b;
+    if (sin_a->sin_addr.s_addr < sin_b->sin_addr.s_addr)
+      return -1;
+    else if (sin_a->sin_addr.s_addr > sin_b->sin_addr.s_addr)
+      return 1;
+    else
+      return 0;
+  } else if (a->ss_family == AF_INET6) {
+    struct sockaddr_in6 *sin6_a = (struct sockaddr_in6 *) a;
+    struct sockaddr_in6 *sin6_b = (struct sockaddr_in6 *) b;
+    return memcmp(sin6_a->sin6_addr.s6_addr, sin6_b->sin6_addr.s6_addr,
+                  sizeof(sin6_a->sin6_addr.s6_addr));
+  } else {
+    assert(0);
+  }
+}
+
 /* This function is an easier version of inet_ntop because you don't
    need to pass a dest buffer.  Instead, it returns a static buffer that
    you can use until the function is called again (by the same or another
    thread in the process).  If there is a wierd error (like sslen being
    too short) then NULL will be returned. */
-const char *inet_ntop_ez(struct sockaddr_storage *ss, size_t sslen) {
+const char *inet_ntop_ez(const struct sockaddr_storage *ss, size_t sslen) {
 
-  struct sockaddr_in *sin = (struct sockaddr_in *) ss;
+  const struct sockaddr_in *sin = (struct sockaddr_in *) ss;
   static char str[INET6_ADDRSTRLEN];
 #if HAVE_IPV6
-  struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) ss;
+  const struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) ss;
 #endif
 
   str[0] = '\0';
@@ -188,6 +220,24 @@ int inheritable_socket(int af, int style, int protocol) {
   return WSASocket(af, style, protocol, NULL, 0, 0);
 #else
   return socket(af, style, protocol);
+#endif
+}
+
+/* The dup function on Windows works only on file descriptors, not socket
+   handles. This function accomplishes the same thing for sockets. */
+int dup_socket(int sd) {
+#ifdef WIN32
+  HANDLE copy;
+
+  if (DuplicateHandle(GetCurrentProcess(), (HANDLE) sd,
+                      GetCurrentProcess(), &copy,
+                      0, FALSE, DUPLICATE_SAME_ACCESS) == 0) {
+    return -1;
+  }
+
+  return (int) copy;
+#else
+  return dup(sd);
 #endif
 }
 
@@ -501,4 +551,78 @@ unsigned long nbase_adler32(unsigned char *buf, int len)
 }
 
 #undef ADLER32_BASE
+
+
+/* This function returns a string containing the hexdump of the supplied
+ * buffer. It uses current locale to determine if a character is printable or
+ * not. It prints 73char+\n wide lines like these:
+
+0000   e8 60 65 86 d7 86 6d 30  35 97 54 87 ff 67 05 9e  .`e...m05.T..g.. 
+0010   07 5a 98 c0 ea ad 50 d2  62 4f 7b ff e1 34 f8 fc  .Z....P.bO{..4.. 
+0020   c4 84 0a 6a 39 ad 3c 10  63 b2 22 c4 24 40 f4 b1  ...j9.<.c.".$@.. 
+
+ * The lines look basically like Wireshark's hex dump.
+ * WARNING: This function returs a pointer to a DINAMICALLY allocated buffer
+ * that the caller is supposed to free().
+ * */
+char *hexdump(const u8 *cp, u32 length){
+  static char asciify[257];          /* Stores cha6acter table           */
+  int asc_init=0;                    /* Flag to generate table only once */
+  u32 i=0, hex=0, asc=0;             /* Array indexes                    */
+  u32 line_count=0;                  /* For byte count at line start     */
+  char *current_line=NULL;           /* Current line to write            */
+  char *buffer=NULL;                 /* Dynamic buffer we return         */
+  #define LINE_LEN 74                /* Lenght of printed line           */
+  char line2print[LINE_LEN];         /* Stores current line              */
+  char printbyte[16];                /* For byte conversion              */
+  int bytes2alloc;                   /* For buffer                       */
+  memset(line2print, ' ', LINE_LEN); /* We fill the line with spaces     */
+
+  /* On the first run, generate a list of nice printable characters
+   * (according to current locale) */
+  if( asc_init==0){
+      asc_init=1;
+      for(i=0; i<256; i++){
+        if( isalnum(i) || isdigit(i) || ispunct(i) ){ asciify[i]=i; }
+        else{ asciify[i]='.'; }
+      }
+  }
+  /* Allocate enough space to print the hex dump */
+  bytes2alloc=(length%16==0)? (1 + LINE_LEN * (length/16)) : (1 + LINE_LEN * (1+(length/16))) ;
+  buffer=(char *)safe_zalloc(bytes2alloc);
+  current_line=buffer;
+#define HEX_START 7
+#define ASC_START 57
+/* This is how or line looks like.
+0000   00 01 02 03 04 05 06 07  08 09 0a 0b 0c 0d 0e 0f  .`e...m05.T..g..[\n]
+01234567890123456789012345678901234567890123456789012345678901234567890123
+0         1         2         3         4         5         6         7
+       ^                                                 ^               ^
+       |                                                 |               |
+    HEX_START                                        ASC_START        Newline
+*/
+  i=0;
+  while( i < length ){
+    memset(line2print, ' ', LINE_LEN); /* Fill line with spaces */
+    sprintf(line2print, "%04x", (16*line_count++) % 0xFFFF); /* Add line No.*/
+    line2print[4]=' '; /* Replace the '\0' inserted by sprintf() with a space */
+    hex=HEX_START;  asc=ASC_START;
+    do { /* Print 16 bytes in both hex and ascii */
+		if (i%16 == 8) hex++; /* Insert space every 8 bytes */
+        sprintf(printbyte,"%02x", cp[i]);/* First print the hex number */
+        line2print[hex++]=printbyte[0];
+        line2print[hex++]=printbyte[1];
+        line2print[hex++]=' ';
+        line2print[asc++]=asciify[ cp[i] ]; /* Then print its ASCII equivalent */
+		i++;
+	} while (i < length && i%16 != 0);
+    /* Copy line to output buffer */
+    line2print[LINE_LEN-1]='\n';
+    memcpy(current_line, line2print, LINE_LEN);
+    current_line += LINE_LEN;
+  }
+  buffer[bytes2alloc-1]='\0'; 
+  return buffer;
+} /* End of hexdump() */
+
 

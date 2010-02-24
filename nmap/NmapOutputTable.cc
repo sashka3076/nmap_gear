@@ -88,7 +88,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOutputTable.cc 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: NmapOutputTable.cc 12955 2009-04-15 00:37:03Z fyodor $ */
 
 #ifdef WIN32
 #include "nmap_winconfig.h"

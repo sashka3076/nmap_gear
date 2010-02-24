@@ -1,4 +1,91 @@
-/* $Id: ncat_ssl.c 13714 2009-06-12 22:21:39Z david $ */
+/***************************************************************************
+ * ncat_ssl.c -- SSL support functions.                                    *
+ ***********************IMPORTANT NMAP LICENSE TERMS************************
+ *                                                                         *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
+ *                                                                         *
+ * Note that the GPL places important restrictions on "derived works", yet *
+ * it does not provide a detailed definition of that term.  To avoid       *
+ * misunderstandings, we consider an application to constitute a           *
+ * "derivative work" for the purpose of this license if it does any of the *
+ * following:                                                              *
+ * o Integrates source code from Nmap                                      *
+ * o Reads or includes Nmap copyrighted data files, such as                *
+ *   nmap-os-db or nmap-service-probes.                                    *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
+ * o Links to a library or executes a program that does any of the above   *
+ *                                                                         *
+ * The term "Nmap" should be taken to also include any portions or derived *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
+ *                                                                         *
+ * If you have any questions about the GPL licensing restrictions on using *
+ * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
+ * we also offer alternative license to integrate Nmap into proprietary    *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
+ * sales@insecure.com for further information.                             *
+ *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included COPYING.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
+ * If you received these files with a written license agreement or         *
+ * contract stating terms other than the terms above, then that            *
+ * alternative license agreement takes precedence over these comments.     *
+ *                                                                         *
+ * Source is provided to this software because we believe users have a     *
+ * right to know exactly what a program is going to do before they run it. *
+ * This also allows you to audit the software for security holes (none     *
+ * have been found so far).                                                *
+ *                                                                         *
+ * Source code also allows you to port Nmap to new platforms, fix bugs,    *
+ * and add new features.  You are highly encouraged to send your changes   *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
+ * distribution.  By sending these changes to Fyodor or one of the         *
+ * Insecure.Org development mailing lists, it is assumed that you are      *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
+ *                                                                         *
+ * This program is distributed in the hope that it will be useful, but     *
+ * WITHOUT ANY WARRANTY; without even the implied warranty of              *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
+ * General Public License v2.0 for more details at                         *
+ * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
+ * included with Nmap.                                                     *
+ *                                                                         *
+ ***************************************************************************/
+
+/* $Id: ncat_ssl.c 16084 2009-11-14 22:47:53Z david $ */
 
 #include "nbase.h"
 #ifdef HAVE_CONFIG_H
@@ -102,23 +189,77 @@ SSL *new_ssl(int fd)
     return ssl;
 }
 
+/* Match a (user-supplied) hostname against a (certificate-supplied) name, which
+   may be a wildcard pattern. A wildcard pattern may contain only one '*', it
+   must be the entire leftmost component, and there must be at least two
+   components following it. len is the length of pattern; pattern may contain
+   null bytes so that len != strlen(pattern). */
+static int wildcard_match(const char *pattern, const char *hostname, size_t len) {
+    if (pattern[0] == '*' && pattern[1] == '.') {
+        /* A wildcard pattern. */
+        const char *p, *h, *dot;
+
+        /* Skip the wildcard component. */
+        p = pattern + 2;
+
+        /* Ensure there are no more wildcard characters. */
+        if (memchr(p, '*', len - 2) != NULL)
+            return 0;
+
+        /* Ensure there's at least one more dot, not counting a dot at the
+           end. */
+        dot = strchr(p, '.');
+        if (dot == NULL || *(dot + 1) == '\0') {
+            if (o.debug > 1) {
+                logdebug("Wildcard name \"%s\" doesn't have at least two"
+                    " components after the wildcard; rejecting.\n", pattern);
+            }
+            return 0;
+        }
+
+        /* Skip the leftmost hostname component. */
+        h = strchr(hostname, '.');
+        if (h == NULL)
+            return 0;
+        h++;
+
+        /* Compare what remains of the pattern and hostname. */
+        return len == strlen(h) + (p - pattern) && strcmp(p, h) == 0;
+    } else {
+        /* Normal string comparison. Check the name length because I'm concerned
+           about someone somehow embedding a '\0' in the subject and matching
+           against a shorter name. */
+        return len == strlen(hostname) && strcmp(pattern, hostname) == 0;
+    }
+}
+
 /* Match a hostname against the contents of a dNSName field of the
    subjectAltName extension, if present. This is the preferred place for a
    certificate to store its domain name, as opposed to in the commonName field.
    It has the advantage that multiple names can be stored, so that one
-   certificate can match both "example.com" and "www.example.com". This function
-   doesn't do wildcard matching. */
-static int cert_match_dnsname(X509 *cert, const char *hostname)
+   certificate can match both "example.com" and "www.example.com".
+   
+   If num_checked is not NULL, the number of dNSName fields that were checked
+   before returning will be stored in it. This is so you can distinguish between
+   the check failing because there were names but none matched, or because there
+   were no names to match. */
+static int cert_match_dnsname(X509 *cert, const char *hostname,
+    unsigned int *num_checked)
 {
     X509_EXTENSION *ext;
-    void *ext_str;
+    STACK_OF(GENERAL_NAME) *gen_names;
     X509V3_EXT_METHOD *method;
-    STACK_OF(CONF_VALUE) *nvalstack;
-    CONF_VALUE *nval;
+    unsigned char *data;
     int i;
 
-    i = X509_get_ext_by_NID(cert, NID_subject_alt_name, 0);
+    if (num_checked != NULL)
+        *num_checked = 0;
+
+    i = X509_get_ext_by_NID(cert, NID_subject_alt_name, -1);
     if (i < 0)
+        return 0;
+    /* If there's more than one subjectAltName extension, forget it. */
+    if (X509_get_ext_by_NID(cert, NID_subject_alt_name, i) >= 0)
         return 0;
     ext = X509_get_ext(cert, i);
 
@@ -127,72 +268,141 @@ static int cert_match_dnsname(X509 *cert, const char *hostname)
     method = X509V3_EXT_get(ext);
     if (method == NULL)
         return 0;
+
+    /* We must copy this address into a temporary variable because ASN1_item_d2i
+       increments it. We don't want it to corrupt ext->value->data. */
+    data = ext->value->data;
+    /* Here we rely on the fact that the internal representation (the "i" in
+       "i2d") for NID_subject_alt_name is STACK_OF(GENERAL_NAME). Converting it
+       to a stack of CONF_VALUE with a i2v method is not satisfactory, because a
+       CONF_VALUE doesn't contain the length of the value so you can't know the
+       presence of null bytes. */
 #if (OPENSSL_VERSION_NUMBER > 0x00907000L)
     if (method->it != NULL) {
-        ext_str = ASN1_item_d2i(NULL,
-            (const unsigned char **) &ext->value->data,
+        gen_names = (STACK_OF(GENERAL_NAME) *) ASN1_item_d2i(NULL,
+            (const unsigned char **) &data,
             ext->value->length, ASN1_ITEM_ptr(method->it));
     } else {
-        ext_str = method->d2i(NULL,
-            (const unsigned char **) &ext->value->data,
+        gen_names = (STACK_OF(GENERAL_NAME) *) method->d2i(NULL,
+            (const unsigned char **) &data,
             ext->value->length);
     }
 #else
-    ext_str = method->d2i(NULL,
-        (const unsigned char **) &ext->value->data,
+    gen_names = (STACK_OF(GENERAL_NAME) *) method->d2i(NULL,
+        (const unsigned char **) &data,
         ext->value->length);
 #endif
-    if (ext_str == NULL)
+    if (gen_names == NULL)
         return 0;
 
-    /* See X509V3_EXT_val_prn. */
-    nvalstack = method->i2v(method, ext_str, NULL);
-    if (nvalstack == NULL)
-        return 0;
     /* Look for a dNSName field with a matching hostname. There may be more than
        one dNSName field. */
-    for (i = 0; i < sk_CONF_VALUE_num(nvalstack); i++) {
-        nval = sk_CONF_VALUE_value(nvalstack, i);
-        if (o.debug > 1)
-            logdebug("Checking certificate DNS name \"%s\" against \"%s\".\n", nval->value, hostname);
-        if (nval->name != NULL && strcmp(nval->name, "DNS") == 0
-            && strcmp(nval->value, hostname) == 0) {
-            return 1;
+    for (i = 0; i < sk_GENERAL_NAME_num(gen_names); i++) {
+        GENERAL_NAME *gen_name;
+
+        gen_name = sk_GENERAL_NAME_value(gen_names, i);
+        if (gen_name->type == GEN_DNS) {
+            if (o.debug > 1)
+                logdebug("Checking certificate DNS name \"%s\" against \"%s\".\n", ASN1_STRING_data(gen_name->d.dNSName), hostname);
+            if (num_checked != NULL)
+                (*num_checked)++;
+            if (wildcard_match((char *) ASN1_STRING_data(gen_name->d.dNSName), hostname, ASN1_STRING_length(gen_name->d.dNSName)))
+               return 1;
         }
     }
 
     return 0;
 }
 
-/* Match a hostname against the contents of the commonName field of a
-   certificate. */
+/* Returns the number of contiguous blocks of bytes in pattern that do not
+   contain the '.' byte. */
+static unsigned int num_components(const unsigned char *pattern, size_t len)
+{
+    const unsigned char *p;
+    unsigned int count;
+
+    count = 0;
+    p = pattern;
+    for (;;) {
+        while (p - pattern < len && *p == '.')
+            p++;
+        if (p - pattern >= len)
+            break;
+        while (p - pattern < len && *p != '.')
+            p++;
+        count++;
+    }
+
+    return count;
+}
+
+/* Returns true if the a pattern is strictly less specific than the b
+   pattern. */
+static int less_specific(const unsigned char *a, size_t a_len,
+    const unsigned char *b, size_t b_len)
+{
+    /* Wildcard patterns are always less specific than non-wildcard patterns. */
+    if (memchr(a, '*', a_len) != NULL && memchr(b, '*', b_len) == NULL)
+        return 1;
+    if (memchr(a, '*', a_len) == NULL && memchr(b, '*', b_len) != NULL)
+        return 0;
+
+    return num_components(a, a_len) < num_components(b, b_len);
+}
+
+static int most_specific_commonname(X509_NAME *subject, const char **result)
+{
+    ASN1_STRING *best, *cur;
+    int i;
+
+    i = -1;
+    best = NULL;
+    while ((i = X509_NAME_get_index_by_NID(subject, NID_commonName, i)) != -1) {
+        cur = X509_NAME_ENTRY_get_data(X509_NAME_get_entry(subject, i));
+        /* We use "not less specific" instead of "more specific" to allow later
+           entries to supersede earlier ones. */
+        if (best == NULL
+            || !less_specific(ASN1_STRING_data(cur), ASN1_STRING_length(cur),
+                              ASN1_STRING_data(best), ASN1_STRING_length(best))) {
+            best = cur;
+        }
+    }
+
+    if (best == NULL) {
+        *result = NULL;
+        return -1;
+    } else {
+        *result = (char *) ASN1_STRING_data(best);
+        return ASN1_STRING_length(best);
+    }
+}
+
+/* Match a hostname against the contents of the "most specific" commonName field
+   of a certificate. The "most specific" term is used in RFC 2818 but is not
+   defined anywhere that I (David Fifield) can find. This is what it means in
+   Ncat: wildcard patterns are always less specific than non-wildcard patterns.
+   If both patterns are wildcard or both are non-wildcard, the one with more
+   name components is more specific. If two names have the same number of
+   components, the one that comes later in the certificate is more specific. */
 static int cert_match_commonname(X509 *cert, const char *hostname)
 {
     X509_NAME *subject;
-    char buf[256];
+    const char *commonname;
     int n;
 
     subject = X509_get_subject_name(cert);
     if (subject == NULL)
         return 0;
 
-    /* First check if the buffer is big enough. */
-    n = X509_NAME_get_text_by_NID(subject, NID_commonName, NULL, 0);
-    if (n > sizeof(buf) - 1) {
-        if (o.verbose)
-            logdebug("Can't get certificate commonName; need %d bytes, have %d.\n", n, sizeof(buf));
+    n = most_specific_commonname(subject, &commonname);
+    if (n < 0 || commonname == NULL)
+        /* No commonName found. */
         return 0;
-    }
-    n = X509_NAME_get_text_by_NID(subject, NID_commonName, buf, sizeof(buf));
-    if (n < 0 || n > sizeof(buf) - 1)
-        return 0;
-    /* Check the name length because I'm concerned about someone somehow
-       embedding a '\0' in the subject and matching against a shorter name. */
-    if (n == strlen(hostname) && strcmp(buf, hostname) == 0)
+    if (wildcard_match(commonname, hostname, n))
         return 1;
-
+    
     if (o.verbose)
-        loguser("Certificate verification error: Connected to \"%s\", but certificate is for \"%s\".\n", hostname, buf);
+        loguser("Certificate verification error: Connected to \"%s\", but certificate is for \"%s\".\n", hostname, commonname);
 
     return 0;
 }
@@ -203,6 +413,7 @@ static int cert_match_commonname(X509 *cert, const char *hostname)
 int ssl_post_connect_check(SSL *ssl, const char *hostname)
 {
     X509 *cert = NULL;
+    unsigned int num_checked;
 
     if (SSL_get_verify_mode(ssl) == SSL_VERIFY_NONE)
         return 1;
@@ -220,9 +431,12 @@ int ssl_post_connect_check(SSL *ssl, const char *hostname)
        be used. Although the use of the Common Name is existing practice, it is
        deprecated and Certification Authorities are encouraged to use the
        dNSName instead. */
-    if (!cert_match_dnsname(cert, hostname) && !cert_match_commonname(cert, hostname)) {
-        X509_free(cert);
-        return 0;
+    if (!cert_match_dnsname(cert, hostname, &num_checked)) {
+        /* If there were dNSNames, we're done. If not, try the commonNames. */
+        if (num_checked > 0 || !cert_match_commonname(cert, hostname)) {
+            X509_free(cert);
+            return 0;
+        }
     }
 
     X509_free(cert);
@@ -269,7 +483,7 @@ static int ssl_gen_cert(X509 **cert, EVP_PKEY **key)
         goto err;
     if (X509_set_version(*cert, 2) == 0) /* Version 3. */
         goto err;
-    ASN1_INTEGER_set(X509_get_serialNumber(*cert), get_random_u32());
+    ASN1_INTEGER_set(X509_get_serialNumber(*cert), get_random_u32() & 0x7FFFFFFF);
 
     /* Set the commonName. */
     subj = X509_get_subject_name(*cert);
@@ -325,7 +539,7 @@ err:
 char *ssl_cert_fp_str_sha1(const X509 *cert, char *strbuf, size_t len)
 {
     unsigned char binbuf[SHA1_BYTES];
-    size_t n;
+    unsigned int n;
     char *p;
     unsigned int i;
 
@@ -348,3 +562,5 @@ char *ssl_cert_fp_str_sha1(const X509 *cert, char *strbuf, size_t len)
     return strbuf;
 }
 #endif
+
+

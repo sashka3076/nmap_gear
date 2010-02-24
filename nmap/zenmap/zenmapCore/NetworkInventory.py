@@ -1,30 +1,100 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2005 Insecure.Com LLC.
-#
-# Author: Vladimir Mitrovic <snipe714@gmail.com>
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+# ***********************IMPORTANT NMAP LICENSE TERMS************************
+# *                                                                         *
+# * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
+# * also a registered trademark of Insecure.Com LLC.  This program is free  *
+# * software; you may redistribute and/or modify it under the terms of the  *
+# * GNU General Public License as published by the Free Software            *
+# * Foundation; Version 2 with the clarifications and exceptions described  *
+# * below.  This guarantees your right to use, modify, and redistribute     *
+# * this software under certain conditions.  If you wish to embed Nmap      *
+# * technology into proprietary software, we sell alternative licenses      *
+# * (contact sales@insecure.com).  Dozens of software vendors already       *
+# * license Nmap technology such as host discovery, port scanning, OS       *
+# * detection, and version detection.                                       *
+# *                                                                         *
+# * Note that the GPL places important restrictions on "derived works", yet *
+# * it does not provide a detailed definition of that term.  To avoid       *
+# * misunderstandings, we consider an application to constitute a           *
+# * "derivative work" for the purpose of this license if it does any of the *
+# * following:                                                              *
+# * o Integrates source code from Nmap                                      *
+# * o Reads or includes Nmap copyrighted data files, such as                *
+# *   nmap-os-db or nmap-service-probes.                                    *
+# * o Executes Nmap and parses the results (as opposed to typical shell or  *
+# *   execution-menu apps, which simply display raw Nmap output and so are  *
+# *   not derivative works.)                                                * 
+# * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+# *   installer, such as those produced by InstallShield.                   *
+# * o Links to a library or executes a program that does any of the above   *
+# *                                                                         *
+# * The term "Nmap" should be taken to also include any portions or derived *
+# * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+# * interpretation of derived works with some common examples.  Our         *
+# * interpretation applies only to Nmap--we don't speak for other people's  *
+# * GPL works.                                                              *
+# *                                                                         *
+# * If you have any questions about the GPL licensing restrictions on using *
+# * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
+# * we also offer alternative license to integrate Nmap into proprietary    *
+# * applications and appliances.  These contracts have been sold to dozens  *
+# * of software vendors, and generally include a perpetual license as well  *
+# * as providing for priority support and updates as well as helping to     *
+# * fund the continued development of Nmap technology.  Please email        *
+# * sales@insecure.com for further information.                             *
+# *                                                                         *
+# * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+# * permission to link the code of this program with any version of the     *
+# * OpenSSL library which is distributed under a license identical to that  *
+# * listed in the included COPYING.OpenSSL file, and distribute linked      *
+# * combinations including the two. You must obey the GNU GPL in all        *
+# * respects for all of the code used other than OpenSSL.  If you modify    *
+# * this file, you may extend this exception to your version of the file,   *
+# * but you are not obligated to do so.                                     *
+# *                                                                         *
+# * If you received these files with a written license agreement or         *
+# * contract stating terms other than the terms above, then that            *
+# * alternative license agreement takes precedence over these comments.     *
+# *                                                                         *
+# * Source is provided to this software because we believe users have a     *
+# * right to know exactly what a program is going to do before they run it. *
+# * This also allows you to audit the software for security holes (none     *
+# * have been found so far).                                                *
+# *                                                                         *
+# * Source code also allows you to port Nmap to new platforms, fix bugs,    *
+# * and add new features.  You are highly encouraged to send your changes   *
+# * to nmap-dev@insecure.org for possible incorporation into the main       *
+# * distribution.  By sending these changes to Fyodor or one of the         *
+# * Insecure.Org development mailing lists, it is assumed that you are      *
+# * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+# * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+# * will always be available Open Source, but this is important because the *
+# * inability to relicense code has caused devastating problems for other   *
+# * Free Software projects (such as KDE and NASM).  We also occasionally    *
+# * relicense the code to third parties as discussed above.  If you wish to *
+# * specify special license conditions of your contributions, just say so   *
+# * when you send them.                                                     *
+# *                                                                         *
+# * This program is distributed in the hope that it will be useful, but     *
+# * WITHOUT ANY WARRANTY; without even the implied warranty of              *
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
+# * General Public License v2.0 for more details at                         *
+# * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
+# * included with Nmap.                                                     *
+# *                                                                         *
+# ***************************************************************************/
 
 import os
+import re
 import unittest
 import zenmapCore
 import zenmapCore.NmapParser
+from zenmapGUI.SearchGUI import SearchParser
+from SearchResult import HostSearch
 
-class NetworkInventory:
+class NetworkInventory(object):
     """This class acts as a container for aggregated scans. It is also
     responsible for opening/saving the aggregation from/to persistent storage."""
     def __init__(self, filename=None):
@@ -123,20 +193,20 @@ class NetworkInventory:
         both scans."""
         
         # Ports
-        for new_port in new_host.ports[0]["port"]:
+        for new_port in new_host.ports:
             # Check if new_port is already present in old_host's ports
-            for old_port in old_host.ports[0]["port"]:
+            for old_port in old_host.ports:
                 if old_port["portid"] == new_port["portid"]:
                     # We update old_host's port information to reflect the latest known port state
                     if old_date < new_date:
-                        index = old_host.ports[0]["port"].index(old_port)
-                        old_host.ports[0]["port"][index] = new_port
+                        index = old_host.ports.index(old_port)
+                        old_host.ports[index] = new_port
                     # Finished processing this new_port, we jump to the next one
                     break
             else:
                 # This new_port isn't present in old_host, so we simply append it to
                 # old_host's port info
-                old_host.ports[0]["port"].append(new_port)
+                old_host.ports.append(new_port)
         
         # extraports, ipidsequence, state, tcpsequence, tcptssequence, uptime
         if old_date < new_date:
@@ -184,6 +254,12 @@ class NetworkInventory:
     
     def get_hosts(self):
         return self.hosts.values()
+
+    def get_hosts_up(self):
+        return filter(lambda h: h.get_state() == 'up', self.hosts.values())
+
+    def get_hosts_down(self):
+        return filter(lambda h: h.get_state() == 'down', self.hosts.values())
     
     def open_from_file(self, path):
         """Loads a scan from the given file."""
@@ -295,6 +371,122 @@ class NetworkInventory:
                          nmap_xml_output = open(filename).read(),
                          date = time())
 
+class FilteredNetworkInventory(NetworkInventory):
+    def __init__(self, filename = None):
+        NetworkInventory.__init__(self, filename)
+
+        # A dictionary listing host filtering criteria
+        self.search_dict = {}
+        self.filtered_hosts = []
+        search_keywords = dict()
+        search_keywords["target"] = "target"
+        search_keywords["t"] = "target"
+        search_keywords["inroute"] = "in_route"
+        search_keywords["ir"] = "in_route"
+        search_keywords["hostname"] = "hostname"
+        search_keywords["service"] = "service"
+        search_keywords["s"] = "service"
+        search_keywords["os"] = "os"
+        search_keywords["open"] = "open"
+        search_keywords["op"] = "open"
+        search_keywords["closed"] = "closed"
+        search_keywords["cp"] = "closed"
+        search_keywords["filtered"] = "filtered"
+        search_keywords["fp"] = "filtered"
+        search_keywords["unfiltered"] = "unfiltered"
+        search_keywords["ufp"] = "unfiltered"
+        search_keywords["open|filtered"] = "open_filtered"
+        search_keywords["ofp"] = "open_filtered"
+        search_keywords["closed|filtered"] = "closed_filtered"
+        search_keywords["cfp"] = "closed_filtered"
+        search_keywords[""] = ""
+        self.search_parser = SearchParser(self, search_keywords)
+
+    # FIXME: This method doesn't do anything.  We just need to support
+    # the type of interface that SearchParser expects in order to use it.
+    # Perhaps, we will eventually refactor the SearchParser a little bit
+    # more?
+    def init_search_dirs(self, junk):
+        pass
+
+    def get_hosts(self):
+        if len(self.search_dict) > 0:
+            return self.filtered_hosts
+        else:
+            return NetworkInventory.get_hosts(self)
+    def get_hosts_up(self):
+        if len(self.search_dict) > 0:
+            return filter(lambda h: h.get_state() == 'up', self.filtered_hosts)
+        else:
+            return NetworkInventory.get_hosts_up(self)
+    def get_hosts_down(self):
+        if len(self.search_dict) > 0:
+            return filter(lambda h: h.get_state() == 'down', self.filtered_hosts)
+        else:
+            return NetworkInventory.get_hosts_down(self)
+    def get_total_host_count(self):
+        return len(self.hosts)
+    def _match_all_args(self, host, operator, args):
+        """A helper function that calls the matching function for the given
+        operator and each of its arguments."""
+        for arg in args:
+            if not self.__getattribute__("match_%s" % operator)(host, arg):
+                # No match for this operator
+                return False
+        else:
+            # if the operator is not supported, pretend its true
+            # All arguments for this operator produced a match
+            return True
+    def get_host_count(self):
+        return len(self.network_inventory.hosts)
+    def match_keyword(self, host, keyword):
+        return self.match_os(host, keyword) or\
+               self.match_target(host, keyword) or\
+               self.match_service(host, keyword)
+    def match_target(self, host, name):
+        return HostSearch.match_target(host, name)
+    def match_in_route(self, host, hop):
+        hops = host.get_trace().get('hops', [])
+        return hop in hops
+    def match_hostname(self, host, hostname):
+        return HostSearch.match_hostname(host, hostname)
+    def match_service(self, host, service):
+        return HostSearch.match_service(host, service)
+    def match_os(self, host, os):
+        return HostSearch.match_os(host, os)
+    def match_open(self, host, portno):
+        host_ports = host.get_ports()
+        return HostSearch.match_port(host_ports, portno, "open")
+    def match_closed(self, host, portno):
+        host_ports = host.get_ports()
+        return HostSearch.match_port(host_ports, portno, "closed")
+    def match_filtered(self, host, portno):
+        host_ports = host.get_ports()
+        return HostSearch.match_port(host_ports, portno, "filtered")
+    def match_unfiltered(self, host, portno):
+        host_ports = host.get_ports()
+        return HostSearch.match_port(host_ports, portno, "unfiltered")
+    def match_open_filtered(self, host, portno):
+        host_ports = host.get_ports()
+        return HostSearch.match_port(host_ports, portno, "open|filtered")
+    def match_closed_filtered(self, host, portno):
+        host_ports = host.get_ports()
+        return HostSearch.match_port(host_ports, portno, "closed|filtered")
+    def apply_filter(self, filter_text):
+        self.filter_text = filter_text.lower()
+        self.search_parser.update(self.filter_text)
+        self.filtered_hosts = []
+        for hostname, host in self.hosts.iteritems():
+            # For each host in this scan
+            # Test each given operator against the current host
+            for operator, args in self.search_dict.iteritems():
+                if not self._match_all_args(host, operator, args):
+                    # No match => we discard this scan_result
+                    break
+            else:
+                # All operator-matching functions have returned True, so this
+                # host satisfies all conditions
+                self.filtered_hosts.append(host)
 
 class NetworkInventoryTest(unittest.TestCase):
     def test_no_external_modification(self):
@@ -303,12 +495,14 @@ class NetworkInventoryTest(unittest.TestCase):
         scan_1 = zenmapCore.NmapParser.ParserBasics()
         host_a = zenmapCore.NmapParser.HostInfo()
         host_a.hostnames = ["a"]
+        host_a.set_state('up')
         scan_1.start = "1000000000"
         scan_1.nmap["hosts"] = [host_a]
 
         scan_2 = zenmapCore.NmapParser.ParserBasics()
         host_b = zenmapCore.NmapParser.HostInfo()
         host_b.hostnames = ["b"]
+        host_b.set_state('up')
         scan_2.start = "1000000001"
         scan_2.nmap["hosts"] = [host_b]
 
@@ -320,7 +514,7 @@ class NetworkInventoryTest(unittest.TestCase):
         self.assertEqual(host_b.hostnames, ["b"])
         self.assertEqual(scan_1.nmap["hosts"], [host_a])
         self.assertEqual(scan_2.nmap["hosts"], [host_b])
-        self.assertEqual(inv.get_hosts()[0].hostnames, ["b"])
+        self.assertEqual(inv.get_hosts_up()[0].hostnames, ["b"])
     def test_cancel_and_remove_scan(self):
         """Test that canceling and removing a scan does not blow away the inventory hosts"""
         added_ips = ['10.0.0.1','10.0.0.2']
@@ -357,50 +551,63 @@ class NetworkInventoryTest(unittest.TestCase):
         self.assertEqual(host_a.hostnames, ["a"])
         self.assertEqual(host_b.hostnames, ["b"])
 
+class FilteredNetworkInventoryTest(unittest.TestCase):
+    def test_filter(self):
+        """Test that the filter still works after moving code to the """
+        """HostSearch class"""
+        from zenmapCore.NmapParser import NmapParser
+        inv = FilteredNetworkInventory()
+        scan = NmapParser()
+        scan.parse_file("test/xml_test9.xml")
+        filter_text = "open:22 os:linux service:openssh"
+        inv.add_scan(scan)
+        inv.apply_filter(filter_text)
+        assert(len(inv.get_hosts()) == 2)
+
 if __name__ == "__main__":
-    from zenmapCore.NmapParser import NmapParser
     unittest.main()
-    
-    scan1 = NmapParser("/home/ndwi/scanz/neobee_1.xml")
-    scan1.parse()
-    scan2 = NmapParser("/home/ndwi/scanz/scanme_nmap_org.usr")
-    scan2.parse()
-    
-    inventory1 = NetworkInventory()
-    inventory1.add_scan(scan1)
-    inventory1.add_scan(scan2)
-    
-    for host in inventory1.get_hosts():
-        print "%s" % host.ip["addr"],
-        #if len(host.hostnames) > 0:
-        #    print "[%s]:" % host.hostnames[0]["hostname"]
-        #else:
-        #    print ":"
-        #for port in host.ports[0]["port"]:
-        #    print "  %s: %s" % (port["portid"], port["port_state"])
-        #print "  OS matches: %s" % host.osmatches
-        #print "  OS classes: %s" % host.osclasses
-        #print "  Ports used: %s" % host.ports_used
-        #print "  Trace: %s" % host.trace
-        #if "hops" in host.trace:
-        #    print "         (%d)" % len(host.trace["hops"])
-    
-    inventory1.remove_scan(scan2)
-    print
-    for host in inventory1.get_hosts():
-        print "%s" % host.ip["addr"],
-    
-    inventory1.add_scan(scan2)
-    print
-    for host in inventory1.get_hosts():
-        print "%s" % host.ip["addr"],
-    
-    dir = "/home/ndwi/scanz/top01"
-    inventory1.save_to_dir(dir)
-    
-    inventory2 = NetworkInventory()
-    inventory2.open_from_dir(dir)
-    
-    print
-    for host in inventory2.get_hosts():
-        print "%s" % host.ip["addr"],
+    if False:
+        
+        scan1 = NmapParser("/home/ndwi/scanz/neobee_1.xml")
+        scan1.parse()
+        scan2 = NmapParser("/home/ndwi/scanz/scanme_nmap_org.usr")
+        scan2.parse()
+        
+        inventory1 = NetworkInventory()
+        inventory1.add_scan(scan1)
+        inventory1.add_scan(scan2)
+        
+        for host in inventory1.get_hosts():
+            print "%s" % host.ip["addr"],
+            #if len(host.hostnames) > 0:
+            #    print "[%s]:" % host.hostnames[0]["hostname"]
+            #else:
+            #    print ":"
+            #for port in host.ports:
+            #    print "  %s: %s" % (port["portid"], port["port_state"])
+            #print "  OS matches: %s" % host.osmatches
+            #print "  OS classes: %s" % host.osclasses
+            #print "  Ports used: %s" % host.ports_used
+            #print "  Trace: %s" % host.trace
+            #if "hops" in host.trace:
+            #    print "         (%d)" % len(host.trace["hops"])
+        
+        inventory1.remove_scan(scan2)
+        print
+        for host in inventory1.get_hosts():
+            print "%s" % host.ip["addr"],
+        
+        inventory1.add_scan(scan2)
+        print
+        for host in inventory1.get_hosts():
+            print "%s" % host.ip["addr"],
+        
+        dir = "/home/ndwi/scanz/top01"
+        inventory1.save_to_dir(dir)
+        
+        inventory2 = NetworkInventory()
+        inventory2.open_from_dir(dir)
+        
+        print
+        for host in inventory2.get_hosts():
+            print "%s" % host.ip["addr"],

@@ -1,14 +1,14 @@
 # Translation of nmap to German
 # Copyright (C) Chris Leick <c.leick@vollbio.de>, 2008.
 # This file is distributed under the same license as the nmap package.
-# Chris Leick <c.leick@vollbio.de>, 2008.
+# Chris Leick <c.leick@vollbio.de>, 2008,2009.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: nmap 4.68-1\n"
+"Project-Id-Version: nmap 5.00-3\n"
 "Report-Msgid-Bugs-To: nmap-dev@insecure.org\n"
 "POT-Creation-Date: 2009-05-08 09:22-0600\n"
-"PO-Revision-Date: 2008-12-09 21:33+GMT\n"
+"PO-Revision-Date: 2009-08-31 21:13+GMT\n"
 "Last-Translator: Chris Leick <c.leick@vollbio.de>\n"
 "Language-Team: German <debian-l10n-german@lists.debian.org>\n"
 "MIME-Version: 1.0\n"
@@ -197,6 +197,42 @@ msgid ""
 "<b>service: (s:)</b> - All service-related fields.\n"
 "<b>inroute: (ir:)</b> - Matches a router in the scan's traceroute output.\n"
 msgstr ""
+"Den Text in die Suche einzugeben, führt eine <b>Schlüsselwortsuche</b> "
+"aus. Der Suchbegriff wird mit der ganzen Ausgabe des Scans verglichen.\n"
+"\n"
+"Um die Suche zu verfeinern, können Sie <b>Operatoren</b> benutzen, um nur "
+"innerhalb eines speziellen Teils des Scans zu suchen. Operatoren können "
+"interaktiv zur Suche hinzugefügt werden, wenn Sie auf den "
+"<b>Ausdrücke</b>-Knopf drücken oder Sie können sie manuell in das "
+"Suchfeld eintragen. Sie können außerdem <b>Operator-Aliase</b> benutzen, "
+"wenn Sie ein erfahrener Anwender sind, der es vorzieht, seine Suche "
+"schnell einzutippen.\n"
+"\n"
+"<b>profile: (pr:)</b> - Benutztes Profil.\n"
+"<b>target: (t:)</b> - Vom Anwender angegebenes Ziel oder rDNS-Ergebnis.\n"
+"<b>option: (o:)</b> - Scan-Optionen.\n"
+"<b>date: (d:)</b> - Das Datum an dem der Scan ausgeführt wurde. Ungenaue "
+"Treffer sind bei Benutzen der »~«-Endung möglich. Jedes »~« erweitert die "
+"Suche auf »jeder Seite« des Datums. Zusätzlich ist es möglich, die "
+"»date:-«-Schreibweise zu benutzen, was soviel wie »N Tage vorher« heißt.\n"
+"<b>after: (a:)</b> - Passt auf Scans, die nach dem angegebenen Datum "
+"((<i>JJJJ-MM-TT</i> oder <i>-n</i>) gemacht wurden.\n"
+"<b>before (b:)</b> - Passt auf Scans, die vor dem angegebenen Datum "
+"((<i>JJJJ-MM-TT</i> oder <i>-n</i>) gemacht wurden.\n"
+"<b>os:</b> - Alle betriebssystembezogenen Felder.\n"
+"<b>scanned: (sp:)</b> - Passt zu einem Port, wenn über diesen gescannt "
+"wurde.\n"
+"<b>open: (op:)</b> - Offene Ports, die in einem Scan entdeckt wurden.\n"
+"<b>closed: (cp:)</b> - Geschlossene Ports, die in einem Scan entdeckt "
+"wurden.\n"
+"<b>filtered: (fp:)</b> - Gefilterte Ports, die in einem Scan entdeckt "
+"wurden.\n"
+"<b>unfiltered: (ufp:)</b> - Ungefilterte Ports, die in einem Scan "
+"entdeckt wurden (zum Beispiel für einen ACK-Scan benutzt).\n"
+"<b>open|filtered: (ofp:)</b> - Ports im »geöffnet|gefiltert«-Status.\n"
+"<b>closed|filtered: (cfp:)</b> - Ports im »geschlossen|gefiltert«-Status\n"
+"<b>service: (s:)</b> - Alle dienstbezogenen Felder.\n"
+"<b>inroute: (ir:)</b> - Passt zu einem Router in der Traceroute-Ausgabe.\n"
 
 #: zenmapGUI/SearchGUI.py:375
 msgid "No search method selected!"
@@ -204,6 +240,7 @@ msgstr "Keine Suchmethode ausgewählt!"
 
 #: zenmapGUI/SearchGUI.py:376
 #, python-format
+# FIXME data base
 msgid ""
 "%s can search results on directories or inside it's own database. Please, "
 "select a method by choosing a directory or by checking the search data base "
@@ -211,8 +248,8 @@ msgid ""
 msgstr ""
 "%s kann Ergebnisse in Verzeichnissen oder seiner eigenen Datenbank suchen. "
 "Bitte wählen Sie eine Methode durch die Auswahl eines Verzeichnisses oder "
-"durch Anwahl der Suchdatenbankoption auf dem »Suchoptionen«-Reiter, bevor Sie "
-"die Suche starten."
+"durch Anwahl der Suchdatenbankoption auf dem »Search options«-Reiter, "
+"bevor Sie die Suche starten."
 
 #: zenmapGUI/About.py:87
 #, python-format
@@ -225,6 +262,8 @@ msgid ""
 "%s is a free and open source utility for network exploration and security "
 "auditing."
 msgstr ""
+"%s ist ein freies und offenes Quellwerkzeug zur Netzwerkuntersuchung und "
+"Sicherheitsauditierung."
 
 #: zenmapGUI/About.py:108
 #, python-format
@@ -232,12 +271,16 @@ msgid ""
 "%s is a multi-platform graphical %s frontend and results viewer. It was "
 "originally derived from %s."
 msgstr ""
+"%s ist eine plattformunabhängige grafische Oberfläche und "
+"Ergebnisanzeige für %s. Es basiert ursprünglich auf %s."
 
 #: zenmapGUI/About.py:114
 #, python-format
 msgid ""
 "%s is an %s GUI created as part of the Nmap/Google Summer of Code program."
 msgstr ""
+"%s ist eine grafische %s-Oberfläche, die als Teil des »Nmap/Google Summer "
+"of Code«-Programms erstellt wurde."
 
 #: zenmapGUI/About.py:117 zenmapGUI/About.py:157
 #, python-format
@@ -266,7 +309,7 @@ msgstr "Übersetzung"
 
 #: zenmapGUI/About.py:203
 msgid "Maemo"
-msgstr ""
+msgstr "Chris Leick"
 
 #: zenmapGUI/NmapOutputProperties.py:38
 msgid "Nmap Output Properties"
@@ -431,7 +474,7 @@ msgstr "Suche Scans"
 
 #: zenmapGUI/SearchWindow.py:73
 msgid "Append"
-msgstr ""
+msgstr "Anhängen"
 
 #: zenmapGUI/ScanHostsView.py:28
 msgid "Scanning"
@@ -471,7 +514,7 @@ msgstr "Beschreibung"
 
 #: zenmapGUI/ProfileEditor.py:159
 msgid "Save Changes"
-msgstr ""
+msgstr "Änderungen speichern"
 
 #: zenmapGUI/ProfileEditor.py:164
 msgid "Help"
@@ -544,6 +587,29 @@ msgid ""
 "http://nmap.org/data/HACKING. Patches may be sent to nmap-dev (recommended) "
 "or to Fyodor directly.\n"
 msgstr ""
+"<big><b>Wie ein Fehler berichtet wird</b></big>\n"
+"\n"
+"Wie ihr Autor sind %(nmap)s und %(app)s nicht perfekt. Aber Sie können "
+"helfen, es durch Senden von Fehlerberichten (auf Englisch) und Schreiben "
+"von Patches zu verbessern. Wenn %(nmap)s sich nicht so verhält, wie Sie "
+"es erwarten, führen Sie zuerst ein Upgrade auf die neuste Version durch, "
+"die auf <b>%(nmap_web)s</b> verfügbar ist. Wenn das Problem weiterhin "
+"besteht, recherchieren Sie, ob das Problem bereits entdeckt und "
+"angesprochen wurde. Versuchen Sie, die Fehlermeldung mit einer "
+"Suchmaschine zu finden oder durchstöbern Sie die Nmap-dev-Archive unter "
+"http://seclists.org/. Lesen Sie außerdem die vollständige Handbuchseite. "
+"Wenn dabei nichts herauskommt, mailen Sie einen Fehlerbericht an "
+"<b>&lt;nmap-dev@insecure.org&gt;</b>. Bitte fügen Sie alles hinzu, was "
+"Sie über das Problem in Erfahrung gebracht haben, auch Ihre Version von "
+"Nmap und auf welcher Betriebssystemversion Sie es ausführen. "
+"Problemberichte und Fragen zum Aufruf von %(nmap)s, die an "
+"nmap-dev@insecure.org geschickt werden, werden viel lieber beantwortet "
+"als solche, die direkt an Fyodor geschickt werden.\n"
+"\n"
+"Code-Patches zum Beheben von Fehlern sind sogar besser als "
+"Fehlerberichte. Grundsätzliche Anleitungen zum Erstellen von Patches mit "
+"Ihren Änderungen finden Sie unter http://nmap.org/data/HACKING. Patches "
+"können an nmap-dev (empfohlen) oder direkt an Fyodor gesandt werden.\n"
 
 #: zenmapGUI/App.py:119
 msgid "Error creating the per-user configuration directory"
@@ -658,11 +724,11 @@ msgstr "Neues Scan-Fenster öffnen"
 
 #: zenmapGUI/MainWindow.py:169
 msgid "Close Window"
-msgstr "Fenster schliessen"
+msgstr "Fenster schließen"
 
 #: zenmapGUI/MainWindow.py:171
 msgid "Close this scan window"
-msgstr "Dieses Scan-Fenster schliessen"
+msgstr "Dieses Scan-Fenster schließen"
 
 #: zenmapGUI/MainWindow.py:176
 msgid "Quit"
@@ -674,11 +740,12 @@ msgstr "Dieses Programm beenden"
 
 #: zenmapGUI/MainWindow.py:183
 msgid "New _Profile or Command"
-msgstr ""
+msgstr "Neues _Profil oder Befehl"
 
 #: zenmapGUI/MainWindow.py:185
 msgid "Create a new scan profile using the current command"
 msgstr ""
+"Den aktuellen Befehl benutzen, um ein neues Scanprofil zu erstellen."
 
 #: zenmapGUI/MainWindow.py:190
 msgid "Search Scan Results"
@@ -799,7 +866,7 @@ msgstr "Der Text oben ist der Aktionsname."
 
 #: zenmapGUI/MainWindow.py:630 zenmapGUI/MainWindow.py:668
 msgid "Close anyway"
-msgstr "Trotzdem schliessen"
+msgstr "Trotzdem schließen"
 
 #: zenmapGUI/MainWindow.py:633
 msgid "Unsaved changes"
@@ -815,14 +882,14 @@ msgstr ""
 
 #: zenmapGUI/MainWindow.py:671
 msgid "Trying to close"
-msgstr "Es wird versucht, zu schliessen"
+msgstr "Es wird versucht, zu schließen"
 
 #: zenmapGUI/MainWindow.py:673
 msgid ""
 "The window you are trying to close has a scan running at the background.\n"
 "What do you want to do?"
 msgstr ""
-"Im Hintergrund des Fensters, das Sie schliessen möchten, läuft ein Scan.\n"
+"Im Hintergrund des Fensters, das Sie schließen möchten, läuft ein Scan.\n"
 "Was möchten Sie tun?"
 
 #: zenmapGUI/MainWindow.py:748
@@ -924,7 +991,7 @@ msgstr "Details"
 
 #: zenmapGUI/DiffCompare.py:86
 msgid "Scan Output"
-msgstr ""
+msgstr "Scan-Ausgabe"
 
 #: zenmapGUI/DiffCompare.py:137
 msgid "Select Scan Result"
@@ -960,11 +1027,11 @@ msgstr ""
 
 #: zenmapGUI/DiffCompare.py:233
 msgid "A Scan"
-msgstr ""
+msgstr "Scan A"
 
 #: zenmapGUI/DiffCompare.py:234
 msgid "B Scan"
-msgstr ""
+msgstr "Scan B"
 
 #: zenmapGUI/DiffCompare.py:284 zenmapGUI/DiffCompare.py:331
 msgid "Error running ndiff"
@@ -1118,23 +1185,23 @@ msgstr "Klasse:"
 
 #: zenmapGUI/ScanScanListPage.py:31
 msgid "Running"
-msgstr ""
+msgstr "In Ausführung"
 
 #: zenmapGUI/ScanScanListPage.py:34
 msgid "Unsaved"
-msgstr ""
+msgstr "Ungespeichert"
 
 #: zenmapGUI/ScanScanListPage.py:38
 msgid "Failed"
-msgstr ""
+msgstr "Fehlgeschlagen"
 
 #: zenmapGUI/ScanScanListPage.py:40
 msgid "Canceled"
-msgstr ""
+msgstr "Abgebrochen"
 
 #: zenmapGUI/ScanScanListPage.py:61
 msgid "Status"
-msgstr ""
+msgstr "Status"
 
 #: zenmapGUI/ScanScanListPage.py:67
 msgid "Command"
@@ -1173,8 +1240,8 @@ msgid ""
 "like to execute."
 msgstr ""
 "Es ist kein Befehl zur Ausführung angegeben. Möglicherweise gibt es das "
-"ausgewählte/eingegebe Profil nicht. Bitte prüfen Sie den Namen des Profils, "
-"oder geben Sie den nmap-Befehl ein, den sie ausführen möchten."
+"ausgewählte/eingegebene Profil nicht. Bitte prüfen Sie den Namen des "
+"Profils, oder geben Sie den nmap-Befehl ein, den Sie ausführen möchten."
 
 #: zenmapGUI/ScanNotebook.py:360
 msgid ""
@@ -1211,6 +1278,10 @@ msgid ""
 "\n"
 "%s"
 msgstr ""
+"Beim Auswerten der aus dem Scan generierten XML-Datei ist ein Fehler "
+"aufgetreten:\n"
+"\n"
+"%s"
 
 #: zenmapGUI/ScanNotebook.py:926
 msgid "Nmap Output"
@@ -1238,35 +1309,35 @@ msgstr "Kein Rechner ausgewählt."
 
 #: radialnet/bestwidgets/windows.py:44
 msgid "Alert"
-msgstr ""
+msgstr "Alarm"
 
 #: radialnet/gui/HostsViewer.py:48 radialnet/gui/Toolbar.py:124
 msgid "Hosts Viewer"
-msgstr ""
+msgstr "Rechnerbetrachter"
 
 #: radialnet/gui/HostsViewer.py:52
 msgid "No node selected"
-msgstr ""
+msgstr "Kein Knoten ausgewählt"
 
 #: radialnet/gui/Toolbar.py:52
 msgid "Hosts viewer"
-msgstr ""
+msgstr "Rechnerbetrachter"
 
 #: radialnet/gui/Toolbar.py:127
 msgid "Controls"
-msgstr ""
+msgstr "Steuerungen"
 
 #: radialnet/gui/Toolbar.py:131
 msgid "Fisheye"
-msgstr ""
+msgstr "Fischauge"
 
 #: radialnet/gui/ControlWidget.py:81
 msgid "Action"
-msgstr ""
+msgstr "Aktion"
 
 #: radialnet/gui/ControlWidget.py:99
 msgid "Change focus"
-msgstr ""
+msgstr "Fokus ändern"
 
 #: radialnet/gui/ControlWidget.py:109
 msgid "Info"
@@ -1274,132 +1345,133 @@ msgstr "Info"
 
 #: radialnet/gui/ControlWidget.py:112
 msgid "Show information"
-msgstr ""
+msgstr "Information anzeigen"
 
 #: radialnet/gui/ControlWidget.py:118
 msgid "Group children"
-msgstr ""
+msgstr "Kinder gruppieren"
 
 #: radialnet/gui/ControlWidget.py:125
 msgid "Fill region"
-msgstr ""
+msgstr "Bereich füllen"
 
 #: radialnet/gui/ControlWidget.py:131
 msgid "Red"
-msgstr ""
+msgstr "Rot"
 
 #: radialnet/gui/ControlWidget.py:132
 msgid "Yellow"
-msgstr ""
+msgstr "Gelb"
 
 #: radialnet/gui/ControlWidget.py:133
 msgid "Green"
-msgstr ""
+msgstr "Grün"
 
 #: radialnet/gui/ControlWidget.py:463
 msgid "<b>Fisheye</b> on ring"
-msgstr ""
+msgstr "<b>Fischauge</b> auf Ring"
 
 #: radialnet/gui/ControlWidget.py:478
 msgid "with interest factor"
-msgstr ""
+msgstr "mit Aufmerksamkeitsfaktor"
 
 #: radialnet/gui/ControlWidget.py:483
 msgid "and spread factor"
-msgstr ""
+msgstr "und Ausbreitungsfaktor"
 
 #: radialnet/gui/ControlWidget.py:595
 msgid "Interpolation"
-msgstr ""
+msgstr "Interpolation"
 
 #: radialnet/gui/ControlWidget.py:607
 msgid "Cartesian"
-msgstr ""
+msgstr "Kartesisch"
 
 #: radialnet/gui/ControlWidget.py:608
 msgid "Polar"
-msgstr ""
+msgstr "Polar"
 
 #: radialnet/gui/ControlWidget.py:621
 msgid "Frames"
-msgstr ""
+msgstr "Frames"
 
 #: radialnet/gui/ControlWidget.py:682
 msgid "Layout"
-msgstr ""
+msgstr "Layout"
 
 #: radialnet/gui/ControlWidget.py:695
 msgid "Symmetric"
-msgstr ""
+msgstr "Symmetrisch"
 
 #: radialnet/gui/ControlWidget.py:696
 msgid "Weighted"
-msgstr ""
+msgstr "Gewichtet"
 
 #: radialnet/gui/ControlWidget.py:756
 msgid "Ring gap"
-msgstr ""
+msgstr "Ringlücke"
 
 #: radialnet/gui/ControlWidget.py:760
 msgid "Lower ring gap"
-msgstr ""
+msgstr "Untere Ringlücke"
 
 #: radialnet/gui/ControlWidget.py:893
 msgid "View"
-msgstr ""
+msgstr "Ansicht"
 
 #: radialnet/gui/ControlWidget.py:906
 msgid "Zoom"
-msgstr ""
+msgstr "Vergrößerung"
 
 #: radialnet/gui/ControlWidget.py:1140
 msgid "Navigation"
-msgstr ""
+msgstr "Navigation"
 
 #: radialnet/gui/NodeNotebook.py:31
 msgid "Method"
-msgstr ""
+msgstr "Methode"
 
 #: radialnet/gui/NodeNotebook.py:32
 msgid "Count"
-msgstr ""
+msgstr "Anzahl"
 
 #: radialnet/gui/NodeNotebook.py:32
 msgid "Reasons"
-msgstr ""
+msgstr "Gründe"
 
 #: radialnet/gui/NodeNotebook.py:42
 msgid "TTL"
-msgstr ""
+msgstr "TTL"
 
 #: radialnet/gui/NodeNotebook.py:42
 msgid "RTT"
-msgstr ""
+msgstr "RTT"
 
 #: radialnet/gui/NodeNotebook.py:42
 msgid "IP"
-msgstr ""
+msgstr "IP"
 
 #: radialnet/gui/NodeNotebook.py:44
 #, python-format
 msgid "Traceroute on port <b>%s/%s</b> totalized <b>%d</b> known hops."
 msgstr ""
+"Traceroute auf Port <b>%s/%s</b> summiert <b>%d</b> bekannte Hops."
 
 #: radialnet/gui/NodeNotebook.py:48
 msgid "No traceroute information available."
-msgstr ""
+msgstr "Keine Traceroute-Informationen verfügbar."
 
 #: radialnet/gui/NodeNotebook.py:55
 msgid "Name"
-msgstr ""
+msgstr "Name"
 
 #: radialnet/gui/NodeNotebook.py:55
 msgid "DB Line"
-msgstr ""
+msgstr "DB-Linie"
 
 #: radialnet/gui/NodeNotebook.py:56
 msgid "Family"
-msgstr ""
+msgstr "Familie"
 
 #: radialnet/gui/NodeNotebook.py:60
 #, python-format
@@ -1407,103 +1479,105 @@ msgid ""
 "<b>*</b> TCP sequence <i>index</i> equal to %d and <i>difficulty</i> is \"%s"
 "\"."
 msgstr ""
+"<b>*</b> TCP-Reihe <i>index</i> entspricht %d und <i>Schwierigkeit</i> "
+"ist »%s«."
 
 #: radialnet/gui/NodeNotebook.py:94
 msgid "General"
-msgstr ""
+msgstr "Allgemein"
 
 #: radialnet/gui/NodeNotebook.py:96
 msgid "Traceroute"
-msgstr ""
+msgstr "Traceroute"
 
 #: radialnet/gui/NodeNotebook.py:140
 #, python-format
 msgid "Ports (%s)"
-msgstr ""
+msgstr "Ports (%s)"
 
 #: radialnet/gui/NodeNotebook.py:162 radialnet/gui/NodeNotebook.py:702
 msgid "<unknown>"
-msgstr ""
+msgstr "<unbekannt>"
 
 #: radialnet/gui/NodeNotebook.py:168
 msgid "<none>"
-msgstr ""
+msgstr "<keins>"
 
 #: radialnet/gui/NodeNotebook.py:193
 #, python-format
 msgid "[%d] service: %s"
-msgstr ""
+msgstr "[%d] Dienst: %s"
 
 #: radialnet/gui/NodeNotebook.py:198
 msgid "<special field>"
-msgstr ""
+msgstr "<Spezialfeld>"
 
 #: radialnet/gui/NodeNotebook.py:301
 #, python-format
 msgid "Extraports (%s)"
-msgstr ""
+msgstr "Extraports (%s)"
 
 #: radialnet/gui/NodeNotebook.py:308
 msgid "Special fields"
-msgstr ""
+msgstr "Spezialfelder"
 
 #: radialnet/gui/NodeNotebook.py:344
 msgid "General information"
-msgstr ""
+msgstr "Allgemeine Informationen"
 
 #: radialnet/gui/NodeNotebook.py:345
 msgid "Sequences"
-msgstr ""
+msgstr "Reihen"
 
 #: radialnet/gui/NodeNotebook.py:348
 msgid "No sequence information."
-msgstr ""
+msgstr "Keine Reiheninformationen"
 
 #: radialnet/gui/NodeNotebook.py:349
 msgid "No OS information."
-msgstr ""
+msgstr "Keine Betriebssysteminformationen"
 
 #: radialnet/gui/NodeNotebook.py:354
 msgid "Address:"
-msgstr ""
+msgstr "Adresse:"
 
 #: radialnet/gui/NodeNotebook.py:377
 msgid "Hostname:"
-msgstr ""
+msgstr "Rechnername:"
 
 #: radialnet/gui/NodeNotebook.py:401
 #, python-format
 msgid "%s (%s seconds)."
-msgstr ""
+msgstr "%s (%s Sekunden)"
 
 #: radialnet/gui/NodeNotebook.py:467
 msgid "Match"
-msgstr ""
+msgstr "Übereinstimmung"
 
 #: radialnet/gui/NodeNotebook.py:517 radialnet/gui/NodeNotebook.py:567
 msgid "Class"
-msgstr ""
+msgstr "Klasse"
 
 #: radialnet/gui/NodeNotebook.py:525
 msgid "Used ports:"
-msgstr ""
+msgstr "Benutzte Ports:"
 
 #: radialnet/gui/NodeNotebook.py:548
 msgid "Fingerprint"
-msgstr ""
+msgstr "Fingerabdruck"
 
 #: radialnet/gui/NodeNotebook.py:568
 msgid "Values"
-msgstr ""
+msgstr "Werte"
 
 #: radialnet/gui/NodeNotebook.py:570
 msgid "TCP *"
-msgstr ""
+msgstr "TCP *"
 
 #: radialnet/gui/NodeNotebook.py:571
 msgid "IP ID"
-msgstr ""
+msgstr "IP-ID"
 
 #: radialnet/gui/NodeNotebook.py:572
 msgid "TCP Timestamp"
-msgstr ""
+msgstr "TCP-Zeitstempel"

@@ -88,7 +88,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: services.cc 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: services.cc 14789 2009-08-06 15:10:00Z josh $ */
 
 #include <list>
 #include <map>
@@ -186,7 +186,7 @@ static int nmap_services_init() {
   while(fgets(line, sizeof(line), fp)) {
     lineno++;
     p = line;
-    while(*p && isspace((int) *p))
+    while(*p && isspace((int) (unsigned char) *p))
       p++;
     if (*p == '#')
       continue;

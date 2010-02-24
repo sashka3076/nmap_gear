@@ -92,7 +92,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: output.h 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: output.h 16098 2009-11-16 08:36:58Z david $ */
 
 #ifndef OUTPUT_H
 #define OUTPUT_H
@@ -178,6 +178,10 @@ void output_ports_to_machine_parseable_output(struct scan_lists *ports,
    requested and the ports which it will scan for */
 void output_xml_scaninfo_records(struct scan_lists *ports);
 
+/* Writes a heading for a full scan report ("Nmap scan report for..."),
+   including host status and DNS records. */
+void write_host_header(Target *currenths);
+
 /* Writes host status info to the log streams (including STDOUT).  An
    example is "Host: 10.11.12.13 (foo.bar.example.com)\tStatus: Up\n" to 
    machine log.  resolve_all should be passed nonzero if the user asked
@@ -193,6 +197,12 @@ void printosscanoutput(Target *currenths);
 void printserviceinfooutput(Target *currenths);
 
 void printhostscriptresults(Target *currenths);
+
+/* Print a table with traceroute hops. */
+void printtraceroute(Target *currenths);
+
+/* Print "times for host" output with latency. */
+void printtimes(Target *currenths);
 
 /* Print a detailed list of Nmap interfaces and routes to
    normal/skiddy/stdout output */

@@ -74,13 +74,16 @@ end
 -- @return Checksum.
 function in_cksum(b)
 	local sum = 0
-	local c
-	local x = b
+	local i
 
-	while x:len() > 1 do
-		c = x:sub(1,2)
-		x = x:sub(3)
-		sum = sum + u16(c, 0)
+	-- Note we are using 0-based indexes here.
+	i = 0
+	while i < b:len() - 1 do
+		sum = sum + u16(b, i)
+		i = i + 2
+	end
+	if i < b:len() then
+		sum = sum + u8(b, i) * 256
 	end
 
 	sum = bit.rshift(sum, 16) + bit.band(sum, 0xffff)
@@ -285,14 +288,14 @@ end
 --- Set the source IP address.
 -- @param binip The source IP address as a byte string.
 function Packet:ip_set_bin_src(binip)
-	nrip = u32(binip, 0)
+	local nrip = u32(binip, 0)
 	self:set_u32(self.ip_offset + 12, nrip)
 	self.ip_bin_src		= self:raw(self.ip_offset + 12,4)	-- raw 4-bytes string
 end
 --- Set the destination IP address.
 -- @param binip The destination IP address as a byte string.
 function Packet:ip_set_bin_dst(binip)
-	nrip = u32(binip, 0)
+	local nrip = u32(binip, 0)
 	self:set_u32(self.ip_offset + 16, nrip)
 	self.ip_bin_dst		= self:raw(self.ip_offset + 16,4)
 end

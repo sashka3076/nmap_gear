@@ -33,7 +33,7 @@ When an account is discovered, it's saved in the <code>smb</code> module (which 
 registry). If an account is already saved, the account's privileges are checked; accounts 
 with administrator privileges are kept over accounts without. The specific method for checking
 is by calling GetShareInfo("IPC$"), which requires administrative privileges. Once this script
-is finished (since it's runlevel 0.5, it'll run first), other scripts will use the saved account
+is finished (all other smb scripts depend on it, it'll run first), other scripts will use the saved account
 to perform their checks. 
 
 The blank password is always tried first, followed by "special passwords" (such as the username
@@ -67,16 +67,16 @@ determined with a fairly efficient bruteforce. For example, if the actual passwo
 --@output
 -- Host script results:
 -- |  smb-brute:
--- |  bad name:test => Login was successful
--- |  consoletest:test => Password was correct, but user can't log in without changing it
--- |  guest:<anything> => Password was correct, but user's account is disabled
--- |  mixcase:BuTTeRfLY1 => Login was successful
--- |  test:password1 => Login was successful
--- |  this:password => Login was successful
--- |  thisisaverylong:password => Login was successful
--- |  thisisaverylongname:password => Login was successful
--- |  thisisaverylongnamev:password => Login was successful
--- |_ web:TeSt => Password was correct, but user's account is disabled
+-- |  |  bad name:test => Login was successful
+-- |  |  consoletest:test => Password was correct, but user can't log in without changing it
+-- |  |  guest:<anything> => Password was correct, but user's account is disabled
+-- |  |  mixcase:BuTTeRfLY1 => Login was successful
+-- |  |  test:password1 => Login was successful
+-- |  |  this:password => Login was successful
+-- |  |  thisisaverylong:password => Login was successful
+-- |  |  thisisaverylongname:password => Login was successful
+-- |  |  thisisaverylongnamev:password => Login was successful
+-- |_ |_ web:TeSt => Password was correct, but user's account is disabled
 -- 
 -- @args smblockout Unless this is set to '1' or 'true', the script won't continue if it 
 --       locks out an account or thinks it will lock out an account. 
@@ -93,10 +93,8 @@ determined with a fairly efficient bruteforce. For example, if the actual passwo
 -----------------------------------------------------------------------
 
 
-author = "Ron Bowes <ron@skullsecurity.net>"
+author = "Ron Bowes"
 license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
--- Set the runlevel to <1 to ensure that it runs before other scripts
-runlevel = 0.5
 
 categories = {"intrusive", "auth"}
 
@@ -175,9 +173,10 @@ local function get_random_string(length, set)
 	local str = ""
 
 	-- Seed the random number, if we haven't already
-	if(random_set == false) then
+	if not nmap.registry.smbbrute or not nmap.registry.smbbrute.seeded then
 		math.randomseed(os.time())
-		random_set = true
+		nmap.registry.smbbrute = {}
+		nmap.registry.smbbrute.seeded = true
 	end
 
 	for i = 1, length, 1 do
@@ -310,19 +309,18 @@ end
 --@return Result, an integer value from the <code>results</code> constants. 
 local function check_login(hostinfo, username, password, logintype)
 	local result
-	local domain
+	local domain = ""
 	local smbstate = hostinfo['smbstate']
 	if(logintype == nil) then
 		logintype = get_type(hostinfo)
 	end
---io.write(string.format("Trying %s:%s\n", username, password))
+
 	-- Determine if we have a password hash or a password
 	if(#password == 32 or #password == 64 or #password == 65) then
---io.write("Hash\n")
 		-- It's a hash (note: we always use NTLM hashes)
-		status, err	  = smb.start_session(smbstate, username, domain, nil, password, "ntlm", false, true)
+		status, err	  = smb.start_session(smbstate, smb.get_overrides(username, domain, nil, password, "ntlm"), false)
 	else
-		status, err	  = smb.start_session(smbstate, username, domain, password, nil, logintype, false, false)
+		status, err	  = smb.start_session(smbstate, smb.get_overrides(username, domain, password, nil, logintype), false)
 	end
    
 	if(status == true) then
@@ -849,7 +847,14 @@ function found_account(hostinfo, username, password, result)
 			return false, err
 		end
 
-		smb.add_account(hostinfo['host'], username, password)
+		-- Check if we have an 'admin' account
+        -- Try getting information about "IPC$". This determines whether or not the user is administrator
+        -- since only admins can get share info. Note that on Vista and up, unless UAC is disabled, all 
+        -- accounts are non-admin. 
+		local is_admin = smb.is_admin(hostinfo['host'], username, '', password, nil, nil)
+
+		-- Add the account
+		smb.add_account(hostinfo['host'], username, '', password, nil, nil, is_admin)
 
 		-- If we haven't retrieved the real user list yet, do so
 		if(hostinfo['have_user_list'] == false) then
@@ -994,7 +999,7 @@ action = function(host, port)
 --	TRACEBACK[coroutine.running()] = true;
 
 	local status, result
-	local response = " \n"
+	local response = {}
 
 	local username
 	local usernames = {}
@@ -1003,11 +1008,7 @@ action = function(host, port)
 
 	status, result, locked_result = go(host)
 	if(status == false) then
-		if(nmap.debugging() > 0) then
-			return "ERROR: " .. result
-		else
-			return nil
-		end
+		return stdnse.format_output(false, result)
 	end
 
 	-- Put the usernames in their own table
@@ -1020,11 +1021,11 @@ action = function(host, port)
 
 	-- Display the usernames
 	if(#usernames == 0) then
-		response = "No accounts found\n"
+		table.insert(response, "No accounts found")
 	else
 		for i=1, #usernames, 1 do
 			local username = usernames[i]
-			response = response .. format_result(username, result[username]['password'], result[username]['result']) .. "\n"
+			table.insert(response, format_result(username, result[username]['password'], result[username]['result']))
 		end
 	end
 
@@ -1037,9 +1038,9 @@ action = function(host, port)
 		table.sort(locked)
 
 		-- Display the list
-		response = response .. string.format("Locked accounts found: %s\n", stdnse.strjoin(", ", locked))
+		table.insert(response, string.format("Locked accounts found: %s", stdnse.strjoin(", ", locked)))
 	end
 
-	return response
+	return stdnse.format_output(true, response)
 end
 

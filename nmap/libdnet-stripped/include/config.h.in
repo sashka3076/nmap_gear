@@ -142,6 +142,9 @@
 /* Define if sockaddr struct has sa_len. */
 #undef HAVE_SOCKADDR_SA_LEN
 
+/* Define to 1 if the system has the type `socklen_t'. */
+#undef HAVE_SOCKLEN_T
+
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
 
@@ -217,6 +220,10 @@
 /* Define to 1 if you have the <winsock2.h> header file. */
 #undef HAVE_WINSOCK2_H
 
+/* Define to the sub-directory in which libtool stores uninstalled libraries.
+   */
+#undef LT_OBJDIR
+
 /* Name of package */
 #undef PACKAGE
 
@@ -256,7 +263,7 @@
 /* Define to `int' if <sys/types.h> does not define. */
 #undef pid_t
 
-/* Define to `unsigned' if <sys/types.h> does not define. */
+/* Define to `unsigned int' if <sys/types.h> does not define. */
 #undef size_t
 
 /* Use MingW32's internal snprintf */
@@ -291,4 +298,8 @@ int	strlcpy(char *, const char *, int);
 
 #ifndef HAVE_STRSEP
 char	*strsep(char **, const char *);
+#endif
+
+#ifndef HAVE_SOCKLEN_T
+typedef int socklen_t;
 #endif

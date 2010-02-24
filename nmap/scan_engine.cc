@@ -89,7 +89,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: scan_engine.cc 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: scan_engine.cc 16466 2010-01-15 03:55:23Z david $ */
 
 #ifdef WIN32
 #include "nmap_winconfig.h"
@@ -101,6 +101,7 @@
 #include "NmapOps.h"
 #include "nmap_tty.h"
 #include "nmap_rpc.h"
+#include "payload.h"
 #include "Target.h"
 #include "targets.h"
 #include "utils.h"
@@ -204,6 +205,7 @@ struct IPExtraProbeData_udp {
 
 struct IPExtraProbeData_sctp {
   u16 sport;
+  u32 vtag;
 };
 
 struct IPExtraProbeData {
@@ -235,7 +237,7 @@ public:
   void setARP(u8 *arppkt, u32 arplen);
   // The 4 accessors below all return in HOST BYTE ORDER
   // source port used if TCP, UDP or SCTP
-  u16 sport() {
+  u16 sport() const {
     switch (mypspec.proto) {
       case IPPROTO_TCP:
 	return probes.IP.pd.tcp.sport;
@@ -249,7 +251,7 @@ public:
     /* not reached */
   }
   // destination port used if TCP, UDP or SCTP
-  u16 dport() {
+  u16 dport() const {
     switch (mypspec.proto) {
       case IPPROTO_TCP:
 	return mypspec.pd.tcp.dport;
@@ -264,10 +266,11 @@ public:
     }
     /* not reached */
   }
-  u16 ipid() { return probes.IP.ipid; }
-  u32 tcpseq(); // TCP sequence number if protocol is TCP
+  u16 ipid() const { return probes.IP.ipid; }
+  u32 tcpseq() const; // TCP sequence number if protocol is TCP
+  u32 sctpvtag() const; // SCTP vtag if protocol is SCTP
   /* Number, such as IPPROTO_TCP, IPPROTO_UDP, etc. */
-  u8 protocol() { return mypspec.proto; }
+  u8 protocol() const { return mypspec.proto; }
   ConnectProbe *CP() { return probes.CP; } // if type == UP_CONNECT
   // Arpprobe removed because not used.
   //  ArpProbe *AP() { return probes.AP; } // if UP_ARP
@@ -275,12 +278,12 @@ public:
   // reading the appropriate fields of the probespec.
 
 /* Get general details about the probe */
-  const probespec *pspec() { return &mypspec; }
+  const probespec *pspec() const { return &mypspec; }
 
   /* Returns true if the given tryno and pingseq match those within this
      probe. */
-  bool check_tryno_pingseq(unsigned int tryno, unsigned int pingseq) {
-    return (pingseq == 0 && tryno >= this->tryno) || (pingseq > 0 && pingseq == this->pingseq);
+  bool check_tryno_pingseq(unsigned int tryno, unsigned int pingseq) const {
+    return (pingseq == 0 && tryno == this->tryno) || (pingseq > 0 && pingseq == this->pingseq);
   }
 
   u8 tryno; /* Try (retransmission) number of this probe */
@@ -304,7 +307,6 @@ private:
     ConnectProbe *CP;
     //    ArpProbe *AP;
   } probes;
-  void *internalProbe;
 };
 
 /* Global info for the connect scan */
@@ -438,6 +440,10 @@ public:
   bool sent_icmp_mask;
   /* Whether we have sent an ICMP timestamp request. */
   bool sent_icmp_ts;
+
+  /* Have we warned that we've given up on a port for this host yet? Only one
+     port per host is reported. */
+  bool retry_capped_warned;
 
   void probeSent(unsigned int nbytes);
 
@@ -651,14 +657,14 @@ public:
 
   void log_overall_rates(int logt) {
     log_write(logt, "Overall sending rates: %.2f packets / s", send_rate_meter.getOverallPacketRate(&now));
-    if (send_rate_meter.getNumBytes()> 0)
+    if (send_rate_meter.getNumBytes() > 0)
       log_write(logt, ", %.2f bytes / s", send_rate_meter.getOverallByteRate(&now));
     log_write(logt, ".\n");
   }
 
   void log_current_rates(int logt, bool update = true) {
     log_write(logt, "Current sending rates: %.2f packets / s", send_rate_meter.getCurrentPacketRate(&now, update));
-    if (send_rate_meter.getNumBytes()> 0)
+    if (send_rate_meter.getNumBytes() > 0)
       log_write(logt, ", %.2f bytes / s", send_rate_meter.getCurrentByteRate(&now));
     log_write(logt, ".\n");
   }
@@ -826,13 +832,14 @@ void UltraProbe::setIP(u8 *ippacket, u32 iplen, const probespec *pspec) {
     assert(iplen >= (unsigned) ipv4->ip_hl * 4 + 12);
     sctp = (struct sctp_hdr *) ((u8 *) ipv4 + ipv4->ip_hl * 4);
     probes.IP.pd.sctp.sport = ntohs(sctp->sh_sport);
+    probes.IP.pd.sctp.vtag = ntohl(sctp->sh_vtag);
   }
 
   mypspec = *pspec;
   return;
 }
 
-u32 UltraProbe::tcpseq() {
+u32 UltraProbe::tcpseq() const {
   if (mypspec.proto == IPPROTO_TCP)
     return probes.IP.pd.tcp.seq;
   else
@@ -840,6 +847,11 @@ u32 UltraProbe::tcpseq() {
 	  pspectype2ascii(mypspec.type));
 
   return 0; // Unreached
+}
+
+u32 UltraProbe::sctpvtag() const {
+  assert(mypspec.proto == IPPROTO_SCTP);
+  return probes.IP.pd.sctp.vtag;
 }
 
 /* Sets this UltraProbe as type UP_CONNECT, preparing to connect to given
@@ -1091,33 +1103,6 @@ static bool pingprobe_is_appropriate(const UltraScanInfo *USI,
   return false;
 }
 
-/* For the given scan type, this returns the port/host state demonstrated
-   by getting no response back */
-static int scantype_no_response_means(stype scantype) {
-  switch(scantype) {
-  case SYN_SCAN:
-  case ACK_SCAN:
-  case WINDOW_SCAN:
-  case CONNECT_SCAN:
-  case SCTP_INIT_SCAN:
-    return PORT_FILTERED;
-  case UDP_SCAN:
-  case IPPROT_SCAN:
-  case NULL_SCAN:
-  case FIN_SCAN:
-  case MAIMON_SCAN:
-  case XMAS_SCAN:
-  case SCTP_COOKIE_ECHO_SCAN:
-    return PORT_OPENFILTERED;
-  case PING_SCAN:
-  case PING_SCAN_ARP:
-    return HOST_DOWN;
-  default:
-    fatal("Unexpected scan type found in %s()", __func__);
-  }
-  return 0; /* Unreached */
-}
-
 HostScanStats::HostScanStats(Target *t, UltraScanInfo *UltraSI) {
   target = t; 
   USI=UltraSI; 
@@ -1131,6 +1116,7 @@ HostScanStats::HostScanStats(Target *t, UltraScanInfo *UltraSI) {
   sent_icmp_ping = false;
   sent_icmp_mask = false;
   sent_icmp_ts = false;
+  retry_capped_warned = false;
   num_probes_active = 0; 
   num_probes_waiting_retransmit = 0;
   lastping_sent = lastprobe_sent = lastrcvd = USI->now;
@@ -1484,6 +1470,46 @@ static void init_perf_values(struct ultra_scan_performance_vars *perf) {
   perf->tryno_cap = o.getMaxRetransmissions();
 }
 
+/* Initialize the state for ports that don't receive a response in all the
+   targets. */
+static void set_default_port_state(vector<Target *> &targets, stype scantype) {
+  vector<Target *>::iterator target;
+
+  for (target = targets.begin(); target != targets.end(); target++) {
+    switch (scantype) {
+    case SYN_SCAN:
+    case ACK_SCAN:
+    case WINDOW_SCAN:
+    case CONNECT_SCAN:
+      (*target)->ports.setDefaultPortState(IPPROTO_TCP, PORT_FILTERED);
+      break;
+    case SCTP_INIT_SCAN:
+      (*target)->ports.setDefaultPortState(IPPROTO_SCTP, PORT_FILTERED);
+      break;
+    case NULL_SCAN:
+    case FIN_SCAN:
+    case MAIMON_SCAN:
+    case XMAS_SCAN:
+      (*target)->ports.setDefaultPortState(IPPROTO_TCP, PORT_OPENFILTERED);
+      break;
+    case UDP_SCAN:
+      (*target)->ports.setDefaultPortState(IPPROTO_UDP, PORT_OPENFILTERED);
+      break;
+    case IPPROT_SCAN:
+      (*target)->ports.setDefaultPortState(IPPROTO_IP, PORT_OPENFILTERED);
+      break;
+    case SCTP_COOKIE_ECHO_SCAN:
+      (*target)->ports.setDefaultPortState(IPPROTO_SCTP, PORT_OPENFILTERED);
+      break;
+    case PING_SCAN:
+    case PING_SCAN_ARP:
+      break;
+    default:
+      fatal("Unexpected scan type found in %s()", __func__);
+    }
+  }
+}
+
 /* Order of initializations in this function CAN BE IMPORTANT, so be careful
  mucking with it. */
 void UltraScanInfo::Init(vector<Target *> &Targets, struct scan_lists *pts, stype scantp) {
@@ -1553,6 +1579,8 @@ void UltraScanInfo::Init(vector<Target *> &Targets, struct scan_lists *pts, styp
   default:
     break;
   }
+
+  set_default_port_state(Targets, scantype);
 
   init_perf_values(&perf);
 
@@ -2319,8 +2347,8 @@ static u32 seq32_encode(UltraScanInfo *USI, unsigned int trynum,
 
 /* Undoes seq32_encode. This extracts a try number and a port number from a
    32-bit value. Returns true if the checksum is correct, false otherwise. */
-static bool seq32_decode(UltraScanInfo *USI, u32 seq, unsigned int *trynum,
-                         unsigned int *pingseq) {
+static bool seq32_decode(const UltraScanInfo *USI, u32 seq,
+  unsigned int *trynum, unsigned int *pingseq) {
   if (trynum)
     *trynum = 0;
   if (pingseq)
@@ -2364,7 +2392,7 @@ static u16 sport_encode(UltraScanInfo *USI, u16 portno, unsigned int trynum,
    a port number given a "magic" original port number (the one given to
    sport_encode). Returns true if the decoded values seem reasonable, false
    otherwise. */
-static bool sport_decode(UltraScanInfo *USI, u16 magic_portno, u16 portno,
+static bool sport_decode(const UltraScanInfo *USI, u16 magic_portno, u16 portno,
                          unsigned int *trynum, unsigned int *pingseq) {
   int t;
 
@@ -2388,23 +2416,94 @@ static bool sport_decode(UltraScanInfo *USI, u16 magic_portno, u16 portno,
   return true;
 }
 
-/* Extracts a probe response's try number and ping sequence number from a TCP
-   header. The values come from either the destination port number or the ACK
-   field, depending on whether o.magic_port_set is true. */
-static bool tcp_trynum_pingseq_decode(UltraScanInfo *USI,
-                                      const struct tcp_hdr *tcp,
-                                      unsigned int *trynum,
-                                      unsigned int *pingseq) {
+static bool tcp_probe_match(const UltraScanInfo *USI, const UltraProbe *probe,
+  const HostScanStats *hss, const struct ip *ip) {
+  const struct tcp_hdr *tcp;
+  const struct probespec_tcpdata *probedata;
+  unsigned int tryno, pingseq;
+  bool goodseq;
+
+  if (ip->ip_p != IPPROTO_TCP)
+    return false;
+
+  tcp = (struct tcp_hdr *) ((u8 *) ip + ip->ip_hl * 4);
+
+  if (o.af() != AF_INET || probe->protocol() != IPPROTO_TCP)
+    return false;
+
+  /* Ensure the connection info matches. */
+  if (probe->dport() != ntohs(tcp->th_sport)
+      || probe->sport() != ntohs(tcp->th_dport)
+      || hss->target->v4sourceip()->s_addr != ip->ip_dst.s_addr)
+    return false;
+
+  tryno = 0;
+  pingseq = 0;
   if (o.magic_port_set) {
-    /* We can't get the values from the port number. Try to get them from the
-       ACK field. First try ACK - 1 because some probes include SYN or FIN
-       packet and thus call for increment. */
-    return seq32_decode(USI, ntohl(tcp->th_ack) - 1, trynum, pingseq)
-      || seq32_decode(USI, ntohl(tcp->th_ack), trynum, pingseq);
+    /* We are looking to recover the tryno and pingseq of the probe, which are
+       encoded in the ACK field for probes with the ACK flag set and in the SEQ
+       field for all other probes. According to RFC 793, section 3.9, under
+       "SEGMENT ARRIVES", it's supposed to work like this: If our probe had ACK
+       set, our ACK number is reflected in the response's SEQ field. If our
+       probe had SYN or FIN set (and not ACK), then our SEQ is one less than the
+       returned ACK value because SYN and FIN consume a sequence number (section
+       3.3). Otherwise, our SEQ is the returned ACK.
+       
+       However, nmap-os-db shows that these assumptions can't be relied on, so
+       we try all three possibilities for each probe. */
+    goodseq = seq32_decode(USI, ntohl(tcp->th_ack) - 1, &tryno, &pingseq)
+      || seq32_decode(USI, ntohl(tcp->th_ack), &tryno, &pingseq)
+      || seq32_decode(USI, ntohl(tcp->th_seq), &tryno, &pingseq);
   } else {
-    /* Get the values from the port number. */
-    return sport_decode(USI, o.magic_port, ntohs(tcp->th_dport), trynum, pingseq);
+    /* Get the values from the destination port (our source port). */
+    sport_decode(USI, o.magic_port, ntohs(tcp->th_dport), &tryno, &pingseq);
+    goodseq = true;
   }
+
+  if (!goodseq) {
+    /* TODO: I need to do some testing and find out how often this happens
+       and whether other techniques such as the response seq should be
+       used in those cases where it happens. Then I should make this just
+       a debugging > X statement. */
+    if (o.debugging)
+      log_write(LOG_PLAIN, "Bad Sequence number from host %s.\n", inet_ntoa(ip->ip_src));
+    /* I'll just assume it is a response to this (most recent) probe. */
+    tryno = probe->tryno;
+    pingseq = probe->pingseq;
+  }
+
+  /* Make sure that trynum and pingseq match the values in the probe. */
+  if (!probe->check_tryno_pingseq(tryno, pingseq))
+    return false;
+
+  /* Make sure we are matching up the right kind of probe, otherwise just the
+     ports, address, tryno, and pingseq can be ambiguous, between a SYN and an
+     ACK probe during a -PS80 -PA80 scan for example. A SYN/ACK can only be
+     matched to a SYN probe. A RST/ACK can only be matched to a SYN or FIN. A
+     bare RST cannot be matched to a SYN or FIN. */
+  probedata = &probe->pspec()->pd.tcp;
+  if ((tcp->th_flags & (TH_SYN | TH_ACK)) == (TH_SYN | TH_ACK)
+      && !(probedata->flags & TH_SYN)) {
+    return false;
+  }
+  if ((tcp->th_flags & (TH_RST | TH_ACK)) == (TH_RST | TH_ACK)
+      && !(probedata->flags & (TH_SYN | TH_FIN))) {
+    return false;
+  }
+  if ((tcp->th_flags & (TH_RST | TH_ACK)) == TH_RST
+      && (probedata->flags & (TH_SYN | TH_FIN))) {
+    return false;
+  }
+
+  /* Sometimes we get false results when scanning localhost with -p- because we
+     scan localhost with src port = dst port and see our outgoing packet and
+     think it is a response. */
+  if (probe->dport() == probe->sport()
+      && ip->ip_src.s_addr == ip->ip_dst.s_addr
+      && probe->ipid() == ntohs(ip->ip_id))
+    return false;
+
+  return true;
 }
 
 /* This function provides the proper cwnd and ssthresh to use.  It may
@@ -2514,7 +2613,6 @@ static bool ultrascan_port_pspec_update(UltraScanInfo *USI,
   u16 portno = 0;
   u8 proto = 0;
   int oldstate = PORT_TESTING;
-  Port *currentp;
   /* Whether no response means a port is open */
   bool noresp_open_scan = USI->noresp_open_scan;
 
@@ -2532,13 +2630,11 @@ static bool ultrascan_port_pspec_update(UltraScanInfo *USI,
     portno = pspec->pd.sctp.dport;
   } else assert(0);
   
-  /* First figure out the current state */
-  currentp = hss->target->ports.getPortEntry(portno, proto);
-  if (!currentp) {
+  oldstate = hss->target->ports.getPortState(portno, proto);
+  if (oldstate == -1) {
     oldstate = PORT_TESTING;
     hss->ports_finished++;
   }
-  else oldstate = currentp->state;
 
   /*    printf("TCP port %hu has changed from state %s to %s!\n", portno, statenum2str(oldstate), statenum2str(newstate)); */
   switch(oldstate) {
@@ -2547,25 +2643,25 @@ static bool ultrascan_port_pspec_update(UltraScanInfo *USI,
        in a SYN scan, but not neccessarily for UDP scan */
   case PORT_TESTING:
     /* Brand new port -- add it to the list */
-    hss->target->ports.addPort(portno, proto, NULL, newstate);
+    hss->target->ports.setPortState(portno, proto, newstate);
     break;
   case PORT_OPEN:
     if (newstate != PORT_OPEN) {
       if (noresp_open_scan) {
-	hss->target->ports.addPort(portno, proto, NULL, newstate);
+	hss->target->ports.setPortState(portno, proto, newstate);
       } /* Otherwise The old open takes precendence */
     }
     break;
   case PORT_CLOSED:
     if (newstate != PORT_CLOSED) {
       if (!noresp_open_scan && newstate != PORT_FILTERED)
-	hss->target->ports.addPort(portno, proto, NULL, newstate);
+	hss->target->ports.setPortState(portno, proto, newstate);
     }
     break;
   case PORT_FILTERED:
     if (newstate != PORT_FILTERED) {
       if (!noresp_open_scan || newstate != PORT_OPEN) 
-	hss->target->ports.addPort(portno, proto, NULL, newstate);
+	hss->target->ports.setPortState(portno, proto, newstate);
     }
     break;
   case PORT_UNFILTERED:
@@ -2574,11 +2670,11 @@ static bool ultrascan_port_pspec_update(UltraScanInfo *USI,
        case.  I'll change it if the new state is open or closed,
        though I don't expect that to ever happen */
     if (newstate == PORT_OPEN || newstate == PORT_CLOSED)
-      hss->target->ports.addPort(portno, proto, NULL, newstate);
+      hss->target->ports.setPortState(portno, proto, newstate);
     break;
   case PORT_OPENFILTERED:
     if (newstate != PORT_OPENFILTERED) {
-      hss->target->ports.addPort(portno, proto, NULL, newstate);
+      hss->target->ports.setPortState(portno, proto, newstate);
     }
     break;
   default:
@@ -2616,18 +2712,16 @@ void HostScanStats::boostScanDelay() {
   sdn.goodRespSinceDelayChanged = 0;
 }
 
-/* Dismiss all probe attempts on bench -- the ports are marked
-     'filtered' or whatever is appropriate for having no response */
+/* Dismiss all probe attempts on bench -- hosts are marked down and ports will
+   be set to whatever the default port state is for the scan. */
 void HostScanStats::dismissBench() {
-  int newstate;
-
   if (probe_bench.empty()) return;
-  newstate = scantype_no_response_means(USI->scantype);
   while(!probe_bench.empty()) {
     if (USI->ping_scan)
-      ultrascan_host_pspec_update(USI, this, &probe_bench.back(), newstate);
-    else
-      ultrascan_port_pspec_update(USI, this, &probe_bench.back(), newstate);
+      ultrascan_host_pspec_update(USI, this, &probe_bench.back(), HOST_DOWN);
+    /* Nothing to do if !USI->ping_scan. ultrascan_port_pspec_update would
+       allocate a Port object but we rely on the default port state to save
+       memory. */
     probe_bench.pop_back();
   }
   bench_tryno = 0;
@@ -2635,7 +2729,6 @@ void HostScanStats::dismissBench() {
 
 /* Move all members of bench to retry_stack for probe retransmission */
 void HostScanStats::retransmitBench() {
-  int newstate;
   if (probe_bench.empty()) return;
 
   /* Move all contents of probe_bench to the end of retry_stack, updating retry_stack_tries accordingly */
@@ -2644,7 +2737,6 @@ void HostScanStats::retransmitBench() {
 			   bench_tryno);
   assert(retry_stack.size() == retry_stack_tries.size());
   probe_bench.erase(probe_bench.begin(), probe_bench.end());
-  newstate = scantype_no_response_means(USI->scantype);
   bench_tryno = 0;
 }
 
@@ -3059,9 +3151,14 @@ static UltraProbe *sendIPScanProbe(UltraScanInfo *USI, HostScanStats *hss,
   if (pspec->type == PS_TCP) {
     assert(USI->scantype != CONNECT_SCAN);
 
-    seq = seq32_encode(USI, tryno, pingseq);
+    /* Normally we encode the tryno and pingseq in the SEQ field, because that
+       comes back (possibly incremented) in the ACK field of responses. But if
+       our probe has the ACK flag set, the response reflects our own ACK number
+       instead. */
     if (pspec->pd.tcp.flags & TH_ACK)
-	  ack = get_random_u32();
+      ack = seq32_encode(USI, tryno, pingseq);
+    else
+      seq = seq32_encode(USI, tryno, pingseq);
 
     if (pspec->pd.tcp.flags & TH_SYN) {
       tcpops = (u8 *) "\x02\x04\x05\xb4";
@@ -3086,12 +3183,17 @@ static UltraProbe *sendIPScanProbe(UltraScanInfo *USI, HostScanStats *hss,
       free(packet);
     }
   } else if (pspec->type == PS_UDP) {
+    const char *payload;
+    size_t payload_length;
+
+    payload = get_udp_payload(pspec->pd.udp.dport, &payload_length);
+
     for(decoy = 0; decoy < o.numdecoys; decoy++) {
       packet = build_udp_raw(&o.decoys[decoy], hss->target->v4hostip(),
 			     o.ttl, ipid, IP_TOS_DEFAULT, false,
 			     o.ipoptions, o.ipoptionslen,
 			     sport, pspec->pd.udp.dport,
-			     o.extra_payload, o.extra_payload_length, 
+			     (char *) payload, payload_length,
 			     &packetlen);
       if (decoy == o.decoyturn) {
 	probe->setIP(packet, packetlen, pspec);
@@ -3597,13 +3699,11 @@ static bool do_one_select_round(UltraScanInfo *USI, struct timeval *stime) {
   int newhoststate = HOST_UNKNOWN;
   int optval;
   recvfrom6_t optlen = sizeof(int);
-  char buf[128];
   int numGoodSD = 0;
   int err = 0;
   u16 pport = 0;
   reason_t current_reason = ER_NORESPONSE;
 #ifdef LINUX
-  int res;
   struct sockaddr_storage sin,sout;
   struct sockaddr_in *s_in;
   struct sockaddr_in6 *s_in6;
@@ -3683,51 +3783,39 @@ static bool do_one_select_round(UltraScanInfo *USI, struct timeval *stime) {
 	case 0:
 #ifdef LINUX
 	  if (!FD_ISSET(sd, &fds_rtmp)) {
-	    /* Linux goofiness -- We need to actually test that it is writeable */
-	    res = send(sd, "", 0, 0);
-	    
-	    if (res < 0 ) {
-	      if (o.debugging > 1) {
-		log_write(LOG_STDOUT, "Bad port %hu caught by 0-byte write: ",
-			  pport);
-		perror("");
-	      }
-	      newportstate = PORT_CLOSED;
-	    } else {
-	      if (getpeername(sd, (struct sockaddr *) &sin, &sinlen) < 0) {
-		pfatal("error in getpeername of connect_results for port %hu", (u16) pport);
-	      } else {
-		s_in = (struct sockaddr_in *) &sin;
-		s_in6 = (struct sockaddr_in6 *) &sin;
-		if ((o.af() == AF_INET &&
-		     pport != ntohs(s_in->sin_port))
+            if (getpeername(sd, (struct sockaddr *) &sin, &sinlen) < 0) {
+              pfatal("error in getpeername of connect_results for port %hu", (u16) pport);
+            } else {
+              s_in = (struct sockaddr_in *) &sin;
+              s_in6 = (struct sockaddr_in6 *) &sin;
+              if ((o.af() == AF_INET &&
+                   pport != ntohs(s_in->sin_port))
 #ifdef HAVE_IPV6
-		    || (o.af() == AF_INET6 && pport != ntohs(s_in6->sin6_port))
+                  || (o.af() == AF_INET6 && pport != ntohs(s_in6->sin6_port))
 #endif
-		    ) {
-		  error("Mismatch!!!! we think we have port %hu but we really have a different one", (u16) pport);
-		}
-	      }
-	      
-	      if (getsockname(sd, (struct sockaddr *) &sout, &soutlen) < 0) {
-		pfatal("error in getsockname for port %hu", (u16) pport);
-		}
-	      s_in = (struct sockaddr_in *) &sout;
-	      s_in6 = (struct sockaddr_in6 *) &sout;
-	      if ((o.af() == AF_INET && htons(s_in->sin_port) == pport) 
+                  ) {
+                error("Mismatch!!!! we think we have port %hu but we really have a different one", (u16) pport);
+              }
+            }
+            
+            if (getsockname(sd, (struct sockaddr *) &sout, &soutlen) < 0) {
+              pfatal("error in getsockname for port %hu", (u16) pport);
+              }
+            s_in = (struct sockaddr_in *) &sout;
+            s_in6 = (struct sockaddr_in6 *) &sout;
+            if ((o.af() == AF_INET && htons(s_in->sin_port) == pport) 
 #ifdef HAVE_IPV6
-		  || (o.af() == AF_INET6 && htons(s_in6->sin6_port) == pport)
+                || (o.af() == AF_INET6 && htons(s_in6->sin6_port) == pport)
 #endif
-		  ) {
-		/* Linux 2.2 bug can lead to bogus successful connect()ions
-		   in this case -- we treat the port as bogus even though it
-		   is POSSIBLE that this is a real connection */
-		newportstate = PORT_CLOSED;
-	      } else {
-		newhoststate = HOST_UP;
-		newportstate = PORT_OPEN;
-	      }
-	    }
+                ) {
+              /* Linux 2.2 bug can lead to bogus successful connect()ions
+                 in this case -- we treat the port as bogus even though it
+                 is POSSIBLE that this is a real connection */
+              newportstate = PORT_CLOSED;
+            } else {
+              newhoststate = HOST_UP;
+              newportstate = PORT_OPEN;
+            }
 	  } else {
 	    newhoststate = HOST_UP;
 	    newportstate = PORT_OPEN;
@@ -3788,12 +3876,10 @@ static bool do_one_select_round(UltraScanInfo *USI, struct timeval *stime) {
 	case ENETDOWN:
 	case ENETRESET:
 	case ECONNABORTED:
-	  Snprintf(buf, sizeof(buf), "Strange SO_ERROR from connection to %s (%d - '%s') -- bailing scan", host->target->targetipstr(), optval, strerror(optval) );
-	  pfatal(buf);
+	  fatal("Strange SO_ERROR from connection to %s (%d - '%s') -- bailing scan", host->target->targetipstr(), optval, strerror(optval));
 	  break;
 	default:
-	  Snprintf(buf, sizeof(buf), "Strange read error from %s (%d - '%s')", host->target->targetipstr(), optval, strerror(optval));
-	  perror(buf);
+	  error("Strange read error from %s (%d - '%s')", host->target->targetipstr(), optval, strerror(optval));
 	  break;
 	}
 
@@ -3821,41 +3907,6 @@ static bool do_one_select_round(UltraScanInfo *USI, struct timeval *stime) {
     }
   }
   return numGoodSD;
-}
-
-/* ICMP error messages generally return the IP header they were sent
-   with.  That provides the opportunity to look at the IPID to
-   determine which probe the packet matches up with.  Unfortunately,
-   this doesn't always work.  Some systems screw up the IPID in the
-   process of sending, and remote systems can screw it up as well.
-   This function is a "soft" match, that returns true if hey really do
-   match, or if matching seems to be broken for one reason or
-   another.  You can send in HBO or NBO, just as
-   long as the two values are in the same byte order. */
-static bool allow_ipid_match(u16 ipid_sent, u16 ipid_rcvd) {
-  static int numvalid = 0;
-  static int numbogus = 0;
-
-  /* TODO: I should check if this applies to more recent Solaris releases */
-  /* These systems seem to hose sent IPID */
-#if defined(SOLARIS) || defined(SUNOS) || defined(IRIX) || defined(HPUX)
-  return true;
-#endif
-
-  if (ipid_sent == ipid_rcvd) {
-    numvalid++;
-    return true;
-  } else numbogus++;
-
-  if (numbogus >= 2 && numvalid == 0)
-    return true; /* Test does not seem to be working */
-
-  /* This test is because sometimes a valid will come by luck */
-  if (numbogus / (numbogus + numvalid) > .8)
-    return true;
-
-  return false;
-
 }
 
 /* Tries to get one *good* (finishes a probe) ARP response with pcap
@@ -3949,8 +4000,6 @@ static bool get_pcap_result(UltraScanInfo *USI, struct timeval *stime) {
   struct sockaddr_in sin;
   list<UltraProbe *>::iterator probeI;
   UltraProbe *probe = NULL;
-  unsigned int trynum = 0;
-  unsigned int pingseq = 0;
   int newstate = PORT_UNKNOWN;
   unsigned int probenum;
   unsigned int listsz;
@@ -4038,43 +4087,11 @@ static bool get_pcap_result(UltraScanInfo *USI, struct timeval *stime) {
       
       /* Find the probe that provoked this response. */
       for (probenum = 0; probenum < listsz && !goodone; probenum++) {
-	bool goodseq = false;
 	probeI--;
 	probe = *probeI;
 
-	if (o.af() != AF_INET || probe->protocol() != IPPROTO_TCP)
-	  continue;
-
-	/* Ensure the connection info matches. */
-	if (probe->dport() != ntohs(tcp->th_sport)
-            || probe->sport() != ntohs(tcp->th_dport)
-            || hss->target->v4sourceip()->s_addr != ip->ip_dst.s_addr)
-	  continue;
-
-        goodseq = tcp_trynum_pingseq_decode(USI, tcp, &trynum, &pingseq);
-        if (!goodseq) {
-          /* TODO: I need to do some testing and find out how often this happens
-             and whether other techniques such as the response seq should be
-             used in those cases where it happens. Then I should make this just
-             a debugging > X statement. */
-	  if (o.debugging)
-	    log_write(LOG_PLAIN, "Bad Sequence number from host %s.\n", inet_ntoa(ip->ip_src));
-	  /* I'll just assume it is a response to this (most recent) probe. */
-          trynum = probe->tryno;
-          pingseq = probe->pingseq;
-        }
-
-        /* Make sure that trynum and pingseq match the values in the probe. */
-        if (!probe->check_tryno_pingseq(trynum, pingseq))
+        if (!tcp_probe_match(USI, probe, hss, ip))
           continue;
-
-	/* Sometimes we get false results when scanning localhost with
-	   -p- because we scan localhost with src port = dst port and
-	   see our outgoing packet and think it is a response. */
-	if (probe->dport() == probe->sport() && 
-	    ip->ip_src.s_addr == ip->ip_dst.s_addr && 
-	    probe->ipid() == ntohs(ip->ip_id))
-	  continue; /* We saw the packet we ourselves sent */
 
 	if (!probe->isPing()) {
 	  /* Now that response has been matched to a probe, I interpret it */
@@ -4217,10 +4234,6 @@ static bool get_pcap_result(UltraScanInfo *USI, struct timeval *stime) {
 	    hss->target->v4hostip()->s_addr != ip2->ip_dst.s_addr)
 	  continue;
 
-	/* Checking IPID is a little more complex because you can't always count on it */
-	if (!allow_ipid_match(probe->ipid(), ntohs(ip2->ip_id)))
-	  continue;
-
 	if (ip2->ip_p == IPPROTO_TCP && !USI->prot_scan) {
 	  struct tcp_hdr *tcp = (struct tcp_hdr *) ((u8 *) ip2 + ip2->ip_hl * 4);
 	  if (ntohs(tcp->th_sport) != probe->sport() || 
@@ -4230,7 +4243,8 @@ static bool get_pcap_result(UltraScanInfo *USI, struct timeval *stime) {
 	} else if (ip2->ip_p == IPPROTO_SCTP && !USI->prot_scan) {
 	  struct sctp_hdr *sctp = (struct sctp_hdr *) ((u8 *) ip2 + ip2->ip_hl * 4);
 	  if (ntohs(sctp->sh_sport) != probe->sport() || 
-	      ntohs(sctp->sh_dport) != probe->dport())
+	      ntohs(sctp->sh_dport) != probe->dport() ||
+	      ntohl(sctp->sh_vtag) != probe->sctpvtag())
 	    continue;
 	} else if (ip2->ip_p == IPPROTO_UDP && !USI->prot_scan) {
 	  /* TODO: IPID verification */
@@ -4274,9 +4288,9 @@ static bool get_pcap_result(UltraScanInfo *USI, struct timeval *stime) {
 	    break;
 
 	  default:
-	    error("Unexpected ICMP type/code 3/%d unreachable packet:", 
+	    error("Unexpected ICMP type/code 3/%d unreachable packet:\n", 
 		  icmp->icmp_code);
-	    hdump((unsigned char *)icmp, ntohs(ip->ip_len) - 
+	      nmap_hexdump((unsigned char *)icmp, ntohs(ip->ip_len) - 
 		  sizeof(struct ip));
 	    break;
 	  }
@@ -4411,7 +4425,6 @@ static int get_ping_pcap_result(UltraScanInfo *USI, struct timeval *stime) {
   list<UltraProbe *>::iterator probeI;
   UltraProbe *probe = NULL;
   unsigned int trynum = 0;
-  unsigned int pingseq = 0;
   unsigned int requiredbytes;
   int newstate = HOST_UNKNOWN;
   unsigned int probenum;
@@ -4528,208 +4541,71 @@ static int get_ping_pcap_result(UltraScanInfo *USI, struct timeval *stime) {
           continue;
         }
 
-        if (ip2->ip_p == IPPROTO_ICMP && USI->ptech.rawicmpscan) {
-          /* The response was based on a ping packet we sent */
-          memset(&sin, 0, sizeof(sin));
-          sin.sin_addr.s_addr = ip2->ip_dst.s_addr;
-          sin.sin_family = AF_INET;
-          hss = USI->findHost((struct sockaddr_storage *) &sin);
-          if (!hss) continue; // Not referring to a host that interests us
-          setTargetMACIfAvailable(hss->target, &linkhdr, ip, 0);
-          probeI = hss->probes_outstanding.end();
-          listsz = hss->num_probes_outstanding();
-
-          /* Find the probe that provoked this response. */
-          for (probenum = 0; probenum < listsz; probenum++) {
-            probeI--;
-            probe = *probeI;
-
-            if (o.af() != AF_INET || probe->protocol() != IPPROTO_ICMP)
-              continue;
-
-            if (!allow_ipid_match(probe->ipid(), ntohs(ip2->ip_id)))
-              continue;
-
-            /* Ensure the connection info matches. */
-            if (hss->target->v4sourceip()->s_addr != ip->ip_dst.s_addr)
-              continue;
-
-            /* If we made it this far, we found it. We don't yet know if it's
-               going to change a host state (goodone) or not. */
-            break;
-          }
-          /* Did we fail to find a probe? */
-          if (probenum >= listsz)
+        /* Bail out early if possible. */
+        if (!USI->ptech.rawprotoscan) {
+          if (ip2->ip_p == IPPROTO_ICMP && !USI->ptech.rawicmpscan)
             continue;
-        } else if (ip2->ip_p == IPPROTO_TCP && USI->ptech.rawtcpscan) {
-          /* The response was based our TCP probe */
-          struct tcp_hdr *tcp = (struct tcp_hdr *) (((char *) ip2) + 4 * ip2->ip_hl);
-          /* Now ensure this host is even in the incomplete list */
-          memset(&sin, 0, sizeof(sin));
-          sin.sin_addr.s_addr = ip2->ip_dst.s_addr;
-          sin.sin_family = AF_INET;
-          hss = USI->findHost((struct sockaddr_storage *) &sin);
-          if (!hss) continue; // Not referring to a host that interests us
-          setTargetMACIfAvailable(hss->target, &linkhdr, ip, 0);
-          probeI = hss->probes_outstanding.end();
-          listsz = hss->num_probes_outstanding();
-
-          /* Find the probe that provoked this response. */
-          for (probenum = 0; probenum < listsz; probenum++) {
-            probeI--;
-            probe = *probeI;
-
-            if (o.af() != AF_INET || probe->protocol() != IPPROTO_TCP)
-              continue;
-
-            if (!allow_ipid_match(probe->ipid(), ntohs(ip2->ip_id)))
-              continue;
-
-            /* Ensure the connection info matches. */
-            if (probe->dport() != ntohs(tcp->th_dport)
-              || probe->sport() != ntohs(tcp->th_sport)
-              || probe->tcpseq() != ntohl(tcp->th_seq)
-              || hss->target->v4sourceip()->s_addr != ip->ip_dst.s_addr)
-              continue;
-
-            /* If we made it this far, we found it. We don't yet know if it's
-               going to change a host state (goodone) or not. */
-            break;
-          }
-          /* Did we fail to find a probe? */
-          if (probenum >= listsz)
+          if (ip2->ip_p == IPPROTO_TCP && !USI->ptech.rawtcpscan)
             continue;
-        } else if (ip2->ip_p == IPPROTO_UDP && USI->ptech.rawudpscan) {
-          /* The response was based our UDP probe */
-          if ((unsigned) ip2->ip_hl * 4 + 8 > bytes)
+          if (ip2->ip_p == IPPROTO_UDP && !USI->ptech.rawudpscan)
             continue;
-          struct udp_hdr *udp = (struct udp_hdr *) ((u8 *) ip2 + ip2->ip_hl * 4);
-          /* Search for this host on the incomplete list */
-          memset(&sin, 0, sizeof(sin));
-          sin.sin_addr.s_addr = ip2->ip_dst.s_addr;
-          sin.sin_family = AF_INET;
-          hss = USI->findHost((struct sockaddr_storage *) &sin);
-          if (!hss) continue; // Not referring to a host that interests us
-          setTargetMACIfAvailable(hss->target, &linkhdr, ip, 0);
-          probeI = hss->probes_outstanding.end();
-          listsz = hss->num_probes_outstanding();
+          if (ip2->ip_p == IPPROTO_SCTP && !USI->ptech.rawsctpscan)
+            continue;
+        }
 
-          for(probenum = 0; probenum < listsz; probenum++) {
-            probeI--;
-            probe = *probeI;
+        memset(&sin, 0, sizeof(sin));
+        sin.sin_addr.s_addr = ip2->ip_dst.s_addr;
+        sin.sin_family = AF_INET;
+        hss = USI->findHost((struct sockaddr_storage *) &sin);
+        if (!hss) continue; // Not referring to a host that interests us
+        setTargetMACIfAvailable(hss->target, &linkhdr, ip, 0);
+        probeI = hss->probes_outstanding.end();
+        listsz = hss->num_probes_outstanding();
 
-            if (o.af() != AF_INET || probe->protocol() != IPPROTO_UDP)
+        /* Find the probe that provoked this response. */
+        for (probenum = 0; probenum < listsz; probenum++) {
+          probeI--;
+          probe = *probeI;
+
+          assert(o.af() == AF_INET);
+          if (probe->protocol() != ip2->ip_p || 
+              hss->target->v4sourceip()->s_addr != ip->ip_dst.s_addr ||
+              hss->target->v4sourceip()->s_addr != ip2->ip_src.s_addr || 
+              hss->target->v4hostip()->s_addr != ip2->ip_dst.s_addr)
+            continue;
+
+          if (ip2->ip_p == IPPROTO_ICMP && USI->ptech.rawicmpscan) {
+            /* The response was based on a ping packet we sent */
+          } else if (ip2->ip_p == IPPROTO_TCP && USI->ptech.rawtcpscan) {
+            struct tcp_hdr *tcp = (struct tcp_hdr *) (((char *) ip2) + 4 * ip2->ip_hl);
+            if (probe->dport() != ntohs(tcp->th_dport) ||
+                probe->sport() != ntohs(tcp->th_sport) ||
+                probe->tcpseq() != ntohl(tcp->th_seq))
               continue;
-
-            if (!allow_ipid_match(probe->ipid(), ntohs(ip2->ip_id)))
-              continue;
-
-            /* Ensure the connection info matches. */
+          } else if (ip2->ip_p == IPPROTO_UDP && USI->ptech.rawudpscan) {
+            struct udp_hdr *udp = (struct udp_hdr *) ((u8 *) ip2 + ip2->ip_hl * 4);
             if (probe->dport() != ntohs(udp->uh_dport) ||
-                probe->sport() != ntohs(udp->uh_sport) ||
-                hss->target->v4sourceip()->s_addr != ip->ip_dst.s_addr)
+                probe->sport() != ntohs(udp->uh_sport))
               continue;
-            
-            /* Sometimes we get false results when scanning localhost with
-               -p- because we scan localhost with src port = dst port and
-               see our outgoing packet and think it is a response. */
-            if (probe->dport() == probe->sport() && 
-                ip->ip_src.s_addr == ip->ip_dst.s_addr && 
-                probe->ipid() == ntohs(ip->ip_id))
-              continue; /* We saw the packet we ourselves sent */
-
-            /* If we made it this far, we found it. We don't yet know if it's
-               going to change a host state (goodone) or not. */
-            break;
-          }
-          /* Did we fail to find a probe? */
-          if (probenum >= listsz)
-            continue;
-        } else if (ip2->ip_p == IPPROTO_SCTP && USI->ptech.rawsctpscan) {
-          /* The response was based our SCTP probe */
-          if ((unsigned) ip2->ip_hl * 4 + 8 > bytes)
-            continue;
-          struct sctp_hdr *sctp = (struct sctp_hdr *) ((u8 *) ip2 + ip2->ip_hl * 4);
-          /* Search for this host on the incomplete list */
-          memset(&sin, 0, sizeof(sin));
-          sin.sin_addr.s_addr = ip2->ip_dst.s_addr;
-          sin.sin_family = AF_INET;
-          hss = USI->findHost((struct sockaddr_storage *) &sin);
-          if (!hss) continue; // Not referring to a host that interests us
-          setTargetMACIfAvailable(hss->target, &linkhdr, ip, 0);
-          probeI = hss->probes_outstanding.end();
-          listsz = hss->num_probes_outstanding();
-
-          for(probenum = 0; probenum < listsz; probenum++) {
-            probeI--;
-            probe = *probeI;
-
-            if (o.af() != AF_INET || probe->protocol() != IPPROTO_SCTP)
-              continue;
-
-            if (!allow_ipid_match(probe->ipid(), ntohs(ip2->ip_id)))
-              continue;
-
-            /* Ensure the connection info matches. */
+          } else if (ip2->ip_p == IPPROTO_SCTP && USI->ptech.rawsctpscan) {
+            struct sctp_hdr *sctp = (struct sctp_hdr *) ((u8 *) ip2 + ip2->ip_hl * 4);
             if (probe->dport() != ntohs(sctp->sh_dport) ||
                 probe->sport() != ntohs(sctp->sh_sport) ||
-                hss->target->v4sourceip()->s_addr != ip->ip_dst.s_addr)
+                probe->sctpvtag() != ntohl(sctp->sh_vtag))
               continue;
-            
-            /* Sometimes we get false results when scanning localhost with
-               -p- because we scan localhost with src port = dst port and
-               see our outgoing packet and think it is a response. */
-            if (probe->dport() == probe->sport() && 
-                ip->ip_src.s_addr == ip->ip_dst.s_addr && 
-                probe->ipid() == ntohs(ip->ip_id))
-              continue; /* We saw the packet we ourselves sent */
-
-            /* If we made it this far, we found it. We don't yet know if it's
-               going to change a host state (goodone) or not. */
-            break;
+          } else if (USI->ptech.rawprotoscan) {
+            /* Success; we already know that the address and protocol match. */
+          } else {
+            assert(0);
           }
-          /* Did we fail to find a probe? */
-          if (probenum >= listsz)
-            continue;
-        } else if (!USI->ptech.rawprotoscan) {
-          if (o.debugging)
-            error("Got ICMP response to a packet which was not TCP, UDP, SCTP or ICMP");
+
+          /* If we made it this far, we found it. We don't yet know if it's
+             going to change a host state (goodone) or not. */
+          break;
+        }
+        /* Did we fail to find a probe? */
+        if (probenum >= listsz)
           continue;
-        }
-        
-        if (!goodone && USI->ptech.rawprotoscan) {
-          memset(&sin, 0, sizeof(sin));
-          sin.sin_addr.s_addr = ip2->ip_dst.s_addr;
-          sin.sin_family = AF_INET;
-          hss = USI->findHost((struct sockaddr_storage *) &sin);
-          if (!hss) continue; // Not referring to a host that interests us
-          setTargetMACIfAvailable(hss->target, &linkhdr, ip, 0);
-          probeI = hss->probes_outstanding.end();
-          listsz = hss->num_probes_outstanding();
-
-          /* Find the probe that provoked this response. */
-          for (probenum = 0; probenum < listsz; probenum++) {
-            probeI--;
-            probe = *probeI;
-
-            if (o.af() != AF_INET || probe->protocol() != ip2->ip_p)
-              continue;
-
-            if (!allow_ipid_match(probe->ipid(), ntohs(ip2->ip_id)))
-              continue;
-
-            /* Ensure the connection info matches. */
-            if (hss->target->v4sourceip()->s_addr != ip->ip_dst.s_addr)
-              continue;
-
-            /* If we made it this far, we found it. We don't yet know if it's
-               going to change a host state (goodone) or not. */
-            break;
-	  }
-          /* Did we fail to find a probe? */
-          if (probenum >= listsz)
-            continue;
-        }
 
         if (ping->type == 3) {
           /* Destination unreachable. */
@@ -4781,43 +4657,11 @@ static int get_ping_pcap_result(UltraScanInfo *USI, struct timeval *stime) {
 
       /* Find the probe that provoked this response. */
       for (probenum = 0; probenum < listsz && !goodone; probenum++) {
-        bool goodseq = false;
         probeI--;
         probe = *probeI;
 
-        if (o.af() != AF_INET || probe->protocol() != IPPROTO_TCP)
+        if (!tcp_probe_match(USI, probe, hss, ip))
           continue;
-
-        /* Ensure the connection info matches. */
-        if (probe->dport() != ntohs(tcp->th_sport)
-            || probe->sport() != ntohs(tcp->th_dport)
-            || hss->target->v4sourceip()->s_addr != ip->ip_dst.s_addr)
-          continue;
-
-        goodseq = tcp_trynum_pingseq_decode(USI, tcp, &trynum, &pingseq);
-        if (!goodseq) {
-          /* TODO: I need to do some testing and find out how often this happens
-             and whether other techniques such as the response seq should be
-             used in those cases where it happens. Then I should make this just
-             a debugging > X statement. */
-	  if (o.debugging)
-	    log_write(LOG_PLAIN, "Bad Sequence number from host %s.\n", inet_ntoa(ip->ip_src));
-	  /* I'll just assume it is a response to this (most recent) probe. */
-          trynum = probe->tryno;
-          pingseq = probe->pingseq;
-        }
-
-        /* Make sure that trynum and pingseq match the values in the probe. */
-        if (!probe->check_tryno_pingseq(trynum, pingseq))
-          continue;
-
-	/* Sometimes we get false results when scanning localhost with
-	   -p- because we scan localhost with src port = dst port and
-	   see our outgoing packet and think it is a response. */
-	if (probe->dport() == probe->sport() && 
-	    ip->ip_src.s_addr == ip->ip_dst.s_addr && 
-	    probe->ipid() == ntohs(ip->ip_id))
-	  continue; /* We saw the packet we ourselves sent */
 
         goodone = true;
         newstate = HOST_UP;
@@ -5018,7 +4862,6 @@ static void begin_sniffer(UltraScanInfo *USI, vector<Target *> &Targets) {
   string pcap_filter="";
   /* 20 IPv6 addresses is max (45 byte addy + 14 (" or src host ")) * 20 == 1180 */
   string dst_hosts="";
-  char macstring[100];
   unsigned int len = 0;
   unsigned int targetno;
   bool doIndividual = Targets.size() <= 20; // Don't bother IP limits if scanning huge # of hosts
@@ -5035,15 +4878,26 @@ static void begin_sniffer(UltraScanInfo *USI, vector<Target *> &Targets) {
   }
 
   USI->pd = my_pcap_open_live(Targets[0]->deviceName(), 100,  (o.spoofsource)? 1 : 0, pcap_selectable_fd_valid()? 200 : 2);
-  if(USI->ping_scan_arp){
+  if (USI->ping_scan_arp){
+    /* Some OSs including Windows 7 and Solaris 10 have been seen to send their
+       ARP replies to the broadcast address, not to the (unicast) address that
+       the request came from, therefore listening for ARP packets directed to
+       us is not enough. Look inside the ARP reply at the target address field
+       instead. The filter string will look like
+         arp and arp[18:4] = 0xAABBCCDD and arp[22:2] = 0xEEFF */
+    char macstring[2 * ETH_ADDR_LEN + 1];
     const u8 *mac = Targets[0]->SrcMACAddress();
     assert(mac);
-    pcap_filter="arp and ether dst host ";
-    len = Snprintf(macstring, sizeof(macstring), 
-      "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    if(len>=sizeof(macstring))
-      fatal("macstring too long");
-    pcap_filter+=macstring;
+    len = Snprintf(macstring, sizeof(macstring), "%02X%02X%02X%02X%02X%02X",
+      mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    if (len != sizeof(macstring) - 1)
+      fatal("macstring length is %d, should be %u", len, (unsigned)(sizeof(macstring) - 1));
+    /* First four bytes of MAC. */
+    pcap_filter = "arp and arp[18:4] = 0x";
+    pcap_filter.append(macstring, 0, 4 * 2);
+    /* Last two bytes. */
+    pcap_filter += " and arp[22:2] = 0x";
+    pcap_filter.append(macstring, 4 * 2, 2 * 2);
     //its not arp, so lets check if for a protocol scan.
   } else if(USI->prot_scan || (USI->ping_scan && USI->ptech.rawprotoscan)){
     if (doIndividual){
@@ -5071,7 +4925,7 @@ static void begin_sniffer(UltraScanInfo *USI, vector<Target *> &Targets) {
     }
   }else assert(0);
   if (o.debugging > 2) log_write(LOG_PLAIN, "Pcap filter: %s\n", pcap_filter.c_str());
-  set_pcap_filter(Targets[0]->deviceName(), USI->pd, pcap_filter.c_str());
+  set_pcap_filter(Targets[0]->deviceFullName(), USI->pd, pcap_filter.c_str());
   /* pcap_setnonblock(USI->pd, 1, NULL); */
   return;
 }
@@ -5083,8 +4937,6 @@ static void processData(UltraScanInfo *USI) {
   list<UltraProbe *>::iterator probeI, nextProbeI;
   HostScanStats *host = NULL;
   UltraProbe *probe = NULL;
-  static UltraScanInfo *lastRetryCappedWarning = NULL;
-  int newstate;
   unsigned int maxtries = 0;
   bool scanmaybedone = true; /* The whole scan is not yet done */
   int expire_us = 0;
@@ -5150,19 +5002,22 @@ static void processData(UltraScanInfo *USI) {
       
       if (!probe->isPing() && probe->timedout && !probe->retransmitted) {
 	if (!tryno_mayincrease && probe->tryno >= maxtries) {
-	  newstate = scantype_no_response_means(USI->scantype);
-	  if (USI->ping_scan)
-	    ultrascan_host_probe_update(USI, host, probeI, newstate, NULL);
-	  else
-	    ultrascan_port_probe_update(USI, host, probeI, newstate, NULL);
-	  if (host->target->reason.reason_id == ER_UNKNOWN)
-	    host->target->reason.reason_id = ER_NORESPONSE;
-	  if (tryno_capped && lastRetryCappedWarning != USI) {
-	    /* Perhaps I should give this on a per-host basis.  Oh
-	       well, hopefully it is rare anyway. */
-	    log_write(LOG_PLAIN, "Warning: Giving up on port early because retransmission cap hit.\n");
-	    lastRetryCappedWarning = USI;
+	  if (tryno_capped && !host->retry_capped_warned) {
+	    log_write(LOG_PLAIN, "Warning: %s giving up on port because"
+              " retransmission cap hit (%d).\n", host->target->targetipstr(),
+              probe->tryno);
+            host->retry_capped_warned = true;
 	  }
+	  if (USI->ping_scan) {
+	    ultrascan_host_probe_update(USI, host, probeI, HOST_DOWN, NULL);
+	    if (host->target->reason.reason_id == ER_UNKNOWN)
+	      host->target->reason.reason_id = ER_NORESPONSE;
+	  } else {
+            /* No ultrascan_port_probe_update because that allocates a Port
+               object; the default port state as set by setDefaultPortState
+               handles these no-response ports. */
+            host->destroyOutstandingProbe(probeI);
+          }
 	  continue;
 	} else if (probe->tryno >= maxtries && 
 		   TIMEVAL_SUBTRACT(USI->now, probe->sent) > expire_us) {
@@ -5413,10 +5268,8 @@ void bounce_scan(Target *target, u16 *portarray, int numports,
 	      perror("recv problem from FTP bounce server");
 	    } else if (res == 0) {
 	      if (timedout)
-		target->ports.addPort(portarray[i], IPPROTO_TCP, NULL, 
-				      PORT_FILTERED);
-	      else target->ports.addPort(portarray[i], IPPROTO_TCP, NULL, 
-					 PORT_CLOSED);
+		target->ports.setPortState(portarray[i], IPPROTO_TCP, PORT_FILTERED);
+	      else target->ports.setPortState(portarray[i], IPPROTO_TCP, PORT_CLOSED);
 	    } else {
 	      recvbuf[res] = '\0';
 	      if (o.debugging) log_write(LOG_STDOUT, "result of LIST: %s", recvbuf);
@@ -5427,7 +5280,7 @@ void bounce_scan(Target *target, u16 *portarray, int numports,
 		res = recvtime(sd, recvbuf, 2048,10, NULL);
 	      }
 	      if (recvbuf[0] == '1' || recvbuf[0] == '2') {
-		target->ports.addPort(portarray[i], IPPROTO_TCP, NULL, PORT_OPEN);
+		target->ports.setPortState(portarray[i], IPPROTO_TCP, PORT_OPEN);
 		if (recvbuf[0] == '1') {
 		  res = recvtime(sd, recvbuf, 2048,5, NULL);
 		  if (res < 0)
@@ -5438,7 +5291,7 @@ void bounce_scan(Target *target, u16 *portarray, int numports,
 		      if (o.debugging) log_write(LOG_STDOUT, "nxt line: %s", recvbuf);
 		      if (recvbuf[0] == '4' && recvbuf[1] == '2' && 
 			  recvbuf[2] == '6') {	      	
-		        target->ports.removePort(portarray[i], IPPROTO_TCP);
+		        target->ports.forgetPort(portarray[i], IPPROTO_TCP);
 		        if (o.debugging || o.verbose)
 			  log_write(LOG_STDOUT, "Changed my mind about port %i\n", portarray[i]);
 		      }
@@ -5447,7 +5300,7 @@ void bounce_scan(Target *target, u16 *portarray, int numports,
 		}
 	      } else {
 		/* This means the port is closed ... */
-		target->ports.addPort(portarray[i], IPPROTO_TCP, NULL, PORT_CLOSED);
+		target->ports.setPortState(portarray[i], IPPROTO_TCP, PORT_CLOSED);
 	      }
 	    }
 	  }
@@ -5510,7 +5363,6 @@ void pos_scan(Target *target, u16 *portarray, int numports, stype scantype) {
   struct scanstats ss;
   int senddelay = 0;
   int rpcportsscanned = 0;
-  int tries = 0;
   time_t starttime;
   struct timeval starttm;
   struct portinfo *scan = NULL,  *current, *next;
@@ -5520,6 +5372,7 @@ void pos_scan(Target *target, u16 *portarray, int numports, stype scantype) {
   unsigned long j;
   struct serviceDeductions sd;
   bool doingOpenFiltered = false;
+  Port port;
 
   ScanProgressMeter *SPM = NULL;
 
@@ -5579,14 +5432,7 @@ void pos_scan(Target *target, u16 *portarray, int numports, stype scantype) {
 
   do {
     ss.changed = 0;
-    if (tries > 3 && tries < 10) {
-      senddelay += 10000 * (tries - 3); 
-      if (o.verbose) log_write(LOG_STDOUT, "Bumping up senddelay by %d (to %d), due to excessive drops\n", 10000 * (tries - 3), senddelay);
-    } else if (tries >= 10) {
-      senddelay += 75000; 
-      if (o.verbose) log_write(LOG_STDOUT, "Bumping up senddelay by 75000 (to %d), due to excessive drops\n", senddelay);
-    }
-    
+
     if (senddelay > 200000) {
       ss.max_width = MIN(ss.max_width, 5);
       ss.numqueries_ideal = MIN(ss.max_width, ss.numqueries_ideal);
@@ -5599,11 +5445,11 @@ void pos_scan(Target *target, u16 *portarray, int numports, stype scantype) {
     while(1) {
       if (doingOpenFiltered) {
 	rsi.rpc_current_port = target->ports.nextPort(rsi.rpc_current_port,
-						      TCPANDUDPANDSCTP,
+						      &port, TCPANDUDPANDSCTP,
 						      PORT_OPENFILTERED);
       } else {
 	rsi.rpc_current_port = target->ports.nextPort(rsi.rpc_current_port,
-						      TCPANDUDPANDSCTP,
+						      &port, TCPANDUDPANDSCTP,
 						      PORT_OPEN);
 	if (!rsi.rpc_current_port && !o.servicescan) {
 	  doingOpenFiltered = true;
@@ -5617,9 +5463,9 @@ void pos_scan(Target *target, u16 *portarray, int numports, stype scantype) {
 	break; // We do all open ports if no service scan
       if (!rsi.rpc_current_port) 
 	break; // done!
-      rsi.rpc_current_port->getServiceDeductions(&sd);
+      target->ports.getServiceDeductions(rsi.rpc_current_port->portno, rsi.rpc_current_port->proto, &sd);
       if (sd.name && sd.service_tunnel == SERVICE_TUNNEL_NONE && 
-	  strcmp(sd.name, "rpc") == 0)
+	  strcmp(sd.name, "rpcbind") == 0)
 	break; // Good - an RPC port for us to scan.
     }
     
@@ -5668,6 +5514,7 @@ void pos_scan(Target *target, u16 *portarray, int numports, stype scantype) {
 		    log_write(LOG_STDOUT, "RPC Scan giving up on port %hu proto %d due to repeated lack of response\n", rsi.rpc_current_port->portno,  rsi.rpc_current_port->proto);
 		  }
 		  rsi.rpc_status = RPC_STATUS_NOT_RPC;
+		  ss.numqueries_outstanding = 0;
 		  break;
 		}
 		else {
@@ -5758,7 +5605,8 @@ void pos_scan(Target *target, u16 *portarray, int numports, stype scantype) {
 
     /* Now we figure out the results of the port we just RPC scanned */
     
-    rsi.rpc_current_port->setRPCProbeResults(rsi.rpc_status, rsi.rpc_program, 
+    target->ports.setRPCProbeResults(rsi.rpc_current_port->portno, rsi.rpc_current_port->proto,
+                                             rsi.rpc_status, rsi.rpc_program, 
 					     rsi.rpc_lowver, rsi.rpc_highver);
     
     /* Time to put our RPC program scan list back together for the
@@ -5772,27 +5620,13 @@ void pos_scan(Target *target, u16 *portarray, int numports, stype scantype) {
     }
     current = pil.testinglist = &scan[0]; 
     pil.firewalled = NULL;
-    ss.numqueries_outstanding = 0;
-    /* Now we out o' here! */
-    continue;
-    
-    if (ss.numqueries_outstanding != 0) {
-      fatal("Bean counting error no. 4321897: ports_left: %d numqueries_outstanding: %d\n", ss.ports_left, ss.numqueries_outstanding);
-    }
-
-    tries++;
 
     if (o.debugging) {
-      log_write(LOG_STDOUT, "Finished round #%d. Current stats: numqueries_ideal: %d; min_width: %d; max_width: %d; packet_incr: %d; senddelay: %dus; fallback: %.f%%\n", tries, (int) ss.numqueries_ideal, ss.min_width, ss.max_width, ss.packet_incr, senddelay, floor(100 * ss.fallback_percent));
+      log_write(LOG_STDOUT, "Finished round. Current stats: numqueries_ideal: %d; min_width: %d; max_width: %d; packet_incr: %d; senddelay: %dus; fallback: %.f%%\n", (int) ss.numqueries_ideal, ss.min_width, ss.max_width, ss.packet_incr, senddelay, floor(100 * ss.fallback_percent));
     }
     ss.numqueries_ideal = ss.initial_packet_width;
-    
-  } while(pil.testinglist && tries < 20);
+  } while(pil.testinglist);
   
-  if (tries == 20) {
-    error("WARNING: GAVE UP ON SCAN AFTER 20 RETRIES");
-  }
-
   numports = rpcportsscanned;
   if (SPM && o.verbose && (numports > 0)) {
     char scannedportsstr[14];

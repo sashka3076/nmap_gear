@@ -10,10 +10,10 @@ http://www.securityfriday.com/promiscuous_detection_01.pdf.
 -- Host script results:
 -- |_ sniffer-detect: Likely in promiscuous mode (tests: "11111111")
 
-author = "Marek Majkowski <majek04+nse@gmail.com>"
+author = "Marek Majkowski"
 license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
 
-categories = {"discovery"}
+categories = {"discovery", "intrusive"}
 
 -- okay, we're interested only in hosts that are on our ethernet lan
 hostrule = function(host, port)

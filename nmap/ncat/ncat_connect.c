@@ -1,4 +1,91 @@
-/* $Id: ncat_connect.c 13631 2009-06-09 01:08:45Z jah $ */
+/***************************************************************************
+ * ncat_connect.c -- Ncat connect mode.                                    *
+ ***********************IMPORTANT NMAP LICENSE TERMS************************
+ *                                                                         *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
+ *                                                                         *
+ * Note that the GPL places important restrictions on "derived works", yet *
+ * it does not provide a detailed definition of that term.  To avoid       *
+ * misunderstandings, we consider an application to constitute a           *
+ * "derivative work" for the purpose of this license if it does any of the *
+ * following:                                                              *
+ * o Integrates source code from Nmap                                      *
+ * o Reads or includes Nmap copyrighted data files, such as                *
+ *   nmap-os-db or nmap-service-probes.                                    *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                *
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
+ * o Links to a library or executes a program that does any of the above   *
+ *                                                                         *
+ * The term "Nmap" should be taken to also include any portions or derived *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
+ *                                                                         *
+ * If you have any questions about the GPL licensing restrictions on using *
+ * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
+ * we also offer alternative license to integrate Nmap into proprietary    *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
+ * sales@insecure.com for further information.                             *
+ *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included COPYING.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
+ * If you received these files with a written license agreement or         *
+ * contract stating terms other than the terms above, then that            *
+ * alternative license agreement takes precedence over these comments.     *
+ *                                                                         *
+ * Source is provided to this software because we believe users have a     *
+ * right to know exactly what a program is going to do before they run it. *
+ * This also allows you to audit the software for security holes (none     *
+ * have been found so far).                                                *
+ *                                                                         *
+ * Source code also allows you to port Nmap to new platforms, fix bugs,    *
+ * and add new features.  You are highly encouraged to send your changes   *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
+ * distribution.  By sending these changes to Fyodor or one of the         *
+ * Insecure.Org development mailing lists, it is assumed that you are      *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
+ *                                                                         *
+ * This program is distributed in the hope that it will be useful, but     *
+ * WITHOUT ANY WARRANTY; without even the implied warranty of              *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
+ * General Public License v2.0 for more details at                         *
+ * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
+ * included with Nmap.                                                     *
+ *                                                                         *
+ ***************************************************************************/
+
+/* $Id: ncat_connect.c 16410 2010-01-06 05:54:55Z david $ */
 
 #include "nsock.h"
 #include "ncat.h"
@@ -6,6 +93,7 @@
 #include "sys_wrap.h"
 
 #include "nbase.h"
+#include "http.h"
 
 #ifndef WIN32
 #include <unistd.h>
@@ -15,14 +103,26 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <errno.h>
 
 #ifdef HAVE_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #endif
 
-static void connect_evt_handler(nsock_pool nsp, nsock_event evt, void *mydata);
+struct conn_state {
+    nsock_iod sock_nsi;
+    nsock_iod stdin_nsi;
+    nsock_event_id idle_timer_event_id;
+};
+
+static struct conn_state cs;
+
+static void connect_handler(nsock_pool nsp, nsock_event evt, void *data);
+static void read_stdin_handler(nsock_pool nsp, nsock_event evt, void *data);
+static void read_socket_handler(nsock_pool nsp, nsock_event evt, void *data);
+static void write_socket_handler(nsock_pool nsp, nsock_event evt, void *data);
+static void idle_timer_handler(nsock_pool nsp, nsock_event evt, void *data);
+static void refresh_idle_timer(nsock_pool nsp);
 
 #ifdef HAVE_OPENSSL
 /* This callback is called for every certificate in a chain. ok is true if
@@ -41,17 +141,17 @@ static int verify_callback(int ok, X509_STORE_CTX *store)
 
         loguser("Subject: ");
         X509_NAME_print_ex_fp(stderr, X509_get_subject_name(cert), 0, XN_FLAG_ONELINE);
-        loguser("\n");
+        loguser_noprefix("\n");
         loguser("Issuer: ");
         X509_NAME_print_ex_fp(stderr, X509_get_issuer_name(cert), 0, XN_FLAG_ONELINE);
-        loguser("\n");
+        loguser_noprefix("\n");
 
         assert(ssl_cert_fp_str_sha1(cert, digest_buf, sizeof(digest_buf)) != NULL);
         loguser("SHA-1 fingerprint: %s\n", digest_buf);
     }
 
     if (!ok && o.verbose) {
-        loguser("Error: certificate verification failed (%s).\n",
+        loguser("Certificate verification failed (%s).\n",
             X509_verify_cert_error_string(err));
     }
 
@@ -77,26 +177,26 @@ static void set_ssl_ctx_options(SSL_CTX *ctx)
         if (o.ssl && o.debug)
             logdebug("Not doing certificate verification.\n");
     }
-   
+
     if (o.sslcert != NULL && o.sslkey != NULL){
       if (SSL_CTX_use_certificate_file(ctx, o.sslcert, SSL_FILETYPE_PEM) != 1)
             bye("SSL_CTX_use_certificate_file(): %s.", ERR_error_string(ERR_get_error(), NULL));
       if (SSL_CTX_use_PrivateKey_file(ctx, o.sslkey, SSL_FILETYPE_PEM) != 1)
-            bye("SSL_CTX_use_Privatekey_file(): %s.", ERR_error_string(ERR_get_error(), NULL)); 
-    } else {   
+            bye("SSL_CTX_use_Privatekey_file(): %s.", ERR_error_string(ERR_get_error(), NULL));
+    } else {
       if ((o.sslcert == NULL)!= (o.sslkey == NULL))
             bye("The --ssl-key and --ssl-cert options must be used together.");
-    }    
+    }
 }
 #endif
 
 /* Depending on verbosity, print a message that a connection was established. */
 static void connect_report(nsock_iod nsi)
 {
-    struct sockaddr_storage peer;
+    union sockaddr_u peer;
 
     nsi_getlastcommunicationinfo(nsi, NULL, NULL, NULL,
-        (struct sockaddr *) &peer, sizeof(peer));
+        &peer.sockaddr, sizeof(peer.storage));
 
     if (o.verbose) {
 #ifdef HAVE_OPENSSL
@@ -117,10 +217,10 @@ static void connect_report(nsock_iod nsi)
 
                 n = X509_NAME_get_text_by_NID(subject, NID_organizationName, buf, sizeof(buf));
                 if (n >= 0 && n <= sizeof(buf) - 1)
-                    loguser(" %s", buf);
+                    loguser_noprefix(" %s", buf);
             }
 
-            loguser("\n");
+            loguser_noprefix("\n");
 
             assert(ssl_cert_fp_str_sha1(cert, digest_buf, sizeof(digest_buf)) != NULL);
             loguser("SHA-1 fingerprint: %s\n", digest_buf);
@@ -134,7 +234,6 @@ static void connect_report(nsock_iod nsi)
 }
 
 int ncat_connect(void) {
-    struct conn_state cs;
     nsock_pool mypool;
     nsock_event_id ev;
     int rc;
@@ -151,306 +250,386 @@ int ncat_connect(void) {
     set_ssl_ctx_options((SSL_CTX *)nsp_ssl_init(mypool));
 #endif
 
-    /* create an iod for a new socket */
-    if ((cs.sock_nsi = nsi_new(mypool, NULL)) == NULL)
-        bye("Failed to create nsock_iod.");
+    if (httpconnect.storage.ss_family == AF_UNSPEC
+             && socksconnect.storage.ss_family == AF_UNSPEC) {
+        /* A non-proxy connection. Create an iod for a new socket. */
+        cs.sock_nsi = nsi_new(mypool, NULL);
+        if (cs.sock_nsi == NULL)
+            bye("Failed to create nsock_iod.");
 
-    if (srcaddr.ss_family != AF_UNSPEC)
-        nsi_set_localaddr(cs.sock_nsi, &srcaddr, srcaddrlen);
+        if (srcaddr.storage.ss_family != AF_UNSPEC)
+            nsi_set_localaddr(cs.sock_nsi, &srcaddr.storage, srcaddrlen);
 
-    if (o.numsrcrtes) {
-        struct sockaddr_in *sin = (struct sockaddr_in *) &targetss;
-        unsigned char *ipopts = NULL;
-        size_t ipoptslen = 0;
+        if (o.numsrcrtes) {
+            unsigned char *ipopts = NULL;
+            size_t ipoptslen = 0;
 
-        if (o.af != AF_INET)
-            bye("Sorry, -g can only currently be used with IPv4.");
-        ipopts = buildsrcrte(sin->sin_addr, o.srcrtes, o.numsrcrtes, o.srcrteptr, &ipoptslen);
+            if (o.af != AF_INET)
+                bye("Sorry, -g can only currently be used with IPv4.");
+            ipopts = buildsrcrte(targetss.in.sin_addr, o.srcrtes, o.numsrcrtes, o.srcrteptr, &ipoptslen);
 
-        nsi_set_ipoptions(cs.sock_nsi, ipopts, ipoptslen);
-        free(ipopts); /* Nsock has its own copy */
-    }
+            nsi_set_ipoptions(cs.sock_nsi, ipopts, ipoptslen);
+            free(ipopts); /* Nsock has its own copy */
+        }
 
-    if (o.udp) {
-        ev = nsock_connect_udp(mypool, cs.sock_nsi, connect_evt_handler,
-                               &cs, (struct sockaddr *) &targetss, targetsslen,
-                               inet_port(&targetss));
-    }
+        if (o.udp) {
+            ev = nsock_connect_udp(mypool, cs.sock_nsi, connect_handler,
+                                   NULL, &targetss.sockaddr, targetsslen,
+                                   inet_port(&targetss));
+        }
 #ifdef HAVE_OPENSSL
-    else if (o.ssl) {
-        cs.ssl_session = NULL;
-        ev = nsock_connect_ssl(mypool, cs.sock_nsi, connect_evt_handler,
-                               o.conntimeout, &cs,
-                               (struct sockaddr *) &targetss, targetsslen,
-                               inet_port(&targetss), cs.ssl_session);
-    }
+        else if (o.sctp && o.ssl) {
+            ev = nsock_connect_ssl(mypool, cs.sock_nsi, connect_handler,
+                                   o.conntimeout, NULL,
+                                   &targetss.sockaddr, targetsslen,
+                                   IPPROTO_SCTP, inet_port(&targetss),
+                                   NULL);
+        }
 #endif
-    else {
-        ev = nsock_connect_tcp(mypool, cs.sock_nsi, connect_evt_handler,
-                               o.conntimeout, &cs,
-                               (struct sockaddr *) &targetss, targetsslen,
-                               inet_port(&targetss));
+        else if (o.sctp) {
+            ev = nsock_connect_sctp(mypool, cs.sock_nsi, connect_handler,
+                                   o.conntimeout, NULL,
+                                   &targetss.sockaddr, targetsslen,
+                                   inet_port(&targetss));
+        }
+#ifdef HAVE_OPENSSL
+        else if (o.ssl) {
+            ev = nsock_connect_ssl(mypool, cs.sock_nsi, connect_handler,
+                                   o.conntimeout, NULL,
+                                   &targetss.sockaddr, targetsslen,
+                                   IPPROTO_TCP, inet_port(&targetss),
+                                   NULL);
+        }
+#endif
+        else {
+            ev = nsock_connect_tcp(mypool, cs.sock_nsi, connect_handler,
+                                   o.conntimeout, NULL,
+                                   &targetss.sockaddr, targetsslen,
+                                   inet_port(&targetss));
+        }
+    } else {
+        /* A proxy connection. */
+        static int connect_socket;
+        static char *proxy_request;
+        char *headerbuf;
+        char *statusbuf ;
+        struct socket_buffer stateful_buf;
+        int len;
+        char* line;
+        size_t n;
+
+        connect_socket = do_connect(SOCK_STREAM);
+        if (connect_socket == -1) {
+            loguser("Proxy connection failed: %s.\n", socket_strerror(socket_errno()));
+            return 1;
+        }
+
+        socket_buffer_init(&stateful_buf, connect_socket);
+
+        if (o.verbose) {
+            loguser("Connected to proxy %s:%hu\n", inet_socktop(&targetss),
+                inet_port(&targetss));
+        }
+
+        if (httpconnect.storage.ss_family != AF_UNSPEC) {
+            int code;
+
+            proxy_request = http_proxy_client_request(o.proxy_auth);
+            len = strlen(proxy_request);
+            if (send(connect_socket, proxy_request, len, 0) < 0) {
+                loguser("Error sending proxy request: %s.\n", socket_strerror(socket_errno()));
+                return 1;
+            }
+            if (http_read_status_line(&stateful_buf, &statusbuf) != 0) {
+                loguser("Error reading proxy response Status-Line.\n");
+                return 1;
+            }
+            if (o.debug > 1)
+                logdebug("Status-Line: %s", statusbuf);
+
+            code = http_parse_status_line_code(statusbuf);
+            free(statusbuf);
+            if (code != 200) {
+                loguser("Proxy returned status code %d.\n", code);
+                return 1;
+            }
+
+            if (http_read_header(&stateful_buf, &headerbuf) != 0) {
+                loguser("Error reading proxy response header.\n");
+                return 1;
+            }
+            free(headerbuf);
+        } else if (socksconnect.storage.ss_family != AF_UNSPEC) {
+            struct socks4_data socks4msg;
+            char socksbuf[7];
+
+            /* Fill the socks4_data struct */
+            zmem(&socks4msg, sizeof(socks4msg));
+            socks4msg.version = SOCKS4_VERSION;
+            socks4msg.type = SOCKS_CONNECT;
+            socks4msg.port = socksconnect.in.sin_port;
+            socks4msg.address = socksconnect.in.sin_addr.s_addr;
+            if (o.proxy_auth)
+                Strncpy(socks4msg.username, (char *) o.proxy_auth, sizeof(socks4msg.username));
+
+            len = 8 + strlen(socks4msg.username) + 1;
+
+            if (send(connect_socket, (char *) &socks4msg, len, 0) < 0) {
+                loguser("Error sending proxy request: %s.\n", socket_strerror(socket_errno()));
+                return 1;
+            }
+            /* The size of the socks4 response is 7 bytes. So read exactly
+               7 bytes from the buffer */
+            if (socket_buffer_readcount(&stateful_buf, socksbuf, 7) < 0) {
+                loguser("Error: short reponse from proxy.\n");
+                return 1;
+            }
+            if (socksbuf[1] != 90) {
+                loguser("Proxy connection failed.\n");
+                return 1;
+            }
+        }
+
+        /* Clear out whatever is left in the socket buffer which may be
+           already sent by proxy server along with http response headers. */
+        line = socket_buffer_remainder(&stateful_buf, &n);
+        /* Write the leftover data to stdout. */
+        Write(STDOUT_FILENO, line, n);
+
+        /* Once the proxy negotiation is done, Nsock takes control of the
+           socket. */
+        cs.sock_nsi = nsi_new2(mypool, connect_socket, NULL);
+
+        /* Create IOD for nsp->stdin */
+        if ((cs.stdin_nsi = nsi_new2(mypool, 0, NULL)) == NULL)
+            bye("Failed to create stdin nsiod.");
+
+        if (o.sendonly == 0) {
+            /* socket event? */
+            nsock_read(mypool, cs.sock_nsi, read_socket_handler, -1, NULL);
+        }
+
+        if (o.recvonly == 0) {
+            /* stdin-fd event? */
+            nsock_readbytes(mypool, cs.stdin_nsi, read_stdin_handler, -1, NULL, 0);
+        }
     }
 
     /* connect */
     rc = nsock_loop(mypool, -1);
-    nsp_delete(mypool);
 
-    return rc;
-}
-
-/* handle nsock-powered connections */
-static void connect_evt_handler(nsock_pool nsp, nsock_event evt, void *mydata)
-{
-    int nbytes = 100, read_timeout = DEFAULT_READ_TIMEOUT,
-        write_timeout = DEFAULT_WRITE_TIMEOUT;
-    static int is_socks4_connected;
-    static int holdstdin;
-    int mysock;
-    char *buf = NULL;
-    nsock_iod nsi = nse_iod(evt);
-
-    enum nse_status status = nse_status(evt);
-    enum nse_type type = nse_type(evt);
-    struct conn_state *cs;
-
-    /* drop conn_evt data into our struct */
-    cs = (struct conn_state *) mydata;
-
-    /* debugging */
-    if (o.debug > 1)
-        logdebug("Received callback of type %s with status %s\n",
-                 nse_type2str(type), nse_status2str(status));
-
-    /* User-defined read/write timeouts */
-    if (o.idletimeout)
-            write_timeout = read_timeout = o.idletimeout;
-
-    mysock = nsi_getsd(cs->sock_nsi);
-
-    /* Handle nsock responses for the connection */
-    if (status == NSE_STATUS_SUCCESS) {
-            switch (type) {
-            case NSE_TYPE_CONNECT:
-            case NSE_TYPE_CONNECT_SSL:
-
-#ifdef HAVE_OPENSSL
-                if (nsi_checkssl(cs->sock_nsi)) {
-                    /* Check the domain name. ssl_post_connect_check prints an
-                       error message if appropriate. */
-                    if (!ssl_post_connect_check((SSL *)nsi_getssl(cs->sock_nsi), o.target))
-                        bye("Certificate verification error.");
-
-                    if (cs->ssl_session) {
-                        if (cs->ssl_session == (SSL_SESSION *)
-                                (nsi_get0_ssl_session(cs->sock_nsi))) {
-                            /* nothing required */
-                        } else {
-                            SSL_SESSION_free((SSL_SESSION *) cs->ssl_session);
-                            cs->ssl_session = (SSL_SESSION *)
-                                (nsi_get1_ssl_session(cs->sock_nsi));
-                        }
-                    } else {
-                        cs->ssl_session = (SSL_SESSION *)
-                            (nsi_get1_ssl_session(cs->sock_nsi));
-                    }
-                }
-#endif
-
-                connect_report(cs->sock_nsi);
-
-                /* Create IOD for nsp->stdin */
-                if ((cs->stdin_nsi = nsi_new2(nsp, 0, NULL)) == NULL)
-                    bye("Failed to create stdin nsiod.");
-
-                /* command to execute */
-                if (o.cmdexec) {
-                 /* Convert Nsock's non-blocking socket to an ordinary blocking one. It's
-                    possible for a program to write fast enough that it will get an
-                    EAGAIN on write on a non-blocking socket.*/
-                    block_socket(mysock);
-                    netexec(mysock, o.cmdexec);
-                }
-
-                /* format an http proxy request */
-                if (httpconnect.ss_family != AF_UNSPEC) {
-                    static char *proxy_request;
-
-                    proxy_request = http_proxy_client_request(o.proxy_auth);
-
-                    cs->latest_writesockev =
-                        nsock_write(nsp, cs->sock_nsi, connect_evt_handler,
-                                    write_timeout, cs, proxy_request, -1);
-                }
-
-                /* we're doing SOCKS proxying */
-                if (socksconnect.ss_family != AF_UNSPEC) {
-                    struct sockaddr_in *sin = (struct sockaddr_in *) &socksconnect;
-                    struct socks4_data socks4msg;
-
-                    /* Fill the socks4_data struct */
-                    zmem(&socks4msg, sizeof(socks4msg));
-                    socks4msg.version = SOCKS4_VERSION;
-                    socks4msg.type = SOCKS_CONNECT;
-                    socks4msg.port = sin->sin_port;
-                    socks4msg.address = sin->sin_addr.s_addr;
-                    if (o.proxy_auth)
-                        Strncpy(socks4msg.username, (char *) o.proxy_auth, sizeof(socks4msg.username));
-
-                    cs->latest_writesockev =
-                        nsock_write(nsp, cs->sock_nsi, connect_evt_handler,
-                                    write_timeout, cs, (char *) &socks4msg,
-                                    8 + strlen(socks4msg.username) + 1);
-
-                    cs->latest_readsockev =
-                        nsock_readbytes(nsp, cs->sock_nsi, connect_evt_handler,
-                                        read_timeout, cs, 8);
-
-                    /* We don't want to read from stdin and send the data
-                     * until we're actually connected to the proxy
-                     */
-                    holdstdin++;
-                }
-
-                if (o.sendonly == 0) {
-                    /* socket event? */
-                    cs->latest_readsockev =
-                        nsock_read(nsp, cs->sock_nsi, connect_evt_handler,
-                                   read_timeout, cs);
-                }
-
-                if (o.recvonly == 0 && holdstdin == 0) {
-                    /* stdin-fd event? */
-                    cs->latest_readstdinev =
-                        nsock_readbytes(nsp, cs->stdin_nsi,
-                                        connect_evt_handler, read_timeout, cs, 0);
-                }
-
-                break;
-
-            case NSE_TYPE_READ:
-                /* read buffer */
-                buf = nse_readbuf(evt, &nbytes);
-
-                /* READ from socket */
-                if (nsi == cs->sock_nsi) {
-                    if (o.linedelay)
-                        ncat_delay_timer(o.linedelay);
-
-                    if (o.sendonly == 0) {
-                        if (socksconnect.ss_family != AF_UNSPEC && is_socks4_connected == 0) {
-
-                            if (nbytes < 7)
-                                bye("Connection to SOCKS4 proxy failed: Invalid SOCKS4 response.");
-
-                            /* validate reply status code */
-                            if(buf[1] != 90)
-                                bye("Connection to SOCKS4 proxy failed: %s.", socks4_error(buf[1]));
-
-                            /* and print rest of data to stdout */
-                            Write(STDOUT_FILENO, buf + 8, nbytes - 8);
-
-                            /*
-                             * Once we've connected to the socks4 server
-                             * we don't need to send any more SOCKS4 requests
-                             * for the rest of this session.
-                             * Therefore, we don't need to hit this code again.
-                             */
-                            is_socks4_connected = 1;
-
-                            /* Go back to reading data from the socket */
-                            cs->latest_readsockev =
-                                nsock_read(nsp, cs->sock_nsi,
-                                           connect_evt_handler,
-                                           read_timeout, cs);
-
-                            /* Now we can do stdin->net data */
-                            if (o.recvonly == 0 && --holdstdin == 0)
-                                cs->latest_readstdinev =
-                                        nsock_readbytes(nsp, cs->stdin_nsi,
-                                              connect_evt_handler, read_timeout, cs, 0);
-                        } else {
-                            if (o.telnet)
-                                dotelnet(mysock, (unsigned char *) buf, nbytes);
-
-                            /* Write socket data to stdout */
-                            Write(STDOUT_FILENO, buf, nbytes);
-                            ncat_log_recv(buf, nbytes);
-
-                            cs->latest_readsockev =
-                                nsock_readbytes(nsp, cs->sock_nsi,
-                                           connect_evt_handler,
-                                           read_timeout, cs, 0);
-                        }
-                    }
-                } else {
-                    /* read from stdin */
-                    if (o.linedelay)
-                        ncat_delay_timer(o.linedelay);
-
-                    if (o.recvonly == 0) {
-                        char *tmp = NULL;
-
-                        if (o.crlf) {
-                            if (fix_line_endings(buf, &nbytes, &tmp))
-                                buf = tmp;
-                        }
-
-                        nsock_write(nsp, cs->sock_nsi, connect_evt_handler,
-                                write_timeout, cs, buf, nbytes);
-                        ncat_log_send(buf, nbytes);
-
-                        if (tmp)
-                            free(tmp); /* buf */
-                    }
-
-                }
-
-                break;
-
-            case NSE_TYPE_WRITE:
-                if (nsi == cs->sock_nsi) {
-                    /* The write to the socket was successful. Allow reading
-                       more from stdin now. */
-                    cs->latest_readstdinev =
-                        nsock_readbytes(nsp, cs->stdin_nsi,
-                                connect_evt_handler, read_timeout, cs, 0);
-                }
-                break;
-
-            case NSE_TYPE_TIMER:
-                break;
-
-            default:
-                bye("connect_evt_handler got bogus type.");
-                break;
-        }   /* end switch */
-
-    } else if (status == NSE_STATUS_EOF) {
-        /* Close up if we either got EOF from network side (e.g. the
-         * TCP connection closed on remote side), or if we got EOF
-         * on stdin while using --send-only mode. */
-        if (nsi == cs->sock_nsi || o.sendonly) {
-            nsi_delete(cs->stdin_nsi, NSOCK_PENDING_NOTIFY);
-            nsi_delete(cs->sock_nsi, NSOCK_PENDING_NOTIFY);
-        }
-    } else if (status == NSE_STATUS_ERROR) {
-        if (socket_errno() == EINPROGRESS)
-            /* XXX: this is weird. errno always seems to be incorrect on ret from nsock. */
-            errno = ECONNREFUSED;
-        if (socket_errno() == EINTR) {
-            sleep(1);
-        } else if (socket_errno() != 0) {
-            if (o.verbose)
-                loguser("%s.\n", socket_strerror(socket_errno()));
-            exit(1);
-        }
-    } else if (status == NSE_STATUS_TIMEOUT){
-            errno = ETIMEDOUT;
-            if (o.verbose)
-                loguser("%s.\n", socket_strerror(socket_errno()));
-            exit(1);
+    if (o.verbose) {
+        struct timeval end_time;
+        gettimeofday(&end_time, NULL);
+        double time = TIMEVAL_MSEC_SUBTRACT(end_time, start_time) / 1000.0;
+        loguser("%lu bytes sent, %lu bytes received in %.2f seconds.\n",
+            nsi_get_write_count(cs.sock_nsi),
+            nsi_get_read_count(cs.sock_nsi), time);
     }
 
-    return;
+    nsp_delete(mypool);
+
+    return rc == NSOCK_LOOP_ERROR ? 1 : 0;
+}
+
+static void connect_handler(nsock_pool nsp, nsock_event evt, void *data)
+{
+    enum nse_status status = nse_status(evt);
+    enum nse_type type = nse_type(evt);
+
+    assert(type == NSE_TYPE_CONNECT || type == NSE_TYPE_CONNECT_SSL);
+
+    if (status == NSE_STATUS_ERROR) {
+        loguser("%s.\n", socket_strerror(nse_errorcode(evt)));
+        exit(1);
+    } else if (status == NSE_STATUS_TIMEOUT) {
+        loguser("%s.\n", socket_strerror(ETIMEDOUT));
+        exit(1);
+    } else {
+        assert(status == NSE_STATUS_SUCCESS);
+    }
+
+#ifdef HAVE_OPENSSL
+    if (nsi_checkssl(cs.sock_nsi)) {
+        /* Check the domain name. ssl_post_connect_check prints an
+           error message if appropriate. */
+        if (!ssl_post_connect_check((SSL *)nsi_getssl(cs.sock_nsi), o.target))
+            bye("Certificate verification error.");
+    }
+#endif
+
+    connect_report(cs.sock_nsi);
+
+    /* Create IOD for nsp->stdin */
+    if ((cs.stdin_nsi = nsi_new2(nsp, 0, NULL)) == NULL)
+        bye("Failed to create stdin nsiod.");
+
+    /* Command to execute. */
+    if (o.cmdexec) {
+        struct fdinfo info;
+
+        info.fd = nsi_getsd(nse_iod(evt));
+#ifdef HAVE_OPENSSL
+        info.ssl = (SSL *) nsi_getssl(nse_iod(evt));
+#endif
+        /* Convert Nsock's non-blocking socket to an ordinary blocking one. It's
+           possible for a program to write fast enough that it will get an
+           EAGAIN on write on a non-blocking socket.*/
+        block_socket(info.fd);
+        netexec(&info, o.cmdexec);
+    }
+
+    /* Start the initial reads. */
+
+    if (!o.sendonly)
+        nsock_read(nsp, cs.sock_nsi, read_socket_handler, -1, NULL);
+
+    if (!o.recvonly)
+        nsock_readbytes(nsp, cs.stdin_nsi, read_stdin_handler, -1, NULL, 0);
+
+    /* The --idle-timeout option says to exit after a certain period of
+       inactivity. We start a timer here and reset it on every read event; see
+       refresh_idle_timer. */
+    if (o.idletimeout > 0) {
+        cs.idle_timer_event_id =
+            nsock_timer_create(nsp, idle_timer_handler, o.idletimeout, NULL);
+    }
+}
+
+static void read_stdin_handler(nsock_pool nsp, nsock_event evt, void *data)
+{
+    enum nse_status status = nse_status(evt);
+    enum nse_type type = nse_type(evt);
+    char *buf, *tmp = NULL;
+    int nbytes;
+
+    assert(type == NSE_TYPE_READ);
+
+    if (status == NSE_STATUS_EOF) {
+        if (o.sendonly) {
+            /* In --send-only mode, exit after EOF on stdin. */
+            nsock_loop_quit(nsp);
+        }
+        return;
+    } else if (status == NSE_STATUS_ERROR) {
+        loguser("%s.\n", socket_strerror(nse_errorcode(evt)));
+        exit(1);
+    } else if (status == NSE_STATUS_TIMEOUT) {
+        loguser("%s.\n", socket_strerror(ETIMEDOUT));
+        exit(1);
+    } else if (status == NSE_STATUS_CANCELLED || status == NSE_STATUS_KILL) {
+        return;
+    } else {
+        assert(status == NSE_STATUS_SUCCESS);
+    }
+
+    buf = nse_readbuf(evt, &nbytes);
+
+    /* read from stdin */
+    if (o.linedelay)
+        ncat_delay_timer(o.linedelay);
+
+    if (o.crlf) {
+        if (fix_line_endings(buf, &nbytes, &tmp))
+            buf = tmp;
+    }
+
+    nsock_write(nsp, cs.sock_nsi, write_socket_handler, -1, NULL, buf, nbytes);
+    ncat_log_send(buf, nbytes);
+
+    if (tmp)
+        free(tmp);
+
+    refresh_idle_timer(nsp);
+}
+
+static void read_socket_handler(nsock_pool nsp, nsock_event evt, void *data)
+{
+    enum nse_status status = nse_status(evt);
+    enum nse_type type = nse_type(evt);
+    char *buf;
+    int nbytes;
+
+    assert(type == NSE_TYPE_READ);
+
+    if (status == NSE_STATUS_EOF) {
+        nsock_loop_quit(nsp);
+        return;
+    } else if (status == NSE_STATUS_ERROR) {
+        loguser("%s.\n", socket_strerror(nse_errorcode(evt)));
+        exit(1);
+    } else if (status == NSE_STATUS_TIMEOUT) {
+        loguser("%s.\n", socket_strerror(ETIMEDOUT));
+        exit(1);
+    } else if (status == NSE_STATUS_CANCELLED || status == NSE_STATUS_KILL) {
+        return;
+    } else {
+        assert(status == NSE_STATUS_SUCCESS);
+    }
+
+    buf = nse_readbuf(evt, &nbytes);
+
+    if (o.linedelay)
+        ncat_delay_timer(o.linedelay);
+
+    if (o.telnet)
+        dotelnet(nsi_getsd(nse_iod(evt)), (unsigned char *) buf, nbytes);
+
+    /* Write socket data to stdout */
+    Write(STDOUT_FILENO, buf, nbytes);
+    ncat_log_recv(buf, nbytes);
+
+    nsock_readbytes(nsp, cs.sock_nsi, read_socket_handler, -1, NULL, 0);
+
+    refresh_idle_timer(nsp);
+}
+
+static void write_socket_handler(nsock_pool nsp, nsock_event evt, void *data)
+{
+    enum nse_status status = nse_status(evt);
+    enum nse_type type = nse_type(evt);
+
+    assert(type == NSE_TYPE_WRITE);
+
+    if (status == NSE_STATUS_ERROR) {
+        loguser("%s.\n", socket_strerror(nse_errorcode(evt)));
+        exit(1);
+    } else if (status == NSE_STATUS_TIMEOUT) {
+        loguser("%s.\n", socket_strerror(ETIMEDOUT));
+        exit(1);
+    } else if (status == NSE_STATUS_CANCELLED || status == NSE_STATUS_KILL) {
+        return;
+    } else {
+        assert(status == NSE_STATUS_SUCCESS);
+    }
+
+    /* The write to the socket was successful. Allow reading more from stdin
+       now. */
+    nsock_readbytes(nsp, cs.stdin_nsi, read_stdin_handler, -1, NULL, 0);
+}
+
+static void idle_timer_handler(nsock_pool nsp, nsock_event evt, void *data)
+{
+    enum nse_status status = nse_status(evt);
+    enum nse_type type = nse_type(evt);
+
+    assert(type == NSE_TYPE_TIMER);
+
+    if (status == NSE_STATUS_CANCELLED || status == NSE_STATUS_KILL)
+        return;
+
+    assert(status == NSE_STATUS_SUCCESS);
+
+    loguser("Idle timeout expired (%d ms).\n", o.idletimeout);
+
+    exit(1);
+}
+
+static void refresh_idle_timer(nsock_pool nsp)
+{
+    if (o.idletimeout <= 0)
+        return;
+    nsock_event_cancel(nsp, cs.idle_timer_event_id, 0);
+    cs.idle_timer_event_id =
+        nsock_timer_create(nsp, idle_timer_handler, o.idletimeout, NULL);
 }

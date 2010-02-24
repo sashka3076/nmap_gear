@@ -7,11 +7,11 @@ malware infection though it can also be used for legitimate privacy
 reasons.
 ]]
 
-author = "Diman Todorov <diman.todorov@gmail.com>"
+author = "Diman Todorov"
 
 license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
 
-categories = {"malware"}
+categories = {"malware", "safe"}
 
 require "comm"
 require "shortport"

@@ -8,6 +8,7 @@ local HAVE_SSL = false
 require 'base64'
 require 'bit'
 require 'stdnse'
+require 'comm'
 
 if pcall(require,'openssl') then
   HAVE_SSL = true
@@ -42,7 +43,7 @@ end
 -- @return Error code if status is false.
 function login_user(socket, user, pw)
    socket:send("USER " .. user .. "\r\n")
-   status, line = socket:receive_lines(1)
+   local status, line = socket:receive_lines(1)
    if not stat(line) then return false, err.user_error end
    socket:send("PASS " .. pw .. "\r\n")
       
@@ -66,7 +67,7 @@ function login_sasl_plain(socket, user, pw)
    local auth64 = base64.enc(user .. "\0" .. user .. "\0" .. pw)
    socket:send("AUTH PLAIN " .. auth64 .. "\r\n")
    
-   status, line = socket:receive_lines(1)
+   local status, line = socket:receive_lines(1)
    
    if stat(line) then 
       return true, err.none
@@ -90,14 +91,14 @@ function login_sasl_login(socket, user, pw)
 
    socket:send("AUTH LOGIN\r\n")
       
-   status, line = socket:receive_lines(1)
+   local status, line = socket:receive_lines(1)
    if not base64.dec(string.sub(line, 3)) == "User Name:" then 
       return false, err.userError 
    end
 
    socket:send(user64)
       
-   status, line = socket:receive_lines(1)
+   local status, line = socket:receive_lines(1)
 
    if not base64.dec(string.sub(line, 3)) == "Password:" then 
       return false, err.userError
@@ -105,7 +106,7 @@ function login_sasl_login(socket, user, pw)
 
    socket:send(pw64)
       
-   status, line = socket:receive_lines(1)
+   local status, line = socket:receive_lines(1)
     
    if stat(line) then
       return true, err.none
@@ -128,7 +129,7 @@ function login_apop(socket, user, pw, challenge)
    local apStr = stdnse.tohex(openssl.md5(challenge .. pw))
    socket:send(("APOP %s %s\r\n"):format(user, apStr))
       
-   status, line = socket:receive_lines(1)
+   local status, line = socket:receive_lines(1)
    
    if (stat(line)) then 
       return true, err.none
@@ -148,21 +149,21 @@ end
 function capabilities(host, port)
    local socket = nmap.new_socket()
    local capas = {}
-   socket:set_timeout(10000)
-   local proto = (port.version and port.version.service_tunnel == "ssl" and "ssl") or "tcp"
-   if not socket:connect(host.ip, port.number, proto) then return nil, "Could Not Connect" end
+   local opts = {timeout=10000, recv_before=true}
+   local i = 1
 
-   status, line = socket:receive_lines(1)
-   if not stat(line) then return nil, "No Response" end
+   local socket, line, bopt, first_line = comm.tryssl(host, port, "CAPA\r\n" , opts)
+   if not socket then return nil, "Could Not Connect" end
+   if not stat(first_line) then return nil, "No Response" end
+  
+   if string.find(first_line, "<[%p%w]+>") then capas.APOP = true end
    
-   if string.find(line, "<[%p%w]+>") then capas.APOP = true end
-   
-   socket:send("CAPA\r\n")
-   status, line = socket:receive_buf("\r\n", false)
+   local lines = stdnse.strsplit("\r\n",line)
+   local line = lines[1]
+
    if not stat(line) then 
       capas.capa = false
    else 
-      status, line = socket:receive_buf("\r\n", false)
       while line do
 	 if line ~= "." then
 	    local capability = string.sub(line, string.find(line, "[%w-]+"))
@@ -179,7 +180,8 @@ function capabilities(host, port)
 	 else
 	    break 
 	 end
-	 status, line = socket:receive_buf("\r\n", false)
+	 line = lines[i]
+	 i = i + 1
       end
    end
    socket:close()
@@ -197,7 +199,7 @@ function login_sasl_crammd5(socket, user, pw)
 
    socket:send("AUTH CRAM-MD5\r\n")
    
-   status, line = socket:receive_lines(1)
+   local status, line = socket:receive_lines(1)
    
    local challenge = base64.dec(string.sub(line, 3))
 
@@ -205,7 +207,7 @@ function login_sasl_crammd5(socket, user, pw)
    local authStr = base64.enc(user .. " " .. digest)
    socket:send(authStr .. "\r\n")
       
-   status, line = socket:receive_lines(1)
+   local status, line = socket:receive_lines(1)
    
    if stat(line) then 
       return true, err.none

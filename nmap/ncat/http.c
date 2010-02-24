@@ -1,3 +1,92 @@
+/***************************************************************************
+ * http.c -- HTTP network interaction, parsing, and construction.          *
+ ***********************IMPORTANT NMAP LICENSE TERMS************************
+ *                                                                         *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
+ *                                                                         *
+ * Note that the GPL places important restrictions on "derived works", yet *
+ * it does not provide a detailed definition of that term.  To avoid       *
+ * misunderstandings, we consider an application to constitute a           *
+ * "derivative work" for the purpose of this license if it does any of the *
+ * following:                                                              *
+ * o Integrates source code from Nmap                                      *
+ * o Reads or includes Nmap copyrighted data files, such as                *
+ *   nmap-os-db or nmap-service-probes.                                    *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
+ * o Links to a library or executes a program that does any of the above   *
+ *                                                                         *
+ * The term "Nmap" should be taken to also include any portions or derived *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
+ *                                                                         *
+ * If you have any questions about the GPL licensing restrictions on using *
+ * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
+ * we also offer alternative license to integrate Nmap into proprietary    *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
+ * sales@insecure.com for further information.                             *
+ *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included COPYING.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
+ * If you received these files with a written license agreement or         *
+ * contract stating terms other than the terms above, then that            *
+ * alternative license agreement takes precedence over these comments.     *
+ *                                                                         *
+ * Source is provided to this software because we believe users have a     *
+ * right to know exactly what a program is going to do before they run it. *
+ * This also allows you to audit the software for security holes (none     *
+ * have been found so far).                                                *
+ *                                                                         *
+ * Source code also allows you to port Nmap to new platforms, fix bugs,    *
+ * and add new features.  You are highly encouraged to send your changes   *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
+ * distribution.  By sending these changes to Fyodor or one of the         *
+ * Insecure.Org development mailing lists, it is assumed that you are      *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
+ *                                                                         *
+ * This program is distributed in the hope that it will be useful, but     *
+ * WITHOUT ANY WARRANTY; without even the implied warranty of              *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
+ * General Public License v2.0 for more details at                         *
+ * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
+ * included with Nmap.                                                     *
+ *                                                                         *
+ ***************************************************************************/
+
+/* $Id$ */
+
 #include <assert.h>
 #include <string.h>
 
@@ -100,6 +189,41 @@ char *socket_buffer_readline(struct socket_buffer *buf, size_t *n, size_t maxlen
     return line;
 }
 
+/* This is like socket_buffer_read, except that it blocks until it can read all
+ * size bytes. If fewer than size bytes are available, it reads them and returns
+ * -1. */
+int socket_buffer_readcount(struct socket_buffer *buf, char *out, size_t size)
+{
+    size_t n = 0;
+    int i;
+    
+    while (n < size) {
+        /* Refill the buffer if necessary. */
+        if (buf->p >= buf->end) {
+            buf->p = buf->buffer;
+            do {
+                errno = 0;
+                i = recv(buf->sd, buf->buffer, sizeof(buf->buffer), 0);
+            } while (i == -1 && errno == EINTR);
+            if (i <= 0)
+                return -1;
+            buf->end = buf->buffer + i;
+        }
+        i = buf->end - buf->p;
+        if (i < size - n) {
+            memcpy(out + n, buf->p, i);
+            buf->p += i;
+            n += i;
+        } else {
+            memcpy(out+ n, buf->p, size - n);
+            buf->p += size - n;
+            n += size - n;
+        } 
+    }  
+
+    return n;
+}
+
 /* Get whatever is left in the buffer. */
 char *socket_buffer_remainder(struct socket_buffer *buf, size_t *len)
 {
@@ -127,14 +251,14 @@ void uri_free(struct uri *uri)
     free(uri->path);
 }
 
-static int hex_digit_value(int digit)
+static int hex_digit_value(char digit)
 {
     const char *DIGITS = "0123456789abcdef";
     const char *p;
 
-    if (digit == '\0')
+    if ((unsigned char) digit == '\0')
         return -1;
-    p = strchr(DIGITS, tolower(digit));
+    p = strchr(DIGITS, tolower((int) (unsigned char) digit));
     if (p == NULL)
         return -1;
 
@@ -146,7 +270,7 @@ static int lowercase(char *s)
     char *p;
 
     for (p = s; *p != '\0'; p++)
-        *p = tolower(*p);
+        *p = tolower((int) (unsigned char) *p);
 
     return p - s;
 }
@@ -296,7 +420,7 @@ struct uri *uri_parse_authority(struct uri *uri, const char *authority)
     }
 
     /* Get the port number. */
-    if (*portsep == ':') {
+    if (*portsep == ':' && *(portsep + 1) != '\0') {
         long n;
 
         errno = 0;
@@ -349,9 +473,9 @@ static int is_sep_char(int c)
 }
 
 /* RFC 2616, section 2.2. */
-static int is_token_char(int c)
+static int is_token_char(char c)
 {
-    return !iscntrl(c) && !is_sep_char(c);
+    return !iscntrl((int) (unsigned char) c) && !is_sep_char((int) (unsigned char) c);
 }
 
 static int is_crlf(const char *s)
@@ -373,7 +497,7 @@ static const char *skip_crlf(const char *s)
 static int field_name_equal(const char *a, const char *b)
 {
     while (*a != '\0' && *b != '\0') {
-        if (tolower(*a) != tolower(*b))
+        if (tolower((int) (unsigned char) *a) != tolower((int) (unsigned char) *b))
             return 0;
         a++;
         b++;
@@ -775,7 +899,7 @@ int http_parse_header(struct http_header **result, const char *header)
             q = p;
             while (*q != '\0' && !is_space_char(*q) && !is_crlf(q)) {
                 /* Section 2.2 of RFC 2616 disallows control characters. */
-                if (iscntrl(*q)) {
+                if (iscntrl((int) (unsigned char) *q)) {
                     http_header_node_free(node);
                     return 400;
                 }
@@ -1030,6 +1154,21 @@ int http_parse_status_line(const char *line, struct http_response *response)
     response->phrase = mkstr(p, q);
 
     return 0;
+}
+
+/* This is a convenience wrapper around http_parse_status_line that only returns
+   the status code. Returns the status code on success or -1 on failure. */
+int http_parse_status_line_code(const char *line)
+{
+    struct http_response resp;
+    int code;
+
+    if (http_parse_status_line(line, &resp) != 0)
+        return -1;
+    code = resp.code;
+    http_response_free(&resp);
+
+    return code;
 }
 
 /* userpass is a user:pass string (the argument to --proxy-auth). value is the

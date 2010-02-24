@@ -335,6 +335,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\sockaddr_u.h"
+				>
+			</File>
+			<File
 				RelativePath="sys_wrap.h"
 				>
 			</File>

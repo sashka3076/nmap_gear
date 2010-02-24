@@ -88,7 +88,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: protocols.h 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: protocols.h 13506 2009-06-03 23:15:45Z daniel $ */
 
 #ifndef PROTOCOLS_H
 #define PROTOCOLS_H

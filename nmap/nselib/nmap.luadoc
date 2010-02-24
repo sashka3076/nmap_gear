@@ -23,7 +23,10 @@ function have_ssl()
 
 --- Returns the verbosity level as a non-negative integer.
 --
--- The verbosity level can be set with the <code>-v</code> option.
+-- The verbosity level can be set with the <code>-v</code> option. When
+-- a script is given by name with the <code>--script</code> option, as
+-- opposed to being selected by default or by category, its verbosity
+-- level is automatically increased by one.
 -- @return The verbosity level.
 -- @usage if nmap.verbosity() > 0 then ... end
 function verbosity()
@@ -52,7 +55,8 @@ function timing_level()
 -- This function takes a host table and a port table and returns a port table
 -- for the queried port. The port table returned is similar in structure to the
 -- ones passed to the <code>hostrule</code>, <code>portrule</code>, and
--- <code>action</code> functions.
+-- <code>action</code> functions. If the given port was not scanned the function
+-- returns <code>nil</code>.
 --
 -- You can of course reuse the host and port tables passed to a script's rule
 -- function. The purpose of this call is to be able to match scripts against
@@ -65,7 +69,7 @@ function timing_level()
 -- @param host Host table, containing an <code>ip</code> field.
 -- @param port Port table, containing <code>number</code> and
 -- <code>protocol</code> fields.
--- @return A new port table holding the status and information for the port.
+-- @return A new port table holding the status and information for the port, or <code>nil</code>.
 -- @usage p = nmap.get_port_state({ip="127.0.0.1"}, {number="80", protocol="tcp"})
 function get_port_state(host, port)
 
@@ -139,13 +143,19 @@ function get_interface_link(interface_name)
 --
 -- This function returns another function that works as a mutex on the object
 -- passed. This object can be any Lua data type except <code>nil</code>,
--- Booleans, and numbers. The returned function allows you to lock, try to
--- lock, and release the mutex. The returned function takes only one argument,
--- which must be one of
+-- Booleans, and Numbers. The Mutex (the returned function) allows you to lock,
+-- try to lock, and release the mutex.  The Mutex function takes only one
+-- argument, which must be one of
 -- * <code>"lock"</code>: makes a blocking lock on the mutex. If the mutex is busy then the thread will yield and wait. The function returns with the mutex locked.
--- * <code>"trylock"</code>: makes a non-blocking lock on the mutex. If the mutex is busy then it immediately returns with a return value of false. Otherwise, the mutex locks the mutex and returns true.
+-- * <code>"trylock"</code>: makes a non-blocking lock on the mutex. If the mutex is busy then it immediately returns a false value. Otherwise, the mutex locks the mutex and returns true.
 -- * <code>"done"</code>: releases the mutex and allows another thread to lock it. If the thread does not have a lock on the mutex, an error will be raised.
 -- * <code>"running"</code>: returns the thread locked on the mutex or <code>nil</code> if no thread is locked. This should only be used for debugging as it interferes with finished threads from being collected.
+--
+-- NSE maintains a weak reference to the Mutex function so other calls to
+-- nmap.mutex with the same object will return the same function (Mutex);
+-- however, if you discard your reference to the Mutex then it may be collected
+-- and subsequent calls to nmap.mutex with the object will return a different
+-- Mutex!
 -- @param object Object to create a mutex for.
 -- @return Mutex function which takes one of the following arguments:
 -- <code>"lock"</code>, <code>"trylock"</code>, <code>"done"</code>, or
@@ -161,6 +171,55 @@ function get_interface_link(interface_name)
 --   return script_output
 -- end
 function mutex(object)
+
+--- Create a condition variable for an object.
+--
+-- This function returns a function that works as a Condition Variable for the
+-- given object parameter. The object can be any Lua data type except
+-- <code>nil</code>, Booleans, and Numbers. The Condition Variable (returned
+-- function) allows you wait, signal, and broadcast on the condition variable.
+-- The Condition Variable function takes only one argument, which must be one of
+-- * <code>"wait"</code>: Wait on the condition variable until another thread wakes us.
+-- * <code>"signal"</code>: Wake up a single thread from the waiting set of threads for this condition variable.
+-- * <code>"broadcast"</code>: Wake up all threads in the waiting set of threads for this condition variable.
+--
+-- NSE maintains a weak reference to the Condition Variable so other calls to
+-- nmap.condvar with the same object will return the same function (Condition
+-- Variable); however, if you discard your reference to the Condition
+-- Variable then it may be collected; and, Subsequent calls to nmap.condvar with
+-- the object will return a different Condition Variable function!
+--
+-- In NSE, Condition Variables are typically used to coordinate with threads
+-- created using the stdnse.new_thread facility. The worker threads must
+-- wait until work is available that the master thread (the actual running
+-- script) will provide. Once work is created, the master thread will awaken
+-- one or more workers so that the work can be done.
+--
+-- It is important to check the predicate (the test to see if your worker
+-- thread should "wait" or not) BEFORE and AFTER the call to wait. You are
+-- not guaranteed spurious wakeups will not occur (that is, there is no
+-- guarantee your thread will not be awakened when no thread called
+-- <code>"signal"</code> or <code>"broadcast"</code> on the condition variable).
+-- One important check for your worker threads, before and after waiting,
+-- should be to check that the master <em>script</em> thread is still alive.
+-- (To check that the master script thread is alive, obtain the "base" thread
+-- using stdnse.base and use coroutine.status). You do not want your worker
+-- threads to continue when the script has ended for reasons unknown to your
+-- worker thread.  <strong>You are guaranteed that all threads waiting on a
+-- condition variable will be awakened if any thread that has accessed
+-- the condition variable via <code>nmap.condvar</code> ends for any
+-- reason.</strong> This is essential to prevent deadlock with threads
+-- waiting for another thread to awaken
+-- them that has ended unexpectedly.
+-- @see stdnse.new_thread
+-- @see stdnse.base
+-- @param object Object to create a condition variable for.
+-- @return ConditionVariable Condition variable function.
+-- @usage
+-- local myobject = {}
+-- local cv = nmap.condvar(myobject)
+-- cv "wait" -- waits until another thread calls cv "signal"
+function condvar(object)
 
 --- Creates a new exception handler.
 --
@@ -178,9 +237,9 @@ function mutex(object)
 -- before the script terminates.
 --
 -- A function that may raise an exception must follow the return protocol
--- understood by this function: on an exception its return values are false
--- followed by an error message; on success its return values are true followed
--- by any other results.
+-- understood by this function: on an exception its return values are
+-- <code>false</code> or <code>nil</code> followed by an error message; on
+-- success its return values are any true value followed by any other results.
 -- @param handler User cleanup function (optional).
 -- @usage
 -- local result, socket, try, catch
@@ -216,6 +275,24 @@ function new_try(handler)
 -- @usage local socket = nmap.new_socket()
 function new_socket()
 
+--- Sets the local address of a socket.
+--
+-- This socket method sets the local address and port of a socket. It must be
+-- called before <code>connect</code>. The address set by <code>bind</code>
+-- overrides Nmap's source address and port set by the <code>-S</code> and
+-- <code>-g</code> options.
+-- @param addr Address string or <code>nil</code> (optional).
+-- @param port Port number or <code>nil</code> (optional).
+-- @return Status (true or false).
+-- @return Error string (if status is false).
+-- @usage
+-- try = nmap.new_try()
+-- try(socket:bind(nil, 53))
+-- try(socket:bind("1.2.3.4"))
+-- try(socket:bind("2001:db8::1"))
+-- try(socket:bind("1.2.3.4", 53))
+function bind(addr, port)
+
 --- Establishes a connection.
 --
 -- This method puts a socket in a state ready for communication. It takes as
@@ -224,9 +301,10 @@ function new_socket()
 -- <code>"tcp"</code>, <code>"udp"</code> or <code>"ssl"</code>; it is
 -- <code>"tcp"</code> if not specified.
 --
--- On success the function returns true. On failure it returns false and an
--- error string. Those strings are taken from the <code>gai_strerror</code> C
--- function. They are (with the error code in parentheses):
+-- On success the function returns a true value. On failure it returns a false
+-- value (<code>false</code> or <code>nil</code>) and an error string. Those
+-- strings are taken from the <code>gai_strerror</code> C function. They are
+-- (with the error code in parentheses):
 -- * <code>"Address family for hostname not supported"</code> (<code>EAI_ADDRFAMILY</code>)
 -- * <code>"Temporary failure in name resolution"</code> (<code>EAI_AGAIN</code>)
 -- * <code>"Bad value for ai_flags"</code> (<code>EAI_BADFLAGS</code>)
@@ -249,15 +327,32 @@ function new_socket()
 -- @return Status (true or false).
 -- @return Error code (if status is false).
 -- @see new_socket
--- @usage local status, err = socket:connect(host.ip, port, "udp")
+-- @usage
+-- local status, err = socket:connect(host.ip, port, "udp")
+-- if not status then
+--     return string.format("Can't connect: %s", err)
+-- end
 function connect(hostid, port, protocol)
+
+--- Reconnect the open (connected) socket with SSL.
+--
+-- It is sometimes desirable to request SSL over an established connection.
+-- The internal buffers for the socket are cleared when the reconnection is
+-- made. Any received data that has not yet been read through a call to receive
+-- is lost.
+-- @usage
+-- local status, err = socket:reconnect_ssl()
+-- if not status then
+--   return string.format("Can't reconnect with ssl: %s", err)
+-- end
+function reconnect_ssl()
 
 --- Sends data on an open socket.
 --
 -- This socket method sends the data contained in the data string through an
--- open connection. On success the function returns true. If the send operation
--- has failed, the function returns true along with an error string. The error
--- strings are
+-- open connection. On success the function returns a true value. If the send
+-- operation fails, the function returns a false value (<code>false</code> or
+-- <code>nil</code>) along with an error string. The error strings are
 -- * <code>"Trying to send through a closed socket"</code>: There was no call to <code>socket:connect</code> before the send operation.
 -- * <code>"TIMEOUT"</code>: The operation took longer than the specified timeout for the socket.
 -- * <code>"ERROR"</code>: An error occurred inside the underlying Nsock library.
@@ -275,11 +370,11 @@ function send(data)
 --
 -- The receive method does a non-blocking receive operation on an open socket.
 -- On success the function returns true along with the received data. On
--- failure the function returns false along with an error string. A failure
--- occurs for example if <code>receive</code> is called on a closed socket. The
--- receive call returns to the NSE script all the data currently stored in the
--- receive buffer of the socket. Error conditions are the same as for
--- <code>send</code>.
+-- failure the function returns a false value (<code>false</code> or
+-- <code>nil</code>) along with an error string. A failure occurs for example if
+-- <code>receive</code> is called on a closed socket. The receive call returns
+-- to the NSE script all the data currently stored in the receive buffer of the
+-- socket. Error conditions are the same as for <code>send</code>.
 -- @return Status (true or false).
 -- @return Data (if status is true) or error string (if status is false).
 -- @see new_socket
@@ -296,9 +391,7 @@ function receive()
 -- returned, not just <code>n</code>. Use <code>stdnse.make_buffer</code> to
 -- guarantee only one line is returned per call.
 --
--- On success the function returns true along with the received data. If
--- receiving data has failed, the function returns false along with an error
--- string. Error conditions are the same as for <code>send</code>.
+-- The return values and error codes are the same as for <code>send</code>.
 -- @param n Minimum number of lines to read.
 -- @return Status (true or false).
 -- @return Data (if status is true) or error string (if status is false).
@@ -314,9 +407,7 @@ function receive_lines(n)
 -- even one is received then it is returned. If no characters arrive before the
 -- operation times out, a <code>"TIMEOUT"</code> error occurs.
 --
--- On success the function returns true along with the received data. If
--- receiving data has failed, the function returns false along with an error
--- string. Error conditions are the same as for <code>send</code>.
+-- The return values and error codes are the same as for <code>send</code>.
 -- @param n Minimum number of bytes to read.
 -- @return Status (true or false).
 -- @return Data (if status is true) or error string (if status is false).
@@ -347,9 +438,9 @@ function receive_bytes(n)
 -- received data (true) or discarded (false).
 --
 -- On success the function returns true along with the received data. On failure
--- the function returns false along with an error string. Possible error
--- messages are the same as those that the other receive functions can return,
--- with the addition of
+-- the function returns <code>false</code> or <code>nil</code> along with an
+-- error string. Possible error messages are the same as those that the other
+-- receive functions can return, with the addition of
 -- * <code>"Error inside splitting-function"</code>: The first argument was a function which caused an error while being called.
 -- * <code>"Error in string.find (nsockobj:receive_buf)!"</code>: A string was provided as the first argument, and string.find() yielded an error while being called.
 -- * <code>"Expected either a function or a string!"</code>: The first argument was neither a function nor a string.
@@ -367,9 +458,9 @@ function receive_buf(delimiter, keeppattern)
 --- Closes an open connection.
 --
 -- On success the function returns true. If the close fails, the function
--- returns false and an error string. Currently the only error message is
--- <code>"Trying to close a closed socket"</code>, which is issued if the
--- socket has already been closed.
+-- returns <code>false</code> or <code>nil</code> and an error string. Currently
+-- the only error message is <code>"Trying to close a closed socket"</code>,
+-- which is issued if the socket has already been closed.
 --
 -- Sockets are subject to garbage collection. Should you forget to close a
 -- socket, it will get closed before it gets deleted (on the next occasion Lua's
@@ -384,12 +475,12 @@ function close()
 --- Gets information about a socket.
 --
 -- This function returns information about a socket object. It returns five
--- values. If an error occurred, the first value is <code>nil</code> and the
--- second value is an error string. Otherwise the first value is true and the
--- remaining 4 values describe both endpoints of the TCP connection. If you put
--- the call inside an exception handler created by <code>new_try</code> the
--- status value is consumed. The call can be used for example if you want to
--- query an authentication server.
+-- values. If an error occurred, the first value is <code>false</code> or
+-- <code>nil</code> and the second value is an error string. Otherwise the first
+-- value is true and the remaining 4 values describe both endpoints of the TCP
+-- connection. If you put the call inside an exception handler created by
+-- <code>new_try</code> the status value is consumed. The call can be used for
+-- example if you want to query an authentication server.
 -- @return Status (true or false).
 -- @return Local IP address (if status is true) or error string (if status is
 -- false).
@@ -463,6 +554,49 @@ function pcap_receive()
 -- @see close, pcap_close
 -- @usage socket:pcap_close()
 function pcap_close()
+
+---
+-- Retrieves the SSL certificate of the peer. The returned value can be accessed
+-- like a table and has the following members:
+--
+-- <code>
+-- subject = { commonName = "...", countryName = "...",
+--             { "2", "5", "4", "15" } = "...", ... },
+-- issuer = { commonName = "...", ... },
+-- validity = { notBefore = { year = 2020, month = 5, day = 5,
+--                            hour = 0, min = 0, sec = 0 },
+--              notAfter = { year = 2021, month = 5, day = 5,
+--                           hour = 0, min = 0, sec = 0 } },
+-- pem = "-----BEGIN CERTIFICATE-----\nMIIFxzCCBK+gAwIBAgIQX02QuADDB7CVj..."
+-- </code>
+--
+-- It also has the following member functions:
+--
+-- * <code>digest(algorithm)</code> returns the digest of the certificate using the given digest algorithm, which is any of the strings returned by <code>openssl.supported_digests</code>, typicaly something like <code>"md5"</code> or <code>"sha1"</code>.
+--
+-- The <code>"subject"</code> and <code>"issuer"</code> fields hold each
+-- distinguished name. Fields with an unknown OID are represented as an array
+-- whose elements are the numeric components of the OID, encoded as strings.
+--
+-- The <code>"validity"</code> table has the members <code>"notBefore"</code>
+-- and <code>"notAfter"</code>. Each of these is a table as returned by
+-- <code>os.date("!*t")</code> if the date in the certificate could be parsed,
+-- except that they lack the <code>"wday"</code> and <code>"yday"</code>
+-- members. If the date could not be parsed, the value will be a string
+-- containing the raw byte values of the field. If absent, the value will be
+-- <code>nil</code>.
+--
+-- The <code>"pem"</code> field contains a PEM-encoded string of the entire
+-- contents of the certificate.
+-- @return A table as described above.
+-- @usage
+-- local s = nmap.new_socket()
+-- local status, error = s:connect(host.ip, port.number, "ssl")
+-- if status then
+--     local cert = s:get_ssl_certificate()
+--     local digest = s:digest("md5")
+-- end
+function get_ssl_certificate()
 
 --- Creates a new dnet object, used to send raw packets.
 -- @usage local dnet = nmap.new_dnet()

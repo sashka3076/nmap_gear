@@ -88,7 +88,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: main.cc 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: main.cc 15005 2009-08-13 21:54:55Z fyodor $ */
 
 #include <signal.h>
 
@@ -168,16 +168,6 @@ int main(int argc, char *argv[]) {
   // I can analyze the log via the command 'mtrace [binaryiran] [logfile]'
   // MTRACE should only be defined during debug sessions.
   mtrace();
-#endif
-
-  /* Trap these sigs for cleanup */
-#if HAVE_SIGNAL
-  signal(SIGINT, sigdie);
-  signal(SIGTERM, sigdie);
-#ifndef WIN32
-  signal(SIGHUP, sigdie); 
-  signal(SIGCHLD, reaper);
-#endif
 #endif
 
   if ((cptr = getenv("NMAP_ARGS"))) {

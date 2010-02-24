@@ -101,7 +101,18 @@
           <indexterm><primary><option>--udp</option> (Ncat option)</primary></indexterm>
         </term>
         <listitem>
-          <para>Use UDP for the connection (the default is TCP)</para>
+          <para>Use UDP for the connection (the default is TCP).</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>--sctp</option> (Use SCTP)
+          <indexterm><primary><option>--sctp</option> (Ncat option)</primary></indexterm>
+        </term>
+        <listitem>
+          <para>Use SCTP for the connection (the default is TCP).
+          SCTP support is implemented in TCP compatible mode.</para>
         </listitem>
       </varlistentry>
     </variablelist>
@@ -698,6 +709,17 @@
     file</quote> server</para>
     <para><command>HOST1$ ncat -l 9899 &lt;inputfile</command></para>
     <para><command>HOST2$ ncat HOST1 9899 &gt;outputfile</command></para>
+  </refsect1>
+
+  <refsect1 id="man-exit-code">
+    <title>Exit Code</title>
+
+    <para>The exit code reflects whether a connection was made and
+    completed successfully. 0 means there was no error. 1 means there
+    was a network error of some kind, for example <quote>Connection
+    refused</quote> or <quote>Connection reset</quote>. 2 is reserved
+    for all other errors, like an invalid option or a nonexistent
+    file.</para>
   </refsect1>
 
   <refsect1 id="man-bugs">

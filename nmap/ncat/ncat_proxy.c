@@ -1,4 +1,91 @@
-/* $Id: ncat_proxy.c 13231 2009-05-09 03:24:52Z david $ */
+/***************************************************************************
+ * ncat_proxy.c -- HTTP proxy server.                                      *
+ ***********************IMPORTANT NMAP LICENSE TERMS************************
+ *                                                                         *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
+ *                                                                         *
+ * Note that the GPL places important restrictions on "derived works", yet *
+ * it does not provide a detailed definition of that term.  To avoid       *
+ * misunderstandings, we consider an application to constitute a           *
+ * "derivative work" for the purpose of this license if it does any of the *
+ * following:                                                              *
+ * o Integrates source code from Nmap                                      *
+ * o Reads or includes Nmap copyrighted data files, such as                *
+ *   nmap-os-db or nmap-service-probes.                                    *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
+ * o Links to a library or executes a program that does any of the above   *
+ *                                                                         *
+ * The term "Nmap" should be taken to also include any portions or derived *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
+ *                                                                         *
+ * If you have any questions about the GPL licensing restrictions on using *
+ * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
+ * we also offer alternative license to integrate Nmap into proprietary    *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
+ * sales@insecure.com for further information.                             *
+ *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included COPYING.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
+ * If you received these files with a written license agreement or         *
+ * contract stating terms other than the terms above, then that            *
+ * alternative license agreement takes precedence over these comments.     *
+ *                                                                         *
+ * Source is provided to this software because we believe users have a     *
+ * right to know exactly what a program is going to do before they run it. *
+ * This also allows you to audit the software for security holes (none     *
+ * have been found so far).                                                *
+ *                                                                         *
+ * Source code also allows you to port Nmap to new platforms, fix bugs,    *
+ * and add new features.  You are highly encouraged to send your changes   *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
+ * distribution.  By sending these changes to Fyodor or one of the         *
+ * Insecure.Org development mailing lists, it is assumed that you are      *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
+ *                                                                         *
+ * This program is distributed in the hope that it will be useful, but     *
+ * WITHOUT ANY WARRANTY; without even the implied warranty of              *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
+ * General Public License v2.0 for more details at                         *
+ * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
+ * included with Nmap.                                                     *
+ *                                                                         *
+ ***************************************************************************/
+
+/* $Id: ncat_proxy.c 15802 2009-10-10 02:41:06Z david $ */
 
 #include "base64.h"
 #include "http.h"
@@ -10,11 +97,13 @@
 #include <unistd.h>
 #endif
 
+#ifndef WIN32
 /* SIG_CHLD handler */
 static void proxyreaper(int signo)
 {
-    while (Waitpid(-1, NULL, WNOHANG) > 0);
+    while (waitpid(-1, NULL, WNOHANG) > 0);
 }
+#endif
 
 /* send a '\0'-terminated string. */
 static int send_string(int sock, const char *s)
@@ -60,18 +149,18 @@ int ncat_http_server(void)
 {
     int c, s;
     size_t sslen;
-    struct sockaddr_storage conn;
+    union sockaddr_u conn;
 
 #ifndef WIN32
     Signal(SIGCHLD, proxyreaper);
 #endif
 
-    s = do_listen(SOCK_STREAM);
+    s = do_listen(SOCK_STREAM, IPPROTO_TCP);
 
     for (;;) {
-        sslen = sizeof(conn);
+        sslen = sizeof(conn.storage);
 
-        c = accept(s, (struct sockaddr *) &conn, (socklen_t *) &sslen);
+        c = accept(s, &conn.sockaddr, (socklen_t *) &sslen);
 
         if (c == -1) {
             if (errno == EINTR)
@@ -262,8 +351,8 @@ static void http_server_handler(int c)
 static int handle_connect(struct socket_buffer *client_sock,
     struct http_request *request)
 {
-    struct sockaddr_storage ss;
-    size_t sslen = sizeof(ss);
+    union sockaddr_u su;
+    size_t sslen = sizeof(su.storage);
     int maxfd, s;
     char *line;
     size_t len;
@@ -277,17 +366,17 @@ static int handle_connect(struct socket_buffer *client_sock,
     if (o.debug > 1)
         logdebug("CONNECT to %s:%hu.\n", request->uri.host, request->uri.port);
 
-    if (!resolve(request->uri.host, request->uri.port, &ss, &sslen, AF_UNSPEC)) {
+    if (!resolve(request->uri.host, request->uri.port, &su.storage, &sslen, o.af)) {
         if (o.debug)
             logdebug("Can't resolve name %s.\n", request->uri.host);
         return 504;
     }
 
-    s = Socket(ss.ss_family, SOCK_STREAM, IPPROTO_TCP);
+    s = Socket(su.storage.ss_family, SOCK_STREAM, IPPROTO_TCP);
 
-    if (connect(s, (struct sockaddr *) &ss, sslen) == -1) {
+    if (connect(s, &su.sockaddr, sslen) == -1) {
         if (o.debug)
-            logdebug("Can't connect to %s.\n", inet_socktop(&ss));
+            logdebug("Can't connect to %s.\n", inet_socktop(&su));
         Close(s);
         return 504;
     }
@@ -311,13 +400,13 @@ static int handle_connect(struct socket_buffer *client_sock,
 
     errno = 0;
 
-    while (!errno || errno == EINTR) {
+    while (!socket_errno() || socket_errno() == EINTR) {
         char buf[DEFAULT_TCP_BUF_LEN];
         int len, numready;
 
         r = m;
 
-        numready = Select(maxfd + 1, &r, NULL, NULL, NULL);
+        numready = fselect(maxfd + 1, &r, NULL, NULL, NULL);
 
         zmem(buf, sizeof(buf));
 
@@ -357,8 +446,8 @@ static int handle_method(struct socket_buffer *client_sock,
     struct http_request *request)
 {
     struct socket_buffer server_sock;
-    struct sockaddr_storage ss;
-    size_t sslen = sizeof(ss);
+    union sockaddr_u su;
+    size_t sslen = sizeof(su.storage);
     int code;
     int s;
 
@@ -373,7 +462,7 @@ static int handle_method(struct socket_buffer *client_sock,
         return 400;
     }
 
-    if (!resolve(request->uri.host, request->uri.port, &ss, &sslen, AF_UNSPEC)) {
+    if (!resolve(request->uri.host, request->uri.port, &su.storage, &sslen, o.af)) {
         if (o.debug)
             logdebug("Can't resolve name %s:%d.\n", request->uri.host, request->uri.port);
         return 504;
@@ -382,17 +471,17 @@ static int handle_method(struct socket_buffer *client_sock,
     /* RFC 2616, section 5.1.2: "In order to avoid request loops, a proxy MUST
        be able to recognize all of its server names, including any aliases,
        local variations, and the numeric IP address. */
-    if (request->uri.port == o.portno && addr_is_local(&ss)) {
+    if (request->uri.port == o.portno && addr_is_local(&su)) {
         if (o.verbose)
             logdebug("Proxy loop detected: %s:%d\n", request->uri.host, request->uri.port);
         return 403;
     }
 
-    s = Socket(ss.ss_family, SOCK_STREAM, IPPROTO_TCP);
+    s = Socket(su.storage.ss_family, SOCK_STREAM, IPPROTO_TCP);
 
-    if (connect(s, (struct sockaddr *) &ss, sslen) == -1) {
+    if (connect(s, &su.sockaddr, sslen) == -1) {
         if (o.debug)
-            logdebug("Can't connect to %s.\n", inet_socktop(&ss));
+            logdebug("Can't connect to %s.\n", inet_socktop(&su));
         Close(s);
         return 504;
     }

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Zenmap\n"
 "Report-Msgid-Bugs-To: nmap-dev@insecure.org\n"
-"POT-Creation-Date: 2009-05-08 09:22-0600\n"
+"POT-Creation-Date: 2009-08-21 09:04-0600\n"
 "PO-Revision-Date: 2006-04-12 11:53-0300\n"
 "Last-Translator: Adriano Monteiro Marques <py.adriano@gmail.com>\n"
 "MIME-Version: 1.0\n"
@@ -43,107 +43,91 @@ msgstr ""
 msgid "Python 2.4 or later is required."
 msgstr ""
 
-#: zenmapCore/NmapParser.py:254
+#: zenmapCore/NmapParser.py:279
 msgid "Unknown Host"
 msgstr "Máquina desconhecida"
 
-#: zenmapCore/NmapParser.py:321
+#: zenmapCore/NmapParser.py:325
 msgid "unknown"
 msgstr ""
 
-#: zenmapCore/NmapParser.py:324
+#: zenmapCore/NmapParser.py:328
 msgid "Unknown version"
 msgstr ""
 
-#: zenmapCore/NmapParser.py:327 zenmapGUI/SearchGUI.py:427
-#: zenmapGUI/ScanNotebook.py:802 zenmapGUI/ScanNotebook.py:824
+#: zenmapCore/NmapParser.py:331 zenmapGUI/SearchGUI.py:414
+#: zenmapGUI/ScanInterface.py:859 zenmapGUI/ScanInterface.py:881
 msgid "Unknown"
 msgstr "Desconhecido"
 
-#: zenmapCore/NmapParser.py:612
+#: zenmapCore/NmapParser.py:616
 #, python-format
 msgid "%s on %s"
 msgstr ""
 
-#: zenmapCore/UmitOptionParser.py:47
+#: zenmapCore/UmitOptionParser.py:45
 msgid ""
-"Specify a scan result file in Nmap XML Output or Umit Scan Result file. Can "
-"be used more than once to specify several scan result files."
+"Specify a scan result file in Nmap XML output format. Can be used more than "
+"once to specify several scan result files."
 msgstr ""
 
-#: zenmapCore/UmitOptionParser.py:58
+#: zenmapCore/UmitOptionParser.py:56
 #, python-format
 msgid "Run %s with the specified args."
 msgstr ""
 
-#: zenmapCore/UmitOptionParser.py:65
+#: zenmapCore/UmitOptionParser.py:63
 msgid ""
 "Begin with the specified profile selected. If combined with the -t (--"
 "target) option, automatically run the profile against the specified target."
 msgstr ""
 
-#: zenmapCore/UmitOptionParser.py:76
+#: zenmapCore/UmitOptionParser.py:74
 msgid ""
 "Specify a target to be used along with other options. If specified alone, "
 "open with the target field filled with the specified target"
 msgstr ""
 
-#: zenmapCore/UmitOptionParser.py:84
+#: zenmapCore/UmitOptionParser.py:82
 msgid ""
 "Increase verbosity of the output. May be used more than once to get even "
 "more verbosity"
 msgstr ""
 
-#: zenmapCore/UmitDB.py:33
+#: zenmapCore/UmitDB.py:39
 msgid "No module named dbapi2.pysqlite2 or sqlite3"
 msgstr ""
 
-#: zenmapCore/UmitConf.py:128
-msgid "Hours"
-msgstr ""
-
-#: zenmapCore/UmitConf.py:129
-msgid "Days"
-msgstr ""
-
-#: zenmapCore/UmitConf.py:130
-msgid "Weeks"
-msgstr ""
-
-#: zenmapCore/UmitConf.py:131
-msgid "Months"
-msgstr ""
-
-#: zenmapCore/UmitConf.py:132
-msgid "Years"
-msgstr ""
-
-#: zenmapCore/UmitConf.py:133
-msgid "Minutes"
-msgstr ""
-
-#: zenmapCore/UmitConf.py:134
-msgid "Seconds"
-msgstr ""
-
-#: zenmapGUI/SearchGUI.py:203
+#: zenmapGUI/SearchGUI.py:213
 msgid "Search:"
 msgstr ""
 
-#: zenmapGUI/SearchGUI.py:205
+#: zenmapGUI/SearchGUI.py:215
 msgid "Expressions "
 msgstr ""
 
-#: zenmapGUI/SearchGUI.py:217 zenmapGUI/ProfileEditor.py:133
+#: zenmapGUI/SearchGUI.py:227 zenmapGUI/ProfileEditor.py:133
 #: zenmapGUI/ScanToolbar.py:72
 msgid "Scan"
 msgstr ""
 
-#: zenmapGUI/SearchGUI.py:218
+#: zenmapGUI/SearchGUI.py:228
 msgid "Date"
 msgstr ""
 
-#: zenmapGUI/SearchGUI.py:250
+#: zenmapGUI/SearchGUI.py:362
+msgid "No search method selected!"
+msgstr ""
+
+#: zenmapGUI/SearchGUI.py:363
+#, python-format
+msgid ""
+"%s can search results on directories or inside it's own database. Please, "
+"select a method by choosing a directory or by checking the search data base "
+"option at the 'Search options' tab before start the search"
+msgstr ""
+
+#: zenmapGUI/SearchGUI.py:824
 msgid ""
 "Entering the text into the search performs a <b>keyword search</b> - the "
 "search string is matched against the entire output of each scan.\n"
@@ -151,8 +135,7 @@ msgid ""
 "To refine the search, you can use <b>operators</b> to search only within a "
 "specific part of a scan. Operators can be added to the search interactively "
 "if you click on the <b>Expressions</b> button, or you can enter them "
-"manually into the search field. You can also use <b>operator aliases</b> if "
-"you're an experienced user who likes to type in his searches quickly.\n"
+"manually into the search field. Most operators have a short form, listed.\n"
 "\n"
 "<b>profile: (pr:)</b> - Profile used.\n"
 "<b>target: (t:)</b> - User-supplied target, or a rDNS result.\n"
@@ -176,18 +159,6 @@ msgid ""
 "<b>closed|filtered: (cfp:)</b> - Ports in the \"closed|filtered\" state.\n"
 "<b>service: (s:)</b> - All service-related fields.\n"
 "<b>inroute: (ir:)</b> - Matches a router in the scan's traceroute output.\n"
-msgstr ""
-
-#: zenmapGUI/SearchGUI.py:375
-msgid "No search method selected!"
-msgstr ""
-
-#: zenmapGUI/SearchGUI.py:376
-#, python-format
-msgid ""
-"%s can search results on directories or inside it's own database. Please, "
-"select a method by choosing a directory or by checking the search data base "
-"option at the 'Search options' tab before start the search"
 msgstr ""
 
 #: zenmapGUI/About.py:87
@@ -300,7 +271,7 @@ msgstr ""
 msgid "highlight color"
 msgstr ""
 
-#: zenmapGUI/ScanOpenPortsPage.py:63 zenmapGUI/ScanHostsView.py:63
+#: zenmapGUI/ScanOpenPortsPage.py:63 zenmapGUI/ScanHostsView.py:61
 msgid "Host"
 msgstr ""
 
@@ -320,7 +291,7 @@ msgid "State"
 msgstr ""
 
 #: zenmapGUI/ScanOpenPortsPage.py:68 zenmapGUI/ScanOpenPortsPage.py:81
-#: zenmapGUI/ScanHostsView.py:70 radialnet/gui/NodeNotebook.py:31
+#: zenmapGUI/ScanHostsView.py:68 radialnet/gui/NodeNotebook.py:31
 msgid "Service"
 msgstr ""
 
@@ -332,18 +303,6 @@ msgstr ""
 #: zenmapGUI/ScanOpenPortsPage.py:82 radialnet/gui/NodeNotebook.py:42
 msgid "Hostname"
 msgstr ""
-
-#: zenmapGUI/ScanOpenPortsPage.py:90
-msgid "Display Order / Grouping"
-msgstr "Mostrar Ordem / Agrupamentos"
-
-#: zenmapGUI/ScanOpenPortsPage.py:96
-msgid "Sort by port number"
-msgstr "Ordenar por número de porta"
-
-#: zenmapGUI/ScanOpenPortsPage.py:98
-msgid "Sort by service name"
-msgstr "Ordenar por nome de serviço"
 
 #: zenmapGUI/CrashReport.py:43
 msgid "Crash Report"
@@ -398,23 +357,15 @@ msgstr ""
 msgid "Append"
 msgstr ""
 
-#: zenmapGUI/ScanHostsView.py:28
-msgid "Scanning"
-msgstr "Varrendo"
-
-#: zenmapGUI/ScanHostsView.py:29
-msgid "Cancelled"
-msgstr ""
-
-#: zenmapGUI/ScanHostsView.py:52
+#: zenmapGUI/ScanHostsView.py:50
 msgid "Hosts"
 msgstr ""
 
-#: zenmapGUI/ScanHostsView.py:53 radialnet/gui/NodeNotebook.py:95
+#: zenmapGUI/ScanHostsView.py:51 radialnet/gui/NodeNotebook.py:95
 msgid "Services"
 msgstr ""
 
-#: zenmapGUI/ScanHostsView.py:62
+#: zenmapGUI/ScanHostsView.py:60
 msgid "OS"
 msgstr ""
 
@@ -510,11 +461,11 @@ msgid ""
 "or to Fyodor directly.\n"
 msgstr ""
 
-#: zenmapGUI/App.py:119
+#: zenmapGUI/App.py:123
 msgid "Error creating the per-user configuration directory"
 msgstr ""
 
-#: zenmapGUI/App.py:120
+#: zenmapGUI/App.py:124
 #, python-format
 msgid ""
 "There was an error creating the directory %s or one of the files in it. The "
@@ -526,11 +477,11 @@ msgid ""
 "scan profiles. Check for access to the directory and try again."
 msgstr ""
 
-#: zenmapGUI/App.py:138
+#: zenmapGUI/App.py:142
 msgid "Error parsing the configuration file"
 msgstr ""
 
-#: zenmapGUI/App.py:139
+#: zenmapGUI/App.py:143
 #, python-format
 msgid ""
 "There was an error parsing the configuration file %s. The specific error "
@@ -542,7 +493,7 @@ msgid ""
 "until it is repaired."
 msgstr ""
 
-#: zenmapGUI/App.py:203
+#: zenmapGUI/App.py:207
 #, python-format
 msgid ""
 "You are trying to run %s with a non-root user!\n"
@@ -550,220 +501,224 @@ msgid ""
 "Some %s options need root privileges to work."
 msgstr ""
 
-#: zenmapGUI/App.py:206
-msgid "Non root user"
-msgstr "Usuário não-root (não-administrador)"
-
-#: zenmapGUI/MainWindow.py:127
-msgid "Sc_an"
+#: zenmapGUI/App.py:210
+msgid "Non-root user"
 msgstr ""
 
 #: zenmapGUI/MainWindow.py:131
+msgid "Sc_an"
+msgstr ""
+
+#: zenmapGUI/MainWindow.py:135
 msgid "_Save Scan"
 msgstr "_Salvar Varredura"
 
-#: zenmapGUI/MainWindow.py:133
+#: zenmapGUI/MainWindow.py:137
 msgid "Save current scan results"
 msgstr "Salva resultados da varredura atual"
 
-#: zenmapGUI/MainWindow.py:138
-msgid "Save to _Directory"
+#: zenmapGUI/MainWindow.py:142
+msgid "Save All Scans to _Directory"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:140
+#: zenmapGUI/MainWindow.py:144
 msgid "Save all scans into a directory"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:145
+#: zenmapGUI/MainWindow.py:149
 msgid "_Open Scan"
 msgstr "_Abrir varredura"
 
-#: zenmapGUI/MainWindow.py:147
+#: zenmapGUI/MainWindow.py:151
 msgid "Open the results of a previous scan"
 msgstr "Abre resultados de uma varredura previamente salva"
 
-#: zenmapGUI/MainWindow.py:152
+#: zenmapGUI/MainWindow.py:156
 msgid "_Open Scan in This Window"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:154
+#: zenmapGUI/MainWindow.py:158
 msgid "Append a saved scan to the list of scans in this window."
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:158
+#: zenmapGUI/MainWindow.py:162
 msgid "_Tools"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:162
+#: zenmapGUI/MainWindow.py:166
 msgid "_New Window"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:164
+#: zenmapGUI/MainWindow.py:168
 msgid "Open a new scan window"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:169
+#: zenmapGUI/MainWindow.py:173
 msgid "Close Window"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:171
+#: zenmapGUI/MainWindow.py:175
 msgid "Close this scan window"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:176
+#: zenmapGUI/MainWindow.py:180
 msgid "Quit"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:178
+#: zenmapGUI/MainWindow.py:182
 msgid "Quit the application"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:183
+#: zenmapGUI/MainWindow.py:187
 msgid "New _Profile or Command"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:185
+#: zenmapGUI/MainWindow.py:189
 msgid "Create a new scan profile using the current command"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:190
+#: zenmapGUI/MainWindow.py:194
 msgid "Search Scan Results"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:192
+#: zenmapGUI/MainWindow.py:196
 msgid "Search for a scan result"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:197
+#: zenmapGUI/MainWindow.py:201 zenmapGUI/ScanInterface.py:917
+msgid "Filter Hosts"
+msgstr ""
+
+#: zenmapGUI/MainWindow.py:203
+msgid "Search for host by criteria"
+msgstr ""
+
+#: zenmapGUI/MainWindow.py:208
 msgid "_Edit Selected Profile"
 msgstr "_Editar Perfil Selecionado"
 
-#: zenmapGUI/MainWindow.py:199
+#: zenmapGUI/MainWindow.py:210
 msgid "Edit selected scan profile"
 msgstr "Edita o perfil de varredura selecionado"
 
-#: zenmapGUI/MainWindow.py:203
+#: zenmapGUI/MainWindow.py:214
 msgid "_Profile"
 msgstr "_Perfil"
 
-#: zenmapGUI/MainWindow.py:207 zenmapGUI/DiffCompare.py:207
+#: zenmapGUI/MainWindow.py:218 zenmapGUI/DiffCompare.py:207
 msgid "Compare Results"
 msgstr "Comparar Resultados"
 
-#: zenmapGUI/MainWindow.py:209
+#: zenmapGUI/MainWindow.py:220
 msgid "Compare Scan Results using Diffies"
 msgstr "Compara resultados de varreduras usando Diff"
 
-#: zenmapGUI/MainWindow.py:214 zenmapGUI/MainWindow.py:234
+#: zenmapGUI/MainWindow.py:225 zenmapGUI/MainWindow.py:245
 msgid "_Help"
 msgstr "Ajuda"
 
-#: zenmapGUI/MainWindow.py:218
+#: zenmapGUI/MainWindow.py:229
 msgid "_Report a bug"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:220
+#: zenmapGUI/MainWindow.py:231
 msgid "Report a bug"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:226
+#: zenmapGUI/MainWindow.py:237
 msgid "_About"
 msgstr "_Sobre"
 
-#: zenmapGUI/MainWindow.py:228
+#: zenmapGUI/MainWindow.py:239
 #, python-format
 msgid "About %s"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:236
+#: zenmapGUI/MainWindow.py:247
 msgid "Shows the application help"
 msgstr "Mostra a ajuda da aplicação"
 
-#: zenmapGUI/MainWindow.py:422
+#: zenmapGUI/MainWindow.py:439
 msgid "Error loading file"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:444 zenmapGUI/MainWindow.py:517
+#: zenmapGUI/MainWindow.py:461 zenmapGUI/MainWindow.py:534
 msgid "Nothing to save"
 msgstr "Nenhuma modificação a ser salva"
 
-#: zenmapGUI/MainWindow.py:445
+#: zenmapGUI/MainWindow.py:462
 msgid ""
 "There are no scans with results to be saved. Run a scan with the \"Scan\" "
 "button first."
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:454 zenmapGUI/MainWindow.py:526
+#: zenmapGUI/MainWindow.py:471 zenmapGUI/MainWindow.py:543
 msgid "There is a scan still running. Wait until it finishes and then save."
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:456 zenmapGUI/MainWindow.py:528
+#: zenmapGUI/MainWindow.py:473 zenmapGUI/MainWindow.py:545
 #, python-format
 msgid "There are %u scans still running. Wait until they finish and then save."
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:458 zenmapGUI/MainWindow.py:530
+#: zenmapGUI/MainWindow.py:475 zenmapGUI/MainWindow.py:547
 msgid "Scan is running"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:497
+#: zenmapGUI/MainWindow.py:514
 msgid "Save Scan"
 msgstr "Salvar Varredura"
 
-#: zenmapGUI/MainWindow.py:518
+#: zenmapGUI/MainWindow.py:535
 msgid ""
 "This scan has not been run yet. Start the scan with the \"Scan\" button "
 "first."
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:538
+#: zenmapGUI/MainWindow.py:555
 msgid "Choose a directory to save scans into"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:557 zenmapGUI/MainWindow.py:577
+#: zenmapGUI/MainWindow.py:574 zenmapGUI/MainWindow.py:594
 msgid "Can't save file"
 msgstr "Não foi possível salvar o arquivo"
 
-#: zenmapGUI/MainWindow.py:578
+#: zenmapGUI/MainWindow.py:595
 #, python-format
 msgid ""
 "Can't open file to write.\n"
 "%s"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:617
-msgid "The text above is this action's name"
-msgstr ""
-
-#: zenmapGUI/MainWindow.py:630 zenmapGUI/MainWindow.py:668
+#: zenmapGUI/MainWindow.py:640 zenmapGUI/MainWindow.py:678
 msgid "Close anyway"
 msgstr "Fechar mesmo assim"
 
-#: zenmapGUI/MainWindow.py:633
+#: zenmapGUI/MainWindow.py:643
 msgid "Unsaved changes"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:635
+#: zenmapGUI/MainWindow.py:645
 msgid ""
 "The given scan has unsaved changes.\n"
 "What do you want to do?"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:671
+#: zenmapGUI/MainWindow.py:681
 msgid "Trying to close"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:673
+#: zenmapGUI/MainWindow.py:683
 msgid ""
 "The window you are trying to close has a scan running at the background.\n"
 "What do you want to do?"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:748
+#: zenmapGUI/MainWindow.py:758
 msgid "Can't find documentation files"
 msgstr ""
 
-#: zenmapGUI/MainWindow.py:749
+#: zenmapGUI/MainWindow.py:759
 #, python-format
 msgid ""
 "There was an error loading the documentation file %s (%s). See the online "
@@ -850,7 +805,7 @@ msgstr "# portas analisadas:"
 msgid "Services:"
 msgstr "Serviços:"
 
-#: zenmapGUI/ScanNmapOutputPage.py:109
+#: zenmapGUI/ScanNmapOutputPage.py:113
 msgid "Details"
 msgstr ""
 
@@ -1087,44 +1042,68 @@ msgstr ""
 msgid "Nmap XML files (%s)"
 msgstr ""
 
-#: zenmapGUI/ScanNotebook.py:256
+#: zenmapGUI/FilterBar.py:23
+msgid "Host Filter:"
+msgstr ""
+
+#: zenmapGUI/FilterBar.py:56
+msgid ""
+"Entering the text into the search performs a <b>keyword search</b> - the "
+"search string is matched against every aspect of the host.\n"
+"\n"
+"To refine the search, you can use <b>operators</b> to search only specific "
+"fields within a host. Most operators have a short form, listed. \n"
+"<b>target: (t:)</b> - User-supplied target, or a rDNS result.\n"
+"<b>os:</b> - All OS-related fields.\n"
+"<b>open: (op:)</b> - Open ports discovered in a scan.\n"
+"<b>closed: (cp:)</b> - Closed ports discovered in a scan.\n"
+"<b>filtered: (fp:)</b> - Filtered ports discovered in scan.\n"
+"<b>unfiltered: (ufp:)</b> - Unfiltered ports found in a scan (using, for "
+"example, an ACK scan).\n"
+"<b>open|filtered: (ofp:)</b> - Ports in the \"open|filtered\" state.\n"
+"<b>closed|filtered: (cfp:)</b> - Ports in the \"closed|filtered\" state.\n"
+"<b>service: (s:)</b> - All service-related fields.\n"
+"<b>inroute: (ir:)</b> - Matches a router in the scan's traceroute output.\n"
+msgstr ""
+
+#: zenmapGUI/ScanInterface.py:316
 msgid "Empty Nmap Command"
 msgstr ""
 
-#: zenmapGUI/ScanNotebook.py:257
+#: zenmapGUI/ScanInterface.py:317
 msgid ""
 "There is no command to  execute. Maybe the selected/typed profile doesn't "
 "exist. Please, check the profile name or type the nmap command you would "
 "like to execute."
 msgstr ""
 
-#: zenmapGUI/ScanNotebook.py:360
+#: zenmapGUI/ScanInterface.py:420
 msgid ""
 "This means that the nmap executable was not found in your system PATH, which "
 "is"
 msgstr ""
 
-#: zenmapGUI/ScanNotebook.py:360
+#: zenmapGUI/ScanInterface.py:420
 msgid "<undefined>"
 msgstr ""
 
-#: zenmapGUI/ScanNotebook.py:370
+#: zenmapGUI/ScanInterface.py:430
 msgid "plus the extra directory"
 msgstr ""
 
-#: zenmapGUI/ScanNotebook.py:372
+#: zenmapGUI/ScanInterface.py:432
 msgid "plus the extra directories"
 msgstr ""
 
-#: zenmapGUI/ScanNotebook.py:374
+#: zenmapGUI/ScanInterface.py:434
 msgid "Error executing command"
 msgstr ""
 
-#: zenmapGUI/ScanNotebook.py:441
+#: zenmapGUI/ScanInterface.py:501
 msgid "Parse error"
 msgstr ""
 
-#: zenmapGUI/ScanNotebook.py:442
+#: zenmapGUI/ScanInterface.py:502
 #, python-format
 msgid ""
 "There was an error while parsing the XML file generated from the scan:\n"
@@ -1132,27 +1111,32 @@ msgid ""
 "%s"
 msgstr ""
 
-#: zenmapGUI/ScanNotebook.py:926
+#: zenmapGUI/ScanInterface.py:614
+#, python-format
+msgid "%d/%d hosts shown"
+msgstr ""
+
+#: zenmapGUI/ScanInterface.py:987
 msgid "Nmap Output"
 msgstr "Saída do Nmap"
 
-#: zenmapGUI/ScanNotebook.py:927
+#: zenmapGUI/ScanInterface.py:988
 msgid "Ports / Hosts"
 msgstr ""
 
-#: zenmapGUI/ScanNotebook.py:928
+#: zenmapGUI/ScanInterface.py:989
 msgid "Topology"
 msgstr ""
 
-#: zenmapGUI/ScanNotebook.py:929
+#: zenmapGUI/ScanInterface.py:990
 msgid "Host Details"
 msgstr "Detalhes da Máquina"
 
-#: zenmapGUI/ScanNotebook.py:930
+#: zenmapGUI/ScanInterface.py:991
 msgid "Scans"
 msgstr ""
 
-#: zenmapGUI/ScanNotebook.py:951
+#: zenmapGUI/ScanInterface.py:1012
 msgid "No host selected."
 msgstr ""
 
@@ -1160,7 +1144,7 @@ msgstr ""
 msgid "Alert"
 msgstr ""
 
-#: radialnet/gui/HostsViewer.py:48 radialnet/gui/Toolbar.py:124
+#: radialnet/gui/HostsViewer.py:48 radialnet/gui/Toolbar.py:132
 msgid "Hosts Viewer"
 msgstr ""
 
@@ -1168,16 +1152,24 @@ msgstr ""
 msgid "No node selected"
 msgstr ""
 
-#: radialnet/gui/Toolbar.py:52
+#: radialnet/gui/Toolbar.py:55
 msgid "Hosts viewer"
 msgstr ""
 
-#: radialnet/gui/Toolbar.py:127
+#: radialnet/gui/Toolbar.py:129
+msgid "Save Graphic"
+msgstr ""
+
+#: radialnet/gui/Toolbar.py:135
 msgid "Controls"
 msgstr ""
 
-#: radialnet/gui/Toolbar.py:131
+#: radialnet/gui/Toolbar.py:139
 msgid "Fisheye"
+msgstr ""
+
+#: radialnet/gui/Toolbar.py:225
+msgid "Error saving snapshot"
 msgstr ""
 
 #: radialnet/gui/ControlWidget.py:81
@@ -1426,4 +1418,35 @@ msgstr ""
 
 #: radialnet/gui/NodeNotebook.py:572
 msgid "TCP Timestamp"
+msgstr ""
+
+#: radialnet/gui/SaveDialog.py:47
+msgid "Save Topology"
+msgstr ""
+
+#: radialnet/gui/SaveDialog.py:67
+msgid "Select File Type:"
+msgstr ""
+
+#: radialnet/gui/SaveDialog.py:99
+msgid "No filename extension"
+msgstr ""
+
+#: radialnet/gui/SaveDialog.py:100
+#, python-format
+msgid ""
+"The filename \"%s\" does not have an extension, and no specific file type "
+"was chosen.\n"
+"Enter a known extension or select the file type from the list."
+msgstr ""
+
+#: radialnet/gui/SaveDialog.py:106
+msgid "Unknown filename extension"
+msgstr ""
+
+#: radialnet/gui/SaveDialog.py:107
+#, python-format
+msgid ""
+"There is no file type known for the filename extension \"%s\".\n"
+"Enter a known extension or select the file type from the list."
 msgstr ""

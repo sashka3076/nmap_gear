@@ -4,6 +4,10 @@ AC_PREREQ(2.13)
 dnl Process this file with autoconf to produce a configure script.
 AC_INIT(nmap.cc)
 
+dnl Give us the --enable-nls option, to choose which translated man pages get
+dnl installed. This gets replaced with AM_GNU_GETTEXT for full gettext support.
+AM_NLS
+
 AC_ARG_WITH(localdirs,
 AC_HELP_STRING([--with-localdirs], [Explicitly ask compiler to use /usr/local/{include,libs} if they exist ]),
   [ case "$with_localdirs" in
@@ -45,34 +49,10 @@ AC_PROG_CC
 AC_PROG_CXX
 AC_PROG_INSTALL
 
- if test -n "$GXX"; then
-      CXXFLAGS="$CXXFLAGS -Wall "
- fi
-
-AC_MSG_CHECKING([whether the compiler is gcc 4 or greater])
-if test x"$GXX" = xno; then
-  AC_MSG_RESULT([no])
-else
-  # On some distros, there are snapshots available as gcc4
-  if test -z "$ac_cv_prog_CC" || test x"$CC" = xgcc4; then
-    our_gcc="$CC"
-  else
-    our_gcc="$ac_cv_prog_CC"
-  fi
-
-  nmap_gcc_major_version=0
-  case `$our_gcc --version | sed -e 's,\..*,.,' -e q` in
-    *4.)
-      nmap_gcc_major_version=4
-      ;;
-  esac
-
-  if test 4 -ge $nmap_gcc_major_version; then
-    AC_MSG_RESULT([yes])
-    CXXFLAGS="$CXXFLAGS -fno-strict-aliasing"
-  else
-    AC_MSG_RESULT([no])
-  fi
+if test -n "$GXX"; then
+  # -fno-strict-aliasing disables strict-aliasing optimizations that assume
+  # that pointers of different types never point to the same object.
+  CXXFLAGS="$CXXFLAGS -Wall -fno-strict-aliasing"
 fi
 
 # Remember that all following tests will run with this CXXFLAGS by default
@@ -386,7 +366,8 @@ int main() {
   exit(0);
 }],
 [AC_MSG_RESULT(yes); have_libpcap=yes],
-[AC_MSG_RESULT(no); have_libpcap=no])
+[AC_MSG_RESULT(no); have_libpcap=no],
+[AC_MSG_RESULT(cross-compiling -- assuming yes); have_libpcap=yes])
 LIBS="$LIBS_OLD"
 fi
 
@@ -487,9 +468,10 @@ LIBDNETDIR=libdnet-stripped
 # Unlike the other included libraries (pcap, pcre, lua), we prefer our local
 # copy of libdnet. That is, with the other libraries we check for a system
 # version by default, whereas with dnet we use the local version unless
-# specifically asked to use a system version.
+# specifically asked to use a system version.  This is because we have
+# made many improvements and fixes to our version of dnet.
 AC_ARG_WITH(libdnet,
-AC_HELP_STRING([--with-libdnet=DIR], [Use an existing (compiled) dnet lib from DIR/include and DIR/lib.])
+AC_HELP_STRING([--with-libdnet=DIR], [Use an existing (compiled) dnet lib from DIR/include and DIR/lib. This is NOT RECOMMENDED because we have made many important fixes to our included libdnet, as described at http://nmap.org/svn/libdnet-stripped/NMAP_MODIFICATIONS])
 AC_HELP_STRING([--with-libdnet=included], [Use the libdnet version included with Nmap (default)]),
 [  case "$with_libdnet" in
   yes)

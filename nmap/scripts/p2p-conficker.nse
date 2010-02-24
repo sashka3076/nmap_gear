@@ -67,9 +67,6 @@ author = "Ron Bowes (with research from Symantec Security Response)"
 copyright = "Ron Bowes"
 license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
 categories = {"default","safe"}
--- Set the runlevel to 2. This means this script will run last, but it will also run in parallel with smb-check-vulns.nse, 
--- which will generally be run at the same time. So, by setting this to 2, we increase our parallelism. 
-runlevel = 2
 
 require 'smb'
 require 'stdnse'
@@ -530,10 +527,10 @@ local function conficker_check(ip, port, protocol)
 	return true, "Received valid data", result
 end
 
-local function go(host)
+action = function(host)
 	local tcp_ports = {}
 	local udp_ports = {}
-	local response = " \n"
+	local response = {}
 	local i
 	local port, protocol
 	local count = 0
@@ -553,10 +550,6 @@ local function go(host)
 					udp_ports[i] = true
 				end
 			end
-
---			if((i % 10) == 0) then
---				io.write(i .. "\n")
---			end
 		end
 	end
 
@@ -582,7 +575,7 @@ local function go(host)
 	udp_ports[generated_ports[2]] = true
 	udp_ports[generated_ports[4]] = true
 
-	response = string.format("Checking for Conficker.C or higher...\n")
+	table.insert(response, string.format("Checking for Conficker.C or higher..."))
 
 	-- Check the TCP ports
 	for port in pairs(tcp_ports) do
@@ -592,10 +585,10 @@ local function go(host)
 		checks = checks + 1
 
 		if(status == true) then
-			response = response .. string.format("| Check %d (port %d/%s): INFECTED (%s)\n", checks, port, "tcp", reason)
+			table.insert(response, string.format("Check %d (port %d/%s): INFECTED (%s)", checks, port, "tcp", reason))
 			count = count + 1
 		else
-			response = response .. string.format("| Check %d (port %d/%s): CLEAN (%s)\n", checks, port, "tcp", reason)
+			table.insert(response, string.format("Check %d (port %d/%s): CLEAN (%s)", checks, port, "tcp", reason))
 		end
 	end
 
@@ -607,43 +600,24 @@ local function go(host)
 		checks = checks + 1
 
 		if(status == true) then
-			response = response .. string.format("| Check %d (port %d/%s): INFECTED (%s)\n", checks, port, "udp", reason)
+			table.insert(response, string.format("Check %d (port %d/%s): INFECTED (%s)", checks, port, "udp", reason))
 			count = count + 1
 		else
-			response = response .. string.format("| Check %d (port %d/%s): CLEAN (%s)\n", checks, port, "udp", reason)
+			table.insert(response, string.format("| Check %d (port %d/%s): CLEAN (%s)", checks, port, "udp", reason))
 		end
 	end
 
-	-- Remove the response if verbose is turned off
-	if(count == 0 and nmap.verbosity() < 2) then
-		response = ""
+	-- Check how many INFECTED hits we got
+	if(count == 0) then
+		if (nmap.verbosity() > 1) then
+			table.insert(response, string.format("%d/%d checks are positive: Host is CLEAN or ports are blocked", count, checks))
+		else
+			response = ''
+		end
 	else
-		response = response .. "|_ "
+		table.insert(response, string.format("%d/%d checks are positive: Host is likely INFECTED", count, checks))
 	end
-	
-    -- Check how many INFECTED hits we got
-    if(count == 0) then
-	if (nmap.verbosity() > 1) then
-		response = response .. string.format("%d/%d checks are positive: Host is CLEAN or ports are blocked\n", count, checks)
-	else
-		response = nil
-	end
-    else
-        response = response .. string.format("%d/%d checks are positive: Host is likely INFECTED\n", count, checks)
-    end
 
-
-	return true, response
+	return true, stdnse.format_output(true, response)
 end
-
-action = function(host)
-	local status, result = go(host)
-
-	if(status == false) then
-		return "ERROR: " .. result
-	else
-		return result
-	end
-end
-
 

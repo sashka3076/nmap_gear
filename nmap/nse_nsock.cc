@@ -13,6 +13,7 @@ extern "C"
 
 #include "nse_nsock.h"
 #include "nse_main.h"
+#include "nse_ssl_cert.h"
 
 #include "nsock.h"
 #include "nmap_error.h"
@@ -39,6 +40,10 @@ extern "C"
 #define DEFAULT_TIMEOUT 30000
 
 extern NmapOps o;
+
+static int l_nsock_loop(lua_State * L);
+
+static int l_nsock_bind(lua_State * L);
 
 static int l_nsock_connect(lua_State * L);
 
@@ -149,6 +154,9 @@ struct l_nsock_udata
   int timeout;
   nsock_iod nsiod;
   void *ssl_session;
+  struct sockaddr_storage source_addr;
+  size_t source_addrlen;
+
   struct nsock_yield yield;
   /* used for buffered reading */
   int bufidx;                                    /* index inside lua's registry 
@@ -182,6 +190,15 @@ static size_t table_length(lua_State * L, int index)
   return len;
 }
 
+static void weak_table(lua_State * L, int narr, int nrec, const char *mode)
+{
+  lua_createtable(L, narr, nrec);
+  lua_createtable(L, 0, 1);
+  lua_pushstring(L, mode);
+  lua_setfield(L, -2, "__mode");
+  lua_setmetatable(L, -2);
+}
+
 static std::string hexify(const unsigned char *str, size_t len)
 {
   size_t num = 0;
@@ -190,13 +207,13 @@ static std::string hexify(const unsigned char *str, size_t len)
 
   // If more than 95% of the chars are printable, we escape unprintable chars
   for (size_t i = 0; i < len; i++)
-    if (isprint(str[i]))
+    if (isprint((int) str[i]))
       num++;
   if ((double) num / (double) len >= 0.95)
   {
     for (size_t i = 0; i < len; i++)
     {
-      if (isprint(str[i]) || isspace(str[i]))
+      if (isprint((int) str[i]) || isspace((int) str[i]))
         ret << str[i];
       else
         ret << std::setw(3) << "\\" << (unsigned int) (unsigned char) str[i];
@@ -214,7 +231,7 @@ static std::string hexify(const unsigned char *str, size_t len)
       else
         ret << "   ";
     for (size_t j = i; j < i + 16 && j < len; j++)
-      ret.put(isgraph(str[j]) ? (unsigned char) str[j] : ' ');
+      ret.put(isgraph((int) str[j]) ? (unsigned char) str[j] : ' ');
     ret << std::endl;
   }
   return ret.str();
@@ -237,49 +254,20 @@ static void set_thread (lua_State *L, int index, struct l_nsock_udata *n)
 /* Some constants used for enforcing a limit on the number of open sockets
  * in use by threads. The maximum value between MAX_PARALLELISM and
  * o.maxparallelism is the max # of threads that can have connected sockets
- * (open). THREAD_PROXY, SOCKET_PROXY, and CONNECT_WAITING are tables in the
- * nsock C functions' environment, at LUA_ENVIRONINDEX, that hold sockets and
- * threads used to enforce this. THREAD_PROXY has <Thread, Userdata> pairs
- * that associate a thread to a proxy userdata. This table has weak keys and
- * values so threads and the proxy itself can be collected. SOCKET_PROXY
- * has <Socket, Userdata> pairs that associate a socket to a proxy userdata.
- * SOCKET_PROXY has weak keys (to allow the collection of sockets) and strong
- * values, so the proxies are not collected when an associated socket is open.
+ * (open).
  *
- * All the sockets used by a thread have the same Proxy Userdata. When all
- * sockets in use by a thread are closed or collected, the entry in the
- * THREAD_PROXY table is cleared, freeing up a slot for another thread
- * to make connections. When a slot is freed, proxy_gc is called, via the
- * userdata's __gc metamethod, which will add a thread in WAITING to running.
+ * THREAD_SOCKETS is a weak keyed table of <Thread, Socket Table> pairs.
+ * A socket table is a weak keyed table (socket keys with garbage values) of
+ * sockets the Thread has allocated but not necessarily open). You may 
+ * test for an open socket by checking whether its nsiod field in the
+ * socket userdata structure is not NULL.
+ *
+ * CONNECT_WAITING is a weak keyed table of <Thread, Garbage Value> pairs.
+ * The table contains threads waiting to make a socket connection.
  */
-#define MAX_PARALLELISM   10
-#define THREAD_PROXY       1           /* <Thread, Userdata> */
-#define SOCKET_PROXY       2           /* <Socket, Userdata> */
-#define CONNECT_WAITING    3           /* Threads waiting to lock */
-#define PROXY_META         4           /* Proxy userdata's metatable */
-
-static int proxy_gc(lua_State * L)
-{
-  lua_rawgeti(L, LUA_ENVIRONINDEX, CONNECT_WAITING);
-  lua_pushnil(L);
-  if (lua_next(L, -2) != 0)
-  {
-    lua_State *thread = lua_tothread(L, -2);
-
-    nse_restore(thread, 0);
-    lua_pushnil(L);
-    lua_replace(L, -2);                // replace boolean
-    lua_settable(L, -3);               // remove thread from waiting
-  }
-  return 0;
-}
-
-static void new_proxy(lua_State * L)
-{
-  lua_newuserdata(L, 0);
-  lua_rawgeti(L, LUA_ENVIRONINDEX, PROXY_META);
-  lua_setmetatable(L, -2);
-}
+#define MAX_PARALLELISM   20
+#define THREAD_SOCKETS     1           /* <Thread, Table of Sockets (keys)> */
+#define CONNECT_WAITING    2           /* Threads waiting to lock */
 
 /* int socket_lock (lua_State *L)
  *
@@ -291,67 +279,148 @@ static void new_proxy(lua_State * L)
  */
 static int socket_lock(lua_State * L)
 {
+  unsigned p = o.max_parallelism == 0 ? MAX_PARALLELISM : o.max_parallelism;
   lua_settop(L, 1);
-  lua_rawgeti(L, LUA_ENVIRONINDEX, THREAD_PROXY);
-  lua_pushthread(L);
-  lua_gettable(L, -2);
-  if (!lua_isnil(L, -1))
+  lua_rawgeti(L, LUA_ENVIRONINDEX, THREAD_SOCKETS);
+  nse_base(L);
+  lua_rawget(L, -2);
+  if (lua_istable(L, -1))
   {
-    // Thread already has open sockets. Add the new socket to SOCKET_PROXY
-    lua_rawgeti(L, LUA_ENVIRONINDEX, SOCKET_PROXY);
-    lua_pushvalue(L, 1);               // socket
-    lua_pushvalue(L, -3);              // proxy userdata
-    lua_settable(L, -3);
-    lua_pop(L, 1);                     // SOCKET_PROXY
+    /* Thread already has a "lock" with open sockets. Place the new socket
+     * in its sockets table */
+    lua_pushvalue(L, 1);
     lua_pushboolean(L, true);
-  } else if (table_length(L, 2) >= MAX(MAX_PARALLELISM, o.max_parallelism))
+    lua_rawset(L, -3);
+  } else if (table_length(L, 2) <= p)
   {
-    // Too many threads have sockets open. Add thread to waiting. The caller
-    // is expected to yield. (see the connect function in luaopen_nsock)
-    lua_rawgeti(L, LUA_ENVIRONINDEX, CONNECT_WAITING);
-    lua_pushthread(L);
+    /* There is room for this thread to open sockets */
+    nse_base(L);
+    weak_table(L, 0, 0, "k"); /* weak socket references */
+    lua_pushvalue(L, 1); /* socket */
     lua_pushboolean(L, true);
-    lua_settable(L, -3);
-    lua_pop(L, 1);                     // CONNECT_WAITING
-    return lua_yield(L, 0);
+    lua_rawset(L, -3); /* add to sockets table */
+    lua_rawset(L, 2); /* add new <Thread, Sockets Table> Pair
+                       * to THREAD_SOCKETS */
   } else
   {
-    // There is room for this thread to open sockets. Make a new proxy userdata
-    // and add it to the THREAD_PROXY and SOCKET_PROXY tables.
-    new_proxy(L);
-    lua_rawgeti(L, LUA_ENVIRONINDEX, THREAD_PROXY);
-    lua_pushthread(L);
-    lua_pushvalue(L, -3);              // proxy
-    lua_settable(L, -3);
-    lua_pop(L, 1);                     // THREAD_PROXY)
-    lua_rawgeti(L, LUA_ENVIRONINDEX, SOCKET_PROXY);
-    lua_pushvalue(L, 1);               // Socket
-    lua_pushvalue(L, -3);              // proxy
-    lua_settable(L, -3);
-    lua_pop(L, 2);                     // proxy, SOCKET_PROXY
+    /* Too many threads have sockets open. Add thread to waiting. The caller
+     * is expected to yield. (see the connect function in luaopen_nsock) */
+    lua_rawgeti(L, LUA_ENVIRONINDEX, CONNECT_WAITING);
+    nse_base(L);
     lua_pushboolean(L, true);
+    lua_settable(L, -3);
+    return nse_yield(L);
   }
+  lua_pushboolean(L, true);
   return 1;
 }
 
-/* void socket_unlock (lua_State *L, int index)
- *
- * index is the location of the userdata on the stack.
- * A socket has been closed or collected, remove it from the SOCKET_PROXY
- * table.
- */
-static void socket_unlock(lua_State * L, int index)
+static void socket_unlock(lua_State * L)
 {
-  lua_pushvalue(L, index);             // socket
-  lua_rawgeti(L, LUA_ENVIRONINDEX, SOCKET_PROXY);
-  lua_pushvalue(L, -2);                // socket
+  int top = lua_gettop(L);
+
+  lua_gc(L, LUA_GCSTOP, 0); /* don't collect threads during iteration */
+
+  lua_rawgeti(L, LUA_ENVIRONINDEX, THREAD_SOCKETS);
   lua_pushnil(L);
-  lua_settable(L, -3);
-  lua_pop(L, 2);                       // socket, SOCKET_PROXY
+  while (lua_next(L, -2) != 0)
+  {
+    unsigned open = 0;
+
+    if (lua_status(lua_tothread(L, -2)) == LUA_YIELD)
+    {
+      lua_pushnil(L);
+      while (lua_next(L, -2) != 0) /* for each socket */
+      {
+        lua_pop(L, 1); /* pop garbage boolean */
+        if (((struct l_nsock_udata *) lua_touserdata(L, -1))->nsiod != NULL)
+          open++;
+      }
+    }
+
+    if (open == 0) /* thread has no open sockets? */
+    {
+      /* close all of its sockets */
+      lua_pushnil(L);
+      while (lua_next(L, -2) != 0) /* for each socket */
+      {
+        lua_pop(L, 1); /* pop garbage boolean */
+        lua_getfield(L, -1, "close");
+        lua_pushvalue(L, -2);
+        lua_call(L, 1, 0);
+      }
+
+      lua_pushvalue(L, -2); /* thread key */
+      lua_pushnil(L);
+      lua_rawset(L, top+1); /* THREADS_SOCKETS */
+
+      lua_rawgeti(L, LUA_ENVIRONINDEX, CONNECT_WAITING);
+      lua_pushnil(L);
+      while (lua_next(L, -2) != 0)
+      {
+        lua_pop(L, 1); /* pop garbage boolean */
+        nse_restore(lua_tothread(L, -1), 0);
+        lua_pushvalue(L, -1);
+        lua_pushnil(L);
+        lua_rawset(L, -4); /* remove thread from waiting */
+      }
+      lua_pop(L, 1); /* CONNECT_WAITING */
+    }
+
+    lua_pop(L, 1); /* pop sockets table */
+  }
+
+  lua_gc(L, LUA_GCRESTART, 0);
+
+  lua_settop(L, top);
 }
 
-
 void l_nsock_clear_buf(lua_State * L, l_nsock_udata * udata);
+
+void l_nsock_ssl_reconnect_handler(nsock_pool nsp, nsock_event nse, void *yield)
+{
+  struct nsock_yield *y = (struct nsock_yield *) yield;
+
+  lua_State *L = y->thread;
+
+  if (lua_status(L) != LUA_YIELD) return;
+
+  if (o.scriptTrace())
+    l_nsock_trace(nse_iod(nse), "SSL RECONNECT", TO);
+
+  if (l_nsock_checkstatus(L, nse) == NSOCK_WRAPPER_SUCCESS)
+    nse_restore(y->thread, 1);
+  else
+    nse_restore(y->thread, 2);
+}
+
+static int l_nsock_reconnect_ssl (lua_State *L)
+{
+  l_nsock_udata *udata = (l_nsock_udata *) luaL_checkudata(L, 1, "nsock");
+
+  l_nsock_clear_buf(L, udata);
+
+  if (udata->nsiod == NULL)
+  {
+    lua_pushboolean(L, false);
+    lua_pushstring(L, "Trying to reconnect ssl through a closed socket\n");
+    return 2;
+  }
+#ifndef HAVE_OPENSSL
+  if (1)
+  {
+    lua_pushboolean(L, false);
+    lua_pushstring(L, "Sorry, you don't have OpenSSL\n");
+    return 2;
+  }
+#endif
+
+  nsock_reconnect_ssl(nsp, udata->nsiod, l_nsock_ssl_reconnect_handler,
+      udata->timeout, &udata->yield, udata->ssl_session);
+
+  set_thread(L, 1, udata);
+  return nse_yield(L);
+}
 
 int luaopen_nsock(lua_State * L)
 {
@@ -366,6 +435,7 @@ int luaopen_nsock(lua_State * L)
       "  return connect(socket, ...);\n" "end";
 
   static const luaL_Reg l_nsock[] = {
+    {"bind", l_nsock_bind},
     {"send", l_nsock_send},
     {"receive", l_nsock_receive},
     {"receive_lines", l_nsock_receive_lines},
@@ -378,40 +448,28 @@ int luaopen_nsock(lua_State * L)
     {"pcap_close", l_nsock_ncap_close},
     {"pcap_register", l_nsock_ncap_register},
     {"pcap_receive", l_nsock_pcap_receive},
+    {"get_ssl_certificate", l_get_ssl_certificate},
+    {"reconnect_ssl", l_nsock_reconnect_ssl},
     // {"callback_test", l_nsock_pcap_callback_test},
     {NULL, NULL}
   };
 
-  /* Set up an environment for all nsock C functions to share. This is
-   * especially important to make the THREAD_PROXY, SOCKET_PROXY, and
-   * CONNECT_WAITING tables available. These values can be accessed at the
-   * pseudo-index LUA_ENVIRONINDEX. These tables are documented where the
-   * #defines are above. */
-  lua_createtable(L, 5, 0);
+  /* Set up an environment for all nsock C functions to share.
+   * This table particularly contains the THREAD_SOCKETS and
+   * CONNECT_WAITING tables.
+   * These values are accessed at the Lua pseudo-index LUA_ENVIRONINDEX.
+   */
+  lua_createtable(L, 2, 0);
   lua_replace(L, LUA_ENVIRONINDEX);
 
-  lua_createtable(L, 0, 10);           // THREAD_PROXY
-  lua_createtable(L, 0, 1);            // metatable
-  lua_pushliteral(L, "kv");            // weak keys and values
-  lua_setfield(L, -2, "__mode");
-  lua_setmetatable(L, -2);
-  lua_rawseti(L, LUA_ENVIRONINDEX, THREAD_PROXY);
+  weak_table(L, 0, MAX_PARALLELISM, "k");
+  lua_rawseti(L, LUA_ENVIRONINDEX, THREAD_SOCKETS);
 
-  lua_createtable(L, 0, 193);          // SOCKET_PROXY (large amount of room)
-  lua_createtable(L, 0, 1);            // metatable
-  lua_pushliteral(L, "k");             // weak keys
-  lua_setfield(L, -2, "__mode");
-  lua_setmetatable(L, -2);
-  lua_rawseti(L, LUA_ENVIRONINDEX, SOCKET_PROXY);
-
-  lua_createtable(L, 0, 499);          // CONNECT_WAITING (large amount of
-                                       // room)
+  weak_table(L, 0, 1000, "k");
   lua_rawseti(L, LUA_ENVIRONINDEX, CONNECT_WAITING);
 
-  lua_createtable(L, 0, 1);            // PROXY_META = metatable for proxies
-  lua_pushcclosure(L, proxy_gc, 0);
-  lua_setfield(L, -2, "__gc");
-  lua_rawseti(L, LUA_ENVIRONINDEX, PROXY_META);
+  lua_pushcfunction(L, l_nsock_loop);
+  lua_setfield(L, LUA_REGISTRYINDEX, NSE_NSOCK_LOOP);
 
   /* Load the connect function */
   if (luaL_loadstring(L, connect) != 0)
@@ -438,6 +496,11 @@ int luaopen_nsock(lua_State * L)
 
   luaL_newmetatable(L, "nsock_proxy");
 
+#if HAVE_OPENSSL
+  /* Set up the SSL certificate userdata code in nse_ssl_cert.cc. */
+  nse_nsock_init_ssl_cert(L);
+#endif
+
   nsp = nsp_new(NULL);
   if (o.scriptTrace())
     nsp_settrace(nsp, NSOCK_TRACE_LEVEL, o.getStartTime());
@@ -463,6 +526,8 @@ int l_nsock_new(lua_State * L)
   lua_setfenv(L, -2);
   udata->nsiod = NULL;
   udata->ssl_session = NULL;
+  udata->source_addr.ss_family = AF_UNSPEC;
+  udata->source_addrlen = sizeof(udata->source_addr);
   udata->timeout = DEFAULT_TIMEOUT;
   udata->bufidx = LUA_NOREF;
   udata->bufused = 0;
@@ -476,9 +541,16 @@ int l_nsock_new(lua_State * L)
   return 1;
 }
 
-int l_nsock_loop(int tout)
+static int l_nsock_loop(lua_State * L)
 {
-  return nsock_loop(nsp, tout);
+  int tout = luaL_checkint(L, 1);
+
+  /* clean up old socket locks */
+  socket_unlock(L);
+
+  if (nsock_loop(nsp, tout) == NSOCK_LOOP_ERROR)
+    luaL_error(L, "a fatal error occurred in nsock_loop");
+  return 0;
 }
 
 int l_nsock_checkstatus(lua_State * L, nsock_event nse)
@@ -511,28 +583,97 @@ int l_nsock_checkstatus(lua_State * L, nsock_event nse)
   return -1;
 }
 
+/* Set the local address for socket operations. The two optional parameters
+   after the first (which is the socket object) are a string representing a
+   numeric address, and a port number. If either optional parameter is omitted
+   or nil, that part of the address will be left unspecified. */
+static int l_nsock_bind(lua_State * L)
+{
+  struct addrinfo hints = { 0 };
+  struct addrinfo *results;
+  char port_buf[16];
+  l_nsock_udata *udata;
+  const char *addr_str = NULL;
+  const char *port_str = NULL;
+  int rc;
+
+  udata = (l_nsock_udata *) luaL_checkudata(L, 1, "nsock");
+  if (!lua_isnoneornil(L, 2))
+    addr_str = luaL_checkstring(L, 2);
+  if (!lua_isnoneornil(L, 3)) {
+    int port;
+    port = luaL_checkint(L, 3);
+    Snprintf(port_buf, sizeof(port_buf), "%d", port);
+    port_str = port_buf;
+  }
+
+  /* If we don't have a string to work with, set our configured address family
+     to get the proper unspecified address (0.0.0.0 or ::). Otherwise infer the
+     family from the string. */
+  if (addr_str == NULL)
+    hints.ai_family = o.af();
+  else
+    hints.ai_family = AF_UNSPEC;
+  /* AI_NUMERICHOST: don't use DNS to resolve names.
+     AI_PASSIVE: set an unspecified address if addr_str is NULL. */
+  hints.ai_flags = AI_NUMERICHOST | AI_PASSIVE;
+
+  rc = getaddrinfo(addr_str, port_str, &hints, &results);
+  if (rc != 0) {
+    lua_pushnil(L);
+    lua_pushstring(L, gai_strerror(rc));
+    return 2;
+  }
+  if (results == NULL) {
+    lua_pushnil(L);
+    lua_pushstring(L, "getaddrinfo: no results found");
+    return 2;
+  }
+  if (results->ai_addrlen > sizeof(udata->source_addr)) {
+    freeaddrinfo(results);
+    lua_pushnil(L);
+    lua_pushstring(L, "getaddrinfo: result is too big");
+    return 2;
+  }
+
+  /* We ignore any results after the first. */
+  /* We would just call nsi_set_localaddr here, but udata->nsiod is not created
+     until connect. So store the address in the userdatum. */
+  udata->source_addrlen = results->ai_addrlen;
+  memcpy(&udata->source_addr, results->ai_addr, udata->source_addrlen);
+
+  lua_pushboolean(L, 1);
+  return 1;
+}
+
 static int l_nsock_connect(lua_State * L)
 {
+  enum type {TCP, UDP, SSL};
+  static const char * const op[] = {"tcp", "udp", "ssl", NULL};
+
   l_nsock_udata *udata = (l_nsock_udata *) luaL_checkudata(L, 1, "nsock");
-
   const char *addr = luaL_checkstring(L, 2);
-
   unsigned short port = (unsigned short) luaL_checkint(L, 3);
-
-  const char *how = luaL_optstring(L, 4, "tcp");
+  int what = luaL_checkoption(L, 4, "tcp", op);
 
   const char *error;
-
   struct addrinfo *dest;
-
   int error_id;
 
   l_nsock_clear_buf(L, udata);
 
+#ifndef HAVE_OPENSSL
+  if (what == SSL)
+  {
+    lua_pushboolean(L, false);
+    lua_pushstring(L, "Sorry, you don't have OpenSSL\n");
+    return 2;
+  }
+#endif
+
   error_id = getaddrinfo(addr, NULL, NULL, &dest);
   if (error_id)
   {
-    socket_unlock(L, 1);
     error = gai_strerror(error_id);
     lua_pushboolean(L, false);
     lua_pushstring(L, error);
@@ -540,17 +681,16 @@ static int l_nsock_connect(lua_State * L)
   }
   if (dest == NULL)
   {
-    socket_unlock(L, 1);
     lua_pushboolean(L, false);
     lua_pushstring(L, "getaddrinfo returned success but no addresses");
     return 2;
   }
 
   udata->nsiod = nsi_new(nsp, NULL);
-  if (o.spoofsource)
-  {
+  if (udata->source_addr.ss_family != AF_UNSPEC) {
+    nsi_set_localaddr(udata->nsiod, &udata->source_addr, udata->source_addrlen);
+  } else if (o.spoofsource) {
     struct sockaddr_storage ss;
-
     size_t sslen;
 
     o.SourceSockAddr(&ss, &sslen);
@@ -559,48 +699,26 @@ static int l_nsock_connect(lua_State * L)
   if (o.ipoptionslen)
     nsi_set_ipoptions(udata->nsiod, o.ipoptions, o.ipoptionslen);
 
-  switch (how[0])
+  switch (what)
   {
-    case 't':
-      if (strcmp(how, "tcp"))
-        goto error;
+    case TCP:
       nsock_connect_tcp(nsp, udata->nsiod, l_nsock_connect_handler,
           udata->timeout, &udata->yield, dest->ai_addr, dest->ai_addrlen, port);
       break;
-    case 'u':
-      if (strcmp(how, "udp"))
-        goto error;
+    case UDP:
       nsock_connect_udp(nsp, udata->nsiod, l_nsock_connect_handler,
           &udata->yield, dest->ai_addr, dest->ai_addrlen, port);
       break;
-    case 's':
-      if (strcmp(how, "ssl"))
-        goto error;
-#ifdef HAVE_OPENSSL
+    case SSL:
       nsock_connect_ssl(nsp, udata->nsiod, l_nsock_connect_handler,
-          udata->timeout, &udata->yield, dest->ai_addr, dest->ai_addrlen, port,
-          udata->ssl_session);
-      break;
-#else
-      socket_unlock(L, 1);
-      lua_pushboolean(L, false);
-      lua_pushstring(L, "Sorry, you don't have OpenSSL\n");
-      return 2;
-#endif
-    default:
-      goto error;
+          udata->timeout, &udata->yield, dest->ai_addr, dest->ai_addrlen,
+          IPPROTO_TCP, port, udata->ssl_session);
       break;
   }
 
   freeaddrinfo(dest);
   set_thread(L, 1, udata);
-  return lua_yield(L, 0);
-
-error:
-  socket_unlock(L, 1);
-  freeaddrinfo(dest);
-  luaL_argerror(L, 4, "invalid connection method");
-  return 0;
+  return nse_yield(L);
 }
 
 void l_nsock_connect_handler(nsock_pool nsp, nsock_event nse, void *yield)
@@ -608,6 +726,8 @@ void l_nsock_connect_handler(nsock_pool nsp, nsock_event nse, void *yield)
   struct nsock_yield *y = (struct nsock_yield *) yield;
 
   lua_State *L = y->thread;
+
+  if (lua_status(L) != LUA_YIELD) return;
 
   if (o.scriptTrace())
   {
@@ -647,7 +767,7 @@ static int l_nsock_send(lua_State * L)
   nsock_write(nsp, udata->nsiod, l_nsock_send_handler, udata->timeout,
       &udata->yield, string, string_len);
   set_thread(L, 1, udata);
-  return lua_yield(L, 0);
+  return nse_yield(L);
 }
 
 void l_nsock_send_handler(nsock_pool nsp, nsock_event nse, void *yield)
@@ -655,6 +775,8 @@ void l_nsock_send_handler(nsock_pool nsp, nsock_event nse, void *yield)
   struct nsock_yield *y = (struct nsock_yield *) yield;
 
   lua_State *L = y->thread;
+
+  if (lua_status(L) != LUA_YIELD) return;
 
   if (l_nsock_checkstatus(L, nse) == NSOCK_WRAPPER_SUCCESS)
   {
@@ -682,7 +804,7 @@ static int l_nsock_receive(lua_State * L)
       &udata->yield);
 
   set_thread(L, 1, udata);
-  return lua_yield(L, 0);
+  return nse_yield(L);
 }
 
 static int l_nsock_receive_lines(lua_State * L)
@@ -704,7 +826,7 @@ static int l_nsock_receive_lines(lua_State * L)
       &udata->yield, nlines);
 
   set_thread(L, 1, udata);
-  return lua_yield(L, 0);
+  return nse_yield(L);
 }
 
 static int l_nsock_receive_bytes(lua_State * L)
@@ -726,7 +848,7 @@ static int l_nsock_receive_bytes(lua_State * L)
       &udata->yield, nbytes);
 
   set_thread(L, 1, udata);
-  return lua_yield(L, 0);
+  return nse_yield(L);
 }
 
 void l_nsock_receive_handler(nsock_pool nsp, nsock_event nse, void *yield)
@@ -734,6 +856,8 @@ void l_nsock_receive_handler(nsock_pool nsp, nsock_event nse, void *yield)
   struct nsock_yield *y = (struct nsock_yield *) yield;
 
   lua_State *L = y->thread;
+
+  if (lua_status(L) != LUA_YIELD) return;
 
   char *rcvd_string;
 
@@ -761,18 +885,14 @@ void l_nsock_trace(nsock_iod nsiod, const char *message, int direction)
   int protocol;
   int af;
 
-  struct sockaddr local;
+  if (!nsi_is_pcap(nsiod)) {
+    char ipstring_local[INET6_ADDRSTRLEN];
+    char ipstring_remote[INET6_ADDRSTRLEN];
+    struct sockaddr_storage local;
+    struct sockaddr_storage remote;
 
-  struct sockaddr remote;
-
-  char *ipstring_local = (char *) safe_malloc(sizeof(char) * INET6_ADDRSTRLEN);
-
-  char *ipstring_remote = (char *) safe_malloc(sizeof(char) * INET6_ADDRSTRLEN);
-
-  if (!nsi_is_pcap(nsiod))
-  {
     status = nsi_getlastcommunicationinfo(nsiod, &protocol, &af,
-        &local, &remote, sizeof(sockaddr));
+        (sockaddr *) &local, (sockaddr *) &remote, sizeof(sockaddr_storage));
     log_write(LOG_STDOUT, "%s: %s %s:%d %s %s:%d | %s\n",
         SCRIPT_ENGINE,
         IPPROTO2STR_UC(protocol),
@@ -781,11 +901,7 @@ void l_nsock_trace(nsock_iod nsiod, const char *message, int direction)
         (direction == TO) ? ">" : "<",
         inet_ntop_both(af, &remote, ipstring_remote),
         inet_port_both(af, &remote), message);
-
-    free(ipstring_local);
-    free(ipstring_remote);
-  } else
-  {                                    // is pcap device
+  } else {                                    // is pcap device
     log_write(LOG_STDOUT, "%s: %s | %s\n",
         SCRIPT_ENGINE, (direction == TO) ? ">" : "<", message);
   }
@@ -851,10 +967,6 @@ static int l_nsock_get_info(lua_State * L)
 
   struct sockaddr remote;
 
-  char *ipstring_local = (char *) safe_malloc(sizeof(char) * INET6_ADDRSTRLEN);
-
-  char *ipstring_remote = (char *) safe_malloc(sizeof(char) * INET6_ADDRSTRLEN);
-
   if (udata->nsiod == NULL)
   {
     lua_pushboolean(L, false);
@@ -866,6 +978,9 @@ static int l_nsock_get_info(lua_State * L)
       &local, &remote, sizeof(sockaddr));
 
   lua_pushboolean(L, true);
+
+  char *ipstring_local = (char *) safe_malloc(sizeof(char) * INET6_ADDRSTRLEN);
+  char *ipstring_remote = (char *) safe_malloc(sizeof(char) * INET6_ADDRSTRLEN);
 
   lua_pushstring(L, inet_ntop_both(af, &local, ipstring_local));
   lua_pushnumber(L, inet_port_both(af, &local));
@@ -899,8 +1014,6 @@ static int l_nsock_gc(lua_State * L)
 static int l_nsock_close(lua_State * L)
 {
   l_nsock_udata *udata = (l_nsock_udata *) luaL_checkudata(L, 1, "nsock");
-
-  socket_unlock(L, 1);                 // Unlock the socket.
 
   /* Never ever collect nse-pcap connections. */
   if (udata->ncap_socket)
@@ -985,13 +1098,13 @@ static int l_nsock_receive_buf(lua_State * L)
       /* if we didn't have enough data in the buffer another nsock_read() was
        * scheduled - its callback will put us in running state again */
       set_thread(L, 1, udata);
-      return lua_yield(L, 0);
+      return nse_yield(L);
     }
     return 2;
   }
   /* yielding with 3 arguments since we need them when the callback arrives */
   set_thread(L, 1, udata);
-  return lua_yield(L, 0);
+  return nse_yield(L);
 }
 
 void l_nsock_receive_buf_handler(nsock_pool nsp, nsock_event nse, void *yield)
@@ -1001,6 +1114,8 @@ void l_nsock_receive_buf_handler(nsock_pool nsp, nsock_event nse, void *yield)
   l_nsock_udata *udata = y->udata;
 
   lua_State *L = y->thread;
+
+  if (lua_status(L) != LUA_YIELD) return;
 
   char *rcvd_string;
 
@@ -1185,6 +1300,8 @@ static void l_nsock_sleep_handler(nsock_pool nsp, nsock_event nse, void *udata)
 {
   lua_State *L = (lua_State *) udata;
 
+  if (lua_status(L) != LUA_YIELD) return;
+
   assert(nse_status(nse) == NSE_STATUS_SUCCESS);
   nse_restore(L, 0);
 }
@@ -1201,7 +1318,7 @@ int l_nsock_sleep(lua_State * L)
   msecs = (int) (secs * 1000 + 0.5);
   nsock_timer_create(nsp, l_nsock_sleep_handler, msecs, L);
 
-  return lua_yield(L, 0);
+  return nse_yield(L);
 }
 
 /****************** NCAP_SOCKET ***********************************************/
@@ -1356,9 +1473,10 @@ static int l_nsock_ncap_close(lua_State * L)
   ns->references--;
   if (ns->references == 0)
   {
-    ncap_socket_map_del(ns->key);
-    if (ns->key)
+    if (ns->key) {
+      ncap_socket_map_del(ns->key);
       free(ns->key);
+    }
     nsi_delete(ns->nsiod, NSOCK_PENDING_NOTIFY);
     free(ns);
   }
@@ -1527,7 +1645,7 @@ int l_nsock_pcap_receive(lua_State * L)
   /* no data yet? suspend thread */
   nr->suspended = 1;
 
-  return lua_yield(L, 0);
+  return nse_yield(L);
 }
 
 /* (free) excute callback function from lua script */
@@ -1659,8 +1777,10 @@ void ncap_request_set_result(nsock_event nse, struct ncap_request *nr)
           &packet_len, NULL);
       char *packet = (char *) safe_malloc(l2_len + l3_len);
 
-      nr->r_layer2 = (unsigned char *) memcpy(&packet[0], l2_data, l2_len);
-      nr->r_layer3 = (unsigned char *) memcpy(&packet[l2_len], l3_data, l3_len);
+      nr->r_layer2 = (unsigned char *) packet;
+      memcpy(nr->r_layer2, l2_data, l2_len);
+      nr->r_layer3 = (unsigned char *) (packet + l2_len);
+      memcpy(nr->r_layer3, l3_data, l3_len);
       nr->r_layer2_len = l2_len;
       nr->r_layer3_len = l3_len;
       nr->packetsz = packet_len;
@@ -1732,6 +1852,27 @@ int ncap_restore_lua(ncap_request * nr)
     return 4;
   return 0;
 }
+
+#if HAVE_OPENSSL
+SSL *nse_nsock_get_ssl(lua_State *L)
+{
+  const l_nsock_udata *udata;
+
+  udata = (l_nsock_udata *) luaL_checkudata(L, 1, "nsock");
+  if (!nsi_checkssl(udata->nsiod))
+    error("Socket is not an SSL socket");
+
+  return (SSL *) nsi_getssl(udata->nsiod);
+}
+#else
+/* If HAVE_OPENSSL is defined, this comes from nse_ssl_cert.cc. */
+int l_get_ssl_certificate(lua_State *L)
+{
+  error("Socket is not an SSL socket");
+
+  return 0;
+}
+#endif
 
 /****************** DNET ******************************************************/
 static int l_dnet_open_ethernet(lua_State * L);

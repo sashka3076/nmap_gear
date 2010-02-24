@@ -33,11 +33,6 @@ pkgdatadir = $(datadir)/ncat
 INSTALL = @INSTALL@
 transform = @program_transform_name@
 
-HAVE_LIB = @HAVE_LIB@
-LIB = @LIB@
-LTLIB = @LTLIB@
-MAKEINFO = @MAKEINFO@
-
 prefix = @prefix@
 exec_prefix = @exec_prefix@
 bindir = @bindir@
@@ -61,11 +56,12 @@ DEFS += -D_FORTIFY_SOURCE=2
 INCLS = -I. -I.. -I../nsock/include/ -I$(NBASEDIR)
 RM = rm -f
 OPENSSL_LIBS = @OPENSSL_LIBS@
+HAVE_OPENSSL = @HAVE_OPENSSL@
 PCAP_LIBS = @PCAP_LIBS@
 
 CPPFLAGS += $(DEFS) $(INCLS)
 
-SHTOOL = ./shtool
+SHTOOL = ../shtool
 
 # DESTDIR can be used by package maintainers to install Ncat under its 
 # usual directory structure into a different tree.
@@ -81,9 +77,12 @@ mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = config.h
 CONFIG_CLEAN_FILES = $(CONFIG_HEADER) config.cache config.log config.status
 
-TESTS = test/addrset test/test-uri
+TEST_PROGS = test/addrset test/test-uri test/test-cmdline-split
+ifneq ($(HAVE_OPENSSL),)
+TEST_PROGS += test/test-wildcard
+endif
 
-all: $(TARGET) $(TESTS)
+all: $(TARGET) $(TEST_PROGS)
 
 $(TARGET): $(OBJS) $(NSOCKLIB)
 	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $(OBJS) $(NSOCKLIB) $(NBASELIB) $(OPENSSL_LIBS) $(PCAP_LIBS) $(LIBS)
@@ -113,6 +112,12 @@ test/addrset: test/addrset.o ncat_core.o ncat_hostmatch.o sys_wrap.o util.o
 test/test-uri: test/test-uri.o base64.o http.o ncat_core.o ncat_hostmatch.o sys_wrap.o util.o
 	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(NSOCKLIB) $(NBASELIB) $(OPENSSL_LIBS) $(PCAP_LIBS) $(LIBS)
 
+test/test-cmdline-split: test/test-cmdline-split.o ncat_posix.o ncat_core.o ncat_hostmatch.o sys_wrap.o util.o
+	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(NSOCKLIB) $(NBASELIB) $(OPENSSL_LIBS) $(PCAP_LIBS) $(LIBS)
+
+test/test-wildcard: test/test-wildcard.o ncat_core.o ncat_hostmatch.o ncat_ssl.o sys_wrap.o util.o
+	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(NSOCKLIB) $(NBASELIB) $(OPENSSL_LIBS) $(PCAP_LIBS) $(LIBS)
+
 .PHONY: uninstall all clean distclean
 
 $(NBASEDIR)/libnbase.a: $(NBASEDIR)/Makefile
@@ -136,12 +141,20 @@ uninstall:
 	$(RM) -f $(mandir)/man1/$(TARGET).1
 
 ncat_clean:
-	$(RM) -f *.o test/*.o $(TARGET) $(TESTS) makefile.dep
+	$(RM) -f *.o test/*.o $(TARGET) $(TEST_PROGS) makefile.dep
 
 clean: ncat_clean
 
 distclean: clean
 	-rm -f Makefile $(CONFIG_CLEAN_FILES)
+
+TESTS = ./test-addrset.sh ./test-cmdline-split ./test-uri
+ifneq ($(HAVE_OPENSSL),)
+TESTS += ./test-wildcard
+endif
+
+check: $(TARGET) $(TEST_PROGS)
+	cd test && ($(addsuffix &&,$(TESTS)) echo "All tests passed.")
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

@@ -3,7 +3,7 @@
 # Well known service port numbers -*- mode: fundamental; -*-
 # From the Nmap Security Scanner ( http://nmap.org )
 #
-# $Id: nmap-services 13888 2009-06-24 21:35:54Z fyodor $
+# $Id: nmap-services 16278 2009-12-17 06:32:42Z fyodor $
 #
 # Derived from IANA data and our own research
 # 
@@ -945,7 +945,7 @@ unknown	615/tcp	0.000063
 unknown	615/udp	0.000330
 unknown	616/tcp	0.000289
 unknown	616/udp	0.000330
-sco-dtmgr	617/tcp	0.000226	# SCO Desktop Administration Server or Arkeia (www.akriea.com) backup software
+sco-dtmgr	617/tcp	0.000226	# SCO Desktop Administration Server or Arkeia (www.arkeia.com) backup software
 sco-dtmgr	617/udp	0.001302	# SCO Desktop Administration Server
 unknown	618/tcp	0.000013
 unknown	619/tcp	0.000025
@@ -2702,8 +2702,8 @@ x25-svc-port	1998/tcp	0.001731	# cisco X.25 service (XOT)
 x25-svc-port	1998/udp	0.000610	# cisco X.25 service (XOT)
 tcp-id-port	1999/tcp	0.000364	# cisco identification port
 tcp-id-port	1999/udp	0.000923	# cisco identification port
-callbook	2000/tcp	0.010112
-callbook	2000/udp	0.011697
+cisco-sccp	2000/tcp	0.010112	# cisco SCCP (Skinny Client Control Protocol)
+cisco-sccp	2000/udp	0.011697	# cisco SCCP (Skinny Client Control Protocol)
 dc	2001/tcp	0.007339	# or nfr20 web queries
 wizard	2001/udp	0.001186	# curry
 globe	2002/tcp	0.001744
@@ -3870,6 +3870,7 @@ unknown	4173/udp	0.000330
 unknown	4174/tcp	0.000076
 unknown	4175/udp	0.000661
 unknown	4179/udp	0.000330
+sieve	4190/tcp	0.000076	# ManageSieve Protocol
 unknown	4191/udp	0.000330
 unknown	4192/tcp	0.000076
 unknown	4194/udp	0.000330
@@ -5778,7 +5779,7 @@ unknown	9407/udp	0.000330
 unknown	9409/tcp	0.000152
 unknown	9415/tcp	0.000760
 unknown	9416/udp	0.000661
-unknown	9418/tcp	0.000228
+git	9418/tcp	0.000228	# Git revision control system
 unknown	9420/udp	0.000330
 unknown	9424/udp	0.000330
 unknown	9431/udp	0.000330
@@ -5923,7 +5924,7 @@ unknown	9893/udp	0.000330
 unknown	9894/udp	0.000330
 unknown	9897/udp	0.000661
 unknown	9898/tcp	0.000228
-sctp-tunneling	9899/sctp	0.000000	# SCTP Tunneling
+sctp-tunneling	9899/sctp	0.000000	# SCTP Tunneling (misconfiguration)
 iua	9900/tcp	0.000380	# IUA
 iua	9900/sctp	0.000000	# IUA
 unknown	9901/tcp	0.000076

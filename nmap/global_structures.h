@@ -88,11 +88,13 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: global_structures.h 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: global_structures.h 16288 2009-12-18 07:59:31Z david $ */
 
 
 #ifndef GLOBAL_STRUCTURES_H
 #define GLOBAL_STRUCTURES_H
+
+#include <vector>
 
 class TargetGroup;
 class Target;
@@ -155,35 +157,41 @@ struct ftpinfo {
 };
 
 struct AVal {
-  char *attribute;
-  char value[256];
-  struct AVal *next;
+  const char *attribute;
+  const char *value;
 };
 
 struct OS_Classification {
-  char *OS_Vendor;
-  char *OS_Family;
-  char *OS_Generation; /* Can be NULL if unclassified */
-  char *Device_Type;
+  const char *OS_Vendor;
+  const char *OS_Family;
+  const char *OS_Generation; /* Can be NULL if unclassified */
+  const char *Device_Type;
 };
 
-#define MAX_OS_CLASSIFICATIONS_PER_FP 10
-typedef struct FingerTest {
-  char *OS_name;
-  struct OS_Classification OS_class[MAX_OS_CLASSIFICATIONS_PER_FP];
-  int num_OS_Classifications;
-  int line; /* For reference prints, the line # in nmap-os-db */
+struct FingerTest {
   const char *name;
-  struct AVal *results;
-  struct FingerTest *next;
- } FingerPrint;
+  std::vector<struct AVal> results;
+  const struct AVal *getattrbyname(const char *name) const;
+};
+
+struct FingerPrint {
+  int line; /* For reference prints, the line # in nmap-os-db */
+  char *OS_name;
+  std::vector<OS_Classification> OS_class;
+  std::vector<FingerTest> tests;
+  const FingerTest *gettestbyname(const char *name) const;
+  FingerPrint();
+};
 
 /* This structure contains the important data from the fingerprint
    database (nmap-os-db) */
-typedef struct FingerPrintDB {
-  FingerPrint **prints;
+struct FingerPrintDB {
   FingerPrint *MatchPoints;
-} FingerPrintDB;
+  std::vector<FingerPrint *> prints;
+
+  FingerPrintDB();
+  ~FingerPrintDB();
+};
 
 struct timeout_info {
   int srtt; /* Smoothed rtt estimate (microseconds) */
@@ -194,13 +202,12 @@ struct timeout_info {
 struct seq_info {
   int responses;
   int ts_seqclass; /* TS_SEQ_* defines in nmap.h */
-  time_t uptime; /* time of latest system boot (or 0 if unknown ) */
   int ipid_seqclass; /* IPID_SEQ_* defines in nmap.h */
   u32 seqs[NUM_SEQ_SAMPLES];
   u32 timestamps[NUM_SEQ_SAMPLES];
   int index;
   u16 ipids[NUM_SEQ_SAMPLES];
-  time_t lastboot; /* 0 means unknown */
+  long lastboot; /* 0 means unknown */
 };
 
 /* Different kinds of Ipids. */
@@ -237,6 +244,6 @@ struct scan_lists {
 	int prot_count;
 };
 
-typedef enum { STYPE_UNKNOWN, HOST_DISCOVERY, ACK_SCAN, SYN_SCAN, FIN_SCAN, XMAS_SCAN, UDP_SCAN, CONNECT_SCAN, NULL_SCAN, WINDOW_SCAN, SCTP_INIT_SCAN, SCTP_COOKIE_ECHO_SCAN, RPC_SCAN, MAIMON_SCAN, IPPROT_SCAN, PING_SCAN, PING_SCAN_ARP, IDLE_SCAN, BOUNCE_SCAN, SERVICE_SCAN, OS_SCAN, SCRIPT_SCAN, TRACEROUTE, REF_TRACEROUTE}stype;
+typedef enum { STYPE_UNKNOWN, HOST_DISCOVERY, ACK_SCAN, SYN_SCAN, FIN_SCAN, XMAS_SCAN, UDP_SCAN, CONNECT_SCAN, NULL_SCAN, WINDOW_SCAN, SCTP_INIT_SCAN, SCTP_COOKIE_ECHO_SCAN, RPC_SCAN, MAIMON_SCAN, IPPROT_SCAN, PING_SCAN, PING_SCAN_ARP, IDLE_SCAN, BOUNCE_SCAN, SERVICE_SCAN, OS_SCAN, SCRIPT_SCAN, TRACEROUTE}stype;
 
 #endif /*GLOBAL_STRUCTURES_H */

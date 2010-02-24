@@ -89,7 +89,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: Target.h 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: Target.h 15925 2009-10-27 06:08:04Z david $ */
 
 #ifndef TARGET_H
 #define TARGET_H
@@ -106,6 +106,8 @@
 #include "tcpip.h"
 #include "scan_engine.h"
 
+#include <list>
+
 #ifndef INET6_ADDRSTRLEN
 #define INET6_ADDRSTRLEN 46
 #endif
@@ -114,11 +116,37 @@ enum osscan_flags {
 	OS_NOTPERF=0, OS_PERF, OS_PERF_UNREL
 };
 
+/* The method used to calculate the Target::distance, included in OS
+   fingerprints. */
+enum dist_calc_method {
+	DIST_METHOD_NONE,
+	DIST_METHOD_LOCALHOST,
+	DIST_METHOD_DIRECT,
+	DIST_METHOD_ICMP,
+	DIST_METHOD_TRACEROUTE
+};
+
 struct host_timeout_nfo {
   unsigned long msecs_used; /* How many msecs has this Target used? */
   bool toclock_running; /* Is the clock running right now? */
   struct timeval toclock_start; /* When did the clock start? */
   time_t host_start, host_end; /* The absolute start and end for this host */
+};
+
+struct TracerouteHop {
+  struct sockaddr_storage tag;
+  bool timedout;
+  std::string name;
+  struct sockaddr_storage addr;
+  int ttl;
+  float rtt; /* In milliseconds. */
+
+  int display_name(char *buf, size_t len) {
+    if (name.empty())
+      return Snprintf(buf, len, "%s", inet_ntop_ez(&addr, sizeof(addr)));
+    else
+      return Snprintf(buf, len, "%s (%s)", name.c_str(), inet_ntop_ez(&addr, sizeof(addr)));
+  }
 };
 
 class Target {
@@ -138,17 +166,17 @@ class Target {
      to sockaddr_storage */
   void setTargetSockAddr(struct sockaddr_storage *ss, size_t ss_len);
   // Returns IPv4 target host address or {0} if unavailable.
-  struct in_addr v4host();
+  struct in_addr v4host() const;
   const struct in_addr *v4hostip() const;
   /* The source address used to reach the target */
   int SourceSockAddr(struct sockaddr_storage *ss, size_t *ss_len);
   /* Note that it is OK to pass in a sockaddr_in or sockaddr_in6 casted
      to sockaddr_storage */
   void setSourceSockAddr(struct sockaddr_storage *ss, size_t ss_len);
-  struct in_addr v4source();
-  const struct in_addr *v4sourceip();
+  struct in_addr v4source() const;
+  const struct in_addr *v4sourceip() const;
   /* The IPv4 or IPv6 literal string for the target host */
-  const char *targetipstr() { return targetipstring; }
+  const char *targetipstr() const { return targetipstring; }
   /* Give the name from the last setHostName() call, which should be
    the name obtained from reverse-resolution (PTR query) of the IP (v4
    or v6).  If the name has not been set, or was set to NULL, an empty
@@ -177,7 +205,7 @@ class Target {
      away when you setTargetSockAddr(), so make sure you do these in proper
      order
   */
-  void setTargetName(char *name);
+  void setTargetName(const char *name);
 
   /* If the host is directly connected on a network, set and retrieve
      that information here.  directlyConnected() will abort if it hasn't
@@ -226,8 +254,8 @@ class Target {
 
   /* Returns a pointer to 6-byte MAC address, or NULL if none is set */
   const u8 *MACAddress() const;
-  const u8 *SrcMACAddress();
-  const u8 *NextHopMACAddress();
+  const u8 *SrcMACAddress() const;
+  const u8 *NextHopMACAddress() const;
 
 /* Set the device names so that they can be returned by deviceName()
    and deviceFullName().  The normal name may not include alias
@@ -242,6 +270,7 @@ class Target {
 
   struct seq_info seq;
   int distance;
+  enum dist_calc_method distance_calculation_method;
   FingerPrintResults *FPR; /* FP results get by the OS scan system. */
   PortList ports;
 
@@ -250,6 +279,14 @@ class Target {
   struct timeout_info to;
   char *hostname; // Null if unable to resolve or unset
   char * targetname; // The name of the target host given on the commmand line if it is a named host
+
+  struct probespec traceroute_probespec;
+  std::list <TracerouteHop> traceroute_hops;
+
+  /* If the address for this target came from a DNS lookup, the list of
+     resultant addresses (sometimes there are more than one). The address
+     actually used is always the first element in this list. */
+  std::list<struct sockaddr_storage> resolved_addrs;
 
 #ifndef NOLUA
   ScriptResults scriptResults;

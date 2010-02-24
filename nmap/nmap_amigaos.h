@@ -88,7 +88,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap_amigaos.h 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: nmap_amigaos.h 12955 2009-04-15 00:37:03Z fyodor $ */
 
 #ifndef _NMAP_AMIGAOS_H_
 #define _NMAP_AMIGAOS_H_

@@ -54,7 +54,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock.h 13448 2009-05-29 23:19:07Z david $ */
+/* $Id: nsock.h 15192 2009-08-20 21:36:58Z david $ */
 
 /* Would you like to include pcap support in nsock?
  * Pcap support code is currently unstable, so we give
@@ -134,8 +134,12 @@ typedef void *nsock_ssl;
    example you could do a series of 15 second runs, allowing you to do
    other stuff between them.  Or you could just schedule a timer to
    call you back every 15 seconds.*/
-enum nsock_loopstatus { NSOCK_LOOP_NOEVENTS = 2, NSOCK_LOOP_TIMEOUT, NSOCK_LOOP_ERROR };
+enum nsock_loopstatus { NSOCK_LOOP_NOEVENTS = 2, NSOCK_LOOP_TIMEOUT, NSOCK_LOOP_ERROR, NSOCK_LOOP_QUIT };
 enum nsock_loopstatus nsock_loop(nsock_pool nsp, int msec_timeout);
+
+/* Calling this function will cause nsock_loop to quit on its next iteration
+   with a return value of NSOCK_LOOP_QUIT. */
+void nsock_loop_quit(nsock_pool nsp);
 
 /* This next function returns the errno style error code -- which is only
    valid if the status is NSOCK_LOOP_ERROR was returned by nsock_loop() */
@@ -326,6 +330,12 @@ int nsi_getsd(nsock_iod nsiod);
    ids for a given nspool (unless you blow through billions of them). */
 unsigned long nsi_id(nsock_iod nsockiod);
 
+/*Returns Packets received in bytes   */
+unsigned long nsi_get_read_count(nsock_iod nsockiod);
+
+/*Returns Packets sent in bytes   */
+unsigned long nsi_get_write_count(nsock_iod nsockiod);
+
   /* Returns 1 if an NSI is communicating via SSL, 0 otherwise */
 int nsi_checkssl(nsock_iod nsockiod);
 
@@ -408,6 +418,17 @@ nsock_event_id nsock_connect_tcp(nsock_pool nsp, nsock_iod nsiod,
 				 void *userdata, struct sockaddr *ss,
 				 size_t sslen, unsigned short port);
 
+/* Request an SCTP association to another system (by IP address).  The
+   in_addr is normal network byte order, but the port number should be
+   given in HOST BYTE ORDER.  ss should be a sockaddr_storage,
+   sockaddr_in6, or sockaddr_in as appropriate (just like what you
+   would pass to connect).  sslen should be the sizeof the structure
+   you are passing in. */
+nsock_event_id nsock_connect_sctp(nsock_pool nsp, nsock_iod nsiod, 
+				 nsock_ev_handler handler, int timeout_msecs, 
+				 void *userdata, struct sockaddr *ss,
+				 size_t sslen, unsigned short port);
+
 /* Request a UDP "connection" to another system (by IP address).  The
    in_addr is normal network byte order, but the port number should be
    given in HOST BYTE ORDER.  Since this is UDP, no packets are
@@ -429,10 +450,10 @@ nsock_event_id nsock_connect_udp(nsock_pool nsp, nsock_iod nsiod,
 				 struct sockaddr *ss, size_t sslen,
 				 unsigned short port);
 
-/* Request an SSL over TCP connection to another system (by IP
+/* Request an SSL over TCP/SCTP connection to another system (by IP
    address).  The in_addr is normal network byte order, but the port
    number should be given in HOST BYTE ORDER.  This function will call
-   back only after it has made the TCP connection AND done the initial
+   back only after it has made the connection AND done the initial
    SSL negotiation.  From that point on, you use the normal read/write
    calls and decryption will happen transparently. ss should be a
    sockaddr_storage, sockaddr_in6, or sockaddr_in as appropriate (just
@@ -441,12 +462,12 @@ nsock_event_id nsock_connect_udp(nsock_pool nsp, nsock_iod nsiod,
 nsock_event_id nsock_connect_ssl(nsock_pool nsp, nsock_iod nsiod, 
 				 nsock_ev_handler handler, int timeout_msecs, 
 				 void *userdata, struct sockaddr *ss, 
-				 size_t sslen, unsigned short port,
+				 size_t sslen, int proto, unsigned short port,
 				 nsock_ssl_session ssl_session);
 
-/* Request ssl connection over already established TCP connection.
+/* Request ssl connection over already established TCP/SCTP connection.
    nsiod must be socket that is already connected to target
-   using nsock_connect_tcp.
+   using nsock_connect_tcp or nsock_connect_sctp.
    All parameters have the same meaning as in 'nsock_connect_ssl' */
 nsock_event_id nsock_reconnect_ssl(nsock_pool nsp, nsock_iod nsiod,
 				   nsock_ev_handler handler, int timeout_msecs,

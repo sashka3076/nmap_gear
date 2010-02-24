@@ -1,161 +1,13 @@
+'\" t
 .\"     Title: Ncat
 .\"    Author: [see the "Authors" section]
-.\" Generator: DocBook XSL Stylesheets v1.74.0 <http://docbook.sf.net/>
-.\"      Date: 06/24/2009
+.\" Generator: DocBook XSL Stylesheets v1.74.3 <http://docbook.sf.net/>
+.\"      Date: 01/14/2010
 .\"    Manual: Ncat Reference Guide
 .\"    Source: Ncat
 .\"  Language: English
 .\"
-.TH "NCAT" "1" "06/24/2009" "Ncat" "Ncat Reference Guide"
-.\" -----------------------------------------------------------------
-.\" * (re)Define some macros
-.\" -----------------------------------------------------------------
-.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-.\" toupper - uppercase a string (locale-aware)
-.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-.de toupper
-.tr aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ
-\\$*
-.tr aabbccddeeffgghhiijjkkllmmnnooppqqrrssttuuvvwwxxyyzz
-..
-.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-.\" SH-xref - format a cross-reference to an SH section
-.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-.de SH-xref
-.ie n \{\
-.\}
-.toupper \\$*
-.el \{\
-\\$*
-.\}
-..
-.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-.\" SH - level-one heading that works better for non-TTY output
-.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-.de1 SH
-.\" put an extra blank line of space above the head in non-TTY output
-.if t \{\
-.sp 1
-.\}
-.sp \\n[PD]u
-.nr an-level 1
-.set-an-margin
-.nr an-prevailing-indent \\n[IN]
-.fi
-.in \\n[an-margin]u
-.ti 0
-.HTML-TAG ".NH \\n[an-level]"
-.it 1 an-trap
-.nr an-no-space-flag 1
-.nr an-break-flag 1
-\." make the size of the head bigger
-.ps +3
-.ft B
-.ne (2v + 1u)
-.ie n \{\
-.\" if n (TTY output), use uppercase
-.toupper \\$*
-.\}
-.el \{\
-.nr an-break-flag 0
-.\" if not n (not TTY), use normal case (not uppercase)
-\\$1
-.in \\n[an-margin]u
-.ti 0
-.\" if not n (not TTY), put a border/line under subheading
-.sp -.6
-\l'\n(.lu'
-.\}
-..
-.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-.\" SS - level-two heading that works better for non-TTY output
-.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-.de1 SS
-.sp \\n[PD]u
-.nr an-level 1
-.set-an-margin
-.nr an-prevailing-indent \\n[IN]
-.fi
-.in \\n[IN]u
-.ti \\n[SN]u
-.it 1 an-trap
-.nr an-no-space-flag 1
-.nr an-break-flag 1
-.ps \\n[PS-SS]u
-\." make the size of the head bigger
-.ps +2
-.ft B
-.ne (2v + 1u)
-.if \\n[.$] \&\\$*
-..
-.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-.\" BB/BE - put background/screen (filled box) around block of text
-.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-.de BB
-.if t \{\
-.sp -.5
-.br
-.in +2n
-.ll -2n
-.gcolor red
-.di BX
-.\}
-..
-.de EB
-.if t \{\
-.if "\\$2"adjust-for-leading-newline" \{\
-.sp -1
-.\}
-.br
-.di
-.in
-.ll
-.gcolor
-.nr BW \\n(.lu-\\n(.i
-.nr BH \\n(dn+.5v
-.ne \\n(BHu+.5v
-.ie "\\$2"adjust-for-leading-newline" \{\
-\M[\\$1]\h'1n'\v'+.5v'\D'P \\n(BWu 0 0 \\n(BHu -\\n(BWu 0 0 -\\n(BHu'\M[]
-.\}
-.el \{\
-\M[\\$1]\h'1n'\v'-.5v'\D'P \\n(BWu 0 0 \\n(BHu -\\n(BWu 0 0 -\\n(BHu'\M[]
-.\}
-.in 0
-.sp -.5v
-.nf
-.BX
-.in
-.sp .5v
-.fi
-.\}
-..
-.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-.\" BM/EM - put colored marker in margin next to block of text
-.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-.de BM
-.if t \{\
-.br
-.ll -2n
-.gcolor red
-.di BX
-.\}
-..
-.de EM
-.if t \{\
-.br
-.di
-.ll
-.gcolor
-.nr BH \\n(dn
-.ne \\n(BHu
-\M[\\$1]\D'P -.75n 0 0 \\n(BHu -(\\n[.i]u - \\n(INu - .75n) 0 0 -\\n(BHu'\M[]
-.in 0
-.nf
-.BX
-.in
-.fi
-.\}
-..
+.TH "NCAT" "1" "01/14/2010" "Ncat" "Ncat Reference Guide"
 .\" -----------------------------------------------------------------
 .\" * set default formatting
 .\" -----------------------------------------------------------------
@@ -166,35 +18,25 @@
 .\" -----------------------------------------------------------------
 .\" * MAIN CONTENT STARTS HERE *
 .\" -----------------------------------------------------------------
-.SH "Name"
+.SH "NAME"
 ncat \- Concatenate and redirect sockets
-.SH "Synopsis"
-.fam C
+.SH "SYNOPSIS"
 .HP \w'\fBncat\fR\ 'u
 \fBncat\fR [\fIOPTIONS\fR...] [\fIhostname\fR] [\fIport\fR]
-.fam
-.SH "Description"
+.SH "DESCRIPTION"
 .PP
 Ncat is a feature\-packed networking utility which will read and write data across a network from the command line\&. Ncat was written for the Nmap Project and is the culmination of the currently splintered family of Netcat incarnations\&. It uses both TCP and UDP for communication and is designed to be a reliable back\-end tool to instantly provide network connectivity to other applications and users\&. Ncat will not only work with IPv4 and IPv6 but provides the user with a virtually limitless number of potential uses\&.
 .PP
 Among Ncat\'s vast number of features there is the ability to chain Ncats together, redirect both TCP and UDP ports to other sites, SSL support, and proxy connections via SOCKS4 or HTTP (CONNECT method) proxies (with optional proxy authentication as well)\&. Some general principles apply to most applications and thus give you the capability of instantly adding networking support to software that would normally never support it\&.
-.SH "Options Summary"
+.SH "OPTIONS SUMMARY"
 .PP
 
 .sp
 .if n \{\
 .RS 4
 .\}
-.fam C
-.ps -1
 .nf
-.if t \{\
-.sp -1
-.\}
-.BB lightgray adjust-for-leading-newline
-.sp -1
-
-Ncat 5\&.00 ( http://nmap\&.org/ncat )
+Ncat 5\&.20 ( http://nmap\&.org/ncat )
 Usage: ncat [options] [hostname] [port]
 
 Options taking a time assume milliseconds, unless you append an \'s\'
@@ -212,13 +54,14 @@ Options taking a time assume milliseconds, unless you append an \'s\'
   \-o, \-\-output               Dump session data to a file
   \-x, \-\-hex\-dump             Dump session data as hex to a file
   \-i, \-\-idle\-timeout <time>  Idle read/write timeout
-  \-p, \-\-source\-port port     Specify source port to use (doesn\'t affect \-l)
+  \-p, \-\-source\-port port     Specify source port to use
   \-s, \-\-source addr          Specify source address to use (doesn\'t affect \-l)
   \-l, \-\-listen               Bind and listen for incoming connections
   \-k, \-\-keep\-open            Accept multiple connections in listen mode
   \-n, \-\-nodns                Do not resolve hostnames via DNS
   \-t, \-\-telnet               Answer Telnet negotiations
   \-u, \-\-udp                  Use UDP instead of default TCP
+      \-\-sctp                 Use SCTP instead of default TCP
   \-v, \-\-verbose              Set verbosity level (can be used up to 3 times)
   \-w, \-\-wait <time>          Connect timeout
       \-\-send\-only            Only send data, ignoring received; quit on EOF
@@ -242,25 +85,19 @@ Options taking a time assume milliseconds, unless you append an \'s\'
 See the ncat(1) manpage for full options, descriptions and usage examples
 
       
-.EB lightgray adjust-for-leading-newline
-.if t \{\
-.sp 1
-.\}
 .fi
-.fam
-.ps +1
 .if n \{\
 .RE
 .\}
 .sp
-.SH "Host Specification"
+.SH "HOST SPECIFICATION"
 .PP
 When passing a host parameter to Ncat, the simplest case is just to list a single hostname or IP address\&. If you are supplying a range of hosts, such as with
 \fB\-\-deny\fR
 or
 \fB\-\-allow\fR
 options, you can denote the chosen range of IP addresses by appending the CIDR\-style \'/mask\' to the IP address\&. The mask must be between zero (select the whole subnet) and 32 (scan the single host specified)\&. For example, you may use /24 to scan a class C subnet and /16 for a class B\&.
-.SH "Protocol Options"
+.SH "PROTOCOL OPTIONS"
 .PP
 \fB\-4\fR (IPv4 only) .\" -4 (Ncat option)
 .RS 4
@@ -274,9 +111,14 @@ Force the use of IPv6 only\&.
 .PP
 \fB\-u\fR, \fB\-\-udp\fR (Use UDP) .\" -u (Ncat option) .\" --udp (Ncat option)
 .RS 4
-Use UDP for the connection (the default is TCP)
+Use UDP for the connection (the default is TCP)\&.
 .RE
-.SH "Client-Mode Options"
+.PP
+\fB\-\-sctp\fR (Use SCTP) .\" --sctp (Ncat option)
+.RS 4
+Use SCTP for the connection (the default is TCP)\&. SCTP support is implemented in TCP compatible mode\&.
+.RE
+.SH "CLIENT-MODE OPTIONS"
 .PP
 \fB\-g \fR\fB\fIhop1\fR\fR\fB[,\fIhop2\fR,\&.\&.\&.]\fR (Loose source routing) .\" -g (Ncat option)
 .RS 4
@@ -304,7 +146,7 @@ Set the port number for Ncat to bind to\&.
 .RS 4
 Set the address for Ncat to bind to\&.
 .RE
-.SH "Server-Mode Options"
+.SH "SERVER-MODE OPTIONS"
 .PP
 See the Access Control section for information on limiting which hosts can connect to the listening Ncat process\&.
 .PP
@@ -338,7 +180,7 @@ The
 \fB\-\-chat\fR
 option enables chat mode, intended for the exchange of text between several users\&. In chat mode, connection brokering is turned on\&. Ncat prefixes each message received with an ID before relaying it to the other connections\&. The ID is unique for each connected client\&. This helps distinguish who sent what\&. Additionally, non\-printing characters such as control characters are escaped to keep them from doing damage to a terminal\&.
 .RE
-.SH "SSL Options"
+.SH "SSL OPTIONS"
 .PP
 \fB\-\-ssl\fR (Use SSL) .\" --ssl (Ncat option)
 .RS 4
@@ -380,7 +222,7 @@ This option sets a list of certificates that are trusted for purposes of certifi
 \fB\-\-ssl\-verify\fR\&. The argument to this option is the name of a PEM.\" PEM (Privacy Enhanced Mail)
 file containing trusted certificates\&. Typically, the file will contain certificates of certification authorities, though it may also contain server certificates directly\&. When this option is used, Ncat does not use its default certificates\&.
 .RE
-.SH "Proxy Options"
+.SH "PROXY OPTIONS"
 .PP
 \fB\-\-proxy \fR\fB\fIhost\fR\fR\fB[:\fR\fB\fIport\fR\fR\fB]\fR (Specify proxy address) .\" --proxy (Ncat option)
 .RS 4
@@ -410,16 +252,16 @@ The currently available protocols in client\-mode are
 \(lqhttp\(rq\&.
 .sp
 If this option is not used, the default protocol is
-\FChttp\F[]\&.
+http\&.
 .RE
 .PP
 \fB\-\-proxy\-auth \fR\fB\fIuser\fR\fR\fB[:\fIpass\fR]\fR (Specify proxy credentials) .\" --proxy-auth (Ncat option)
 .RS 4
 Used to specify proxy authentication credentials for client\-mode\&. For use with
-\fB\-\-proxy\-type \fR\fB\FChttp\F[]\fR, the form should be user:pass\&. For
-\fB\-\-proxy\-type \fR\fB\FCsocks4\F[]\fR, it should just be a username\&.
+\fB\-\-proxy\-type \fR\fBhttp\fR, the form should be user:pass\&. For
+\fB\-\-proxy\-type \fR\fBsocks4\fR, it should just be a username\&.
 .RE
-.SH "Command Execution Options"
+.SH "COMMAND EXECUTION OPTIONS"
 .PP
 \fB\-e \fR\fB\fIcommand\fR\fR, \fB\-\-exec \fR\fB\fIcommand\fR\fR (Execute command) .\" --exec (Ncat option) .\" -e (Ncat option)
 .RS 4
@@ -431,7 +273,7 @@ Execute the specified command after a connection has been established\&. The com
 Same as
 \fB\-e\fR, except it tries to execute the command via /bin/sh (so you don\'t have to specify the full path for the command)\&.
 .RE
-.SH "Access Control Options"
+.SH "ACCESS CONTROL OPTIONS"
 .PP
 \fB\-\-allow \fR\fB\fIhost\fR\fR\fB[,\fIhost\fR,\&.\&.\&.]\fR (Allow connections) .\" --allow (Ncat option)
 .RS 4
@@ -455,10 +297,10 @@ Issue Ncat with a list of hosts that will not be allowed to connect to the liste
 This is the same functionality as
 \fB\-\-deny\fR, except that excluded hosts are provided in a new\-line delimited deny file, rather than directly on the command line\&.
 .RE
-.SH "Timing Options"
+.SH "TIMING OPTIONS"
 .PP
 These options accept a
-\FCtime\F[]
+time
 parameter\&. This is specified in milliseconds by default, though you can append
 \(lqs\(rq,
 \(lqm\(rq, or
@@ -481,7 +323,7 @@ Set a fixed timeout for idle connections\&. If the idle timeout is reached, the 
 .RS 4
 Set a fixed timeout for connection attempts\&.
 .RE
-.SH "Output Options"
+.SH "OUTPUT OPTIONS"
 .PP
 \fB\-o \fR\fB\fIfile\fR\fR, \fB\-\-output \fR\fB\fIfile\fR\fR (Save session data) .\" --output (Ncat option) .\" -o (Ncat option)
 .RS 4
@@ -501,7 +343,7 @@ Issue Ncat with
 \fB\-v\fR
 and it will be verbose and display all kinds of useful connection based information\&. If you issue this twice (\fB\-vv\fR) then you will get all the code debugging information\&. Issue it three times (\fB\-vvv\fR) and you get the connection information and the code debugging information\&.
 .RE
-.SH "Misc Options"
+.SH "MISC OPTIONS"
 .PP
 \fB\-C\fR, \fB\-\-crlf\fR (Use CRLF as EOL) .\" --crlf (Ncat option) .\" -C (Ncat option)
 .RS 4
@@ -532,7 +374,7 @@ Handle DO/DONT WILL/WONT Telnet negotiations\&. This makes it possible to script
 .RS 4
 This displays the Ncat version, release information and any additional build information and exits\&.
 .RE
-.SH "Examples"
+.SH "EXAMPLES"
 .PP
 Connect to example\&.org on TCP port 8080
 .PP
@@ -575,7 +417,13 @@ server
 \fBHOST1$ ncat \-l 9899 <inputfile\fR
 .PP
 \fBHOST2$ ncat HOST1 9899 >outputfile\fR
-.SH "Bugs"
+.SH "EXIT CODE"
+.PP
+The exit code reflects whether a connection was made and completed successfully\&. 0 means there was no error\&. 1 means there was a network error of some kind, for example
+\(lqConnection refused\(rq
+or
+\(lqConnection reset\(rq\&. 2 is reserved for all other errors, like an invalid option or a nonexistent file\&.
+.SH "BUGS"
 .PP
 Like its author, Ncat isn\'t perfect\&. But you can help make it better by sending bug reports or even writing patches\&. If Ncat doesn\'t behave the way you expect, first upgrade to the latest version available from
 \m[blue]\fB\%http://nmap.org\fR\m[]\&. If the problem persists, do some research to determine whether it has already been discovered and addressed\&. Try Googling the error message or browsing the
@@ -584,28 +432,28 @@ archives at
 \m[blue]\fB\%http://seclists.org/\fR\m[]\&.
 .\" nmap-dev mailing list
 Read this full manual page as well\&. If nothing comes of this, mail a bug report to
-\FCnmap\-dev@insecure\&.org\F[]\&. Please include everything you have learned about the problem, as well as what version of Ncat you are running and what operating system version it is running on\&. Problem reports and Ncat usage questions sent to nmap\-dev@insecure\&.org are far more likely to be answered than those sent to Fyodor directly\&.
+nmap\-dev@insecure\&.org\&. Please include everything you have learned about the problem, as well as what version of Ncat you are running and what operating system version it is running on\&. Problem reports and Ncat usage questions sent to nmap\-dev@insecure\&.org are far more likely to be answered than those sent to Fyodor directly\&.
 .PP
 Code patches to fix bugs are even better than bug reports\&. Basic instructions for creating patch files with your changes are available at
 \m[blue]\fB\%http://nmap.org/data/HACKING\fR\m[]\&. Patches may be sent to
 nmap\-dev
 (recommended) or to Fyodor directly\&.
-.SH "Authors"
+.SH "AUTHORS"
 .PP
 Chris Gibson
-\FCchris@linuxops\&.net\F[]
+chris@linuxops\&.net
 .PP
 Kris Katterjohn
-\FCkatterjohn@gmail\&.com\F[]
+katterjohn@gmail\&.com
 .PP
 Mixter
-\FCmixter@gmail\&.com\F[]
+mixter@gmail\&.com
 .PP
 Fyodor
-\FCfyodor@insecure\&.org\F[]
+fyodor@insecure\&.org
 (\m[blue]\fB\%http://insecure.org\fR\m[])
 .PP
 The original Netcat was written by *Hobbit*
-\FChobbit@avian\&.org\F[]\&. While Ncat isn\'t built on any code from the
+hobbit@avian\&.org\&. While Ncat isn\'t built on any code from the
 \(lqtraditional\(rq
 Netcat (or any other implementation), Ncat is most definitely based on Netcat in spirit and functionality\&.

@@ -88,7 +88,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: osscan.h 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: osscan.h 16190 2009-11-23 21:22:07Z david $ */
 
 #ifndef OSSCAN_H
 #define OSSCAN_H
@@ -96,6 +96,7 @@
 #include "nmap.h"
 #include "global_structures.h"
 #include "FingerPrintResults.h"
+#include "Target.h"
 
 #define OSSCAN_SUCCESS 0
 #define OSSCAN_NOMATCHES -1
@@ -109,6 +110,13 @@
 /* moved to global_structures.h */
 
 /**********************  PROTOTYPES  ***********************************/
+
+/* The OS database consists of many small strings, many of which appear
+   thousands of times. It pays to allocate memory only once for each unique
+   string, and have all references point at the one allocated value. */
+const char *string_pool_insert(const char *s);
+const char *string_pool_sprintf(const char *fmt, ...);
+
 const char *fp2ascii(FingerPrint *FP);
 
 /* Parses a single fingerprint from the memory region given.  If a
@@ -146,7 +154,11 @@ void match_fingerprint(FingerPrint *FP, FingerPrintResults *FPR,
 /* Returns true if perfect match -- if num_subtests & num_subtests_succeeded are non_null it updates them.  if shortcircuit is zero, it does all the tests, otherwise it returns when the first one fails */
 
 void freeFingerPrint(FingerPrint *FP);
-const char *mergeFPs(FingerPrint *FPs[], int numFPs, bool isGoodFP, const struct in_addr * const addr, int distance, const u8 *mac, int openTcpPort, int closedTcpPort, int closedUdpPort, bool wrapit);
+const char *mergeFPs(FingerPrint *FPs[], int numFPs, bool isGoodFP,
+                           const struct in_addr * const addr, int distance,
+                           enum dist_calc_method distance_calculation_method,
+                           const u8 *mac, int openTcpPort, int closedTcpPort,
+                           int closedUdpPort, bool wrapit);
 
 #endif /*OSSCAN_H*/
 

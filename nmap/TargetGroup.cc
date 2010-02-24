@@ -90,7 +90,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: TargetGroup.cc 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: TargetGroup.cc 16120 2009-11-18 01:17:59Z david $ */
 
 #include "TargetGroup.h"
 #include "NmapOps.h"
@@ -167,6 +167,8 @@ int TargetGroup::parse_expr(const char * const target_expr, int af) {
 
   ipsleft = 0;
 
+  resolvedaddrs.clear();
+
   if (af == AF_INET) {
 
     if (strchr(hostexp, ':'))
@@ -185,7 +187,7 @@ int TargetGroup::parse_expr(const char * const target_expr, int af) {
       
       *s = '\0';  /* Make sure target_net is terminated before the /## */
       s++;        /* Point s at the netmask */
-      if (!isdigit(*s)) {
+      if (!isdigit((int) (unsigned char) *s)) {
         error("Illegal netmask value, must be /0 - /32 .  Assuming /32 (one host)");
         netmask = 32;
       } else {
@@ -198,22 +200,34 @@ int TargetGroup::parse_expr(const char * const target_expr, int af) {
       }
     } else
       netmask = 32;
+    resolvedname = hostexp;
     for(i=0; *(hostexp + i); i++) 
-      if (isupper((int) *(hostexp +i)) || islower((int) *(hostexp +i))) {
+      if (isupper((int) (unsigned char) *(hostexp +i)) ||
+          islower((int) (unsigned char) *(hostexp +i))) {
         namedhost = 1;
         break;
       }
     if (netmask != 32 || namedhost) {
+      struct in_addr addr;
+
       targets_type = IPV4_NETMASK;
-      if (!inet_pton(AF_INET, target_net, &(startaddr))) {
+      if (!inet_pton(AF_INET, target_net, &(addr))) {
         if ((target = gethostbyname(target_net))) {
           int count=0;
 
-          memcpy(&(startaddr), target->h_addr_list[0], sizeof(struct in_addr));
+          memcpy(&(addr), target->h_addr_list[0], sizeof(addr));
 
-          while (target->h_addr_list[count]) count++;
+          while (target->h_addr_list[count]) {
+            struct sockaddr_storage ss;
+            struct sockaddr_in *sin = (struct sockaddr_in *) &ss;
 
-          if (count > 1)
+            sin->sin_family = AF_INET;
+            sin->sin_addr = addr;
+            resolvedaddrs.push_back(ss);
+            count++;
+          }
+
+          if (count > 1 && o.verbose > 1)
              error("Warning: Hostname %s resolves to %d IPs. Using %s.", target_net, count, inet_ntoa(*((struct in_addr *)target->h_addr_list[0])));
         } else {
           error("Failed to resolve given hostname/IP: %s.  Note that you can't use '/mask' AND '1-4,7,100-' style IP ranges", target_net);
@@ -222,7 +236,7 @@ int TargetGroup::parse_expr(const char * const target_expr, int af) {
         }
       } 
       if (netmask) {
-        unsigned long longtmp = ntohl(startaddr.s_addr);
+        unsigned long longtmp = ntohl(addr.s_addr);
         startaddr.s_addr = longtmp & (unsigned long) (0 - (1<<(32 - netmask)));
         endaddr.s_addr = longtmp | (unsigned long)  ((1<<(32 - netmask)) - 1);
       } else {
@@ -251,7 +265,7 @@ int TargetGroup::parse_expr(const char * const target_expr, int af) {
           *r = '\0';
           addy[i] = r + 1;
         }
-        else if (*r != '*' && *r != ',' && *r != '-' && !isdigit((int)*r)) 
+        else if (*r != '*' && *r != ',' && *r != '-' && !isdigit((int) (unsigned char) *r)) 
           fatal("Invalid character in host specification.  Note in particular that square brackets [] are no longer allowed.  They were redundant and can simply be removed.");
         *r++;
       }
@@ -337,6 +351,15 @@ int TargetGroup::skip_range(_octet_nums octet) {
   if (targets_type != IPV4_RANGES)
     return -1;
 
+  /* The decision to skip a range was based on the address that came immediately
+     before what our current array contains now. For example, if we have just
+     handed out 0.0.0.0 from the the range 0-5.0.0.0, and we're asked to skip
+     the first octet, we want to advance to 1.0.0.0. But 1.0.0.0 is what is in
+     the current array right now, because TargetGroup::get_next_host advances
+     the array after returning an address. If we didn't step back we would
+     erroneously skip ahead to 2.0.0.0. */
+  return_last_host();
+
   switch (octet) {
     case FIRST_OCTET:
       oct = 0;
@@ -372,9 +395,7 @@ int TargetGroup::skip_range(_octet_nums octet) {
     current[i] = 0;
   }
 
-  /* we actually don't skip the current, it was accounted for 
-   * by get_next_host */
-  ipsleft -= hosts_skipped - 1;
+  ipsleft -= hosts_skipped;
  
   return hosts_skipped;
 }
@@ -507,6 +528,41 @@ int TargetGroup::return_last_host() {
     assert(ipsleft == 1);    
   }
   return 0;
+}
+
+/* Returns true iff the given address is the one that was resolved to create
+   this target group; i.e., not one of the addresses derived from it with a
+   netmask. */
+bool TargetGroup::is_resolved_address(const struct sockaddr_storage *ss)
+{
+  const struct sockaddr_in *sin, *sin_resolved;
+  struct sockaddr_storage resolvedaddr;
+
+  if (targets_type != IPV4_NETMASK || ss->ss_family != AF_INET
+      || resolvedaddrs.empty()) {
+    return false;
+  }
+  resolvedaddr = *resolvedaddrs.begin();
+  if (resolvedaddr.ss_family != AF_INET)
+    return false;
+
+  sin = (struct sockaddr_in *) ss;
+  sin_resolved = (struct sockaddr_in *) &resolvedaddr;
+
+  return sin->sin_addr.s_addr == sin_resolved->sin_addr.s_addr;
+}
+
+/* Return a string of the name or address that was resolved for this group. */
+const char *TargetGroup::get_resolved_name(void)
+{
+  return resolvedname.c_str();
+}
+
+/* Return the list of addresses that the name for this group resolved to, if
+   it came from a name resolution. */
+const std::list<struct sockaddr_storage> &TargetGroup::get_resolved_addrs(void)
+{
+  return resolvedaddrs;
 }
 
 /* Lookahead is the number of hosts that can be

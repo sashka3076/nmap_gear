@@ -8,6 +8,7 @@ local ipairs   = ipairs
 local tonumber = tonumber
 
 local stdnse   = require "stdnse"
+local bit      = require "bit"
 
 module ( "ipOps" )
 
@@ -31,6 +32,7 @@ module ( "ipOps" )
 -- @return True or false (or <code>nil</code> in case of an error).
 -- @return String error message in case of an error.
 isPrivate = function( ip )
+  local err
 
   ip, err = expand_ip( ip )
   if err then return nil, err end
@@ -77,7 +79,7 @@ todword = function( ip )
     return nil, "Error in ipOps.todword: Expected IPv4 address."
   end
 
-  local n, ret = {}
+  local n, ret, err = {}
   n, err = get_parts_as_number( ip )
   if err then return nil, err end
 
@@ -87,7 +89,26 @@ todword = function( ip )
 
 end
 
+---
+-- Converts the supplied IPv4 address from a DWORD value into a dotted string. 
+--
+-- For example, the address (((a*256+b)*256+c)*256+d) becomes a.b.c.d. 
+--
+--@param ip DWORD representing an IPv4 address. 
+--@return The string representing the address. 
+fromdword = function( ip )
+  if type( ip ) ~= "number" then
+    stdnse.print_debug(1, "Error in ipOps.todword: Expected IPv4 address.")
+    return nil
+  end
 
+  local n1 = bit.band(bit.rshift(ip, 0),  0x000000FF)
+  local n2 = bit.band(bit.rshift(ip, 8),  0x000000FF)
+  local n3 = bit.band(bit.rshift(ip, 16), 0x000000FF)
+  local n4 = bit.band(bit.rshift(ip, 24), 0x000000FF)
+
+  return string.format("%d.%d.%d.%d", n1, n2, n3, n4)
+end
 
 ---
 -- Separates the supplied IP address into its constituent parts and
@@ -104,6 +125,7 @@ end
 -- <code>nil</code> in case of an error).
 -- @return String error message in case of an error.
 get_parts_as_number = function( ip )
+  local err
 
   ip, err = expand_ip( ip )
   if err then return nil, err end
@@ -250,6 +272,7 @@ end
 -- <code>nil</code> in case of an error).
 -- @return String error message in case of an error.
 expand_ip = function( ip )
+  local err
 
   if type( ip ) ~= "string" or ip == "" then
     return nil, "Error in ipOps.expand_ip: Expected IP address as a string."
@@ -427,6 +450,7 @@ end
 -- digits (or <code>nil</code> in case of an error).
 -- @return    String error message in case of an error.
 ip_to_bin = function( ip )
+  local err
 
   ip, err = expand_ip( ip )
   if err then return nil, err end
@@ -473,6 +497,7 @@ bin_to_ip = function( binstring )
     return nil, "Error in ipOps.bin_to_ip: Expected string of binary digits."
   end
 
+  local af
   if string.len( binstring ) == 32 then
     af = 4
   elseif string.len( binstring ) == 128 then
@@ -481,7 +506,7 @@ bin_to_ip = function( binstring )
     return nil, "Error in ipOps.bin_to_ip: Expected exactly 32 or 128 binary digits."
   end
 
-  t = {}
+  local t = {}
   if af == 6 then
     local pattern = string.rep( "[01]", 16 )
     for chunk in string.gmatch( binstring, pattern ) do

