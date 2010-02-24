@@ -89,7 +89,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: Target.h 15925 2009-10-27 06:08:04Z david $ */
+/* $Id: Target.h 16578 2010-01-26 23:03:21Z david $ */
 
 #ifndef TARGET_H
 #define TARGET_H
@@ -107,6 +107,7 @@
 #include "scan_engine.h"
 
 #include <list>
+#include <string>
 
 #ifndef INET6_ADDRSTRLEN
 #define INET6_ADDRSTRLEN 46

@@ -87,7 +87,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: portlist.cc 16313 2009-12-20 03:22:19Z david $ */
+/* $Id: portlist.cc 16578 2010-01-26 23:03:21Z david $ */
 
 
 #include "portlist.h"
@@ -413,6 +413,7 @@ void PortList::setRPCProbeResults(u16 portno, int proto, int rpcs, unsigned long
 }
 
 
+#ifndef NOLUA
 void PortList::addScriptResult(u16 portno, int protocol, ScriptResult& sr) {
   Port *port;
 
@@ -420,6 +421,7 @@ void PortList::addScriptResult(u16 portno, int protocol, ScriptResult& sr) {
 
   port->scriptResults.push_back(sr);
 }
+#endif
 
 /*****************************************************************************/
 /* Convert protocol name from in.h to enum portlist_proto.
@@ -538,9 +540,16 @@ int PortList::getPortState(u16 portno, u8 protocol) {
 
   port = lookupPort(portno, protocol);
   if (port == NULL)
-    return -1;
+    return default_port_state[INPROTO2PORTLISTPROTO(protocol)].state;
 
   return port->state;
+}
+
+/* Return true if nothing special is known about this port; i.e., it's in the
+   default state as defiend by setDefaultPortState and every other data field is
+   unset. */
+bool PortList::portIsDefault(u16 portno, u8 protocol) {
+  return lookupPort(portno, protocol) == NULL;
 }
 
   /* Saves an identification string for the target containing these
@@ -662,6 +671,7 @@ const Port *PortList::lookupPort(u16 portno, u8 protocol) const {
 
 /* Create the port if it doesn't exist; otherwise this is like lookupPort. */
 Port *PortList::createPort(u16 portno, u8 protocol) {
+  Port *p;
   u16 mapped_portno;
   u8 mapped_protocol;
 
@@ -670,10 +680,13 @@ Port *PortList::createPort(u16 portno, u8 protocol) {
   if (!mapPort(&mapped_portno, &mapped_protocol))
     return NULL;
 
-  if (port_list[mapped_protocol][mapped_portno] == NULL) {
-    Port *p = new Port();
+  p = port_list[mapped_protocol][mapped_portno];
+  if (p == NULL) {
+    p = new Port();
     p->portno = portno;
     p->proto = protocol;
+    p->state = default_port_state[mapped_protocol].state;
+    p->reason.reason_id = ER_NORESPONSE;
     port_list[mapped_protocol][mapped_portno] = p;
   }
 

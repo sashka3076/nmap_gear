@@ -191,6 +191,13 @@ def path_strip_prefix(path, prefix):
 # Distutils subclasses
 
 class my_install(install):
+    def finalize_options(self):
+	# Ubuntu's python2.6-2.6.4-0ubuntu3 package changes sys.prefix in
+        # install.finalize_options when sys.prefix is "/usr/local" (our
+        # default). Because we need the unchanged value later, remember it here.
+        self.saved_prefix = self.prefix
+        install.finalize_options(self)
+
     def run(self):
         install.run(self)
 
@@ -344,11 +351,11 @@ for dir in dirs:
 
     def fix_paths(self):
         """Replace some hardcoded paths to match where files were installed."""
-        interesting_paths = {"CONFIG_DIR": os.path.join(self.prefix, config_dir),
-                             "DOCS_DIR": os.path.join(self.prefix, docs_dir),
-                             "LOCALE_DIR": os.path.join(self.prefix, locale_dir),
-                             "MISC_DIR": os.path.join(self.prefix, misc_dir),
-                             "PIXMAPS_DIR": os.path.join(self.prefix, pixmaps_dir)}
+        interesting_paths = {"CONFIG_DIR": os.path.join(self.saved_prefix, config_dir),
+                             "DOCS_DIR": os.path.join(self.saved_prefix, docs_dir),
+                             "LOCALE_DIR": os.path.join(self.saved_prefix, locale_dir),
+                             "MISC_DIR": os.path.join(self.saved_prefix, misc_dir),
+                             "PIXMAPS_DIR": os.path.join(self.saved_prefix, pixmaps_dir)}
 
         # Find and read the Paths.py file.
         pcontent = ""
@@ -376,8 +383,8 @@ for dir in dirs:
         # Rewrite the zenmap.desktop and zenmap-root.desktop files to point to
         # the installed locations of the su-to-zenmap.sh script and application
         # icon.
-        su_filename = os.path.join(self.prefix, data_dir, "su-to-zenmap.sh")
-        icon_filename = os.path.join(self.prefix, pixmaps_dir, "zenmap.png")
+        su_filename = os.path.join(self.saved_prefix, data_dir, "su-to-zenmap.sh")
+        icon_filename = os.path.join(self.saved_prefix, pixmaps_dir, "zenmap.png")
 
         desktop_filename = None
         root_desktop_filename = None

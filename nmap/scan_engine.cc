@@ -89,7 +89,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: scan_engine.cc 16466 2010-01-15 03:55:23Z david $ */
+/* $Id: scan_engine.cc 16578 2010-01-26 23:03:21Z david $ */
 
 #ifdef WIN32
 #include "nmap_winconfig.h"
@@ -2630,10 +2630,11 @@ static bool ultrascan_port_pspec_update(UltraScanInfo *USI,
     portno = pspec->pd.sctp.dport;
   } else assert(0);
   
-  oldstate = hss->target->ports.getPortState(portno, proto);
-  if (oldstate == -1) {
+  if (hss->target->ports.portIsDefault(portno, proto)) {
     oldstate = PORT_TESTING;
     hss->ports_finished++;
+  } else {
+    oldstate = hss->target->ports.getPortState(portno, proto);
   }
 
   /*    printf("TCP port %hu has changed from state %s to %s!\n", portno, statenum2str(oldstate), statenum2str(newstate)); */

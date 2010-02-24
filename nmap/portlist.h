@@ -87,7 +87,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: portlist.h 16313 2009-12-20 03:22:19Z david $ */
+/* $Id: portlist.h 16578 2010-01-26 23:03:21Z david $ */
 
 #ifndef PORTLIST_H
 #define PORTLIST_H
@@ -221,6 +221,7 @@ class PortList {
   void setPortState(u16 portno, u8 protocol, int state);
   int getPortState(u16 portno, u8 protocol);
   int forgetPort(u16 portno, u8 protocol);
+  bool portIsDefault(u16 portno, u8 protocol);
   /* Saves an identification string for the target containing these
      ports (an IP addrss might be a good example, but set what you
      want).  Only used when printing new port updates.  Optional.  A
@@ -278,7 +279,9 @@ class PortList {
   void setRPCProbeResults(u16 portno, int proto, int rpc_status, unsigned long rpc_program, 
 			  unsigned int rpc_lowver, unsigned int rpc_highver);
 
+#ifndef NOLUA
   void addScriptResult(u16 portno, int protocol, ScriptResult& sr);
+#endif
 
   /* Cycles through the 0 or more "ignored" ports which should be
    consolidated for Nmap output.  They are returned sorted by the
