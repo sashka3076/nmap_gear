@@ -2,8 +2,9 @@ description = [[
 Attempts to extract information from Microsoft SQL Server instances.
 ]]
 -- rev 1.0 (2007-06-09)
+-- rev 1.1 (2009-12-06 - Added SQL 2008 identification T Sellers)
 
-author = "Thomas Buchanan <tbuchanan@thecompassgrp.net>"
+author = "Thomas Buchanan"
 
 license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
 
@@ -192,6 +193,16 @@ action = function(host, port)
 	  if result == nil then
 	    result = "Discovered Microsoft SQL Server 2005"
 	  end
+	elseif string.match(serverInfo[1].version, "^10%.0") then
+	  -- The Express Edition of MS SQL Server 2008 has a default instance name of SQLEXPRESS
+	  for _,instance in ipairs(serverInfo) do
+	    if string.match(instance.instanceName, "SQLEXPRESS") then
+	      result = "Discovered Microsoft SQL Server 2008 Express Edition"
+	    end
+	  end
+	  if result == nil then
+	    result = "Discovered Microsoft SQL Server 2008"
+	  end
 	else
 	  result = "Discovered Microsoft SQL Server"
 	end
@@ -210,6 +221,13 @@ action = function(host, port)
 	    result = result .. " (SP1)"
 	  elseif string.match(serverInfo[1].version, "9.00.1399") then
 	    result = result .. " (RTM)"
+	  -- Check for versions of SQL Server 2008
+	  elseif string.match(serverInfo[1].version, "10.0.1075") then
+	    result = result .. " (CTP)"
+	  elseif string.match(serverInfo[1].version, "10.0.1600") then
+	    result = result .. " (RTM)"
+	  elseif string.match(serverInfo[1].version, "10.0.2531") then
+	    result = result .. " (SP1)"		
 	  end
 	end
 	for _,instance in ipairs(serverInfo) do

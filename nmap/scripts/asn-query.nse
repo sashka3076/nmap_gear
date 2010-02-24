@@ -36,9 +36,7 @@ server (your default DNS server, or whichever one you specified with the
 
 author = "jah, Michael"
 license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
-categories = {"discovery", "external"}
-runlevel = 1
-
+categories = {"discovery", "external", "safe"}
 
 
 local dns    = require "dns"
@@ -211,24 +209,13 @@ function ip_to_asn( query )
   end
 
   -- send the query
-  local decoded_response, other_response = dns.query( query, options)
+  local status, decoded_response = dns.query( query, options)
 
-  -- failed to find or get a response from any dns server - fatal
-  if not decoded_response and ( other_response == nil or other_response == 9 ) then
-    stdnse.print_debug( "%s Failed to send dns query.  Response from dns.query(): %s", filename, other_response or "nil" )
-    return false, nil
+  if not status then
+    stdnse.print_debug( "%s Error from dns.query(): %s", filename, decoded_response )
   end
 
-  -- error codes from dns.lua
-  if not decoded_response and type( other_response ) == "number" then
-    if other_response ~= 3 then stdnse.print_debug( "%s Error from dns.query() Code: %s in response to %s", filename, other_response, query ) end
-    return false, err_code[other_response] or "Unknown Error"
-  end
-
-  -- catch
-  if not decoded_response then return false, nil end
-
-  return true, decoded_response
+  return status, decoded_response
 
 end
 
@@ -455,6 +442,7 @@ function nice_output( output, combined_records )
   if #output == 0 then return nil end
 
   -- sort BGP asc. and combine BGP when ASN info is duplicated
+  local first, second
   table.sort( output, function(a,b) return (get_prefix_length(a) or 0) > (get_prefix_length(b) or 0) end )
   for i=1,#output,1 do
     for j=1,#output,1 do

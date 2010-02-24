@@ -88,7 +88,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nbase_ipv6.h 12956 2009-04-15 00:37:23Z fyodor $ */
+/* $Id: nbase_ipv6.h 15481 2009-09-16 01:30:37Z david $ */
 
 #ifndef NBASE_IPV6_H
 #define NBASE_IPV6_H
@@ -154,12 +154,19 @@ struct sockaddr_storage {
 }; 
 #endif /* SOCKADDR_STORAGE */
 
+/* Compares two sockaddr_storage structures with a return value like strcmp.
+   First the address families are compared, then the addresses if the families
+   are equal. The structures must be real full-length sockaddr_storage
+   structures, not something shorter like sockaddr_in. */
+int sockaddr_storage_cmp(const struct sockaddr_storage *a,
+  const struct sockaddr_storage *b);
+
 /* This function is an easier version of inet_ntop because you don't
    need to pass a dest buffer.  Instead, it returns a static buffer that
    you can use until the function is called again (by the same or another
    thread in the process).  If there is a wierd error (like sslen being
    too short) then NULL will be returned. */
-const char *inet_ntop_ez(struct sockaddr_storage *ss, size_t sslen);
+const char *inet_ntop_ez(const struct sockaddr_storage *ss, size_t sslen);
 
 
 #if !HAVE_GETNAMEINFO || !HAVE_GETADDRINFO

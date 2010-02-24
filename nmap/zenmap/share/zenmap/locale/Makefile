@@ -27,7 +27,7 @@ update-mo: $(addsuffix /LC_MESSAGES/zenmap.mo,$(LINGUAS))
 
 %.po: $(ZENMAP_POT)
 	cp -f $@ $(TMP_PO)
-	msgmerge --no-fuzzy-matching $(TMP_PO) $< | msgattrib --no-obsolete -o $@
+	msgmerge $(TMP_PO) $< | msgattrib --no-obsolete -o $@
 	rm -f $(TMP_PO)
 
 %/LC_MESSAGES/zenmap.mo: %.po

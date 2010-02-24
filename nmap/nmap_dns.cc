@@ -243,7 +243,8 @@ typedef struct host_elem_s host_elem;
 
 struct dns_server_s {
   char *hostname;
-  sockaddr_in addr;
+  sockaddr_storage addr;
+  size_t addr_len;
   nsock_iod nsd;
   int connected;
   int reqs_on_wire;
@@ -583,7 +584,7 @@ static u32 parse_inaddr_arpa(unsigned char *buf, int maxlen) {
     maxlen -= buf[0] + 1;
     if (maxlen <= 0) return 0;
 
-    for (j=1; j<=buf[0]; j++) if (!isdigit(buf[j])) return 0;
+    for (j=1; j<=buf[0]; j++) if (!isdigit((int) buf[j])) return 0;
 
     ip |= atoi((char *) buf+1) << (8*i);
     buf += buf[0] + 1;
@@ -793,12 +794,12 @@ static void add_dns_server(char *ipaddrs) {
   std::list<dns_server *>::iterator servI;
   dns_server *tpserv;
   char *hostname;
-  struct sockaddr_in addr;
+  struct sockaddr_storage addr;
   size_t addr_len = sizeof(addr);
 
   for (hostname = strtok(ipaddrs, " ,"); hostname != NULL; hostname = strtok(NULL, " ,")) {
 
-    if (!resolve(hostname, (struct sockaddr_storage *) &addr, &addr_len, PF_INET)) continue;
+    if (!resolve(hostname, (struct sockaddr_storage *) &addr, &addr_len, PF_UNSPEC)) continue;
 
     for(servI = servs.begin(); servI != servs.end(); servI++) {
       tpserv = *servI;
@@ -813,6 +814,7 @@ static void add_dns_server(char *ipaddrs) {
 
       tpserv->hostname = strdup(hostname);
       memcpy(&tpserv->addr, &addr, sizeof(addr));
+      tpserv->addr_len = addr_len;
 
       servs.push_front(tpserv);
 
@@ -860,7 +862,7 @@ static void connect_dns_servers() {
     s->capacity = CAPACITY_MIN;
     s->write_busy = 0;
 
-    nsock_connect_udp(dnspool, s->nsd, connect_evt_handler, NULL, (struct sockaddr *) &s->addr, sizeof(struct sockaddr), 53);
+    nsock_connect_udp(dnspool, s->nsd, connect_evt_handler, NULL, (struct sockaddr *) &s->addr, s->addr_len, 53);
     nsock_read(dnspool, s->nsd, read_evt_handler, -1, NULL);
     s->connected = 1;
   }
@@ -935,13 +937,17 @@ void win32_read_registry(char *controlset) {
 static void parse_resolvdotconf() {
   FILE *fp;
   char buf[2048], *tp;
-  char ipaddr[16];
+  char fmt[32];
+  char ipaddr[INET6_ADDRSTRLEN];
 
   fp = fopen("/etc/resolv.conf", "r");
   if (fp == NULL) {
     if (firstrun) error("mass_dns: warning: Unable to open /etc/resolv.conf. Try using --system-dns or specify valid servers with --dns-servers");
     return;
   }
+
+  /* Customize a sscanf format to sizeof(ipaddr). */
+  Snprintf(fmt, sizeof(fmt), "nameserver %%%us", sizeof(ipaddr));
 
   while (fgets(buf, sizeof(buf), fp)) {
     tp = buf;
@@ -954,7 +960,7 @@ static void parse_resolvdotconf() {
     // Skip any leading whitespace
     while (*tp == ' ' || *tp == '\t') tp++;
 
-    if (sscanf(tp, "nameserver %15s", ipaddr) == 1) add_dns_server(ipaddr);
+    if (sscanf(tp, fmt, ipaddr) == 1) add_dns_server(ipaddr);
   }
 
   fclose(fp);
@@ -1350,8 +1356,8 @@ std::list<std::string> get_dns_servers() {
 
   std::list<dns_server *>::iterator servI;
   std::list<std::string> serverList;
-  for(servI = servs.begin(); servI != servs.end(); servI++)
-    serverList.push_back(inet_ntoa((*servI)->addr.sin_addr));
-
+  for(servI = servs.begin(); servI != servs.end(); servI++) {
+    serverList.push_back(inet_socktop((struct sockaddr_storage *) &(*servI)->addr));
+  }
   return serverList;
 }

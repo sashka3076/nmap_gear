@@ -122,10 +122,12 @@ local LSA_MINEMPTY = 10
 --@param host The host object. 
 --@param path The path to the named pipe; for example, msrpc.SAMR_PATH or msrpc.SRVSVC_PATH. 
 --@param disable_extended [optional] If set to 'true', disables extended security negotiations. 
+--@param overrides [optional] Overrides variables in all the SMB functions. 
 --@return (status, smbstate) if status is false, smbstate is an error message. Otherwise, smbstate is
 --        required for all further calls. 
-function start_smb(host, path, disable_extended)
-	return smb.start_ex(host, true, true, "IPC$", path, disable_extended)
+function start_smb(host, path, disable_extended, overrides)
+	overrides = overrides or {}
+	return smb.start_ex(host, true, true, "IPC$", path, disable_extended, overrides)
 end
 
 --- A wrapper around the <code>smb.stop</code> function. I only created it to add symmetry, so client code
@@ -391,6 +393,65 @@ local function call_function(smbstate, opnum, arguments)
 	stdnse.print_debug(3, "MSRPC: Function call successful, %d bytes of returned argumenst", string.len(result['arguments']))
 
 	return true, result
+end
+
+---LANMAN API calls use different conventions than everything else, so make a separate function for them. 
+function call_lanmanapi(smbstate, opnum, server_type)
+	local status, result
+	local parameters = ""
+	local data
+	local convert, entry_count, available_entries
+	local entries = {}
+	local pos
+
+	parameters = bin.pack("<SzzSSI", 
+							opnum, 
+							"WrLehDO",  -- Parameter Descriptor
+							"B16",      -- Return Descriptor
+							0,          -- Detail level
+							14724,      -- Return buffer size
+							server_type -- Server type
+						)
+
+	stdnse.print_debug(1, "MSRPC: Sending Browser Service request")
+	status, result = smb.send_transaction_named_pipe(smbstate, parameters, nil, "\\PIPE\\LANMAN", true)
+	if(not(status)) then
+		return false, "Couldn't call LANMAN API: " .. result
+	end
+
+	parameters = result.parameters
+	data       = result.data
+
+	stdnse.print_debug(1, "MSRPC: Parsing Browser Service response")
+	pos, status, convert, entry_count, available_entries = bin.unpack("<SSSS", parameters)
+	if(status ~= 0) then
+		return false, string.format("Call to Browser Service failed with status = %d", status)
+	end
+
+	stdnse.print_debug(1, "MSRPC: Browser service returned %d entries", entry_count)
+
+	local pos = 1
+	local entry
+	for i = 1, entry_count, 1 do
+		-- Read the string
+		pos, entry = bin.unpack("<z", data, pos)
+		stdnse.print_debug(1, "MSRPC: Found name: %s", entry)
+
+		-- pos needs to be rounded to the next even multiple of 16
+		while(((pos - 1) % 16) ~= 0) do
+			pos = pos + 1
+		end
+
+		-- Make sure we didn't hit the end of the packet
+		if(not(entry)) then
+			return false, "Call to browser service didn't receive enough data"
+		end
+
+		-- Insert the result
+		table.insert(entries, entry)
+	end
+
+	return true, entries
 end
 
 ---A proxy to a <code>msrpctypes</code> function that converts a ShareType to an english string. 
@@ -660,7 +721,7 @@ function srvsvc_netservergetstatistics(smbstate, server)
 	stdnse.print_debug(2, "MSRPC: Calling NetServerGetStatistics() [%s]", smbstate['ip'])
 
 --		[in]      [string,charset(UTF16)] uint16 *server_unc,
-	arguments = msrpctypes.marshall_unicode_ptr(server_unc, true)
+	arguments = msrpctypes.marshall_unicode_ptr(server, true)
 
 --		[in]      [string,charset(UTF16)] uint16 *service,
 	arguments = arguments .. msrpctypes.marshall_unicode_ptr(service, true)
@@ -1323,6 +1384,280 @@ function samr_querydomaininfo2(smbstate, domain_handle, level)
 	
 	return true, result
 end
+
+---Call the <code>EnumDomainAliases</code> function, which retrieves a list of groups for a given domain
+--
+--@param smbstate       The SMB state table
+--@param domain_handle  The domain_handle, returned by <code>samr_opendomain</code>
+--@return (status, result) If status is false, result is an error message. Otherwise, result is a table of values. 
+function samr_enumdomainaliases(smbstate, domain_handle)
+	local i, j
+	local status, result
+	local arguments
+	local pos, align
+
+	arguments = ''
+
+--        [in]          policy_handle *domain_handle,
+	arguments = arguments .. msrpctypes.marshall_policy_handle(domain_handle)
+	
+--        [in,out,ref]  uint32 *resume_handle,
+	arguments = arguments .. msrpctypes.marshall_int32_ptr(nil)
+
+--        [out,ref]     samr_SamArray **sam,
+--        [in]          uint32 max_size, (note: Wireshark says this is flags. Either way..)
+	arguments = arguments .. msrpctypes.marshall_int32(0x400)
+
+--        [out,ref]     uint32 *num_entries
+
+
+	-- Do the call
+	status, result = call_function(smbstate, 0x0f, arguments)
+	if(status ~= true) then
+		return false, result
+	end
+
+	-- Make arguments easier to use
+	arguments = result['arguments']
+	pos = 1
+
+--        [in]          policy_handle *domain_handle,
+--        [in,out,ref]  uint32 *resume_handle,
+	pos, result['resume_handle'] = msrpctypes.unmarshall_int32(arguments, pos)
+	
+--        [out,ref]     samr_SamArray **sam,
+	pos, result['sam'] = msrpctypes.unmarshall_samr_SamArray_ptr(arguments, pos)
+
+--        [in]          uint32 max_size,
+--        [out,ref]     uint32 *num_entries
+	pos, result['num_entries'] = msrpctypes.unmarshall_int32(arguments, pos)
+
+	pos, result['return'] = msrpctypes.unmarshall_int32(arguments, pos)
+	if(result['return'] == nil) then
+		return false, "Read off the end of the packet (samr.enumdomainaliases)"
+	end
+	if(result['return'] ~= 0) then
+		return false, smb.get_status_name(result['return']) .. " (samr.enumdomainaliases)"
+	end
+	
+	return true, result
+end
+
+---Call the <code>EnumDomainAliases</code> function, which retrieves a list of groups for a given domain
+--
+--@param smbstate       The SMB state table
+--@param domain_handle  The domain_handle, returned by <code>samr_opendomain</code>
+--@return (status, result) If status is false, result is an error message. Otherwise, result is a table of values. 
+function samr_lookupnames(smbstate, domain_handle, names)
+	local i, j
+	local status, result
+	local arguments
+	local pos, align
+
+	arguments = ''
+
+--        [in,ref]      policy_handle *domain_handle,
+	arguments = arguments .. msrpctypes.marshall_policy_handle(domain_handle)
+
+--        [in,range(0,1000)] uint32 num_names,
+	arguments = arguments .. msrpctypes.marshall_int32(#names)
+
+--        [in,size_is(1000),length_is(num_names)] lsa_String names[],
+	arguments = arguments .. msrpctypes.marshall_lsa_String_array2(names)
+	
+--        [out,ref]     samr_Ids *rids,
+--        [out,ref]     samr_Ids *types
+
+
+	-- Do the call
+	status, result = call_function(smbstate, 0x11, arguments)
+	if(status ~= true) then
+		return false, result
+	end
+
+	-- Make arguments easier to use
+	arguments = result['arguments']
+	pos = 1
+
+--        [in,ref]      policy_handle *domain_handle,
+--        [in,range(0,1000)] uint32 num_names,
+--        [in,size_is(1000),length_is(num_names)] lsa_String names[],
+--        [out,ref]     samr_Ids *rids,
+	pos, result['rids'] = msrpctypes.unmarshall_samr_Ids(arguments, pos)
+
+--        [out,ref]     samr_Ids *types
+	pos, result['types'] = msrpctypes.unmarshall_samr_Ids(arguments, pos)
+
+	pos, result['return'] = msrpctypes.unmarshall_int32(arguments, pos)
+	if(result['return'] == nil) then
+		return false, "Read off the end of the packet (samr.lookupnames)"
+	end
+	if(result['return'] == smb.status_codes['NT_STATUS_NONE_MAPPED']) then
+		return false, "Couldn't find any names the host recognized"
+	end
+
+	if(result['return'] ~= 0 and result['return'] ~= smb.status_codes['NT_STATUS_SOME_NOT_MAPPED']) then
+		return false, smb.get_status_name(result['return']) .. " (samr.lookupnames)"
+	end
+	
+	return true, result
+end
+
+---Call the <code>OpenAlias</code> function, which gets a handle to a group. 
+--
+--@param smbstate       The SMB state table
+--@param domain_handle  The domain_handle, returned by <code>samr_opendomain</code>
+--@param rid            The RID of the alias
+--@return (status, result) If status is false, result is an error message. Otherwise, result is a table of values. 
+function samr_openalias(smbstate, domain_handle, rid)
+	local i, j
+	local status, result
+	local arguments
+	local pos, align
+
+	arguments = ''
+
+--        [in,ref]      policy_handle *domain_handle,
+	arguments = arguments .. msrpctypes.marshall_policy_handle(domain_handle)
+
+--        [in]          samr_AliasAccessMask access_mask,
+	arguments = arguments .. msrpctypes.marshall_int32(0x0002000c) -- Full read permission
+
+--        [in]          uint32 rid,
+	arguments = arguments .. msrpctypes.marshall_int32(rid)
+
+--        [out,ref]     policy_handle *alias_handle
+
+
+	-- Do the call
+	status, result = call_function(smbstate, 0x1b, arguments)
+	if(status ~= true) then
+		return false, result
+	end
+
+	-- Make arguments easier to use
+	arguments = result['arguments']
+	pos = 1
+
+--        [in,ref]      policy_handle *domain_handle,
+--        [in]          samr_AliasAccessMask access_mask,
+--        [in]          uint32 rid,
+--        [out,ref]     policy_handle *alias_handle
+	pos, result['alias_handle'] = msrpctypes.unmarshall_policy_handle(arguments, pos)
+
+	pos, result['return'] = msrpctypes.unmarshall_int32(arguments, pos)
+	if(result['return'] == nil) then
+		return false, "Read off the end of the packet (samr.openalias)"
+	end
+	if(result['return'] ~= 0) then
+		return false, smb.get_status_name(result['return']) .. " (samr.openalias)"
+	end
+	
+	return true, result
+end
+
+---Call the <code>GetMembersInAlias</code> function, which retrieves a list of users in 
+-- a group. 
+--
+--@param smbstate       The SMB state table
+--@param alias_handle   The alias_handle, returned by <code>samr_openalias</code>
+--@return (status, result) If status is false, result is an error message. Otherwise, result is a table of values. 
+function samr_getmembersinalias(smbstate, alias_handle)
+	local i, j
+	local status, result
+	local arguments
+	local pos, align
+
+	arguments = ''
+
+--        [in,ref]   policy_handle *alias_handle,
+	arguments = arguments .. msrpctypes.marshall_policy_handle(alias_handle)
+--        [out,ref]  lsa_SidArray    *sids
+
+
+	-- Do the call
+	status, result = call_function(smbstate, 0x21, arguments)
+	if(status ~= true) then
+		return false, result
+	end
+
+	-- Make arguments easier to use
+	arguments = result['arguments']
+	pos = 1
+
+--        [in,ref]   policy_handle *alias_handle,
+--        [out,ref]  lsa_SidArray    *sids
+	pos, result['sids'] = msrpctypes.unmarshall_lsa_SidArray(arguments, pos)
+
+	pos, result['return'] = msrpctypes.unmarshall_int32(arguments, pos)
+	if(result['return'] == nil) then
+		return false, "Read off the end of the packet (samr.getmembersinalias)"
+	end
+	if(result['return'] ~= 0) then
+		return false, smb.get_status_name(result['return']) .. " (samr.getmembersinalias)"
+	end
+	
+	return true, result
+end
+
+---Call the <code>LookupRids</code> function, which converts a list of RIDs to 
+-- names. 
+--
+--NOTE: This doesn't appear to work (it generates a fault, despite the packet being properly formatted). 
+--if you ever feel like you need this function, check out <code>lsa_lookupsids2</code>. 
+--
+--@param smbstate       The SMB state table
+--@param domain_handle  The domain_handle, returned by <code>samr_opendomain</code>
+--@param rids           An array of RIDs to look up
+--@return (status, result) If status is false, result is an error message. Otherwise, result is a table of values. 
+--function samr_lookuprids(smbstate, domain_handle, rids)
+--	local i, j
+--	local status, result
+--	local arguments
+--	local pos, align
+--
+--	arguments = ''
+--
+----        [in,ref]      policy_handle *domain_handle,
+--	arguments = arguments .. msrpctypes.marshall_policy_handle(domain_handle)
+----        [in,range(0,1000)] uint32 num_rids,
+--	arguments = arguments .. msrpctypes.marshall_int32(#rids)
+----        [in,size_is(1000),length_is(num_rids)] uint32 rids[],
+--	arguments = arguments .. msrpctypes.marshall_int32_array(rids)
+----        [out,ref]     lsa_Strings *names,
+----        [out,ref]     samr_Ids *types
+--
+--
+--	-- Do the call
+--	status, result = call_function(smbstate, 0x12, arguments)
+--	if(status ~= true) then
+--		return false, result
+--	end
+--
+--	-- Make arguments easier to use
+--	arguments = result['arguments']
+--	pos = 1
+--
+----        [in,ref]      policy_handle *domain_handle,
+----        [in,range(0,1000)] uint32 num_rids,
+----        [in,size_is(1000),length_is(num_rids)] uint32 rids[],
+----        [out,ref]     lsa_Strings *names,
+----        [out,ref]     samr_Ids *types
+--
+--
+--	pos, result['return'] = msrpctypes.unmarshall_int32(arguments, pos)
+--stdnse.print_debug("Return = %08x\n", result['return'])
+--	if(result['return'] == nil) then
+--		return false, "Read off the end of the packet (samr.getmembersinalias)"
+--	end
+--	if(result['return'] ~= 0) then
+--		return false, smb.get_status_name(result['return']) .. " (samr.getmembersinalias)"
+--	end
+--	
+--	return true, result
+--end
+
+
 
 ---Call the <code>close</code> function, which closes a handle of any type (for example, domain_handle or connect_handle)
 --@param smbstate The SMB state table
@@ -2122,6 +2457,7 @@ function winreg_queryvalue(smbstate, handle, value)
 
 	-- Format the type properly and put it in "value"
 	if(result['data'] ~= nil) then
+        local _
 		if(result['type'] == "REG_DWORD") then
 			_, result['value'] = bin.unpack("<I", result['data'])
 		elseif(result['type'] == "REG_SZ" or result['type'] == "REG_MULTI_SZ" or result['type'] == "REG_EXPAND_SZ") then
@@ -2804,8 +3140,6 @@ end
 function samr_enum_users(host)
 	local i, j
 
-	stdnse.print_debug(3, "Entering enum_samr()")
-
 	local smbstate
 	local bind_result, connect4_result, enumdomains_result
 	local connect_handle
@@ -2855,35 +3189,31 @@ function samr_enum_users(host)
 		local domain = enumdomains_result['sam']['entries'][i]['name']
 		-- We don't care about the 'builtin' domain, in all my tests it's empty
 		if(domain ~= 'Builtin') then
-			local sid
-			local domain_handle
-			local opendomain_result, querydisplayinfo_result
-
 			-- Call LookupDomain()
-			status, lookupdomain_result = samr_lookupdomain(smbstate, connect_handle, domain)
+			local status, lookupdomain_result = samr_lookupdomain(smbstate, connect_handle, domain)
 			if(status == false) then
 				stop_smb(smbstate)
 				return false, lookupdomain_result
 			end
 
 			-- Save the sid
-			sid = lookupdomain_result['sid']
+			local sid = lookupdomain_result['sid']
 	
 			-- Call OpenDomain()
-			status, opendomain_result = samr_opendomain(smbstate, connect_handle, sid)
+			local status, opendomain_result = samr_opendomain(smbstate, connect_handle, sid)
 			if(status == false) then
 				stop_smb(smbstate)
 				return false, opendomain_result
 			end
 
 			-- Save the domain handle
-			domain_handle = opendomain_result['domain_handle']
+			local domain_handle = opendomain_result['domain_handle']
 
 			-- Loop as long as we're getting valid results	
 			j = 0
 			repeat
 				-- Call QueryDisplayInfo()
-				status, querydisplayinfo_result = samr_querydisplayinfo(smbstate, domain_handle, j, SAMR_GROUPSIZE)
+				local status, querydisplayinfo_result = samr_querydisplayinfo(smbstate, domain_handle, j, SAMR_GROUPSIZE)
 				if(status == false) then
 					stop_smb(smbstate)
 					return false, querydisplayinfo_result
@@ -2930,9 +3260,197 @@ function samr_enum_users(host)
 	-- Stop the SAMR SMB
 	stop_smb(smbstate)
 
-	stdnse.print_debug(3, "Leaving enum_samr()")
-
 	return true, response
+end
+
+function samr_enum_groups(host)
+	local i, j
+
+	stdnse.print_debug(1, "MSRPC: Attempting to enumerate groups on %s", host.ip)
+	-- Create the SMB session
+	local status, smbstate = start_smb(host, SAMR_PATH, true)
+
+	if(status == false) then
+		return false, smbstate
+	end
+
+	-- Bind to SAMR service
+	local status, bind_result = bind(smbstate, SAMR_UUID, SAMR_VERSION, nil)
+	if(status == false) then
+		stop_smb(smbstate)
+		return false, bind_result
+	end
+
+	-- Call connect4()
+	local status, connect4_result = samr_connect4(smbstate, host.ip)
+	if(status == false) then
+		stop_smb(smbstate)
+		return false, connect4_result
+	end
+
+	-- Save the connect_handle
+	local connect_handle = connect4_result['connect_handle']
+
+	-- Call EnumDomains()
+	local status, enumdomains_result = samr_enumdomains(smbstate, connect_handle)
+	if(status == false) then
+		stop_smb(smbstate)
+		return false, enumdomains_result
+	end
+
+	-- If no domains were returned, go back with an error
+	if(#enumdomains_result['sam']['entries'] == 0) then
+		stop_smb(smbstate)
+		return false, "Couldn't find any domains"
+	end
+
+	-- Now, loop through the domains and find the groups
+	local domains = {}
+	for _, domain in ipairs(enumdomains_result['sam']['entries']) do
+		-- Get a handy domain name
+		domain = domain['name']
+		domains[domain] = {}
+
+		-- Call LookupDomain()
+		local status, lookupdomain_result = samr_lookupdomain(smbstate, connect_handle, domain)
+		if(status == false) then
+			stop_smb(smbstate)
+			return false, lookupdomain_result
+		end
+
+		-- Save the sid
+		local domain_sid = lookupdomain_result['sid']
+
+		-- Call OpenDomain()
+		local status, opendomain_result = samr_opendomain(smbstate, connect_handle, domain_sid)
+		if(status == false) then
+			stop_smb(smbstate)
+			return false, opendomain_result
+		end
+
+		-- Save the domain handle
+		local domain_handle = opendomain_result['domain_handle']
+
+		-- Get a list of groups
+		local status, enumaliases_result = samr_enumdomainaliases(smbstate, domain_handle)
+		if(status == false) then
+			stop_smb(smbstate)
+			return false, "Couldn't enumerate groups: " .. enumaliases_result
+		end
+
+		-- Print some output
+		stdnse.print_debug(1, "MSRPC: Found %d groups in %s", #enumaliases_result['sam']['entries'], domain)
+
+		-- Record the results
+		local group_rids = {}
+		for _, group in ipairs(enumaliases_result['sam']['entries']) do
+			-- The RID
+			local group_rid = group['idx']
+
+			-- Keep a list of just RIDs, for easier lookup after
+			table.insert(group_rids, group_rid)
+
+			-- Save the output, this is what will be returned
+			domains[domain][group_rid] = {}
+			domains[domain][group_rid]['name'] = group['name']
+		end -- Loop over group entries
+
+		for _, group_rid in ipairs(group_rids) do
+			-- Get a handle to the alias
+			local status, openalias_result = samr_openalias(smbstate, domain_handle, group_rid)
+			if(not(status)) then
+				stop_smb(smbstate)
+				return false, "Couldn't open handle to group: " .. openalias_result
+			end
+			local group_handle = openalias_result['alias_handle']
+
+			-- Get the members of the group
+			local status, getmembers_result = samr_getmembersinalias(smbstate, group_handle)
+			if(not(status)) then
+				stop_smb(smbstate)
+				return false, "Couldn't get members in group: " .. getmembers_result
+			end
+
+			-- Save the SIDs
+			local member_sids = {}
+			if(getmembers_result and getmembers_result.sids and getmembers_result.sids.sids) then
+				-- Set the list of member_sids
+				member_sids = getmembers_result.sids.sids
+			end
+
+			-- Print some output
+			stdnse.print_debug(1, "MSRPC: Adding group '%s' (RID: %d) with %d members", domains[domain][group_rid]['name'], group_rid, #member_sids)
+
+			-- Save the output
+			domains[domain][group_rid]['member_sids'] = member_sids
+
+			-- Close the group
+			samr_close(smbstate, group_handle)
+		end -- Loop over group RIDs
+
+		-- Close the domain handle
+		samr_close(smbstate, domain_handle)
+
+	end -- Domain loop
+
+	-- Close the connect handle
+	samr_close(smbstate, connect_handle)
+
+	-- Stop the SAMR SMB
+	stop_smb(smbstate)
+
+
+	-- Now, we need a handle to LSA (in order to convert the RIDs to users
+	-- Create the SMB session
+	local status, smbstate = start_smb(host, LSA_PATH, true)
+	if(status == false) then
+		return false, smbstate
+	end
+
+	-- Bind to LSA service
+	local status, bind_result = bind(smbstate, LSA_UUID, LSA_VERSION, nil)
+	if(status == false) then
+		stop_smb(smbstate)
+		return false, bind_result
+	end
+
+	-- Open the LSA policy
+	local status, openpolicy2_result = lsa_openpolicy2(smbstate, host.ip)
+	if(status == false) then
+		stop_smb(smbstate)
+		return false, openpolicy2_result
+	end
+
+	-- Loop through the domains
+	for domain, domain_data in pairs(domains) do
+		for group_rid, group in pairs(domain_data) do
+			-- Look up the SIDs
+			local status, lookupsids2_result = lsa_lookupsids2(smbstate, openpolicy2_result['policy_handle'], group['member_sids'])
+			if(status == false) then
+				stop_smb(smbstate)
+				return false, "Error looking up RIDs: " .. lookupsids2_result
+			end
+
+			if(lookupsids2_result and lookupsids2_result.names and lookupsids2_result.names.names and (#lookupsids2_result.names.names > 0)) then
+				local members = {}
+				for _, resolved_name in ipairs(lookupsids2_result.names.names) do
+					if(resolved_name.sid_type == "SID_NAME_USER") then
+						table.insert(members, resolved_name.name)
+					end
+				end
+				domains[domain][group_rid]['members'] = members
+			else
+				domains[domain][group_rid]['members'] = {}
+			end
+		end
+	end
+
+	-- Close the handle
+	lsa_close(smbstate, openpolicy2_result['policy_handle'])
+
+	stop_smb(smbstate)
+
+	return true, domains
 end
 
 ---Attempt to enumerate users using LSA functions.
@@ -2950,8 +3468,6 @@ function lsa_enum_users(host)
 	local smbstate
 	local response = {}
 	local status, smbstate, bind_result, openpolicy2_result, lookupnames2_result, lookupsids2_result
-
-	stdnse.print_debug(3, "Entering enum_lsa()")
 
 	-- Create the SMB session
 	status, smbstate = start_smb(host, LSA_PATH, true)
@@ -2975,7 +3491,7 @@ function lsa_enum_users(host)
 
 	-- Start with some common names, as well as the name returned by the negotiate call
 	-- Vista doesn't like a 'null' after the server name, so fix that (TODO: the way I strip the null here feels hackish, is there a better way?)
-	names = {"administrator", "guest", "test"}
+	local names = {"administrator", "guest", "test"}
 	-- These aren't always sent back (especially with 'extended security')
 	if(smbstate['domain'] ~= nil) then
 		names[#names + 1] = smbstate['domain']
@@ -3020,7 +3536,7 @@ function lsa_enum_users(host)
 			-- Put the details for each name into an array
 			-- NOTE: Be sure to mirror any changes here in the next bit! 
 			for j = 1, #lookupsids2_result['names']['names'], 1 do
-				if(lookupsids2_result['names']['names'][j]['sid_type'] ~= "SID_NAME_UNKNOWN") then
+				if(lookupsids2_result['names']['names'][j]['sid_type'] == "SID_NAME_USER") then
 					local result = {}
 					result['name']    = lookupsids2_result['names']['names'][j]['name']
 					result['rid']	  = 500 + j - 1
@@ -3062,7 +3578,7 @@ function lsa_enum_users(host)
 					-- Check if the username matches the rid (one server we discovered returned every user as valid, 
 					-- this is to prevent that infinite loop)
 					if(tonumber(name) ~= rid) then
-						if(lookupsids2_result['names']['names'][j]['sid_type'] ~= "SID_NAME_UNKNOWN") then
+						if(lookupsids2_result['names']['names'][j]['sid_type'] == "SID_NAME_USER") then
 							local result = {}
 							result['name']    = name
 							result['rid']	  = rid
@@ -3096,8 +3612,6 @@ function lsa_enum_users(host)
 	lsa_close(smbstate, openpolicy2_result['policy_handle'])
 
 	stop_smb(smbstate)
-
-	stdnse.print_debug(3, "Leaving enum_lsa()")
 
 	return true, response
 end
@@ -3275,15 +3789,16 @@ function service_start(host, servicename, args)
 		return false, start_result
 	end
 
-	-- Wait for it to start
-	stdnse.print_debug(2, "Waiting for the service to start")
+	-- Wait for it to start (TODO: Check the query result better)
+	stdnse.print_debug(1, "Waiting for the service to start")
 	repeat
 		status, query_result = svcctl_queryservicestatus(smbstate, open_service_result['handle'])
 		if(status == false) then
 			smb.stop(smbstate)
 			return false, query_result
 		end
-	until query_result['service_status']['controls_accepted'][1] == "SERVICE_CONTROL_STOP"
+		stdnse.sleep(.5)
+	until query_result['service_status']['controls_accepted'][1] == "SERVICE_CONTROL_STOP" or query_result['service_status']['state'][1] == "SERVICE_STATE_ACTIVE"
 
 	-- Close the handle to the service
 	status, close_result = svcctl_closeservicehandle(smbstate, open_service_result['handle'])
@@ -3356,7 +3871,7 @@ function service_stop(host, servicename)
 		return false, control_result
 	end
 
-	-- Wait for it to stop (TODO: Make this better)
+	-- Wait for it to stop (TODO: Check the query result better)
 	stdnse.print_debug(2, "Waiting for the service to stop")
 	repeat
 		status, query_result = svcctl_queryservicestatus(smbstate, open_service_result['handle'])
@@ -3364,6 +3879,7 @@ function service_stop(host, servicename)
 			smb.stop(smbstate)
 			return false, query_result
 		end
+		stdnse.sleep(.5)
 	until query_result['service_status']['controls_accepted'][1] == nil
 
 	-- Close the handle to the service
@@ -3471,14 +3987,14 @@ function get_server_stats(host)
 	end
    
 	-- Bind to SRVSVC service
-	status, bind_result = bind(smbstate, SRVSVC_UUID, SRVSVC_VERSION, nil)
+	local status, bind_result = bind(smbstate, SRVSVC_UUID, SRVSVC_VERSION, nil)
 	if(status == false) then
 		smb.stop(smbstate)
 		return false, bind_result
 	end
    
 	-- Call netservergetstatistics for 'server'
-	status, netservergetstatistics_result = srvsvc_netservergetstatistics(smbstate, host.ip)
+	local status, netservergetstatistics_result = srvsvc_netservergetstatistics(smbstate, host.ip)
 	if(status == false) then
 		smb.stop(smbstate)
 		return false, netservergetstatistics_result
@@ -3573,24 +4089,23 @@ end
 --@return A table of information about the share (if status is true) or an an error string (if 
 --        status is false).
 function get_share_info(host, name)
-	local status, smbstate
 	local response = {}
 
 	-- Create the SMB session
-	status, smbstate = start_smb(host, SRVSVC_PATH)
+	local status, smbstate = start_smb(host, SRVSVC_PATH)
 	if(status == false) then
 		return false, smbstate
 	end
 
 	-- Bind to SRVSVC service
-	status, bind_result = bind(smbstate, SRVSVC_UUID, SRVSVC_VERSION, nil)
+	local status, bind_result = bind(smbstate, SRVSVC_UUID, SRVSVC_VERSION, nil)
 	if(status == false) then
 		smb.stop(smbstate) 
 		return false, bind_result
 	end
 
 	-- Call NetShareGetInfo
-	status, netsharegetinfo_result = srvsvc_netsharegetinfo(smbstate, host.ip, name, 2)
+	local status, netsharegetinfo_result = srvsvc_netsharegetinfo(smbstate, host.ip, name, 2)
 	if(status == false) then
 		smb.stop(smbstate) 
 		return false, netsharegetinfo_result

@@ -12,16 +12,16 @@ server version may be available.
 -- 110/tcp open  pop3
 -- |_ pop3-capabilities: USER CAPA RESP-CODES UIDL PIPELINING STLS TOP SASL(PLAIN)
 
-author = "Philip Pickering <pgpickering@gmail.com>"
+author = "Philip Pickering"
 license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
 
-categories = {"default"}
+categories = {"default","discovery","safe"}
 
 require 'pop3'
 require 'shortport'
 require 'stdnse'
 
-portrule = shortport.port_or_service({110}, "pop3")
+portrule = shortport.port_or_service({110,995},{"pop3","pop3s"})
 
 action = function(host, port)
   local capa, err = pop3.capabilities(host, port)

@@ -643,6 +643,7 @@ PCAP_BUILD
 PCAP_DEPENDS
 libpcapdir
 OPENSSL_LIBS
+HAVE_OPENSSL
 LIBOBJS
 EGREP
 GREP
@@ -2866,6 +2867,9 @@ ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
+if test -n "$GCC"; then
+  CFLAGS="$CFLAGS -Wall"
+fi
 # Find a good install program.  We prefer a C program (faster),
 # so one script is as good as another.  But avoid the broken or
 # incompatible versions:
@@ -6603,6 +6607,9 @@ cat >>confdefs.h <<\_ACEOF
 _ACEOF
 
   OPENSSL_LIBS="-lssl -lcrypto"
+  # Define in Makefile also.
+  HAVE_OPENSSL=yes
+
 fi
 
 
@@ -7059,13 +7066,8 @@ if test $have_libpcap = yes; then
   { $as_echo "$as_me:$LINENO: checking if libpcap version is recent enough" >&5
 $as_echo_n "checking if libpcap version is recent enough... " >&6; }
   if test "$cross_compiling" = yes; then
-  { { $as_echo "$as_me:$LINENO: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-{ { $as_echo "$as_me:$LINENO: error: cannot run test program while cross compiling
-See \`config.log' for more details." >&5
-$as_echo "$as_me: error: cannot run test program while cross compiling
-See \`config.log' for more details." >&2;}
-   { (exit 1); exit 1; }; }; }
+  { $as_echo "$as_me:$LINENO: result: cross-compiling -- assuming yes" >&5
+$as_echo "cross-compiling -- assuming yes" >&6; }; have_libpcap=yes
 else
   cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
@@ -8405,3 +8407,8 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
 
+# NCAT ASCII ART
+if test -f docs/ncat-ascii-art.txt; then
+	cat docs/ncat-ascii-art.txt
+fi
+echo "Configuration complete."

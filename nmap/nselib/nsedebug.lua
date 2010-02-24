@@ -34,19 +34,19 @@ function tostr(data, indent)
 		str = str .. (" "):rep(indent) .. data .. "\n"
 	elseif(type(data) == "boolean") then
 		if(data == true) then
-			str = str .. "true"
+			str = str .. "true\n"
 		else
-			str = str .. "false"
+			str = str .. "false\n"
 		end
 	elseif(type(data) == "table") then
 		local i, v
 		for i, v in pairs(data) do
 			-- Check for a table in a table
 			if(type(v) == "table") then
-				str = str .. (" "):rep(indent) .. i .. ":\n"
+				str = str .. (" "):rep(indent) .. tostring(i) .. ":\n"
 				str = str .. tostr(v, indent + 2)
 			else
-				str = str .. (" "):rep(indent) .. i .. ": " .. tostr(v, 0)
+				str = str .. (" "):rep(indent) .. tostring(i) .. ": " .. tostr(v, 0)
 			end
 		end
 	else
@@ -65,7 +65,7 @@ function print_hex(str)
 
 		-- Loop through the string, printing the hex
 		for char=1, 16, 1 do
-			ch = string.byte(str, ((line - 1) * 16) + char)
+			local ch = string.byte(str, ((line - 1) * 16) + char)
 			io.write(string.format("%02x ", ch))
 		end
 
@@ -73,7 +73,7 @@ function print_hex(str)
 
 		-- Loop through the string again, this time the ascii
 		for char=1, 16, 1 do
-			ch = string.byte(str, ((line - 1) * 16) + char)
+			local ch = string.byte(str, ((line - 1) * 16) + char)
 			if ch < 0x20 or ch > 0x7f then
 				ch = string.byte(".", 1)
 			end
@@ -84,18 +84,18 @@ function print_hex(str)
 	end
 
 	-- Prints out the final, partial line
-	line = math.floor((string.len(str)/16)) + 1
+	local line = math.floor((string.len(str)/16)) + 1
 	io.write(string.format("%08x ", (line - 1) * 16))
 
 	for char=1, string.len(str) % 16, 1 do
-		ch = string.byte(str, ((line - 1) * 16) + char)
+		local ch = string.byte(str, ((line - 1) * 16) + char)
 		io.write(string.format("%02x ", ch))
 	end
 	io.write(string.rep("   ", 16 - (string.len(str) % 16)));
 	io.write("   ")
 
 	for char=1, string.len(str) % 16, 1 do
-		ch = string.byte(str, ((line - 1) * 16) + char)
+		local ch = string.byte(str, ((line - 1) * 16) + char)
 		if ch < 0x20 or ch > 0x7f then
 			ch = string.byte(".", 1)
 		end

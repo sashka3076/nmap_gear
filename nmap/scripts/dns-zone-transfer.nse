@@ -46,7 +46,7 @@ Useful resources
 -- |_ foo.com.            SOA     ns2.foo.com. piou.foo.com.
 -- @usage
 -- nmap --script dns-zone-transfer.nse \
---      --script-args 'dnszonetransfer={domain=<domain>}'
+--      --script-args dnszonetransfer.domain=<domain>
 
 require('shortport')
 require('strbuf')
@@ -56,10 +56,9 @@ require('bit')
 require('tab')
 require('dns')
 
-author = 'Eddie Bell <ejlbell@gmail.com>'
+author = 'Eddie Bell'
 license = 'Same as Nmap--See http://nmap.org/book/man-legal.html'
 categories = {'default', 'intrusive', 'discovery'}
-runlevel = 1.0
 
 portrule = shortport.portnumber(53, 'tcp') 
 
@@ -68,7 +67,7 @@ portrule = shortport.portnumber(53, 'tcp')
 --@name typetab
 local typetab = { 'A', 'NS', 'MD', 'MF', 'CNAME', 'SOA', 'MB', 'MG', 'MR', 
  'NULL', 'WKS', 'PTR', 'HINFO', 'MINFO', 'MX', 'TXT', 'RP', 'AFSDB', 'X25',
- 'ISDN', 'RT', 'NSAP', 'NSAP-PTR', 'SIG', 'KEY', 'PX', 'GPOS', 'AAAAA', 'LOC',
+ 'ISDN', 'RT', 'NSAP', 'NSAP-PTR', 'SIG', 'KEY', 'PX', 'GPOS', 'AAAA', 'LOC',
  'NXT', 'EID', 'NIMLOC', 'SRV', 'ATMA', 'NAPTR', 'KX', 'CERT', 'A6', 'DNAME',
  'SINK', 'OPT', [250]='TSIG', [251]='IXFR', [252]='AXFR', [253]='MAILB', 
  [254]='MAILA', [255]='ANY', [256]='ZXFR'
@@ -311,6 +310,8 @@ action = function(host, port)
 
 	if args.dnszonetransfer and args.dnszonetransfer.domain then
 		domain = args.dnszonetransfer.domain
+	elseif args['dnszonetransfer.domain'] then
+		domain = args['dnszonetransfer.domain']
 	elseif args.domain then
 		domain = args.domain
 	elseif host.targetname then

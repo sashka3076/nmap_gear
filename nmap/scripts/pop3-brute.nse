@@ -7,7 +7,7 @@ Tries to log into a POP3 account by guessing usernames and passwords.
 -- (default), <code>"SASL-PLAIN"</code>, <code>"SASL-LOGIN"</code>,
 -- <code>"SASL-CRAM-MD5"</code>, or <code>"APOP"</code>.
 
-author = "Philip Pickering <pgpickering@gmail.com>"
+author = "Philip Pickering"
 license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
 
 categories = {"intrusive", "auth"}
@@ -16,12 +16,11 @@ require 'pop3'
 require 'shortport'
 require 'unpwdb'
 
-portrule = shortport.port_or_service({110}, "pop3")
+portrule = shortport.port_or_service({110, 995}, {"pop3","pop3s"})
 
 action = function(host, port)
    local pMeth = nmap.registry.args.pop3loginmethod
    if (not pMeth) then pMeth = nmap.registry.pop3loginmethod end
-   if (not pMeth) then pMeth = method end
    if (not pMeth) then pMeth = "USER" end
 
    local login
@@ -45,22 +44,25 @@ action = function(host, port)
    local status
    local line
    local socket = nmap.new_socket()
-
-   if not socket:connect(host.ip, port.number) then return end -- no connection
+   local opts = {timeout=10000, recv_before=true}
    
-   status, line = socket:receive_lines(1)
+   local socket, nothing, bopt, line = comm.tryssl(host, port, "" , opts)
+
+   if not socket then return end -- no connection 
    if not stat(line) then return end -- no pop-connection
 
    local apopChallenge = string.match(line, "<[%p%w]+>") 
-   
+  
    if pMeth == "APOP" then 
       additional = apopChallenge 
    end
    
    local getUser
+   local _
 
    status, getUser = unpwdb.usernames()
    if (not status) then return end
+
 
    local currUser = getUser()
    while currUser do
@@ -83,8 +85,13 @@ action = function(host, port)
 	 elseif (perror == pop3.err.userError) then
 	    currPw = nil
 	 else
-	    return
-	 end
+            local socstatus = socket:connect(host.ip, port.number, bopt)
+	    if not socstatus 
+	       then return
+               else _, line = socket:receive()
+                    if not stat(line) then return end -- no connection
+            end
+         end
       end
       currUser = getUser()
       getPW("reset")

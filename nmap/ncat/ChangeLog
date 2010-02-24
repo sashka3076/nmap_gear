@@ -1,4 +1,11 @@
-# Ncat Changelog ($Id: ChangeLog 11667 2009-01-08 02:11:38Z kris $); -*-text-*-
+# Ncat Changelog ($Id: ChangeLog 14126 2009-07-09 04:00:35Z josh $); -*-text-*-
+
+o Reworked the test program test/test-cmdline-split slightly and added
+  additional test cases.  Rewrote cmdline_split in ncat_posix.c [Josh Marlow]
+
+o Added a test program, test/test-cmdline-split to test the cmdline_split
+  function in test/test-cmdline-split in preparation for an eventual rewrite of
+  cmdline_split [Josh Marlow].
 
 Ncat 0.2
 

@@ -37,6 +37,26 @@
 # more ambiguity. This ensures that such options maintain their relative order
 # when rendered again to output. In this example "-x -e eth0" will always appear
 # in that order, and the -e option will be uninterpreted.
+#
+# To add a new option, one should do the following:
+# 1) Add a test case to the NmapOptionsTest::test_options() method for the new
+#   option and make sure it initially fails.
+# 2) Add an appropriate case to NmapOptions::handle_result()
+#   This should include a line something like
+#       self[opt] = True
+#   or, if the option has an argument 'arg':
+#       self[opt] = arg
+# 3) Add an appropriate case to NmapOptions::render()
+#   This should include a check to make sure the option was set in
+#   handle_result:
+#       if self[opt]:
+#   or, if self[opt] contains arguments
+#       if self[opt] is not None:
+#   If the check passed, then opt should be added to opt_list
+# 4) Edit profile_editor.xml to display the new option in the gui.
+# 5) Depending on the option, one may need to edit
+#   get_option_check_auxiliary_widget in OptionBuilder.py
+# 6) Make sure the test case works now.
 
 class option:
     """A single option, part of a pool of potential options. It's just a name
@@ -539,11 +559,13 @@ class NmapOptions(object):
                 self["-PO"] = ports
             elif type == "B":
                 self["-PB"] = ports
+            elif type == "Y":
+                self["-PY"] = ports
             else:
                 self.extras.append("-P%s" % arg)
         elif opt == "s":
             for type in arg:
-                if type in "ACFLMNOPRSTUVWX":
+                if type in "ACFLMNOPRSTUVWXYZ":
                     self["-s%s" % type] = True
                 else:
                     self.extras.append("-s%s" % type)
@@ -573,7 +595,7 @@ class NmapOptions(object):
     def render(self):
         opt_list = []
 
-        for opt in ("-sA", "-sC", "-sF", "-sL", "-sM", "-sN", "-sO", "-sP", "-sR", "-sS", "-sT", "-sU", "-sV", "-sW", "-sX"):
+        for opt in ("-sA", "-sC", "-sF", "-sL", "-sM", "-sN", "-sO", "-sP", "-sR", "-sS", "-sT", "-sU", "-sV", "-sW", "-sX", "-sY", "-sZ"):
             if self[opt]:
                 opt_list.append(opt)
 
@@ -636,7 +658,7 @@ class NmapOptions(object):
         for ping_option in ("-PN", "-PE", "-PM", "-PP", "-PR"):
             if self[ping_option]:
                 opt_list.append(ping_option)
-        for ping_option in ("-PS", "-PA", "-PU", "-PO"):
+        for ping_option in ("-PS", "-PA", "-PU", "-PO", "-PY"):
             if self[ping_option] is not None:
                 opt_list.append(ping_option + self[ping_option])
         if self["-PB"] is not None:
@@ -950,9 +972,9 @@ class NmapOptionsTest(unittest.TestCase):
             "-e eth0", "-f -f", "-g 53", "-i input.txt", "-M 100",
             "-m output.gnmap", "-O", "-O2", "-o output.nmap", "-p 1-100",
             "-S 192.168.0.1", "-T0", "-v -v"]
-        TESTS += ["-s" + opt for opt in "ACFLMNOPRSTUVWX"]
-        TESTS += ["-P" + opt for opt in "IEMP0NDRBSTAUO"]
-        TESTS += ["-P" + opt + "100" for opt in "STAUO"]
+        TESTS += ["-s" + opt for opt in "ACFLMNOPRSTUVWXYZ"]
+        TESTS += ["-P" + opt for opt in "IEMP0NDRBSTAUOY"]
+        TESTS += ["-P" + opt + "100" for opt in "STAUOY"]
         TESTS += [
             "--version",
             "--verbose",

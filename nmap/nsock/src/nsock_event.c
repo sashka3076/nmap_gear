@@ -56,7 +56,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_event.c 12956 2009-04-15 00:37:23Z fyodor $ */
+/* $Id: nsock_event.c 16449 2010-01-13 20:09:01Z david $ */
 
 #include "nsock_internal.h"
 #include "gh_list.h"
@@ -240,7 +240,7 @@ int msevent_cancel(mspool *nsp, msevent *nse, gh_list *event_list, gh_list_elem 
 #if PCAP_BSD_SELECT_HACK
   if(nse->type==NSE_TYPE_PCAP_READ){
     if (nsp->tracelevel > 8)
-      nsock_trace(nsp, "PCAP NSE #%lu: CANCELL TEST el.pcap=%x el.read=%x el.curr=%x sd=%i", 
+      nsock_trace(nsp, "PCAP NSE #%lu: CANCELL TEST el.pcap=%p el.read=%p el.curr=%p sd=%i", 
 	    nse->id, &nsp->evl.pcap_read_events, &nsp->evl.read_events, event_list,((mspcap *) nse->iod->pcap)->pcap_desc );
   /* If event occured, and we're in BSD_HACK mode, than this event was added
    * to two queues. evl.read_event and evl.pcap_read_event 
@@ -442,8 +442,6 @@ const char *nse_type2str(enum nse_type type) {
   default:
     return "UNKNOWN!";
   }
-
-  return "WTF????"; /* Unreached */
 }
 
 /* Takes an nse_status (as returned by nse_status() and returns a static
@@ -460,9 +458,6 @@ const char *nse_status2str(enum nse_status status) {
   default:
     return "UNKNOWN!";
   }
-
-  return "WTF????"; /* Unreached */
-
 }
 
 

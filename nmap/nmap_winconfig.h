@@ -90,7 +90,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap_winconfig.h 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: nmap_winconfig.h 12955 2009-04-15 00:37:03Z fyodor $ */
 
 #ifndef NMAP_WINCONFIG_H
 #define NMAP_WINCONFIG_H

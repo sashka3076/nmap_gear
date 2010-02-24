@@ -89,7 +89,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: MACLookup.h 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: MACLookup.h 12955 2009-04-15 00:37:03Z fyodor $ */
 
 #ifndef MACLOOKUP_H
 #define MACLOOKUP_H

@@ -89,7 +89,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.h 13897 2009-06-25 00:23:03Z fyodor $ */
+/* $Id: nmap.h 16586 2010-01-27 01:44:28Z fyodor $ */
 
 #ifndef NMAP_H
 #define NMAP_H
@@ -252,8 +252,8 @@ void *realloc();
 #ifndef NMAP_VERSION
 /* Edit this definition only within the quotes, because it is read from this
    file by the makefiles. */
-#define NMAP_VERSION "5.00"
-#define NMAP_NUM_VERSION "5.0.0.0"
+#define NMAP_VERSION "5.21"
+#define NMAP_NUM_VERSION "5.21.0.0"
 #endif
 
 /* User configurable #defines: */
@@ -399,6 +399,10 @@ void *realloc();
 #define MAXHOSTNAMELEN 64
 #endif
 
+/* Max payload: Worst case is IPv4 with 40bytes of options and TCP with 20
+ * bytes of options. */
+#define MAX_PAYLOAD_ALLOWED 65535-60-40
+
 #ifndef recvfrom6_t
 #  define recvfrom6_t int
 #endif
@@ -435,7 +439,6 @@ void nmap_free_mem();
 /* general helper functions */
 const char *statenum2str(int state);
 const char *scantype2str(stype scantype);
-void sigdie(int signo);
 void reaper(int signo);
 char *seqreport(struct seq_info *seq);
 const char *ipidclass2ascii(int seqclass);

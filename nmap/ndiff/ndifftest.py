@@ -2,6 +2,7 @@
 
 # Unit tests for Ndiff.
 
+import subprocess
 import unittest
 import xml.dom.minidom
 import StringIO
@@ -32,12 +33,10 @@ class scan_test(unittest.TestCase):
         self.assertEqual(len(host.ports), 2)
 
     def test_extraports(self):
-        """Test that the correct number of known ports is returned when there
-        are extraports in only one state."""
         scan = Scan()
         scan.load_from_file("test-scans/single.xml")
         host = scan.hosts[0]
-        self.assertEqual(len(host.ports), 100)
+        self.assertEqual(len(host.ports), 5)
         self.assertEqual(host.extraports.items(), [("filtered", 95)])
 
     def test_extraports_multi(self):
@@ -46,8 +45,8 @@ class scan_test(unittest.TestCase):
         scan = Scan()
         scan.load_from_file("test-scans/complex.xml")
         host = scan.hosts[0]
-        self.assertEqual(len(host.ports), 5)
-        self.assertEqual(set(host.extraports.items()), set([("filtered", 95), ("open|filtered", 100)]))
+        self.assertEqual(len(host.ports), 6)
+        self.assertEqual(set(host.extraports.items()), set([("filtered", 95), ("open|filtered", 99)]))
 
     def test_addresses(self):
         """Test that addresses are recorded."""
@@ -66,9 +65,17 @@ class scan_test(unittest.TestCase):
     def test_os(self):
         """Test that OS information is recorded."""
         scan = Scan()
-        scan.load_from_file("test-scans/os.xml")
+        scan.load_from_file("test-scans/complex.xml")
         host = scan.hosts[0]
         self.assertTrue(len(host.os) > 0)
+
+    def test_script(self):
+        """Test that script results are recorded."""
+        scan = Scan()
+        scan.load_from_file("test-scans/complex.xml")
+        host = scan.hosts[0]
+        self.assertTrue(len(host.script_results) > 0)
+        self.assertTrue(len(host.ports[(22, u"tcp")].script_results) > 0)
 
 # This test is commented out because Nmap XML doesn't store any information
 # about down hosts, not even the fact that they are down. Recovering the list of
@@ -162,7 +169,7 @@ class host_test(unittest.TestCase):
         s = Scan()
         s.load_from_file("test-scans/single.xml")
         h = s.hosts[0]
-        self.assertEqual(len(h.ports), 100)
+        self.assertEqual(len(h.ports), 5)
         self.assertEqual(len(h.extraports), 1)
         self.assertEqual(h.extraports.keys()[0], u"filtered")
         self.assertEqual(h.extraports.values()[0], 95)
@@ -201,27 +208,6 @@ class address_test(unittest.TestCase):
         e = IPv6Address("::1")
         self.assertEqual(e, e)
         self.assertNotEqual(a, e)
-
-    def test_sort(self):
-        """Test the sort order of addresses."""
-        l = [MACAddress("00:00:00:00:00:00"), IPv4Address("127.0.0.1"), IPv6Address("::1")]
-        l.sort()
-        self.assertEqual(["ipv4", "ipv6", "mac"], [a.type for a in l])
-
-        strings = ["3.0.0.0", "20.0.0.0", "100.0.0.2", "100.0.0.10"]
-        l = [IPv4Address(s) for s in strings]
-        l.sort()
-        self.assertEqual(strings, [a.s for a in l])
-
-        strings = ["3::", "20::", "100::2", "100::10"]
-        l = [IPv6Address(s) for s in strings]
-        l.sort()
-        self.assertEqual(strings, [a.s for a in l])
-
-        strings = ["20:00:00:00:00:00", "a0:00:00:00:00:20", "a0:00:00:00:00:a0"]
-        l = [MACAddress(s) for s in strings]
-        l.sort()
-        self.assertEqual(strings, [a.s for a in l])
 
 class port_test(unittest.TestCase):
     """Test the Port class."""
@@ -336,41 +322,8 @@ class scan_diff_test(unittest.TestCase):
             diff = ScanDiff(a, b)
             scan_apply_diff(a, diff)
             diff = ScanDiff(a, b)
-            self.assertEqual(len(diff.host_diffs), 0, "%d != 0 in pair %s" % (len(diff.host_diffs), str(pair)))
+            self.assertEqual(diff.host_diffs, {})
             self.assertEqual(set(diff.hosts), set(diff.host_diffs.keys()))
-
-class parse_port_list_test(unittest.TestCase):
-    """Test the parse_port_list function."""
-    def test_empty(self):
-        ports = parse_port_list(u"")
-        self.assertEqual(len(ports), 0)
-
-    def test_single(self):
-        ports = parse_port_list(u"1,10,100")
-        self.assertEqual(len(ports), 3)
-        self.assertEqual(set(ports), set([1, 10, 100]))
-
-    def test_range(self):
-        ports = parse_port_list(u"10-20")
-        self.assertEqual(len(ports), 11)
-        self.assertEqual(set(ports), set(range(10, 21)))
-
-    def test_combo(self):
-        ports = parse_port_list(u"1,10,100-102,150")
-        self.assertEqual(set(ports), set([1, 10, 100, 101, 102, 150]))
-
-    def test_dups(self):
-        ports = parse_port_list(u"5,1-10")
-        self.assertEqual(len(ports), 10)
-        self.assertEqual(set(ports), set(range(1, 11)))
-
-    def test_invalid(self):
-        self.assertRaises(ValueError, parse_port_list, u"a")
-        self.assertRaises(ValueError, parse_port_list, u",1")
-        self.assertRaises(ValueError, parse_port_list, u"1,,2")
-        self.assertRaises(ValueError, parse_port_list, u"1,")
-        self.assertRaises(ValueError, parse_port_list, u"1-2-3")
-        self.assertRaises(ValueError, parse_port_list, u"10-1")
 
 class host_diff_test(unittest.TestCase):
     """Test the HostDiff class."""
@@ -641,6 +594,15 @@ class table_test(unittest.TestCase):
         t.append(("a", "b", "c", "d"))
         self.assertEqual(str(t), "<<<a>>>b!!!cd")
 
+    def test_append_raw(self):
+        """Test the append_raw method that inserts an unformatted row."""
+        t = Table("<* * *>")
+        t.append(("1", "2", "3"))
+        t.append_raw("   row   ")
+        self.assertEqual(str(t), "<1 2 3>\n   row   ")
+        t.append(("4", "5", "6"))
+        self.assertEqual(str(t), "<1 2 3>\n   row   \n<4 5 6>")
+
     def test_strip(self):
         """Test that trailing whitespace is stripped."""
         t = Table("* * * ")
@@ -715,5 +677,55 @@ def host_apply_diff(host, diff):
             del host.ports[port.spec]
         else:
             host.ports[port.spec] = diff.port_diffs[port].port_b
+
+    for sr_diff in diff.script_result_diffs:
+        sr_a = sr_diff.sr_a
+        sr_b = sr_diff.sr_b
+        if sr_a is None:
+            host.script_results.append(sr_b)
+        elif sr_b is None:
+            host.script_results.remove(sr_a)
+        else:
+            host.script_results[host.script_results.index(sr_a)] = sr_b
+    host.script_results.sort()
+
+def call_quiet(args, **kwargs):
+    """Run a command with subprocess.call and hide its output."""
+    return subprocess.call(args, stdout = subprocess.PIPE,
+        stderr = subprocess.STDOUT, **kwargs)
+
+class exit_code_test(unittest.TestCase):
+    NDIFF = "./ndiff"
+
+    def test_exit_equal(self):
+        """Test that the exit code is 0 when the diff is empty."""
+        for format in ("--text", "--xml"):
+            code = call_quiet([self.NDIFF, format, 
+                "test-scans/simple.xml", "test-scans/simple.xml"])
+            self.assertEqual(code, 0)
+        # Should be independent of verbosity.
+        for format in ("--text", "--xml"):
+            code = call_quiet([self.NDIFF, "-v", format, 
+                "test-scans/simple.xml", "test-scans/simple.xml"])
+            self.assertEqual(code, 0)
+
+    def test_exit_different(self):
+        """Test that the exit code is 1 when the diff is not empty."""
+        for format in ("--text", "--xml"):
+            code = call_quiet([self.NDIFF, format, 
+                "test-scans/simple.xml", "test-scans/complex.xml"])
+            self.assertEqual(code, 1)
+
+    def test_exit_error(self):
+        """Test that the exit code is 2 when there is an error."""
+        code = call_quiet([self.NDIFF])
+        self.assertEqual(code, 2)
+        code = call_quiet([self.NDIFF, "test-scans/simple.xml"])
+        self.assertEqual(code, 2)
+        code = call_quiet([self.NDIFF, "test-scans/simple.xml",
+            "test-scans/nonexistent.xml"])
+        self.assertEqual(code, 2)
+        code = call_quiet([self.NDIFF, "--nothing"])
+        self.assertEqual(code, 2)
 
 unittest.main()

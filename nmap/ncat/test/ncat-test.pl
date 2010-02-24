@@ -9,8 +9,9 @@ use MIME::Base64;
 use File::Temp qw/ tempfile /;
 use URI::Escape;
 use Data::Dumper;
+use Socket;
 
-use IPC::Open2;
+use IPC::Open3;
 use strict;
 
 my $NCAT = "../ncat";
@@ -23,18 +24,24 @@ my $BUFSIZ = 1024;
 
 my $num_tests = 0;
 my $num_failures = 0;
+my $num_expected_failures = 0;
+my $num_unexpected_passes = 0;
+
+# If true during a test, failure is expected (XFAIL).
+our $xfail = 0;
 
 # Run $NCAT with the given arguments.
 sub ncat {
 	my $pid;
-	local *OUT;
 	local *IN;
+	local *OUT;
+	local *ERR;
 	# print join(" ", ($NCAT, @_)) . "\n";
-	$pid = open2(*OUT, *IN, $NCAT, @_);
+	$pid = open3(*IN, *OUT, *ERR, $NCAT, @_);
 	if (!defined $pid) {
 		die "open2 failed";
 	}
-	return ($pid, *OUT, *IN);
+	return ($pid, *OUT, *IN, *ERR);
 }
 
 sub ncat_server {
@@ -42,7 +49,10 @@ sub ncat_server {
 }
 
 sub ncat_client {
-	return ncat($HOST, $PORT, @_);
+	my @ret = ncat($HOST, $PORT, @_);
+	# Give it a moment to connect.
+	select(undef, undef, undef, 0.1);
+	return @ret;
 }
 
 # Kill all child processes.
@@ -56,7 +66,7 @@ sub kill_children {
 # Read until a timeout occurs. Return undef on EOF or "" on timeout.
 sub timeout_read {
 	my $fh = shift;
-	my $timeout = 1.0;
+	my $timeout = 0.50;
 	if (scalar(@_) > 0) {
 		$timeout = shift;
 	}
@@ -64,10 +74,11 @@ sub timeout_read {
 	my $rd = "";
 	my $frag;
 	vec($rd, fileno($fh), 1) = 1;
+	# Here we rely on $timeout being decremented after select returns,
+	# which may not be supported on all systems.
 	while (select($rd, undef, undef, $timeout) != 0) {
 		return ($result or undef) if sysread($fh, $frag, $BUFSIZ) == 0;
 		$result .= $frag;
-		$timeout = 0;
 	}
 	return $result;
 }
@@ -86,11 +97,21 @@ sub test {
 	my $code = shift;
 	$num_tests++;
 	if (eval { &$code() }) {
-		print "PASS $desc\n";
+		if ($xfail) {
+			print "UNEXPECTED PASS $desc\n";
+			$num_unexpected_passes++;
+		} else {
+			print "PASS $desc\n";
+		}
 	} else {
-		$num_failures++;
-		print "FAIL $desc\n";
-		print "     $@";
+		if ($xfail) {
+			$num_expected_failures++;
+			print "XFAIL $desc\n";
+		} else {
+			$num_failures++;
+			print "FAIL $desc\n";
+			print "     $@";
+		}
 	}
 }
 
@@ -114,35 +135,53 @@ sub server_client_test {
 }
 
 sub server_client_test_multi {
-	my $protos = shift;
+	my $specs = shift;
 	my $desc = shift;
-	my $server_args = shift;
-	my $client_args = shift;
+	my $server_args_ref = shift;
+	my $client_args_ref = shift;
 	my $code = shift;
+	my $outer_xfail = $xfail;
+	local $xfail;
 
-	for my $proto (@$protos) {
-		if ($proto eq "tcp") {
-			server_client_test($desc . " (TCP)",
-				$server_args, $client_args, $code);
-		} elsif ($proto eq "udp") {
-			server_client_test($desc . " (UDP)",
-				[@$server_args, ("--udp")], [@$client_args, ("--udp")], $code);
-		} elsif ($proto eq "ssl") {
-			server_client_test($desc . " (SSL)",
-				[@$server_args, ("--ssl", "--ssl-key", "test-cert.pem", "--ssl-cert", "test-cert.pem")], [@$client_args, ("--ssl")], $code);
-		} else {
-			die "Unknown protocol $proto";
+	for my $spec (@$specs) {
+		my @server_args = @$server_args_ref;
+		my @client_args = @$client_args_ref;
+
+		$xfail = $outer_xfail;
+		for my $proto (split(/ /, $spec)) {
+			if ($proto eq "tcp") {
+				# Nothing needed.
+			} elsif ($proto eq "udp") {
+				push @server_args, ("--udp");
+				push @client_args, ("--udp");
+			} elsif ($proto eq "sctp") {
+				push @server_args, ("--sctp");
+				push @client_args, ("--sctp");
+			} elsif ($proto eq "ssl") {
+				push @server_args, ("--ssl", "--ssl-key", "test-cert.pem", "--ssl-cert", "test-cert.pem");
+				push @client_args, ("--ssl");
+			} elsif ($proto eq "xfail") {
+				$xfail = 1;
+			} else {
+				die "Unknown protocol $proto";
+			}
 		}
+		server_client_test("$desc ($spec)", [@server_args], [@client_args], $code);
 	}
 }
 
-# Like server_client_test, but run the test once each for TCP, UDP, and SSL.
-sub server_client_test_tcp_udp_ssl {
-	server_client_test_multi(["tcp", "udp", "ssl"], @_);
+# Like server_client_test, but run the test once each for each mix of TCP, UDP,
+# SCTP, and SSL.
+sub server_client_test_all {
+	server_client_test_multi(["tcp", "udp", "sctp", "tcp ssl", "sctp ssl"], @_);
+}
+
+sub server_client_test_tcp_sctp_ssl {
+	server_client_test_multi(["tcp", "sctp", "tcp ssl", "sctp ssl"], @_);
 }
 
 sub server_client_test_tcp_ssl {
-	server_client_test_multi(["tcp", "ssl"], @_);
+	server_client_test_multi(["tcp", "tcp ssl"], @_);
 }
 
 # Set up a proxy running on $PROXY_PORT and connect a client to it. Start a
@@ -231,34 +270,51 @@ sub max_conns_test {
 }
 
 sub max_conns_test_multi {
-	my $protos = shift;
+	my $specs = shift;
 	my $desc = shift;
-	my $server_args = shift;
-	my $client_args = shift;
+	my $server_args_ref = shift;
+	my $client_args_ref = shift;
 	my $count = shift;
+	my $outer_xfail = $xfail;
+	local $xfail;
 
-	for my $proto (@$protos) {
-		if ($proto eq "tcp") {
-			max_conns_test("$desc (TCP)",
-				$server_args, $client_args, $count);
-		} elsif ($proto eq "udp") {
-			max_conns_test("$desc (UDP)",
-				[@$server_args, ("--udp")], [@$client_args, ("--udp")], $count);
-		} elsif ($proto eq "ssl") {
-			max_conns_test("$desc (SSL)",
-				[@$server_args, ("--ssl", "--ssl-key", "test-cert.pem", "--ssl-cert", "test-cert.pem")], [@$client_args, ("--ssl")], $count);
-		} else {
-			die "Unknown protocol $proto";
+	for my $spec (@$specs) {
+		my @server_args = @$server_args_ref;
+		my @client_args = @$client_args_ref;
+
+		$xfail = $outer_xfail;
+		for my $proto (split(/ /, $spec)) {
+			if ($proto eq "tcp") {
+				# Nothing needed.
+			} elsif ($proto eq "udp") {
+				push @server_args, ("--udp");
+				push @client_args, ("--udp");
+			} elsif ($proto eq "sctp") {
+				push @server_args, ("--sctp");
+				push @client_args, ("--sctp");
+			} elsif ($proto eq "ssl") {
+				push @server_args, ("--ssl", "--ssl-key", "test-cert.pem", "--ssl-cert", "test-cert.pem");
+				push @client_args, ("--ssl");
+			} elsif ($proto eq "xfail") {
+				$xfail = 1;
+			} else {
+				die "Unknown protocol $proto";
+			}
 		}
+		max_conns_test("$desc ($spec)", [@server_args], [@client_args], $count);
 	}
 }
 
-sub max_conns_test_tcp_ssl {
-	max_conns_test_multi(["tcp", "ssl"], @_);
+sub max_conns_test_all {
+	max_conns_test_multi(["tcp", "udp", "sctp", "tcp ssl", "sctp ssl"], @_);
 }
 
-sub max_conns_test_tcp_udp_ssl {
-	max_conns_test_multi(["tcp", "udp", "ssl"], @_);
+sub max_conns_test_tcp_sctp_ssl {
+	max_conns_test_multi(["tcp", "sctp", "tcp ssl", "sctp ssl"], @_);
+}
+
+sub max_conns_test_tcp_ssl {
+	max_conns_test_multi(["tcp", "tcp ssl"], @_);
 }
 
 # Ignore broken pipe signals that result when trying to read from a terminated
@@ -308,6 +364,130 @@ sub {
 };
 kill_children;
 
+server_client_test "Connect success exit code",
+[], ["--send-only"], sub {
+	my ($pid, $code);
+	local $SIG{CHLD} = sub { };
+
+	syswrite($c_in, "abc\n");
+	close($c_in);
+	do {
+		$pid = waitpid($c_pid, 0);
+	} while ($pid > 0 && $pid != $c_pid);
+	$pid == $c_pid or die;
+	$code = $? >> 8;
+        $code == 0 or die "Exit code was $code, not 0";
+};
+kill_children;
+
+test "Connect connection refused exit code",
+sub {
+	my ($pid, $code);
+	local $SIG{CHLD} = sub { };
+
+	my ($c_pid, $c_out, $c_in) = ncat($HOST, $PORT, "--send-only");
+	syswrite($c_in, "abc\n");
+	close($c_in);
+	do {
+		$pid = waitpid($c_pid, 0);
+	} while ($pid > 0 && $pid != $c_pid);
+	$pid == $c_pid or die;
+	$code = $? >> 8;
+        $code == 1 or die "Exit code was $code, not 1";
+};
+kill_children;
+
+test "Connect connection interrupted exit code",
+sub {
+	my ($pid, $code);
+	local $SIG{CHLD} = sub { };
+	local *SOCK;
+	local *S;
+
+	socket(SOCK, PF_INET, SOCK_STREAM, getprotobyname("tcp")) or die;
+	setsockopt(SOCK, SOL_SOCKET, SO_REUSEADDR, pack("l", 1)) or die;
+	bind(SOCK, sockaddr_in($PORT, INADDR_ANY)) or die;
+	listen(SOCK, 1) or die;
+
+	my ($c_pid, $c_out, $c_in) = ncat($HOST, $PORT);
+
+	accept(S, SOCK) or die;
+	# Shut down the socket with a RST.
+	setsockopt(S, SOL_SOCKET, SO_LINGER, pack("II", 1, 0)) or die;
+	close(S) or die;
+
+	do {
+		$pid = waitpid($c_pid, 0);
+	} while ($pid > 0 && $pid != $c_pid);
+	$pid == $c_pid or die;
+	$code = $? >> 8;
+        $code == 1 or die "Exit code was $code, not 1";
+};
+kill_children;
+
+server_client_test "Listen success exit code",
+[], ["--send-only"], sub {
+	my ($resp, $pid, $code);
+	local $SIG{CHLD} = sub { };
+
+	syswrite($c_in, "abc\n");
+	close($c_in);
+	do {
+		$pid = waitpid($s_pid, 0);
+	} while ($pid > 0 && $pid != $s_pid);
+	$pid == $s_pid or die "$pid != $s_pid";
+	$code = $? >> 8;
+        $code == 0 or die "Exit code was $code, not 0";
+};
+kill_children;
+
+test "Listen connection interrupted exit code",
+sub {
+	my ($pid, $code);
+	local $SIG{CHLD} = sub { };
+	local *SOCK;
+
+	my ($s_pid, $s_out, $s_in) = ncat_server();
+
+	socket(SOCK, PF_INET, SOCK_STREAM, getprotobyname("tcp")) or die;
+	my $addr = gethostbyname($HOST);
+	connect(SOCK, sockaddr_in($PORT, $addr)) or die;
+	# Shut down the socket with a RST.
+	setsockopt(SOCK, SOL_SOCKET, SO_LINGER, pack("II", 1, 0)) or die;
+	close(SOCK) or die;
+
+	do {
+		$pid = waitpid($s_pid, 0);
+	} while ($pid > 0 && $pid != $s_pid);
+	$pid == $s_pid or die;
+	$code = $? >> 8;
+        $code == 1 or die "Exit code was $code, not 1";
+};
+kill_children;
+
+test "Program error exit code",
+sub {
+	my ($pid, $code);
+	local $SIG{CHLD} = sub { };
+
+	my ($c_pid, $c_out, $c_in) = ncat($HOST, $PORT, "--baffle");
+	do {
+		$pid = waitpid($c_pid, 0);
+	} while ($pid > 0 && $pid != $c_pid);
+	$pid == $c_pid or die;
+	$code = $? >> 8;
+        $code == 2 or die "Exit code was $code, not 2";
+
+	my ($s_pid, $s_out, $s_in) = ncat_server("--baffle");
+	do {
+		$pid = waitpid($s_pid, 0);
+	} while ($pid > 0 && $pid != $s_pid);
+	$pid == $s_pid or die;
+	$code = $? >> 8;
+        $code == 2 or die "Exit code was $code, not 2";
+};
+kill_children;
+
 # Test that the server closes its output stream after a client disconnects.
 # This is for uses like
 #   ncat -l | tar xzvf -
@@ -315,7 +495,7 @@ kill_children;
 # where tar on the listening side could be any program that potentially buffers
 # its input. The listener must close its standard output so the program knows
 # to stop reading and process what remains in its buffer.
-server_client_test_tcp_ssl "Server sends EOF after client disconnect",
+server_client_test_tcp_sctp_ssl "Server sends EOF after client disconnect",
 [], ["--send-only"], sub {
 	my $resp;
 
@@ -347,7 +527,30 @@ sub {
 };
 kill_children;
 
-server_client_test_tcp_udp_ssl "-C translation on input",
+# Test --exec and --sh-exec.
+
+server_client_test_all "--exec",
+["--exec", "/usr/bin/perl -e \$|=1;while(<>){tr/a-z/A-Z/;print}"], [], sub {
+	syswrite($c_in, "abc\n");
+	my $resp = timeout_read($c_out) or die "Read timeout";
+	$resp eq "ABC\n" or die "Client received " . d($resp) . ", not " . d("ABC\n");
+};
+
+server_client_test_all "--sh-exec",
+["--sh-exec", "perl -e '\$|=1;while(<>){tr/a-z/A-Z/;print}'"], [], sub {
+	syswrite($c_in, "abc\n");
+	my $resp = timeout_read($c_out) or die "Read timeout";
+	$resp eq "ABC\n" or die "Client received " . d($resp) . ", not " . d("ABC\n");
+};
+
+server_client_test_all "--sh-exec with -C",
+["--sh-exec", "/usr/bin/perl -e '\$|=1;while(<>){tr/a-z/A-Z/;print}'", "-C"], [], sub {
+	syswrite($c_in, "abc\n");
+	my $resp = timeout_read($c_out) or die "Read timeout";
+	$resp eq "ABC\r\n" or die "Client received " . d($resp) . ", not " . d("ABC\r\n");
+};
+
+server_client_test_all "-C translation on input",
 ["-C"], ["-C"], sub {
 	my $resp;
 	my $expected = "\r\na\r\nb\r\n---\r\nc\r\nd\r\n---e\r\n\r\nf\r\n";
@@ -370,7 +573,7 @@ server_client_test_tcp_udp_ssl "-C translation on input",
 };
 kill_children;
 
-server_client_test_tcp_udp_ssl "-C server no translation on output",
+server_client_test_all "-C server no translation on output",
 ["-C"], [], sub {
 	my $resp;
 	my $expected = "\na\nb\n---\r\nc\r\nd\r\n";
@@ -383,7 +586,7 @@ server_client_test_tcp_udp_ssl "-C server no translation on output",
 };
 kill_children;
 
-server_client_test_tcp_ssl "-C client no translation on output",
+server_client_test_tcp_sctp_ssl "-C client no translation on output",
 [], ["-C"], sub {
 	my $resp;
 	my $expected = "\na\nb\n---\r\nc\r\nd\r\n";
@@ -396,9 +599,29 @@ server_client_test_tcp_ssl "-C client no translation on output",
 };
 kill_children;
 
+# Test that both reads and writes reset the idle counter, and that the client
+# properly exits after the timeout expires.
+server_client_test "idle timeout",
+[], ["-i", "3000"], sub {
+	my $resp;
+
+	syswrite($c_in, "abc\n");
+	$resp = timeout_read($s_out) or die "Read timeout";
+	sleep 2;
+	syswrite($s_in, "abc\n");
+	$resp = timeout_read($c_out) or die "Read timeout";
+	sleep 2;
+	syswrite($c_in, "abc\n");
+	$resp = timeout_read($s_out) or die "Read timeout";
+	sleep 4;
+	syswrite($s_in, "abc\n");
+	$resp = timeout_read($c_out);
+	!$resp or die "Client received \"$resp\" after delay of 4000 ms with idle timeout of 3000 ms."
+};
+
 # --send-only tests.
 
-server_client_test_tcp_udp_ssl "--send-only client",
+server_client_test_all "--send-only client",
 [], ["--send-only"], sub {
 	my $resp;
 
@@ -412,7 +635,7 @@ server_client_test_tcp_udp_ssl "--send-only client",
 	!$resp or die "Client received \"$resp\" in --send-only mode";
 };
 
-server_client_test_tcp_udp_ssl "--send-only server",
+server_client_test_all "--send-only server",
 ["--send-only"], [], sub {
 	my $resp;
 
@@ -450,9 +673,9 @@ kill_children;
 
 # --recv-only tests.
 
-# Note this test is TCP-only. The --recv-only UDP client never sends anything to
-# the server, so the server never knows to start sending its data.
-server_client_test_tcp_ssl "--recv-only client",
+# Note this test excludes UDP. The --recv-only UDP client never sends anything
+# to the server, so the server never knows to start sending its data.
+server_client_test_tcp_sctp_ssl "--recv-only client",
 [], ["--recv-only"], sub {
 	my $resp;
 
@@ -466,7 +689,7 @@ server_client_test_tcp_ssl "--recv-only client",
 	$resp eq "abc\n" or die "Client got \"$resp\", not \"abc\\n\"";
 };
 
-server_client_test_tcp_udp_ssl "--recv-only server",
+server_client_test_all "--recv-only server",
 ["--recv-only"], [], sub {
 	my $resp;
 
@@ -497,6 +720,68 @@ sub {
 	syswrite($c1_in, "abc\n");
 	$resp = timeout_read($c2_out);
 	!$resp or die "Client received \"$resp\" from --recv-only broker";
+};
+kill_children;
+
+# Source address tests.
+
+test "Connect with -p",
+sub {
+	my ($pid, $code);
+	local $SIG{CHLD} = sub { };
+	local *SOCK;
+	local *S;
+
+	socket(SOCK, PF_INET, SOCK_STREAM, getprotobyname("tcp")) or die;
+	setsockopt(SOCK, SOL_SOCKET, SO_REUSEADDR, pack("l", 1)) or die;
+	bind(SOCK, sockaddr_in($PORT, INADDR_ANY)) or die;
+	listen(SOCK, 1) or die;
+
+	my ($c_pid, $c_out, $c_in) = ncat("-p", "1234", $HOST, $PORT);
+
+	accept(S, SOCK) or die;
+	my ($port, $addr) = sockaddr_in(getpeername(S));
+	$port == 1234 or die "Client connected to prosy with source port $port, not 1234";
+};
+kill_children;
+
+test "Connect through HTTP proxy with -p",
+sub {
+	my ($pid, $code);
+	local $SIG{CHLD} = sub { };
+	local *SOCK;
+	local *S;
+
+	socket(SOCK, PF_INET, SOCK_STREAM, getprotobyname("tcp")) or die;
+	setsockopt(SOCK, SOL_SOCKET, SO_REUSEADDR, pack("l", 1)) or die;
+	bind(SOCK, sockaddr_in($PROXY_PORT, INADDR_ANY)) or die;
+	listen(SOCK, 1) or die;
+
+	my ($c_pid, $c_out, $c_in) = ncat("--proxy-type", "http", "--proxy", "$HOST:$PROXY_PORT", "-p", "1234", $HOST, $PORT);
+
+	accept(S, SOCK) or die;
+	my ($port, $addr) = sockaddr_in(getpeername(S));
+	$port == 1234 or die "Client connected to prosy with source port $port, not 1234";
+};
+kill_children;
+
+test "Connect through SOCKS4 proxy with -p",
+sub {
+	my ($pid, $code);
+	local $SIG{CHLD} = sub { };
+	local *SOCK;
+	local *S;
+
+	socket(SOCK, PF_INET, SOCK_STREAM, getprotobyname("tcp")) or die;
+	setsockopt(SOCK, SOL_SOCKET, SO_REUSEADDR, pack("l", 1)) or die;
+	bind(SOCK, sockaddr_in($PROXY_PORT, INADDR_ANY)) or die;
+	listen(SOCK, 1) or die;
+
+	my ($c_pid, $c_out, $c_in) = ncat("--proxy-type", "socks4", "--proxy", "$HOST:$PROXY_PORT", "-p", "1234", $HOST, $PORT);
+
+	accept(S, SOCK) or die;
+	my ($port, $addr) = sockaddr_in(getpeername(S));
+	$port == 1234 or die "Client connected to prosy with source port $port, not 1234";
 };
 kill_children;
 
@@ -579,6 +864,38 @@ server_client_test "HTTP CONNECT IPv6 address, good request",
 	my $code = HTTP::Response->parse($resp)->code;
 	$code == 200 or die "Expected response code 200, got $code";
 };
+
+# Try accessing an IPv6 server with a proxy that uses -4, should fail.
+proxy_test "HTTP CONNECT IPv4-only proxy",
+["-4"], ["-6"], ["-4"], sub {
+	my $req = http_request("CONNECT", "[$IPV6_ADDR]:$PORT");
+	syswrite($c_in, $req);
+	my $resp = timeout_read($c_out) or die "Read timeout";
+	my $code = HTTP::Response->parse($resp)->code;
+	$code == 504 or die "Expected response code 504, got $code";
+};
+
+# Try accessing an IPv4 server with a proxy that uses -6, should fail.
+proxy_test "HTTP CONNECT IPv6-only proxy",
+["-6"], ["-4"], ["-6"], sub {
+	my $req = http_request("CONNECT", "$HOST:$PORT");
+	syswrite($c_in, $req);
+	my $resp = timeout_read($c_out) or die "Read timeout";
+	my $code = HTTP::Response->parse($resp)->code;
+	$code == 504 or die "Expected response code 504, got $code";
+};
+
+{
+local $xfail = 1;
+proxy_test "HTTP CONNECT IPv4 client, IPv6 server",
+[], ["-6"], ["-4"], sub {
+	my $req = http_request("CONNECT", "[$IPV6_ADDR]:$PORT");
+	syswrite($c_in, $req);
+	my $resp = timeout_read($c_out) or die "Read timeout";
+	my $code = HTTP::Response->parse($resp)->code;
+	$code == 200 or die "Expected response code 200, got $code";
+};
+}
 
 # Check that the proxy relays in both directions.
 proxy_test "HTTP CONNECT proxy relays",
@@ -721,7 +1038,7 @@ proxy_test "HTTP GET remove Connection header fields",
 	my $resp = timeout_read($s_out) or die "Read timeout";
 	$resp = HTTP::Request->parse($resp);
 	!defined($resp->header("Keep-Alive")) or die "Proxy did not remove Keep-Alive header field";
-	!defined($resp->header("Two")) or die "Proxy did not remove Keep-Alive header field";
+	!defined($resp->header("Two")) or die "Proxy did not remove Two header field";
 	$resp->header("One") eq "1" or die "Proxy modified One header field";
 	$resp->header("Three") eq "3" or die "Proxy modified Three header field";
 };
@@ -848,11 +1165,7 @@ server_client_test "HTTP proxy auth base64 encoding: \"$auth\"",
 };
 }
 
-# These proxy auth tests sometimes fail because the proxy client dies before we
-# can read the response from it, creating a broken pipe. I need to find a way
-# to keep that information.
-
-server_client_test_tcp_ssl "HTTP proxy server auth challenge",
+server_client_test_multi ["tcp", "tcp ssl xfail"], "HTTP proxy server auth challenge",
 ["--proxy-type", "http", "--proxy-auth", "user:pass"],
 [],
 sub {
@@ -865,7 +1178,7 @@ sub {
 	$auth or die "Proxy server didn't send Proxy-Authenticate header field";
 };
 
-server_client_test_tcp_ssl "HTTP proxy server correct auth",
+server_client_test_multi ["tcp", "tcp ssl xfail"], "HTTP proxy server correct auth",
 ["--proxy-type", "http", "--proxy-auth", "user:pass"],
 [],
 sub {
@@ -878,7 +1191,7 @@ sub {
 	$code == 200 or die "Expected response code 200, got $code";
 };
 
-server_client_test_tcp_ssl "HTTP proxy server wrong user",
+server_client_test_multi ["tcp", "tcp ssl xfail"], "HTTP proxy server wrong user",
 ["--proxy-type", "http", "--proxy-auth", "user:pass"],
 [],
 sub {
@@ -891,7 +1204,7 @@ sub {
 	$code == 407 or die "Expected response code 407, got $code";
 };
 
-server_client_test_tcp_ssl "HTTP proxy server wrong pass",
+server_client_test_multi ["tcp", "tcp ssl xfail"], "HTTP proxy server wrong pass",
 ["--proxy-type", "http", "--proxy-auth", "user:pass"],
 [],
 sub {
@@ -904,7 +1217,7 @@ sub {
 	$code == 407 or die "Expected response code 407, got $code";
 };
 
-server_client_test_tcp_ssl "HTTP proxy server correct auth, different case",
+server_client_test_multi ["tcp", "tcp ssl xfail"], "HTTP proxy server correct auth, different case",
 ["--proxy-type", "http", "--proxy-auth", "user:pass"],
 [],
 sub {
@@ -918,7 +1231,7 @@ sub {
 };
 
 # Test that header field values can be split across lines with LWS.
-server_client_test_tcp_ssl "HTTP proxy server LWS",
+server_client_test_multi ["tcp", "tcp ssl xfail"], "HTTP proxy server LWS",
 ["--proxy-type", "http", "--proxy-auth", "user:pass"],
 [],
 sub {
@@ -931,7 +1244,7 @@ sub {
 	$code == 200 or die "Expected response code 200, got $code";
 };
 
-server_client_test_tcp_ssl "HTTP proxy server LWS",
+server_client_test_multi ["tcp", "tcp ssl xfail"], "HTTP proxy server LWS",
 ["--proxy-type", "http", "--proxy-auth", "user:pass"],
 [],
 sub {
@@ -944,7 +1257,7 @@ sub {
 	$code == 200 or die "Expected response code 200, got $code";
 };
 
-server_client_test_tcp_ssl "HTTP proxy server no auth",
+server_client_test_multi ["tcp", "tcp ssl xfail"], "HTTP proxy server no auth",
 ["--proxy-type", "http", "--proxy-auth", "user:pass"],
 [],
 sub {
@@ -957,7 +1270,7 @@ sub {
 	$code != 200 or die "Got unexpected 200 response";
 };
 
-server_client_test_tcp_ssl "HTTP proxy server broken auth",
+server_client_test_multi ["tcp", "tcp ssl xfail"], "HTTP proxy server broken auth",
 ["--proxy-type", "http", "--proxy-auth", "user:pass"],
 [],
 sub {
@@ -970,7 +1283,7 @@ sub {
 	$code != 200 or die "Got unexpected 200 response";
 };
 
-server_client_test_tcp_ssl "HTTP proxy server extra auth",
+server_client_test_multi ["tcp", "tcp ssl xfail"], "HTTP proxy server extra auth",
 ["--proxy-type", "http", "--proxy-auth", "user:pass"],
 [],
 sub {
@@ -985,7 +1298,7 @@ sub {
 
 # Allow and deny list tests.
 
-server_client_test_tcp_udp_ssl "Allow localhost (IPv4 address)",
+server_client_test_all "Allow localhost (IPv4 address)",
 ["--allow", "127.0.0.1"], [], sub {
 	my $resp;
 
@@ -995,7 +1308,7 @@ server_client_test_tcp_udp_ssl "Allow localhost (IPv4 address)",
 	$resp eq "abc\n" or die "Server got \"$resp\", not \"abc\\n\"";
 };
 
-server_client_test_tcp_udp_ssl "Allow localhost (host name)",
+server_client_test_all "Allow localhost (host name)",
 ["--allow", "localhost"], [], sub {
 	my $resp;
 
@@ -1006,7 +1319,7 @@ server_client_test_tcp_udp_ssl "Allow localhost (host name)",
 };
 
 # Anyone not allowed is denied.
-server_client_test_tcp_udp_ssl "Allow non-localhost",
+server_client_test_all "Allow non-localhost",
 ["--allow", "1.2.3.4"], [], sub {
 	my $resp;
 
@@ -1016,7 +1329,7 @@ server_client_test_tcp_udp_ssl "Allow non-localhost",
 };
 
 # --allow options should accumulate.
-server_client_test_tcp_udp_ssl "--allow options accumulate",
+server_client_test_all "--allow options accumulate",
 ["--allow", "127.0.0.1", "--allow", "1.2.3.4"], [], sub {
 	my $resp;
 
@@ -1026,7 +1339,7 @@ server_client_test_tcp_udp_ssl "--allow options accumulate",
 	$resp eq "abc\n" or die "Server got \"$resp\", not \"abc\\n\"";
 };
 
-server_client_test_tcp_udp_ssl "Deny localhost (IPv4 address)",
+server_client_test_all "Deny localhost (IPv4 address)",
 ["--deny", "127.0.0.1"], [], sub {
 	my $resp;
 
@@ -1035,7 +1348,7 @@ server_client_test_tcp_udp_ssl "Deny localhost (IPv4 address)",
 	!$resp or die "Server did not reject host in deny list";
 };
 
-server_client_test_tcp_udp_ssl "Deny localhost (host name)",
+server_client_test_all "Deny localhost (host name)",
 ["--deny", "localhost"], [], sub {
 	my $resp;
 
@@ -1045,7 +1358,7 @@ server_client_test_tcp_udp_ssl "Deny localhost (host name)",
 };
 
 # Anyone not denied is allowed.
-server_client_test_tcp_udp_ssl "Deny non-localhost",
+server_client_test_all "Deny non-localhost",
 ["--deny", "1.2.3.4"], [], sub {
 	my $resp;
 
@@ -1056,7 +1369,7 @@ server_client_test_tcp_udp_ssl "Deny non-localhost",
 };
 
 # --deny options should accumulate.
-server_client_test_tcp_udp_ssl "--deny options accumulate",
+server_client_test_all "--deny options accumulate",
 ["--deny", "127.0.0.1", "--deny", "1.2.3.4"], [], sub {
 	my $resp;
 
@@ -1066,7 +1379,7 @@ server_client_test_tcp_udp_ssl "--deny options accumulate",
 };
 
 # If a host is both allowed and denied, denial takes precedence.
-server_client_test_tcp_udp_ssl "Allow and deny",
+server_client_test_all "Allow and deny",
 ["--allow", "127.0.0.1", "--deny", "127.0.0.1"], [], sub {
 	my $resp;
 
@@ -1085,7 +1398,7 @@ localhost",
 ) {
 my ($fh, $filename) = tempfile("ncat-test-XXXXX", SUFFIX => ".txt");
 print $fh $contents;
-server_client_test_tcp_udp_ssl "--allowfile",
+server_client_test_all "--allowfile",
 ["--allowfile", $filename], [], sub {
 	my $resp;
 
@@ -1094,7 +1407,7 @@ server_client_test_tcp_udp_ssl "--allowfile",
 	$resp or die "Read timeout";
 	$resp eq "abc\n" or die "Server got \"$resp\", not \"abc\\n\"";
 };
-server_client_test_tcp_udp_ssl "--denyfile",
+server_client_test_all "--denyfile",
 ["--denyfile", $filename], [], sub {
 	my $resp;
 
@@ -1182,15 +1495,26 @@ kill_children;
 
 # Test --max-conns.
 for my $count (0, 1, 10) {
-	max_conns_test_tcp_ssl("--max-conns $count --keep-open", ["--keep-open"], [], $count);
+	max_conns_test_tcp_sctp_ssl("--max-conns $count --keep-open", ["--keep-open"], [], $count);
 }
 
 for my $count (0, 1, 10) {
 	max_conns_test_tcp_ssl("--max-conns $count --broker", ["--broker"], [], $count);
 }
 
-for my $count (0, 1, 10) {
-	max_conns_test_tcp_udp_ssl("--max-conns $count with exec", ["--exec", "/bin/cat"], [], $count);
+max_conns_test_all("--max-conns 0 with exec", ["--exec", "/bin/cat"], [], 0);
+for my $count (1, 10) {
+	max_conns_test_multi(["tcp", "sctp", "udp xfail", "tcp ssl", "sctp ssl"],
+		"--max-conns $count with exec", ["--exec", "/bin/cat"], [], $count);
 }
 
-print "$num_failures failures in $num_tests tests.\n";
+print "$num_expected_failures expected failures.\n" if $num_expected_failures > 0;
+print "$num_unexpected_passes unexpected passes.\n" if $num_unexpected_passes > 0;
+print "$num_failures unexpected failures.\n";
+print "$num_tests tests total.\n";
+
+if ($num_failures + $num_unexpected_passes == 0) {
+	exit 0;
+} else {
+	exit 1;
+}

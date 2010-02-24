@@ -53,7 +53,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_utils.h 12956 2009-04-15 00:37:23Z fyodor $ */
+/* $Id: nsock_utils.h 14680 2009-07-30 17:11:18Z venkat $ */
 #ifndef UTILS_H
 #define UTILS_H
 
@@ -77,30 +77,5 @@
 #ifndef MIN
 #define MIN(x,y) (((x)<(y))?(x):(y))
 #endif
-#ifndef MYABS
-#define MYABS(x) (((x) >= 0)?(x):(-x))
-#endif
-#ifndef FALSE
-#define FALSE 0
-#endif
-#ifndef TRUE
-#define TRUE 1
-#endif
-
-#define NIPQUAD(addr) \
-        (((addr) >> 0)  & 0xff), \
-        (((addr) >> 8)  & 0xff), \
-        (((addr) >> 16) & 0xff), \
-        (((addr) >> 24) & 0xff)
-
-
-/* Timeval subtraction in microseconds */
-#define TIMEVAL_SUBTRACT(a,b) (((a).tv_sec - (b).tv_sec) * 1000000 + (a).tv_usec - (b).tv_usec)
-/* Timeval subtract in milliseconds */
-#define TIMEVAL_MSEC_SUBTRACT(a,b) ((((a).tv_sec - (b).tv_sec) * 1000) + ((a).tv_usec - (b).tv_usec) / 1000)
-/* Timeval subtract in seconds; truncate towards zero */
-#define TIMEVAL_SEC_SUBTRACT(a,b) ((a).tv_sec - (b).tv_sec + (((a).tv_usec < (b).tv_usec) ? - 1 : 0))
-/* assign one timeval to another timeval plus some msecs: a = b + msecs */
-#define TIMEVAL_MSEC_ADD(a, b, msecs) { (a).tv_sec = (b).tv_sec + ((msecs) / 1000); (a).tv_usec = (b).tv_usec + ((msecs) % 1000) * 1000; (a).tv_sec += (a).tv_usec / 1000000; (a).tv_usec %= 1000000; }
 
 #endif

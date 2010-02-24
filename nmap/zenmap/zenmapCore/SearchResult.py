@@ -1,28 +1,96 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2005 Insecure.Com LLC.
-#
-# Author: Adriano Monteiro Marques <py.adriano@gmail.com>
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+# ***********************IMPORTANT NMAP LICENSE TERMS************************
+# *                                                                         *
+# * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
+# * also a registered trademark of Insecure.Com LLC.  This program is free  *
+# * software; you may redistribute and/or modify it under the terms of the  *
+# * GNU General Public License as published by the Free Software            *
+# * Foundation; Version 2 with the clarifications and exceptions described  *
+# * below.  This guarantees your right to use, modify, and redistribute     *
+# * this software under certain conditions.  If you wish to embed Nmap      *
+# * technology into proprietary software, we sell alternative licenses      *
+# * (contact sales@insecure.com).  Dozens of software vendors already       *
+# * license Nmap technology such as host discovery, port scanning, OS       *
+# * detection, and version detection.                                       *
+# *                                                                         *
+# * Note that the GPL places important restrictions on "derived works", yet *
+# * it does not provide a detailed definition of that term.  To avoid       *
+# * misunderstandings, we consider an application to constitute a           *
+# * "derivative work" for the purpose of this license if it does any of the *
+# * following:                                                              *
+# * o Integrates source code from Nmap                                      *
+# * o Reads or includes Nmap copyrighted data files, such as                *
+# *   nmap-os-db or nmap-service-probes.                                    *
+# * o Executes Nmap and parses the results (as opposed to typical shell or  *
+# *   execution-menu apps, which simply display raw Nmap output and so are  *
+# *   not derivative works.)                                                * 
+# * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+# *   installer, such as those produced by InstallShield.                   *
+# * o Links to a library or executes a program that does any of the above   *
+# *                                                                         *
+# * The term "Nmap" should be taken to also include any portions or derived *
+# * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+# * interpretation of derived works with some common examples.  Our         *
+# * interpretation applies only to Nmap--we don't speak for other people's  *
+# * GPL works.                                                              *
+# *                                                                         *
+# * If you have any questions about the GPL licensing restrictions on using *
+# * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
+# * we also offer alternative license to integrate Nmap into proprietary    *
+# * applications and appliances.  These contracts have been sold to dozens  *
+# * of software vendors, and generally include a perpetual license as well  *
+# * as providing for priority support and updates as well as helping to     *
+# * fund the continued development of Nmap technology.  Please email        *
+# * sales@insecure.com for further information.                             *
+# *                                                                         *
+# * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+# * permission to link the code of this program with any version of the     *
+# * OpenSSL library which is distributed under a license identical to that  *
+# * listed in the included COPYING.OpenSSL file, and distribute linked      *
+# * combinations including the two. You must obey the GNU GPL in all        *
+# * respects for all of the code used other than OpenSSL.  If you modify    *
+# * this file, you may extend this exception to your version of the file,   *
+# * but you are not obligated to do so.                                     *
+# *                                                                         *
+# * If you received these files with a written license agreement or         *
+# * contract stating terms other than the terms above, then that            *
+# * alternative license agreement takes precedence over these comments.     *
+# *                                                                         *
+# * Source is provided to this software because we believe users have a     *
+# * right to know exactly what a program is going to do before they run it. *
+# * This also allows you to audit the software for security holes (none     *
+# * have been found so far).                                                *
+# *                                                                         *
+# * Source code also allows you to port Nmap to new platforms, fix bugs,    *
+# * and add new features.  You are highly encouraged to send your changes   *
+# * to nmap-dev@insecure.org for possible incorporation into the main       *
+# * distribution.  By sending these changes to Fyodor or one of the         *
+# * Insecure.Org development mailing lists, it is assumed that you are      *
+# * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+# * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+# * will always be available Open Source, but this is important because the *
+# * inability to relicense code has caused devastating problems for other   *
+# * Free Software projects (such as KDE and NASM).  We also occasionally    *
+# * relicense the code to third parties as discussed above.  If you wish to *
+# * specify special license conditions of your contributions, just say so   *
+# * when you send them.                                                     *
+# *                                                                         *
+# * This program is distributed in the hope that it will be useful, but     *
+# * WITHOUT ANY WARRANTY; without even the implied warranty of              *
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
+# * General Public License v2.0 for more details at                         *
+# * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
+# * included with Nmap.                                                     *
+# *                                                                         *
+# ***************************************************************************/
 
 import os
 import os.path
 import re
 import StringIO
+import unittest
 
 from glob import glob
 from types import StringTypes
@@ -31,6 +99,75 @@ from zenmapCore.Name import APP_NAME
 from zenmapCore.NmapParser import NmapParser
 from zenmapCore.UmitLogging import log
 
+class HostSearch(object):
+    @staticmethod
+    def match_target(host, name):
+        addrs = []
+        mac = host.get_mac()
+        ip = host.get_ip()
+        ipv6 = host.get_ipv6()
+
+        if mac and mac.has_key('addr'):
+            if name in mac['addr'].lower(): return True
+        if ip and ip.has_key('addr'):
+            if name in ip['addr'].lower(): return True
+        if ipv6 and ipv6.has_key('addr'):
+            if name in ipv6['addr'].lower(): return True
+
+        if HostSearch.match_hostname(host, name):
+            return True
+        return False
+    @staticmethod
+    def match_hostname(host, hostname):
+        hostnames = host.get_hostnames()
+        for hn in hostnames:
+            if hostname in hn['hostname'].lower():
+                return True
+        else:
+            return False
+    @staticmethod
+    def match_service(host, service):
+        for port in host.get_ports():
+            # We concatenate all useful fields and add them to the list
+            if port['port_state'] not in ['open','open|filtered']:
+                continue
+            version = port.get("service_name", "") + " " + \
+                      port.get("service_product", "") + " " + \
+                      port.get("service_version", "") + " " + \
+                      port.get("service_extrainfo", "")
+            if service in version.lower():
+                return True
+        else:
+            return False
+    @staticmethod
+    def match_os(host, os):
+        os = os.lower()
+        os_str = ""
+
+        osclasses = host.get_osclasses()
+        osmatches = host.get_osmatches()
+
+        for osclass in osclasses:
+            os_str += osclass['vendor'].lower() + " " +\
+                      osclass['osfamily'].lower() + " " +\
+                      osclass['type'].lower()
+        for osmatch in osmatches:
+            os_str += osmatch['name'].lower()
+
+        if os in os_str:
+            return True
+        return False
+    @staticmethod
+    def match_port(host_ports, port, port_state):
+        # Check if the port is parsable, if not return False silently
+        if re.match("^\d+$", port) == None:
+            return False
+
+        for hp in host_ports:
+            if hp['portid'] == port and hp['port_state'] == port_state:
+                return True
+        else:
+            return False
 
 class SearchResult(object):    
     def __init__(self):
@@ -171,15 +308,8 @@ class SearchResult(object):
             return True
         else:
             # We search the (rDNS) hostnames list
-            for hostname in self.parsed_scan.get_hostnames():
-                if target in hostname["hostname"]:
-                    return True
-            # We search the address list
-            addrlist = self.parsed_scan.get_mac() + \
-                       self.parsed_scan.get_ipv4() + \
-                       self.parsed_scan.get_ipv6()
-            for addr in addrlist:
-                if target in addr:
+            for host in self.parsed_scan.get_hosts():
+                if HostSearch.match_target(host, target):
                     return True
         return False
     
@@ -191,15 +321,8 @@ class SearchResult(object):
         hosts = self.parsed_scan.get_hosts()
         os = os.lower()
         for host in hosts:
-            for osclass in host.get_osclasses():
-                for value in osclass.itervalues():
-                    if os in value.lower():
-                        return True
-            for osmatch in host.get_osmatches():
-                for value in osmatch.itervalues():
-                    if os in value.lower():
-                        return True
-        
+            if HostSearch.match_os(host, os):
+                return True
         return False
     
     def match_scanned(self, ports):
@@ -243,33 +366,16 @@ class SearchResult(object):
         
         # Transform a comma-delimited string containing ports into a list
         ports = filter(lambda not_empty: not_empty, ports.split(","))
-        
-        # Check if they're parsable, if not return False silently
-        for port in ports:
-            if re.match("^\d+$", port) == None:
-                return False
-        
-        # Get all scanned ports that are in a state that matches port_state
-        scanned_ports = []
-        for p in self.parsed_scan.ports:
-            for port_dic in p:
-                for portid in port_dic["port"]:
-                    if portid["port_state"] == port_state:
-                        scanned_ports.append(portid["portid"])
-        
-        if len(ports) == 0:
-            # In this case, a user has given us only the port state, but not the
-            # port itself (for example, "fp:"), so we need to return True if
-            # this scan has any ports in the given state.
-            return (len(scanned_ports) > 0)
-        else:
-            # Return True only if all given ports are in the desired state
+
+        for host in self.parsed_scan.get_hosts():
             for port in ports:
-                if port not in scanned_ports:
-                    return False
+                if not HostSearch.match_port(host.get_ports(), port, port_state):
+                    break
             else:
                 return True
-    
+        else:
+            return False
+        
     def match_open(self, port):
         return self.match_port(port, "open")
     
@@ -293,20 +399,8 @@ class SearchResult(object):
             return True
         
         versions = []
-        for first in self.parsed_scan.ports:
-            for ports in first:
-                for port in ports["port"]:
-                    if port["service_name"] not in versions:
-                        # We concatenate all useful fields and add them to the list
-                        version = port["service_name"] + " " + \
-                                  port["service_product"] + " " + \
-                                  port["service_version"] + " " + \
-                                  port["service_extrainfo"]
-                        version = version.lower()
-                        versions.append(version)
-        
-        for v in versions:
-            if sversion.lower() in v:
+        for host in self.parsed_scan.get_hosts():
+            if HostSearch.match_service(host, sversion):
                 return True
         else:
             return False
@@ -404,11 +498,56 @@ class SearchDir(SearchResult, object):
     def get_scan_results(self):
         return self.scan_results
 
+class SearchResultTest(unittest.TestCase):
+    class SearchClass(SearchResult):
+        """This class is for use by the unit testing code"""
+        def __init__(self, filenames):
+            SearchResult.__init__(self)
+            self.scan_results = []
+            for filename in filenames:
+                scan = NmapParser()
+                scan.parse_file(filename)
+                self.scan_results.append(scan)
+        def get_scan_results(self):
+            return self.scan_results
+
+    def setUp(self):
+        files = ["test/xml_test%d.xml" % no for no in range(1, 13)]
+        self.search_result = self.SearchClass(files)
+
+    def _test_skeleton(self, key, val):
+        results = []
+        search = {key:[val]}
+        for scan in self.search_result.search(**search):
+            results.append(scan)
+        return len(results)
+    def test_match_os(self):
+        """Test that checks if the match_os predicate works"""
+        assert(self._test_skeleton('os','linux') == 2)
+    def test_match_target(self):
+        """Test that checks if the match_target predicate works"""
+        assert(self._test_skeleton('target','localhost') == 4)
+    def test_match_port_open(self):
+        """Test that checks if the match_open predicate works"""
+        assert(self._test_skeleton('open', '22') == 7)
+    def test_match_port_closed(self):
+        """Test that checks if the match_closed predicate works"""
+        assert(self._test_skeleton('open', '22') == 7)
+        assert(self._test_skeleton('closed', '22') == 9)
+    def test_match_service(self):
+        """Test that checks if the match_service predicate works"""
+        assert(self._test_skeleton('service', 'apache') == 9)
+        assert(self._test_skeleton('service', 'openssh') == 7)
+    def test_match_service_version(self):
+        """Test that checks if the match_service predicate works when """
+        """checking version"""
+        assert(self._test_skeleton('service', '2.0.52') == 7)
 
 if __name__ == "__main__":
-    s = SearchDir("/home/adriano/umit/test", ["usr", "xml"])
-    for result in s.search(\
-                             keyword="",
+    unittest.main()
+#    s = SearchDir("/home/adriano/umit/test", ["usr", "xml"])
+#    for result in s.search(\
+#                             keyword="",
                              #profile="",
                              #option="",
                              #started="1121737119",
@@ -427,7 +566,7 @@ if __name__ == "__main__":
                              #osclass="Microsoft | Windows | 95/98/ME | General Purpose",
                              #osmatch="gentoo",
                              #product="Apache"\
-                           ):
+#                           ):
 
-        print "Ports:", result.hosts[-1].ports
+#        print "Ports:", result.hosts[-1].ports
 

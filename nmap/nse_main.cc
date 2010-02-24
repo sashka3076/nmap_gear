@@ -22,15 +22,18 @@
 #define NSE_MAIN "NSE_MAIN" /* the main function */
 #define NSE_TRACEBACK "NSE_TRACEBACK"
 
-/* string keys used in interface with nse_main.lua */
+/* These are indices into the registry, for data shared with nse_main.lua. The
+   definitions here must match those in nse_main.lua. */
+#define NSE_YIELD "NSE_YIELD"
+#define NSE_BASE "NSE_BASE"
 #define NSE_WAITING_TO_RUNNING "NSE_WAITING_TO_RUNNING"
 #define NSE_DESTRUCTOR "NSE_DESTRUCTOR"
+#define NSE_SELECTED_BY_NAME "NSE_SELECTED_BY_NAME"
+#define NSE_CURRENT_HOSTS "NSE_CURRENT_HOSTS"
 
 #define MAX_FILENAME_LEN 4096
 
 extern NmapOps o;
-
-int current_hosts = LUA_NOREF;
 
 static int timedOut (lua_State *L)
 {
@@ -79,13 +82,14 @@ static int ports (lua_State *L)
   Target *target = get_target(L, 1);
   PortList *plist = &(target->ports);
   Port *current = NULL;
+  Port port;
   lua_newtable(L);
   for (int i = 0; states[i] != PORT_HIGHEST_STATE; i++)
-    while ((current = plist->nextPort(current, TCPANDUDPANDSCTP,
+    while ((current = plist->nextPort(current, &port, TCPANDUDPANDSCTP,
             states[i])) != NULL)
     {
       lua_newtable(L);
-      set_portinfo(L, current);
+      set_portinfo(L, target, current);
       lua_pushboolean(L, 1);
       lua_rawset(L, -3);
     }
@@ -107,12 +111,13 @@ static int host_set_output (lua_State *L)
 
 static int port_set_output (lua_State *L)
 {
+  Port port, *p;
   ScriptResult sr;
   Target *target = get_target(L, 1);
-  Port *port = get_port(L, target, 2);
+  p = get_port(L, target, &port, 2);
   sr.set_id(luaL_checkstring(L, 3));
   sr.set_output(luaL_checkstring(L, 4));
-  port->scriptResults.push_back(sr);
+  target->ports.addScriptResult(p->portno, p->proto, sr);
   /* increment host port script results*/
   target->ports.numscriptresults++;
   return 0;
@@ -151,10 +156,16 @@ static int dump_dir (lua_State *L)
   return 1;
 }
 
+/* This must call the l_nsock_loop function defined in nse_nsock.cc.
+ * That closure is created in luaopen_nsock in order to allow
+ * l_nsock_loop to have access to the nsock library environment.
+ */
 static int nsock_loop (lua_State *L)
 {
-  if (l_nsock_loop(luaL_checkint(L, 1)) == NSOCK_LOOP_ERROR)
-    luaL_error(L, "an error occurred in nsock_loop");
+  lua_settop(L, 1);
+  lua_getfield(L, LUA_REGISTRYINDEX, NSE_NSOCK_LOOP);
+  lua_pushvalue(L, 1);
+  lua_call(L, 1, 0);
   return 0;
 }
 
@@ -162,19 +173,6 @@ static int key_was_pressed (lua_State *L)
 {
   lua_pushboolean(L, keyWasPressed());
   return 1;
-}
-
-static int ref (lua_State *L)
-{
-  lua_settop(L, 1);
-  lua_pushinteger(L, (lua_Integer) luaL_ref(L, LUA_REGISTRYINDEX));
-  return 1;
-}
-
-static int unref (lua_State *L)
-{
-  luaL_unref(L, LUA_REGISTRYINDEX, luaL_checkint(L, 1));
-  return 0;
 }
 
 static int updatedb (lua_State *L)
@@ -222,8 +220,6 @@ static void open_cnse (lua_State *L)
     {"dump_dir", dump_dir},
     {"nsock_loop", nsock_loop},
     {"key_was_pressed", key_was_pressed},
-    {"ref", ref},
-    {"unref", unref},
     {"updatedb", updatedb},
     {"scan_progress_meter", scan_progress_meter},
     {"timedOut", timedOut},
@@ -253,7 +249,7 @@ void ScriptResult::set_output (const char *out)
   output = std::string(out);
 }
 
-std::string ScriptResult::get_output (void)
+std::string ScriptResult::get_output (void) const
 {
   return output;
 }
@@ -263,7 +259,7 @@ void ScriptResult::set_id (const char *ident)
   id = std::string(ident);
 }
 
-std::string ScriptResult::get_id (void)
+std::string ScriptResult::get_id (void) const
 {
   return id;
 }
@@ -389,10 +385,8 @@ static int init_main (lua_State *L)
   luaL_openlibs(L);
   set_nmap_libraries(L);
 
-  /* Load current_hosts */
-  luaL_unref(L, LUA_REGISTRYINDEX, current_hosts);
   lua_newtable(L);
-  current_hosts = luaL_ref(L, LUA_REGISTRYINDEX);
+  lua_setfield(L, LUA_REGISTRYINDEX, NSE_CURRENT_HOSTS);
 
   /* Load debug.traceback for collecting any error tracebacks */
   lua_settop(L, 0); /* clear the stack */
@@ -438,6 +432,11 @@ static int run_main (lua_State *L)
       lua_touserdata(L, 1);
 
   lua_settop(L, 0);
+
+  /* New host group */
+  lua_newtable(L);
+  lua_setfield(L, LUA_REGISTRYINDEX, NSE_CURRENT_HOSTS);
+
   lua_getfield(L, LUA_REGISTRYINDEX, NSE_TRACEBACK); /* index 1 */
 
   lua_getfield(L, LUA_REGISTRYINDEX, NSE_MAIN); /* index 2 */
@@ -447,23 +446,52 @@ static int run_main (lua_State *L)
    * This has all the target names, 1-N, in a list.
    */
   lua_createtable(L, targets->size(), 0); // stack index 3
+  lua_getfield(L, LUA_REGISTRYINDEX, NSE_CURRENT_HOSTS); /* index 4 */
   for (std::vector<Target *>::iterator ti = targets->begin();
        ti != targets->end(); ti++)
   {
+    Target *target = (Target *) *ti;
+    const char *TargetName = target->TargetName();
+    const char *targetipstr = target->targetipstr();
     lua_newtable(L);
-    set_hostinfo(L, (Target *) *ti);
+    set_hostinfo(L, target);
     lua_rawseti(L, 3, lua_objlen(L, 3) + 1);
-    lua_rawgeti(L, LUA_REGISTRYINDEX, current_hosts);
-    lua_pushlightuserdata(L, (void *) *ti);
-    lua_setfield(L, -2, (*ti)->targetipstr());
-    lua_pop(L, 1); /* current_hosts */
+    if (TargetName != NULL && strcmp(TargetName, "") != 0)
+      lua_pushstring(L, TargetName);
+    else
+      lua_pushstring(L, targetipstr);
+    lua_pushlightuserdata(L, target);
+    lua_rawset(L, 4); /* add to NSE_CURRENT_HOSTS */
   }
+  lua_pop(L, 1); /* pop NSE_CURRENT_HOSTS */
 
   if (lua_pcall(L, 1, 0, 1) != 0) lua_error(L); /* we wanted a traceback */
 
   return 0;
 }
 
+/* int nse_yield (lua_State *L)                            [-?, +?, e]
+ *
+ * This function will yield the running thread back to NSE, even across script
+ * auxiliary coroutines. All NSE initiated yields must use this function. The
+ * correct and only way to call is as a tail call:
+ *   return nse_yield(L);
+ */
+int nse_yield (lua_State *L)
+{
+  lua_getfield(L, LUA_REGISTRYINDEX, NSE_YIELD);
+  lua_pushthread(L);
+  lua_call(L, 1, 1); /* returns NSE_YIELD_VALUE */
+  return lua_yield(L, 1); /* yield with NSE_YIELD_VALUE */
+}
+
+/* void nse_restore (lua_State *L, int number)             [-, -, e]
+ *
+ * Restore the thread 'L' back into the running NSE queue. 'number' is the
+ * number of values on the stack to be passed when the thread is resumed. This
+ * function may cause a panic due to extraordinary and unavoidable
+ * circumstances.
+ */
 void nse_restore (lua_State *L, int number)
 {
   luaL_checkstack(L, 5, "nse_restore: stack overflow");
@@ -477,13 +505,15 @@ void nse_restore (lua_State *L, int number)
     fatal("nse_restore: WAITING_TO_RUNNING error!\n%s", lua_tostring(L, -1));
 }
 
-/* This function adds (what = 'a') or removes (what 'r') a destructor
- * from the Thread owning the running Lua thread (L). We call the nse_main.lua
- * function _R.NSE_DESTRUCTOR in order to add (or remove) the destructor to
- * the Thread's close handler table.
+/* void nse_destructor (lua_State *L, char what)           [-(1|2), +0, e]
+ *
+ * This function adds (what = 'a') or removes (what = 'r') a destructor from
+ * the Thread owning the running Lua thread (L). A destructor is called when
+ * the thread finishes for any reason (including error). A unique key is used
+ * to associate with the destructor so it is removable later.
  *
  * what == 'r', destructor key on stack
- * what == 'a', destructor key and destructor on stack
+ * what == 'a', destructor key and destructor function on stack
  */
 void nse_destructor (lua_State *L, char what)
 {
@@ -504,6 +534,51 @@ void nse_destructor (lua_State *L, char what)
   if (lua_pcall(L, 4, 0, 0) != 0)
     fatal("nse_destructor: NSE_DESTRUCTOR error!\n%s", lua_tostring(L, -1));
   lua_pop(L, what == 'a' ? 2 : 1);
+}
+
+/* void nse_base (lua_State *L)                             [-0, +1, e]
+ *
+ * Returns the base Lua thread (coroutine) for the running thread. The base
+ * thread is resumed by NSE (runs the action function). Other coroutines being
+ * used by the base thread may be in a chain of resumes, we use the base thread
+ * as the "holder" of resources (for the Nsock binding in particular).
+ */
+void nse_base (lua_State *L)
+{
+  lua_getfield(L, LUA_REGISTRYINDEX, NSE_BASE);
+  lua_call(L, 0, 1); /* returns base thread */
+}
+
+/* void nse_selectedbyname (lua_State *L)                  [-0, +1, e]
+ *
+ * Returns a boolean signaling whether the running script was selected by name
+ * on the command line (--script).
+ */
+void nse_selectedbyname (lua_State *L)
+{
+  lua_getfield(L, LUA_REGISTRYINDEX, NSE_SELECTED_BY_NAME);
+  if (lua_isnil(L, -1)) {
+    lua_pushboolean(L, 0);
+    lua_replace(L, -2);
+  } else {
+    lua_call(L, 0, 1);
+  }
+}
+
+/* void nse_gettarget (lua_State *L)                  [-0, +1, -]
+ *
+ * Given the index to a string on the stack identifying the host, an ip or a
+ * targetname (host name specified on the command line, see Target.h), returns
+ * a lightuserdatum that points to the host's Target (see Target.h). If the
+ * host cannot be found, nil is returned.
+ */
+void nse_gettarget (lua_State *L, int index)
+{
+  lua_pushvalue(L, index);
+  lua_getfield(L, LUA_REGISTRYINDEX, NSE_CURRENT_HOSTS);
+  lua_insert(L, -2);
+  lua_rawget(L, -2);
+  lua_replace(L, -2);
 }
 
 static lua_State *L_NSE = NULL;

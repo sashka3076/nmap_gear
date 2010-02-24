@@ -1,24 +1,90 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2005,2008 Insecure.Com LLC.
-#
-# Author: Adriano Monteiro Marques <py.adriano@gmail.com>
-# Modified: Jurand Nogiec <jurand@jurand.net>, 2008
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+# ***********************IMPORTANT NMAP LICENSE TERMS************************
+# *                                                                         *
+# * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
+# * also a registered trademark of Insecure.Com LLC.  This program is free  *
+# * software; you may redistribute and/or modify it under the terms of the  *
+# * GNU General Public License as published by the Free Software            *
+# * Foundation; Version 2 with the clarifications and exceptions described  *
+# * below.  This guarantees your right to use, modify, and redistribute     *
+# * this software under certain conditions.  If you wish to embed Nmap      *
+# * technology into proprietary software, we sell alternative licenses      *
+# * (contact sales@insecure.com).  Dozens of software vendors already       *
+# * license Nmap technology such as host discovery, port scanning, OS       *
+# * detection, and version detection.                                       *
+# *                                                                         *
+# * Note that the GPL places important restrictions on "derived works", yet *
+# * it does not provide a detailed definition of that term.  To avoid       *
+# * misunderstandings, we consider an application to constitute a           *
+# * "derivative work" for the purpose of this license if it does any of the *
+# * following:                                                              *
+# * o Integrates source code from Nmap                                      *
+# * o Reads or includes Nmap copyrighted data files, such as                *
+# *   nmap-os-db or nmap-service-probes.                                    *
+# * o Executes Nmap and parses the results (as opposed to typical shell or  *
+# *   execution-menu apps, which simply display raw Nmap output and so are  *
+# *   not derivative works.)                                                * 
+# * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+# *   installer, such as those produced by InstallShield.                   *
+# * o Links to a library or executes a program that does any of the above   *
+# *                                                                         *
+# * The term "Nmap" should be taken to also include any portions or derived *
+# * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+# * interpretation of derived works with some common examples.  Our         *
+# * interpretation applies only to Nmap--we don't speak for other people's  *
+# * GPL works.                                                              *
+# *                                                                         *
+# * If you have any questions about the GPL licensing restrictions on using *
+# * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
+# * we also offer alternative license to integrate Nmap into proprietary    *
+# * applications and appliances.  These contracts have been sold to dozens  *
+# * of software vendors, and generally include a perpetual license as well  *
+# * as providing for priority support and updates as well as helping to     *
+# * fund the continued development of Nmap technology.  Please email        *
+# * sales@insecure.com for further information.                             *
+# *                                                                         *
+# * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+# * permission to link the code of this program with any version of the     *
+# * OpenSSL library which is distributed under a license identical to that  *
+# * listed in the included COPYING.OpenSSL file, and distribute linked      *
+# * combinations including the two. You must obey the GNU GPL in all        *
+# * respects for all of the code used other than OpenSSL.  If you modify    *
+# * this file, you may extend this exception to your version of the file,   *
+# * but you are not obligated to do so.                                     *
+# *                                                                         *
+# * If you received these files with a written license agreement or         *
+# * contract stating terms other than the terms above, then that            *
+# * alternative license agreement takes precedence over these comments.     *
+# *                                                                         *
+# * Source is provided to this software because we believe users have a     *
+# * right to know exactly what a program is going to do before they run it. *
+# * This also allows you to audit the software for security holes (none     *
+# * have been found so far).                                                *
+# *                                                                         *
+# * Source code also allows you to port Nmap to new platforms, fix bugs,    *
+# * and add new features.  You are highly encouraged to send your changes   *
+# * to nmap-dev@insecure.org for possible incorporation into the main       *
+# * distribution.  By sending these changes to Fyodor or one of the         *
+# * Insecure.Org development mailing lists, it is assumed that you are      *
+# * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+# * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+# * will always be available Open Source, but this is important because the *
+# * inability to relicense code has caused devastating problems for other   *
+# * Free Software projects (such as KDE and NASM).  We also occasionally    *
+# * relicense the code to third parties as discussed above.  If you wish to *
+# * specify special license conditions of your contributions, just say so   *
+# * when you send them.                                                     *
+# *                                                                         *
+# * This program is distributed in the hope that it will be useful, but     *
+# * WITHOUT ANY WARRANTY; without even the implied warranty of              *
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
+# * General Public License v2.0 for more details at                         *
+# * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
+# * included with Nmap.                                                     *
+# *                                                                         *
+# ***************************************************************************/
 
 import re
 import locale
@@ -49,7 +115,7 @@ class HostInfo(object):
         self._tcpsequence = {}
         self._osclasses = []
         self._osmatches = []
-        self._ports = [{"extraports": [], "port": []}]
+        self._ports = []
         self._ports_used = []
         self._extraports = []
         self._uptime = {}
@@ -69,13 +135,11 @@ class HostInfo(object):
         clone._tcpsequence = copy.deepcopy(self._tcpsequence)
         clone._osclasses = map(lambda d: copy.deepcopy(d), self._osclasses)
         clone._osmatches = self._osmatches
-        # note: _ports is a list containing a single element, which is a
-        # dictionary.  The comment on self.get_ports() says this is wrong
-        clone._ports = [copy.deepcopy(self._ports[0])]
+        clone._ports = copy.deepcopy(self._ports)
         clone._ports_used = self._ports_used
         clone._extraports = self._extraports
         clone._uptime = copy.deepcopy(self._uptime)
-        clone._hostnames = self._hostnames
+        clone._hostnames = copy.deepcopy(self._hostnames)
         clone._tcptssequence = copy.deepcopy(self._tcptssequence)
         clone._ipidsequence = copy.deepcopy(self._ipidsequence)
         clone._ip = copy.deepcopy(self._ip)
@@ -141,7 +205,7 @@ class HostInfo(object):
         """Return the OS match with the highest accuracy. If there is a tie, one
         of the best matches will be returned."""
         if not self._osmatches:
-            return {}
+            return None
         def osmatch_key(osmatch):
             # Sort first by accuracy, then by name so it's deterministic.
             try:
@@ -158,7 +222,7 @@ class HostInfo(object):
         """Return the OS class with the highest accuracy. If there is a tie, one
         of the best matches will be returned."""
         if not self._osclasses:
-            return {}
+            return None
         def osclass_key(osclass):
             # Sort first by accuracy, then by name so it's deterministic.
             try:
@@ -193,23 +257,19 @@ class HostInfo(object):
         # Avoid empty dict return
         return {"seconds":"", "lastboot":""}
 
-    # ports is a list of one element, having the form
-    # [{'extraports': [{'count': u'1709', 'state': u'filtered'}],
-    #   'port': [...]}]
-    # where each 'port' entry is a dict like
+    # ports is an array containing dicts of the form
     # {'port_state': u'open', 'portid': u'22', 'protocol': u'tcp',
     #  'service_conf': u'10', 'service_extrainfo': u'protocol 2.0',
     #  'service_method': u'probed', 'service_name': u'ssh',
     #  'service_product': u'OpenSSH', 'service_version': u'4.3'}
-    # Having ports be a list with one element is wrong. It should be a simple
-    # variable.
-    def set_ports(self, port_list):
-        self._ports = port_list
+    def set_ports(self, ports):
+        self._ports = ports
     
     def get_ports(self):
         return self._ports
 
-    # extraports is identical to the 'extraports' entry of 'ports'.
+    # extraports is an array of dicts of the form
+    # {'count': u'1709', 'state': u'filtered'}
     def set_extraports(self, port_list):
         self._extraports = port_list
     
@@ -278,79 +338,51 @@ class HostInfo(object):
             else:
                 return _("Unknown Host")
 
-    def get_open_ports(self):
-        ports = self.get_ports()
-        open = 0
-        
-        for i in ports:
-            port = i['port']
-            for p in port:
-                if re.findall('open', p['port_state']):
-                    open+=1
-        
-        return open
-    
-    def get_filtered_ports(self):
-        ports = self.get_ports()
-        extraports = self.get_extraports()
-        filtered = 0
-        
-        for i in ports:
-            port = i['port']
-            for p in port:
-                if re.findall('filtered', p['port_state']):
-                    filtered+=1
+    def get_port_count_by_states(self, states):
+        count = 0
+
+        for p in self.ports:
+            state = p.get('port_state')
+            if state in states:
+                count += 1
  
-        for extra in extraports:
-            if extra["state"] == "filtered":
-                filtered += int(extra["count"])
+        for extra in self.get_extraports():
+            if extra['state'] in states:
+                count += int(extra['count'])
 
-        return filtered
-    
+        return count
+
+    def get_open_ports(self):
+        return self.get_port_count_by_states(('open', 'open|filtered'))
+
+    def get_filtered_ports(self):
+        return self.get_port_count_by_states(('filtered', 'open|filtered', 'closed|filtered'))
+
     def get_closed_ports(self):
-        ports = self.get_ports()
-        extraports = self.get_extraports()
-        closed = 0
-        
-        for i in ports:
-            port = i['port']
-            for p in port:
-                if re.findall('closed', p['port_state']):
-                    closed+=1
-        
-        for extra in extraports:
-            if extra["state"] == "closed":
-                closed += int(extra["count"])
+        return self.get_port_count_by_states(('closed', 'closed|filtered'))
 
-        return closed
-    
     def get_scanned_ports(self):
-        ports = self.get_ports()
-        extraports = self.get_extraports()
         scanned = 0
         
-        for i in ports:
-            port = i['port']
-            for p in port:
-                scanned+=1
+        for p in self.ports:
+            scanned+=1
         
-        for extra in extraports:
+        for extra in self.get_extraports():
             scanned += int(extra["count"])
 
         return scanned
 
     def get_services(self):
         services = []
-        for port in self.ports:
-            for p in port.get("port", []):
-                services.append({"service_name":p.get("service_name", _("unknown")),
-                                 "portid":p.get("portid", ""),
-                                 "service_version":p.get("service_version",
-                                                         _("Unknown version")),
-                                 "service_product":p.get("service_product", ""),
-                                 "service_extrainfo":p.get("service_extrainfo", ""),
-                                 "port_state":p.get("port_state", _("Unknown")),
-                                 "protocol":p.get("protocol", "")})
+        for p in self.ports:
+            services.append({"service_name":p.get("service_name", _("unknown")),
+                             "portid":p.get("portid", ""),
+                             "service_version":p.get("service_version",
+                                                     _("Unknown version")),
+                             "service_product":p.get("service_product", ""),
+                             "service_extrainfo":p.get("service_extrainfo", ""),
+                             "port_state":p.get("port_state", _("Unknown")),
+                             "protocol":p.get("protocol", "")})
         return services
     
     def get_trace(self):
@@ -539,7 +571,7 @@ in epoch format!")
 
         return ports
 
-    def get_formated_date(self):
+    def get_formatted_date(self):
         return time.strftime("%B %d, %Y - %H:%M", self.get_date())
 
     def get_scanner (self):
@@ -580,13 +612,6 @@ in epoch format!")
         for host in self.nmap.get('hosts', []):
             hostnames += host.get_hostnames()
         return hostnames
-
-    def get_ports(self):
-        ports = []
-        for port in self.nmap.get('hosts', []):
-            ports.append(port.get_ports())
-        
-        return ports
 
     def get_hosts(self):
         return self.nmap.get('hosts', None)
@@ -640,7 +665,7 @@ in epoch format!")
     def set_scan_name(self, scan_name):
         self.nmap["scan_name"] = scan_name
     
-    def get_formated_finish_date(self):
+    def get_formatted_finish_date(self):
         return time.strftime("%B %d, %Y - %H:%M", self.get_finish_time())
 
     def _verify_output_options(self, command):
@@ -672,14 +697,13 @@ in epoch format!")
     open_ports = property(get_open_ports)
     filtered_ports = property(get_filtered_ports)
     closed_ports = property(get_closed_ports)
-    formated_date = property(get_formated_date)
+    formatted_date = property(get_formatted_date)
     scanner = property(get_scanner, set_scanner)
     scanner_version = property(get_scanner_version, set_scanner_version)
     ipv4 = property(get_ipv4)
     mac = property(get_mac)
     ipv6 = property(get_ipv6)
     hostnames = property(get_hostnames)
-    ports = property(get_ports)
     hosts = property(get_hosts)
     runstats = property(get_runstats, set_runstats)
     hosts_down = property(get_hosts_down, set_hosts_down)
@@ -687,7 +711,7 @@ in epoch format!")
     hosts_scanned = property(get_hosts_scanned, set_hosts_scanned)
     finish_time = property(get_finish_time, set_finish_time)
     finish_epoc_time = property(get_finish_epoc_time, set_finish_epoc_time)
-    formated_finish_date = property(get_formated_finish_date)
+    formatted_finish_date = property(get_formatted_finish_date)
     start = property(get_start, set_start)
     scan_name = property(get_scan_name, set_scan_name)
 
@@ -901,7 +925,6 @@ class NmapParserSAX(ParserBasics, ContentHandler):
             self.in_host = True
             self._parse_host(attrs)
             self.list_ports = []
-            self.list_port = []
             self.list_extraports = []
         elif self.in_host and name == "status":
             self._parse_host_status(attrs)
@@ -960,12 +983,9 @@ class NmapParserSAX(ParserBasics, ContentHandler):
             self.in_run_stats = False
         elif name == "host":
             self.in_host = False
-            self.list_ports.append({"extraports":self.list_extraports,
-                                    "port":self.list_port})
             self.host_info.set_extraports(self.list_extraports)
             self.host_info.set_ports(self.list_ports)
             self.nmap["hosts"].append(self.host_info)
-            del(self.list_ports)
         elif self.in_host and name == "hostnames":
             self.in_hostnames = False
             self.host_info.set_hostnames(self.list_hostnames)
@@ -973,7 +993,7 @@ class NmapParserSAX(ParserBasics, ContentHandler):
             self.in_ports = False
         elif self.in_host and self.in_ports and name == "port":
             self.in_port = False
-            self.list_port.append(self.dic_port)
+            self.list_ports.append(self.dic_port)
             del(self.dic_port)
         elif self.in_host and self.in_os and name == "os":
             self.in_os = False
@@ -1037,7 +1057,8 @@ class NmapParserSAX(ParserBasics, ContentHandler):
 
         ## Finished element
         writer.startElement("finished",
-                        Attributes(dict(time = str(self.finish_epoc_time))))
+                        Attributes(dict(time = str(self.finish_epoc_time),
+                                        timestr = time.ctime(time.mktime(self.get_finish_time())))))
         writer.endElement("finished")
 
         ## Hosts element
@@ -1114,43 +1135,42 @@ class NmapParserSAX(ParserBasics, ContentHandler):
             # Ports element
             writer.startElement("ports", Attributes({}))
 
-            for ps in host.ports:
-                ## Extraports elements
-                for ext in ps["extraports"]:
-                    if type(ext) == type({}):
-                        writer.startElement("extraports",
-                            Attributes(dict(count = ext.get("count", ""),
-                                            state = ext.get("state", ""))))
-                        writer.endElement("extraports")
+            ## Extraports elements
+            for ext in host.get_extraports():
+                if type(ext) == type({}):
+                    writer.startElement("extraports",
+                        Attributes(dict(count = ext.get("count", ""),
+                                        state = ext.get("state", ""))))
+                    writer.endElement("extraports")
 
-                ## Port elements
-                for p in ps["port"]:
-                    if type(p) == type({}):
-                        writer.startElement("port",
-                            Attributes(dict(portid = p.get("portid", ""),
-                                            protocol = p.get("protocol", ""))))
+            ## Port elements
+            for p in host.ports:
+                if type(p) == type({}):
+                    writer.startElement("port",
+                        Attributes(dict(portid = p.get("portid", ""),
+                                        protocol = p.get("protocol", ""))))
 
-                        ### Port state
-                        writer.startElement("state",
-                            Attributes(dict(state=p.get("port_state", ""),
-                                            reason=p.get("reason", ""),
-                                            reason_ttl=p.get("reason_ttl", ""))))
-                        writer.endElement("state")
+                    ### Port state
+                    writer.startElement("state",
+                        Attributes(dict(state=p.get("port_state", ""),
+                                        reason=p.get("reason", ""),
+                                        reason_ttl=p.get("reason_ttl", ""))))
+                    writer.endElement("state")
 
-                        ### Port service info
-                        d = {}
-                        for xml_attr, member in (("conf", "service_conf"),
-                                ("method", "service_method"),
-                                ("name", "service_name"),
-                                ("product", "service_product"),
-                                ("version", "service_version"),
-                                ("extrainfo", "service_extrainfo")):
-                            if p.get(member):
-                                d[xml_attr] = p.get(member)
-                        writer.startElement("service", Attributes(d))
-                        writer.endElement("service")
+                    ### Port service info
+                    d = {}
+                    for xml_attr, member in (("conf", "service_conf"),
+                            ("method", "service_method"),
+                            ("name", "service_name"),
+                            ("product", "service_product"),
+                            ("version", "service_version"),
+                            ("extrainfo", "service_extrainfo")):
+                        if p.get(member):
+                            d[xml_attr] = p.get(member)
+                    writer.startElement("service", Attributes(d))
+                    writer.endElement("service")
 
-                        writer.endElement("port")
+                    writer.endElement("port")
 
             writer.endElement("ports")
             # End of Ports element
@@ -1281,7 +1301,7 @@ class NmapParserSAX(ParserBasics, ContentHandler):
                                 profile_name = str(self.profile_name),
                                 scanner = str(self.scanner),
                                 start = str(self.start),
-                                startstr = str(self.formated_date),
+                                startstr = time.ctime(time.mktime(self.get_date())),
                                 version = str(self.scanner_version),
                                 xmloutputversion = str(XML_OUTPUT_VERSION))))
 
@@ -1319,9 +1339,8 @@ if __name__ == '__main__':
         print "  Uptime:", repr(host.uptime)
         print "  OS Match:", repr(host.osmatches)
         print "  Ports:"
-        for i in host.ports:
-            for p in i['port']:
-                print "\t%s" % repr(p)
+        for p in host.ports:
+            print "\t%s" % repr(p)
         print "  Ports used:", repr(host.ports_used)
         print "  OS Class:", repr(host.osclasses)
         print "  Hostnames:", repr(host.hostnames)

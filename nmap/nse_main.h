@@ -20,19 +20,23 @@ class ScriptResult
     std::string id;
   public:
     void set_output (const char *);
-    std::string get_output (void);
+    std::string get_output (void) const;
     void set_id (const char *);
-    std::string get_id (void);
+    std::string get_id (void) const;
 };
 
-typedef std::vector<ScriptResult> ScriptResults;
+typedef std::list<ScriptResult> ScriptResults;
 
 class Target;
 
 
 /* API */
+int nse_yield (lua_State *);
 void nse_restore (lua_State *, int);
 void nse_destructor (lua_State *, char);
+void nse_base (lua_State *);
+void nse_selectedbyname (lua_State *);
+void nse_gettarget (lua_State *, int);
 
 void open_nse (void);
 void script_scan (std::vector<Target *> &targets);

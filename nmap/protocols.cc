@@ -88,7 +88,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: protocols.cc 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: protocols.cc 14789 2009-08-06 15:10:00Z josh $ */
 
 #include "protocols.h"
 #include "NmapOps.h"
@@ -132,7 +132,7 @@ static int nmap_protocols_init() {
   while(fgets(line, sizeof(line), fp)) {
     lineno++;
     p = line;
-    while(*p && isspace((int) *p))
+    while(*p && isspace((int) (unsigned char) *p))
       p++;
     if (*p == '#')
       continue;

@@ -55,7 +55,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_internal.h 13448 2009-05-29 23:19:07Z david $ */
+/* $Id: nsock_internal.h 15192 2009-08-20 21:36:58Z david $ */
 
 #ifndef NSOCK_INTERNAL_H
 #define NSOCK_INTERNAL_H
@@ -97,6 +97,10 @@
 #endif
 #if HAVE_STRINGS_H
 #include <strings.h>
+#endif
+
+#ifndef IPPROTO_SCTP
+#define IPPROTO_SCTP 132
 #endif
 
 #include "nsock_utils.h"
@@ -182,6 +186,11 @@ typedef struct  {
 		     stdout */
   /* This time is subtracted from the current time for trace reports */
   struct timeval tracebasetime; 
+
+  /* If true, exit the next iteration of nsock_loop with a status of
+     NSOCK_LOOP_QUIT. */
+  int quit;
+
 #if HAVE_OPENSSL
   SSL_CTX *sslctx; /* The SSL Context (options and such) */
 #endif
@@ -210,6 +219,7 @@ struct msiod {
      writability. */
   int readsd_count;
   int writesd_count;
+  int readpcapsd_count;
   mspool *nsp; /* The mspool used to create the iod (used for deletion) */
   enum msiod_state state;
   struct sockaddr_storage peer; /* The host and port we are connected to
@@ -237,6 +247,9 @@ struct msiod {
 #endif
   unsigned long id; /* Every iod has an id which is always unique for the
 		       same nspool (unless you create billions of them) */
+
+  unsigned long read_count;  /* No. of bytes read  from the sd*/ 
+  unsigned long write_count; /* No. of bytes written to the sd */
   void *userdata;
 
   /* IP options to set on socket before connect() */
@@ -322,6 +335,10 @@ void msevent_delete(mspool *nsp, msevent *nse);
    such as adjusting the descriptor select/poll lists, registering the
    timeout value, etc. */
 void nsp_add_event(mspool *nsp, msevent *nse);
+
+void nsock_connect_internal(mspool *ms, msevent *nse, int proto,
+			    struct sockaddr_storage *ss, size_t sslen,
+			    unsigned short port);
 
 /* Comments on using the following handle_*_result functions are available
    in nsock_core.c */

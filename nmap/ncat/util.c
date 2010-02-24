@@ -1,4 +1,91 @@
-/* $Id: util.c 13631 2009-06-09 01:08:45Z jah $ */
+/***************************************************************************
+ * util.c -- Various utility functions.                                    *
+ ***********************IMPORTANT NMAP LICENSE TERMS************************
+ *                                                                         *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
+ *                                                                         *
+ * Note that the GPL places important restrictions on "derived works", yet *
+ * it does not provide a detailed definition of that term.  To avoid       *
+ * misunderstandings, we consider an application to constitute a           *
+ * "derivative work" for the purpose of this license if it does any of the *
+ * following:                                                              *
+ * o Integrates source code from Nmap                                      *
+ * o Reads or includes Nmap copyrighted data files, such as                *
+ *   nmap-os-db or nmap-service-probes.                                    *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
+ * o Links to a library or executes a program that does any of the above   *
+ *                                                                         *
+ * The term "Nmap" should be taken to also include any portions or derived *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
+ *                                                                         *
+ * If you have any questions about the GPL licensing restrictions on using *
+ * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
+ * we also offer alternative license to integrate Nmap into proprietary    *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
+ * sales@insecure.com for further information.                             *
+ *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included COPYING.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
+ * If you received these files with a written license agreement or         *
+ * contract stating terms other than the terms above, then that            *
+ * alternative license agreement takes precedence over these comments.     *
+ *                                                                         *
+ * Source is provided to this software because we believe users have a     *
+ * right to know exactly what a program is going to do before they run it. *
+ * This also allows you to audit the software for security holes (none     *
+ * have been found so far).                                                *
+ *                                                                         *
+ * Source code also allows you to port Nmap to new platforms, fix bugs,    *
+ * and add new features.  You are highly encouraged to send your changes   *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
+ * distribution.  By sending these changes to Fyodor or one of the         *
+ * Insecure.Org development mailing lists, it is assumed that you are      *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
+ *                                                                         *
+ * This program is distributed in the hope that it will be useful, but     *
+ * WITHOUT ANY WARRANTY; without even the implied warranty of              *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
+ * General Public License v2.0 for more details at                         *
+ * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
+ * included with Nmap.                                                     *
+ *                                                                         *
+ ***************************************************************************/
+
+/* $Id: util.c 16410 2010-01-06 05:54:55Z david $ */
 
 #include "sys_wrap.h"
 #include "util.h"
@@ -63,6 +150,18 @@ void loguser(const char *fmt, ...)
 {
     va_list ap;
 
+    fprintf(stderr, "%s: ", NCAT_NAME);
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+}
+
+/* Log a user message without the "Ncat: " prefix, to allow building up a line
+   with a series of strings. */
+void loguser_noprefix(const char *fmt, ...)
+{
+    va_list ap;
+
     va_start(ap, fmt);
     vfprintf(stderr, fmt, ap);
     va_end(ap);
@@ -72,16 +171,17 @@ void logdebug(const char *fmt, ...)
 {
     va_list ap;
 
-    fprintf(stderr, "DEBUG: ");
+    fprintf(stderr, "NCAT DEBUG: ");
     va_start(ap, fmt);
     vfprintf(stderr, fmt, ap);
     va_end(ap);
 }
 
+/* Exit status 2 indicates a program error other than a network error. */
 void die(char *err)
 {
     perror(err);
-    exit(EXIT_FAILURE);
+    exit(2);
 }
 
 /* adds newline for you */
@@ -95,7 +195,7 @@ void bye(const char *fmt, ...)
     va_end(ap);
     fprintf(stderr, " QUITTING.\n");
 
-    exit(EXIT_FAILURE);
+    exit(2);
 }
 
 /* zero out some mem, bzero() is deprecated */
@@ -176,7 +276,7 @@ char *mkstr(const char *start, const char *end)
    or radix prefix. */
 long parse_long(const char *s, char **tail)
 {
-    if (!isdigit(*s)) {
+    if (!isdigit((int) (unsigned char) *s)) {
         *tail = (char *) s;
         return 0;
     }
@@ -185,25 +285,22 @@ long parse_long(const char *s, char **tail)
 }
 
 /* Return true if the given address is a local one. */
-int addr_is_local(const struct sockaddr_storage *ss)
+int addr_is_local(const union sockaddr_u *su)
 {
     struct addrinfo hints = { 0 }, *addrs, *addr;
     char hostname[128];
 
     /* Check loopback addresses. */
-    if (ss->ss_family == AF_INET) {
-        const struct sockaddr_in *s_in = (const struct sockaddr_in *) ss;
-        if ((ntohl(s_in->sin_addr.s_addr) & 0xFF000000UL) == 0x7F000000UL)
+    if (su->storage.ss_family == AF_INET) {
+        if ((ntohl(su->in.sin_addr.s_addr) & 0xFF000000UL) == 0x7F000000UL)
             return 1;
-        if (ntohl(s_in->sin_addr.s_addr) == 0x00000000UL)
+        if (ntohl(su->in.sin_addr.s_addr) == 0x00000000UL)
             return 1;
     }
 #ifdef HAVE_IPV6
-    else if (ss->ss_family == AF_INET6) {
-        const struct sockaddr_in6 *s_in6 = (const struct sockaddr_in6 *) ss;
-
-        if (memcmp(&s_in6->sin6_addr, &in6addr_any, sizeof(s_in6->sin6_addr)) == 0
-            || memcmp(&s_in6->sin6_addr, &in6addr_loopback, sizeof(s_in6->sin6_addr)) == 0)
+    else if (su->storage.ss_family == AF_INET6) {
+        if (memcmp(&su->in6.sin6_addr, &in6addr_any, sizeof(su->in6.sin6_addr)) == 0
+            || memcmp(&su->in6.sin6_addr, &in6addr_loopback, sizeof(su->in6.sin6_addr)) == 0)
             return 1;
     }
 #endif
@@ -211,19 +308,24 @@ int addr_is_local(const struct sockaddr_storage *ss)
     /* Check addresses assigned to the local host name. */
     if (gethostname(hostname, sizeof(hostname)) == -1)
         return 0;
-    hints.ai_family = ss->ss_family;
+    hints.ai_family = su->storage.ss_family;
     if (getaddrinfo(hostname, NULL, &hints, &addrs) != 0)
         return 0;
     for (addr = addrs; addr != NULL; addr = addr->ai_next) {
-        if (addr->ai_family != ss->ss_family)
+        union sockaddr_u addr_su;
+
+        if (addr->ai_family != su->storage.ss_family)
             continue;
-        if (ss->ss_family == AF_INET) {
-            const struct sockaddr_in *s_in = (const struct sockaddr_in *) ss;
-            if (s_in->sin_addr.s_addr == ((struct sockaddr_in *) addr->ai_addr)->sin_addr.s_addr)
+        if (addr->ai_addrlen > sizeof(addr_su)) {
+            bye("getaddrinfo returned oversized address (%u > %u)",
+                addr->ai_addrlen, sizeof(addr_su));
+        }
+        memcpy(&addr_su, addr->ai_addr, addr->ai_addrlen);
+        if (su->storage.ss_family == AF_INET) {
+            if (su->in.sin_addr.s_addr == addr_su.in.sin_addr.s_addr)
                 break;
-        } else if (ss->ss_family == AF_INET6) {
-            const struct sockaddr_in6 *s_in6 = (const struct sockaddr_in6 *) ss;
-            if (memcmp(&s_in6->sin6_addr, &((struct sockaddr_in6 *) addr->ai_addr)->sin6_addr, sizeof(s_in6->sin6_addr)) == 0)
+        } else if (su->storage.ss_family == AF_INET6) {
+            if (memcmp(&su->in6.sin6_addr, &addr_su.in6.sin6_addr, sizeof(su->in6.sin6_addr)) == 0)
                 break;
         }
     }
@@ -234,45 +336,46 @@ int addr_is_local(const struct sockaddr_storage *ss)
     return 0;
 }
 
-/* Converts an IP address given in a sockaddr_storage to an IPv4 or
+/* Converts an IP address given in a sockaddr_u to an IPv4 or
    IPv6 IP address string.  Since a static buffer is returned, this is
    not thread-safe and can only be used once in calls like printf()
 */
-const char *inet_socktop(const struct sockaddr_storage *ss) {
-  static char buf[INET6_ADDRSTRLEN];
-  struct sockaddr_in *sin = (struct sockaddr_in *) ss;
-#if HAVE_IPV6
-  struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) ss;
-#endif
+const char *inet_socktop(const union sockaddr_u *su) {
+    static char buf[INET6_ADDRSTRLEN + 1];
+    void *addr;
 
-  if (inet_ntop(sin->sin_family, (ss->ss_family == AF_INET)?
-                (char *) &sin->sin_addr :
+    if (su->storage.ss_family == AF_INET)
+        addr = (void *) &su->in.sin_addr;
 #if HAVE_IPV6
-                (char *) &sin6->sin6_addr,
-#else
-                (char *) NULL,
-#endif /* HAVE_IPV6 */
-                buf, sizeof(buf)) == NULL) {
-    bye("Failed to convert address to presentation format!  Error: %s.", strerror(socket_errno()));
-  }
-  return buf;
+    else if (su->storage.ss_family == AF_INET6)
+        addr = (void *) &su->in6.sin6_addr;
+#endif
+    else
+        addr = NULL;
+
+    if (inet_ntop(su->storage.ss_family, addr, buf, sizeof(buf)) == NULL) {
+        bye("Failed to convert address to presentation format!  Error: %s.",
+            strerror(socket_errno()));
+    }
+
+    return buf;
 }
 
-/* Returns the port number in HOST BYTE ORDER based on the ss's family */
-unsigned short inet_port(struct sockaddr_storage *ss)
+/* Returns the port number in HOST BYTE ORDER based on the su's family */
+unsigned short inet_port(const union sockaddr_u *su)
 {
-    if (ss->ss_family == AF_INET)
-        return ntohs(((struct sockaddr_in *) ss)->sin_port);
-#ifdef HAVE_IPV6
-    else if (ss->ss_family == AF_INET6)
-        return ntohs(((struct sockaddr_in6 *) ss)->sin6_port);
+    if (su->storage.ss_family == AF_INET)
+        return ntohs(su->in.sin_port);
+#if HAVE_IPV6
+    else if (su->storage.ss_family == AF_INET6)
+        return ntohs(su->in6.sin6_port);
 #endif
 
     bye("Invalid address family passed to inet_port().");
     return 0;
 }
 
-int do_listen(int type)
+int do_listen(int type, int proto)
 {
     int sock = 0, option_on = 1;
 
@@ -282,11 +385,11 @@ int do_listen(int type)
     /* We need a socket that can be inherited by child processes in
        ncat_exec_win.c, for --exec and --sh-exec. inheritable_socket is from
        nbase. */
-    sock = inheritable_socket(srcaddr.ss_family, type, 0);
+    sock = inheritable_socket(srcaddr.storage.ss_family, type, proto);
 
     Setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &option_on, sizeof(int));
 
-    Bind(sock, (struct sockaddr *) &srcaddr, (int) srcaddrlen);
+    Bind(sock, &srcaddr.sockaddr, (int) srcaddrlen);
 
     if(type == SOCK_STREAM)
         Listen(sock, BACKLOG);
@@ -295,6 +398,30 @@ int do_listen(int type)
         loguser("Listening on %s:%hu\n", inet_socktop(&srcaddr), inet_port(&srcaddr));
 
     return sock;
+}
+
+int do_connect(int type)
+{
+    int sock=0;
+
+    if(type != SOCK_STREAM && type != SOCK_DGRAM)
+        return -1;
+
+    /* We need a socket that can be inherited by child processes in
+       ncat_exec_win.c, for --exec and --sh-exec. inheritable_socket is from
+       nbase. */
+    sock = inheritable_socket(targetss.storage.ss_family, type, 0);
+
+    if (srcaddr.storage.ss_family != AF_UNSPEC)
+        Bind(sock, &srcaddr.sockaddr, (int) srcaddrlen);
+    
+    if(sock != -1){
+       if(connect(sock, &targetss.sockaddr, (int) targetsslen)!= -1)
+          return sock;
+       else if(socket_errno()==EINPROGRESS||socket_errno()==EAGAIN)
+          return sock;
+    }
+    return -1 ;
 }
 
 unsigned char *buildsrcrte(struct in_addr dstaddr, struct in_addr routes[],
@@ -328,13 +455,13 @@ unsigned char *buildsrcrte(struct in_addr dstaddr, struct in_addr routes[],
     return opts;
 }
 
-int allow_access(const struct sockaddr_storage *ss)
+int allow_access(const union sockaddr_u *su)
 {
     /* A host not in the allow set is denied, but only if the --allow or
        --allowfile option was given. */
-    if (o.allow && !addrset_contains(&o.allowset, (const struct sockaddr *) ss))
+    if (o.allow && !addrset_contains(&o.allowset, &su->sockaddr))
         return 0;
-    if (addrset_contains(&o.denyset, (const struct sockaddr *) ss))
+    if (addrset_contains(&o.denyset, &su->sockaddr))
         return 0;
 
     return 1;
@@ -346,25 +473,34 @@ int allow_access(const struct sockaddr_storage *ss)
  * stupidity. -sean
  */
 
-/* add a descriptor to our list */
-int add_fd(fd_list_t *fdl, int fd, void *ssl)
+/* add an fdinfo to our list */
+int add_fdinfo(fd_list_t *fdl, struct fdinfo *s)
 {
     if(fdl->nfds >= fdl->maxfds)
         return -1;
 
-    fdl->fds[fdl->nfds].fd = fd;
-#ifdef HAVE_OPENSSL
-    fdl->fds[fdl->nfds].ssl = (SSL *) ssl;
-#endif
+    fdl->fds[fdl->nfds] = *s;
 
     fdl->nfds++;
 
-    if(fd > fdl->fdmax)
-        fdl->fdmax = fd;
+    if(s->fd > fdl->fdmax)
+        fdl->fdmax = s->fd;
 
     if(o.debug > 1)
-        logdebug("Added fd %d to list, nfds %d, maxfd %d\n", fd, fdl->nfds, fdl->fdmax);
+        logdebug("Added fd %d to list, nfds %d, maxfd %d\n", s->fd, fdl->nfds, fdl->fdmax);
     return 0;
+}
+
+/* Add a descriptor to the list. Use this when you are only adding to the list
+ * for the side effect of increasing fdmax, and don't care about fdinfo
+ * members. */
+int add_fd(fd_list_t *fdl, int fd)
+{
+    struct fdinfo info = { 0 };
+
+    info.fd = fd;
+
+    return add_fdinfo(fdl, &info);
 }
 
 /* remove a descriptor from our list */
@@ -451,7 +587,6 @@ void free_fdlist(fd_list_t *fdl)
  */
 int fix_line_endings(char *src, int *len, char **dst)
 {
-    char *tmp = NULL;
     int fix_count;
     int i,j;
     int num_bytes = *len;

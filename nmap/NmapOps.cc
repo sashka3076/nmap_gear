@@ -88,7 +88,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: NmapOps.cc 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: NmapOps.cc 16467 2010-01-15 05:39:25Z david $ */
 #include "nmap.h"
 #include "nbase.h"
 #include "NmapOps.h"
@@ -256,9 +256,10 @@ void NmapOps::Initialize() {
   override_excludeports = 0;
   version_intensity = 7;
   pingtype = PINGTYPE_UNKNOWN;
-  listscan = pingscan = allowall = ackscan = bouncescan = connectscan = 0;
+  listscan = allowall = ackscan = bouncescan = connectscan = 0;
   rpcscan = nullscan = xmasscan = fragscan = synscan = windowscan = 0;
-  maimonscan = idlescan = finscan = udpscan = ipprotscan = noresolve = 0;
+  maimonscan = idlescan = finscan = udpscan = ipprotscan;
+  noportscan = noresolve = 0;
   sctpinitscan = 0;
   sctpcookieechoscan = 0;
   append_output = 0;
@@ -322,7 +323,7 @@ bool NmapOps::UDPScan() {
 }
 
 bool NmapOps::RawScan() {
-  if (ackscan|finscan|idlescan|ipprotscan|maimonscan|nullscan|osscan|synscan|udpscan|windowscan|xmasscan|sctpinitscan|sctpcookieechoscan)
+  if (ackscan||finscan||idlescan||ipprotscan||maimonscan||nullscan||osscan||synscan||udpscan||windowscan||xmasscan||sctpinitscan||sctpcookieechoscan||traceroute)
     return true;
   if (pingtype & (PINGTYPE_ICMP_PING|PINGTYPE_ICMP_MASK|PINGTYPE_ICMP_TS|PINGTYPE_TCP_USE_ACK|PINGTYPE_UDP|PINGTYPE_SCTP_INIT))
     return true;
@@ -336,15 +337,23 @@ bool NmapOps::RawScan() {
 
 
 void NmapOps::ValidateOptions() {
-	const char *privreq = "root privileges";
+	const char *privreq = "root privileges.";
 #ifdef WIN32
 	if (!o.have_pcap)
-		privreq = "that WinPcap version 3.1 or higher and iphlpapi.dll be installed. You seem to be missing one or both of these.  Winpcap is available from http://www.winpcap.org.  iphlpapi.dll comes with Win98 and later operating sytems and NT 4.0 with SP4 or greater.  For previous windows versions, you may be able to take iphlpapi.dll from another system and place it in your system32 dir (e.g. c:\\windows\\system32)";
+		privreq = "WinPcap version 3.1 or higher and\n\
+iphlpapi.dll.  You seem to be missing one or both of these.  Winpcap is\n\
+available from http://www.winpcap.org.  iphlpapi.dll comes with Win98 and\n\
+later operating sytems and NT 4.0 with SP4 or greater.  For previous windows\n\
+versions, you may be able to take iphlpapi.dll from another system and place\n\
+it in your system32 dir (e.g. c:\\windows\\system32).\n\
+On Windows Vista and Windows 7, The WinPcap NPF service must be started by an\n\
+administrator before WinPcap can be used.  Running nmap.exe will open a UAC\n\
+dialog where you can start NPF if you have administrator privileges.";
 #endif
 
 
   /* Insure that at least one scantype is selected */
-  if (TCPScan() + UDPScan() + SCTPScan() + ipprotscan + listscan + pingscan == 0) {
+  if (!noportscan && !(TCPScan() || UDPScan() || SCTPScan() || ipprotscan)) {
     if (isr00t && af() == AF_INET)
       synscan++;
     else connectscan++;
@@ -380,16 +389,12 @@ void NmapOps::ValidateOptions() {
    fatal("Sorry, IPProto Ping (-PO) only works if you are root (because we need to read raw responses off the wire) and only for IPv4");
  }
 
- if (ipprotscan + (TCPScan() || UDPScan() || SCTPScan()) + listscan + pingscan > 1) {
-   fatal("Sorry, the IPProtoscan, Listscan, and Pingscan (-sO, -sL, -sP) must currently be used alone rather than combined with other scan types.");
+ if (ipprotscan && (TCPScan() || UDPScan() || SCTPScan())) {
+   fatal("Sorry, the IPProtoscan (-sO) must currently be used alone rather than combined with other scan types.");
  }
 
- if ((pingscan && pingtype == PINGTYPE_NONE)) {
-    fatal("-PN (skip ping) is incompatable with -sP (ping scan).  If you only want to enumerate hosts, try list scan (-sL)");
-  }
-
- if (pingscan && (TCPScan() || UDPScan() || SCTPScan() || ipprotscan || listscan)) {
-   fatal("Ping scan is not valid with any other scan types (the other ones all include a ping scan");
+ if (noportscan && (TCPScan() || UDPScan() || SCTPScan() || ipprotscan)) {
+   fatal("-sL and -sP (skip port scan) are not valid with any other scan types");
  }
 
  if (af() == AF_INET6 && (pingtype & (PINGTYPE_ICMP_PING|PINGTYPE_ICMP_MASK|PINGTYPE_ICMP_TS))) {
@@ -407,19 +412,19 @@ void NmapOps::ValidateOptions() {
   if (!isr00t) {
     
     if (ackscan|finscan|idlescan|ipprotscan|maimonscan|nullscan|synscan|udpscan|windowscan|xmasscan|sctpinitscan|sctpcookieechoscan) {
-      fatal("You requested a scan type which requires %s.", privreq);
+      fatal("You requested a scan type which requires %s", privreq);
     }
     
     if (numdecoys > 0) {
-      fatal("Sorry, but decoys (-D) require %s.", privreq);
+      fatal("Sorry, but decoys (-D) require %s", privreq);
     }
     
     if (fragscan) {
-      fatal("Sorry, but fragscan requires %s.", privreq);
+      fatal("Sorry, but fragscan requires %s", privreq);
     }
     
     if (osscan) {
-      fatal("TCP/IP fingerprinting (for OS scan) requires %s.", privreq);
+      fatal("TCP/IP fingerprinting (for OS scan) requires %s", privreq);
     }
   }
   
@@ -453,8 +458,8 @@ void NmapOps::ValidateOptions() {
   }
 #endif
   
-  if (osscan && pingscan) {
-    fatal("WARNING:  OS Scan is unreliable with a ping scan.  You need to use a scan type along with it, such as -sS, -sT, -sF, etc instead of -sP");
+  if (osscan && noportscan) {
+    fatal("WARNING:  OS Scan is unreliable without a port scan.  You need to use a scan type along with it, such as -sS, -sT, -sF, etc instead of -sP");
   }
 
   if (osscan && ipprotscan) {
@@ -467,7 +472,7 @@ void NmapOps::ValidateOptions() {
     servicescan = 0;
   }
 
-  if (servicescan && pingscan)
+  if (servicescan && noportscan)
     servicescan = 0;
 
   if (defeat_rst_ratelimit && !synscan) {

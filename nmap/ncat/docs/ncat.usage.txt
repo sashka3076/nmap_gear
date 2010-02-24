@@ -1,4 +1,4 @@
-Ncat 5.00 ( http://nmap.org/ncat )
+Ncat 5.21 ( http://nmap.org/ncat )
 Usage: ncat [options] [hostname] [port]
 
 Options taking a time assume milliseconds, unless you append an 's'
@@ -16,13 +16,14 @@ Options taking a time assume milliseconds, unless you append an 's'
   -o, --output               Dump session data to a file
   -x, --hex-dump             Dump session data as hex to a file
   -i, --idle-timeout <time>  Idle read/write timeout
-  -p, --source-port port     Specify source port to use (doesn't affect -l)
+  -p, --source-port port     Specify source port to use
   -s, --source addr          Specify source address to use (doesn't affect -l)
   -l, --listen               Bind and listen for incoming connections
   -k, --keep-open            Accept multiple connections in listen mode
   -n, --nodns                Do not resolve hostnames via DNS
   -t, --telnet               Answer Telnet negotiations
   -u, --udp                  Use UDP instead of default TCP
+      --sctp                 Use SCTP instead of default TCP
   -v, --verbose              Set verbosity level (can be used up to 3 times)
   -w, --wait <time>          Connect timeout
       --send-only            Only send data, ignoring received; quit on EOF

@@ -27,6 +27,9 @@ AC_ARG_WITH(openssl,[  --with-openssl=DIR    Use optional openssl libs and inclu
 
 # Checks for programs.
 AC_PROG_CC
+if test -n "$GCC"; then
+  CFLAGS="$CFLAGS -Wall"
+fi
 AC_PROG_INSTALL
 
 # Checks for header files.
@@ -94,6 +97,9 @@ OPENSSL_LIBS=
 if test "$use_openssl" = "yes"; then
   AC_DEFINE([HAVE_OPENSSL], [1], [Define to 1 if you have OpenSSL.])
   OPENSSL_LIBS="-lssl -lcrypto"
+  # Define in Makefile also.
+  HAVE_OPENSSL=yes
+  AC_SUBST(HAVE_OPENSSL)
 fi
 
 AC_SUBST(OPENSSL_LIBS)    
@@ -166,7 +172,8 @@ int main() {
   exit(0);
 }],
 [AC_MSG_RESULT(yes); have_libpcap=yes],
-[AC_MSG_RESULT(no); have_libpcap=no])
+[AC_MSG_RESULT(no); have_libpcap=no],
+[AC_MSG_RESULT(cross-compiling -- assuming yes); have_libpcap=yes])
 LIBS="$LIBS_OLD"
 fi
 
@@ -199,3 +206,8 @@ AC_SUBST(PCAP_LIBS)
 
 AC_CONFIG_FILES(Makefile)
 AC_OUTPUT
+# NCAT ASCII ART
+if test -f docs/ncat-ascii-art.txt; then
+	cat docs/ncat-ascii-art.txt
+fi
+echo "Configuration complete."

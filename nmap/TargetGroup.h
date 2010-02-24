@@ -90,10 +90,13 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: TargetGroup.h 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: TargetGroup.h 16104 2009-11-16 23:17:59Z david $ */
 
 #ifndef TARGETGROUP_H
 #define TARGETGROUP_H
+
+#include <list>
+#include <string>
 
 #include "nmap.h"
 
@@ -121,6 +124,15 @@ class TargetGroup {
      this if you have fetched at least 1 host since parse_expr() was
      called */
   int return_last_host();
+  /* Returns true iff the given address is the one that was resolved to create
+     this target group; i.e., not one of the addresses derived from it with a
+     netmask. */
+  bool is_resolved_address(const struct sockaddr_storage *ss);
+  /* Return a string of the name or address that was resolved for this group. */
+  const char *get_resolved_name(void);
+  /* Return the list of addresses that the name for this group resolved to, if
+     it came from a name resolution. */
+  const std::list<struct sockaddr_storage> &get_resolved_addrs(void);
   /* return the target type */
   char get_targets_type() {return targets_type;};
   /* get the netmask */
@@ -137,14 +149,17 @@ class TargetGroup {
   struct sockaddr_in6 ip6;
 #endif
 
-  /* These 4 are used for the '/mask' style of specifying target 
+  std::list<struct sockaddr_storage> resolvedaddrs;
+
+  /* These are used for the '/mask' style of specifying target 
      net (IPV4_NETMASK) */
   u32 netmask;
+  std::string resolvedname;
   struct in_addr startaddr;
   struct in_addr currentaddr;
   struct in_addr endaddr;
 
-  // These three are for the '138.[1-7,16,91-95,200-].12.1' style (IPV4_RANGES)
+  // These three are for the '138.1-7,16,91-95,200-.12.1' style (IPV4_RANGES)
   u8 addresses[4][256];
   unsigned int current[4];
   u8 last[4];  

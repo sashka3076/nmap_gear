@@ -88,7 +88,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: utils.cc 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: utils.cc 15282 2009-08-25 18:09:19Z luis $ */
 
 #include "nmap.h"
 #include "utils.h"
@@ -119,7 +119,7 @@ int wildtest(char *wild, char *test) {
       if (wild[1] == '\0') return 1;
 
       for(i=0; test[i]!='\0'; i++)
-        if ((tolower((int)wild[1]) == tolower((int)test[i]) || wild[1] == '?')
+        if ((tolower((int) (unsigned char) wild[1]) == tolower((int) (unsigned char) test[i]) || wild[1] == '?')
             &&  wildtest(wild+1, test+i) == 1) return 1;
 
       return 0;
@@ -128,98 +128,27 @@ int wildtest(char *wild, char *test) {
     /* --- '?' can't match '\0'. --- */
     if (*wild == '?' && *test == '\0') return 0;
 
-    if (*wild != '?' && tolower((int)*wild) != tolower((int)*test)) return 0;
+    if (*wild != '?' && tolower((int) (unsigned char) *wild) != tolower((int) (unsigned char) *test)) return 0;
     wild++; test++;
   }
 
-  if (tolower((int)*wild) == tolower((int)*test)) return 1;
+  if (tolower((int) (unsigned char) *wild) == tolower((int) (unsigned char) *test)) return 1;
   return 0;
 
 }
 
+/* Wrapper for nbase function hexdump() */
+void nmap_hexdump(unsigned char *cp, unsigned int length){
 
-
-/* Hex dump */
-void hdump(unsigned char *packet, unsigned int len) {
-unsigned int i=0, j=0;
-
-log_write(LOG_PLAIN, "Here it is:\n");
-
-for(i=0; i < len; i++){
-  j = (unsigned) (packet[i]);
-  log_write(LOG_PLAIN, "%-2X ", j);
-  if (!((i+1)%16))
-    log_write(LOG_PLAIN, "\n");
-  else if (!((i+1)%4))
-    log_write(LOG_PLAIN, "  ");
-}
-log_write(LOG_PLAIN, "\n");
+ char *string=NULL;
+ string = hexdump((u8*)cp, length);
+ if(string){
+    log_write(LOG_PLAIN, "%s", string);
+    free(string);
+ }
+ return;
 }
 
-/* A better version of hdump, from Lamont Granquist.  Modified slightly
-   by Fyodor (fyodor@insecure.org) */
-void lamont_hdump(char *cp, unsigned int length) {
-
-  /* stolen from tcpdump, then kludged extensively */
-
-  static const char asciify[] = "................................ !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~.................................................................................................................................";
-
-  const u_short *sp;
-  const u_char *ap;
-  unsigned char *bp = (unsigned char *) cp;
-  u_int i, j;
-  int nshorts, nshorts2;
-  int padding;
-  
-  log_write(LOG_PLAIN, "\n\t");
-  padding = 0;
-  sp = (u_short *)bp;
-  ap = (u_char *)bp;
-  nshorts = (u_int) length / sizeof(u_short);
-  nshorts2 = (u_int) length / sizeof(u_short);
-  i = 0;
-  j = 0;
-  while(1) {
-    while (--nshorts >= 0) {
-      log_write(LOG_PLAIN, " %04x", ntohs(*sp));
-      sp++;
-      if ((++i % 8) == 0)
-        break;
-    }
-    if (nshorts < 0) {
-      if ((length & 1) && (((i-1) % 8) != 0)) {
-        log_write(LOG_PLAIN, " %02x  ", *(u_char *)sp);
-        padding++;
-      }
-      nshorts = (8 - (nshorts2 - nshorts));
-      while(--nshorts >= 0) {
-        log_write(LOG_PLAIN, "     ");
-      }
-      if (!padding) log_write(LOG_PLAIN, "     ");
-    }
-    log_write(LOG_PLAIN, "  ");
-
-    while (--nshorts2 >= 0) {
-      log_write(LOG_PLAIN, "%c%c", asciify[*ap], asciify[*(ap+1)]);
-      ap += 2;
-      if ((++j % 8) == 0) {
-        log_write(LOG_PLAIN, "\n\t");
-        break;
-      }
-    }
-    if (nshorts2 < 0) {
-      if ((length & 1) && (((j-1) % 8) != 0)) {
-        log_write(LOG_PLAIN, "%c", asciify[*ap]);
-      }
-      break;
-    }
-  }
-  if ((length & 1) && (((i-1) % 8) == 0)) {
-    log_write(LOG_PLAIN, " %02x", *(u_char *)sp);
-    log_write(LOG_PLAIN, "                                       %c", asciify[*ap]);
-  }
-  log_write(LOG_PLAIN, "\n");
-}
 
 #ifndef HAVE_STRERROR
 char *strerror(int errnum) {
@@ -392,7 +321,7 @@ int arg_parse(const char *command, char ***argv) {
   myargv++;
   start = mycommand;
   while(start && *start) {
-    while(*start && isspace((int) *start))
+    while(*start && isspace((int) (unsigned char) *start))
       start++;
     if (*start == '"') {
       start++;
@@ -404,7 +333,7 @@ int arg_parse(const char *command, char ***argv) {
       continue;
     } else {
       end = start+1;
-      while(*end && !isspace((int) *end)) {      
+      while(*end && !isspace((int) (unsigned char) *end)) {      
 	end++;
       }
     }
@@ -446,14 +375,14 @@ void arg_parse_free(char **argv) {
 static unsigned char hex2char(unsigned char a, unsigned char b)
 {
   int val;
-  if (!isxdigit(a) || !isxdigit(b)) return 0;
-  a = tolower(a);
-  b = tolower(b);
-  if (isdigit(a))
+  if (!isxdigit((int) a) || !isxdigit((int) b)) return 0;
+  a = tolower((int) a);
+  b = tolower((int) b);
+  if (isdigit((int) a))
     val = (a - '0') << 4;
   else val = (10 + (a - 'a')) << 4;
 
-  if (isdigit(b))
+  if (isdigit((int) b))
     val += (b - '0');
   else val += 10 + (b - 'a');
 
@@ -492,12 +421,12 @@ char *cstring_unescape(char *str, unsigned int *newlen) {
       case 'x':
 	src++;
 	if (!*src || !*(src + 1)) return NULL;
-	if (!isxdigit(*src) || !isxdigit(*(src + 1))) return NULL;
+	if (!isxdigit((int) (unsigned char) *src) || !isxdigit((int) (unsigned char) *(src + 1))) return NULL;
 	newchar = hex2char(*src, *(src + 1));
 	src += 2;
 	break;
       default:
-	if (isalnum(*src))
+	if (isalnum((int) (unsigned char) *src))
 	  return NULL; // I don't really feel like supporting octals such as \015
 	// Other characters I'll just copy as is
 	newchar = *src;
@@ -558,7 +487,7 @@ int parse_ip_options(char *txt, u8 *data, int datalen, int* firsthopoff, int* la
       	base = 16;
         break;
       }
-      if(isxdigit(*c)){
+      if(isxdigit((int) (unsigned char) *c)){
         *d++ = strtol(c, &n, base);
         c=n-1;
       }else
@@ -971,11 +900,11 @@ char *mmapfile(char *fname, int *length, int openflags)
  if (!fileptr)
   pfatal ("%s(%u): MapViewOfFile()", __FILE__, __LINE__);
 
- CloseHandle (fd);
-
  if (o.debugging > 2)
   log_write(LOG_PLAIN, "%s(): fd %08lX, gmap %08lX, fileptr %08lX, length %d\n",
     __func__, (DWORD)fd, (DWORD)gmap, (DWORD)fileptr, *length);
+
+ CloseHandle (fd);
 
 	return fileptr;
 }

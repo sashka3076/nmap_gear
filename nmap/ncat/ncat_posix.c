@@ -1,14 +1,101 @@
-/* This file includes POSIX-specific definitions of certain functions. */
+/***************************************************************************
+ * ncat_posix.c -- POSIX-specific functions.                               *
+ ***********************IMPORTANT NMAP LICENSE TERMS************************
+ *                                                                         *
+ * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
+ * also a registered trademark of Insecure.Com LLC.  This program is free  *
+ * software; you may redistribute and/or modify it under the terms of the  *
+ * GNU General Public License as published by the Free Software            *
+ * Foundation; Version 2 with the clarifications and exceptions described  *
+ * below.  This guarantees your right to use, modify, and redistribute     *
+ * this software under certain conditions.  If you wish to embed Nmap      *
+ * technology into proprietary software, we sell alternative licenses      *
+ * (contact sales@insecure.com).  Dozens of software vendors already       *
+ * license Nmap technology such as host discovery, port scanning, OS       *
+ * detection, and version detection.                                       *
+ *                                                                         *
+ * Note that the GPL places important restrictions on "derived works", yet *
+ * it does not provide a detailed definition of that term.  To avoid       *
+ * misunderstandings, we consider an application to constitute a           *
+ * "derivative work" for the purpose of this license if it does any of the *
+ * following:                                                              *
+ * o Integrates source code from Nmap                                      *
+ * o Reads or includes Nmap copyrighted data files, such as                *
+ *   nmap-os-db or nmap-service-probes.                                    *
+ * o Executes Nmap and parses the results (as opposed to typical shell or  *
+ *   execution-menu apps, which simply display raw Nmap output and so are  *
+ *   not derivative works.)                                                * 
+ * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+ *   installer, such as those produced by InstallShield.                   *
+ * o Links to a library or executes a program that does any of the above   *
+ *                                                                         *
+ * The term "Nmap" should be taken to also include any portions or derived *
+ * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+ * interpretation of derived works with some common examples.  Our         *
+ * interpretation applies only to Nmap--we don't speak for other people's  *
+ * GPL works.                                                              *
+ *                                                                         *
+ * If you have any questions about the GPL licensing restrictions on using *
+ * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
+ * we also offer alternative license to integrate Nmap into proprietary    *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing for priority support and updates as well as helping to     *
+ * fund the continued development of Nmap technology.  Please email        *
+ * sales@insecure.com for further information.                             *
+ *                                                                         *
+ * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * permission to link the code of this program with any version of the     *
+ * OpenSSL library which is distributed under a license identical to that  *
+ * listed in the included COPYING.OpenSSL file, and distribute linked      *
+ * combinations including the two. You must obey the GNU GPL in all        *
+ * respects for all of the code used other than OpenSSL.  If you modify    *
+ * this file, you may extend this exception to your version of the file,   *
+ * but you are not obligated to do so.                                     *
+ *                                                                         *
+ * If you received these files with a written license agreement or         *
+ * contract stating terms other than the terms above, then that            *
+ * alternative license agreement takes precedence over these comments.     *
+ *                                                                         *
+ * Source is provided to this software because we believe users have a     *
+ * right to know exactly what a program is going to do before they run it. *
+ * This also allows you to audit the software for security holes (none     *
+ * have been found so far).                                                *
+ *                                                                         *
+ * Source code also allows you to port Nmap to new platforms, fix bugs,    *
+ * and add new features.  You are highly encouraged to send your changes   *
+ * to nmap-dev@insecure.org for possible incorporation into the main       *
+ * distribution.  By sending these changes to Fyodor or one of the         *
+ * Insecure.Org development mailing lists, it is assumed that you are      *
+ * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+ * will always be available Open Source, but this is important because the *
+ * inability to relicense code has caused devastating problems for other   *
+ * Free Software projects (such as KDE and NASM).  We also occasionally    *
+ * relicense the code to third parties as discussed above.  If you wish to *
+ * specify special license conditions of your contributions, just say so   *
+ * when you send them.                                                     *
+ *                                                                         *
+ * This program is distributed in the hope that it will be useful, but     *
+ * WITHOUT ANY WARRANTY; without even the implied warranty of              *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
+ * General Public License v2.0 for more details at                         *
+ * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
+ * included with Nmap.                                                     *
+ *                                                                         *
+ ***************************************************************************/
+
+/* $Id$ */
 
 #include <assert.h>
 
 #include "ncat.h"
 
-static char **cmdline_split(const char *cmdexec);
+char **cmdline_split(const char *cmdexec);
 
 /* fork and exec a child process with netexec. Close the given file descriptor
    in the parent process. Return the child's PID or -1 on error. */
-int netrun(int fd, char *cmdexec)
+int netrun(struct fdinfo *info, char *cmdexec)
 {
     int pid;
 
@@ -16,116 +103,226 @@ int netrun(int fd, char *cmdexec)
     pid = fork();
     if (pid == 0) {
         /* In the child process. */
-        netexec(fd, cmdexec);
+        netexec(info, cmdexec);
     }
+
+    Close(info->fd);
 
     if (pid == -1 && o.verbose)
         logdebug("Error in fork: %s\n", strerror(errno));
 
-    Close(fd);
-
     return pid;
 }
 
-/* exec the given command line. Before the exec, redirect stdin, stdout, and
-   stderr to the given file descriptor. Never returns. */
-void netexec(int fd, char *cmdexec)
+/* Call write in a loop until all the data is written or an error occurs. The
+   return value is the number of bytes written. If it is less than size, then
+   there was an error. */
+static int write_loop(int fd, char *buf, size_t size)
 {
-    /* If we're executing through /bin/sh */
-    if (o.shellexec) {
-        if (o.debug)
-            logdebug("Executing with shell: %s\n", cmdexec);
+    char *p;
+    int n;
 
-        /* rearrange stdin/stdout/stderr */
-        Dup2(fd, STDIN_FILENO);
-        Dup2(fd, STDOUT_FILENO);
-        Dup2(fd, STDERR_FILENO);
-
-        execl("/bin/sh", "sh", "-c", cmdexec, NULL);
-    } else {
-        char **cmdargs;
-
-        if (o.debug)
-            logdebug("Executing: %s\n", cmdexec);
-
-        cmdargs = cmdline_split(cmdexec);
-
-        /* rearrange stdin/stdout/stderr */
-        Dup2(fd, STDIN_FILENO);
-        Dup2(fd, STDOUT_FILENO);
-        Dup2(fd, STDERR_FILENO);
-
-        execv(cmdargs[0], cmdargs);
+    p = buf;
+    while (p - buf < size) {
+	n = write(fd, p, size - (p - buf));
+	if (n == -1) {
+	    if (errno == EINTR)
+		continue;
+	    else
+		break;
+	}
+	p += n;
     }
-    /* exec failed.*/
-    die("exec");
+
+    return p - buf;
 }
 
-/* Split a command line into an array suitable for handing to execv. */
-static char **cmdline_split(const char *cmdexec)
+/* Run the given command line as if with exec. What we actually do is fork the
+   command line as a subprocess, then loop, relaying data between the socket and
+   the subprocess. This allows Ncat to handle SSL from the socket and give plain
+   text to the subprocess, and also allows things like logging and line delays.
+   Never returns. */
+void netexec(struct fdinfo *info, char *cmdexec)
 {
-    char *token,    *newtoken,  **cmdargs,  *cmdbin;
-    char *cmdexec_local,    *cmdexec_path;
-    int x = 1,  arg_count = 0,  y = 0,  path_count = 0, maxlen = 0;
+    int child_stdin[2];
+    int child_stdout[2];
+    int pid;
 
-    /* FIXME fix this command parsing code it is not pretty */
-    maxlen = strlen(cmdexec);
-    cmdexec_local = Strdup(cmdexec);
-    cmdexec_path = Strdup(cmdexec);
+    char buf[DEFAULT_TCP_BUF_LEN];
+    int maxfd;
 
-    /* parse command line into cmd + args */
-    if ((token = strtok(cmdexec_path, " ")) != NULL) {
-        do {
-            /* position of the end of token */
-            y = (strlen(token)) - 1;
-
-            /* if token ends with an escape */
-            if (token[y] == '\\') {
-                path_count++;
-            } else {
-                arg_count++;
-            }
-        } while ((token = strtok(NULL, " ")) != NULL);
+    if (o.debug) {
+        if (o.shellexec)
+            logdebug("Executing with shell: %s\n", cmdexec);
+        else
+            logdebug("Executing: %s\n", cmdexec);
     }
 
-    /* malloc space based on supplied command/arguments */
-    cmdbin = (char *)safe_malloc((path_count + 2) * sizeof(cmdbin));
-    cmdargs = (char **)safe_malloc((arg_count + 2) * sizeof(cmdargs));
-    newtoken = (char *)Calloc(((maxlen + arg_count + path_count) * 4), sizeof(char));
+    if (pipe(child_stdin) == -1 || pipe(child_stdout) == -1)
+	bye("Can't create child pipes: %s", strerror(errno));
 
-    /* assemble arg vector */
-    if ((token = strtok(cmdexec_local, " ")) != NULL) {
-        int ar = 0;
+    pid = fork();
+    if (pid == -1)
+	bye("Error in fork: %s", strerror(errno));
+    if (pid == 0) {
+	/* This is the child process. Exec the command. */
+	close(child_stdin[1]);
+	close(child_stdout[0]);
 
-        do {
-            /* craft the path & executable name, handling whitespaces. */
-            if (ar <= path_count) {
-                y = (strlen(token)) - 1;
+	/* rearrange stdin and stdout */
+	Dup2(child_stdin[0], STDIN_FILENO);
+	Dup2(child_stdout[1], STDOUT_FILENO);
 
-                if (token[y] == '\\') {
-                    strncat(newtoken, token, (strlen(token) - 1));
-                    strcat(newtoken, " ");
-                } else
-                    strncat(newtoken, token, (strlen(token)));
+	if (o.shellexec) {
+	    execl("/bin/sh", "sh", "-c", cmdexec, NULL);
+	} else {
+	    char **cmdargs;
 
-                if (o.debug > 1)
-                    logdebug("Executable path: %s\n", newtoken);
-                ar++;
-            } else {
-                /* craft the arguments to the command */
+	    cmdargs = cmdline_split(cmdexec);
+	    execv(cmdargs[0], cmdargs);
+	}
 
-                if (o.debug > 1)
-                    logdebug("Command argument: %s\n", token);
-
-                cmdargs[x++] = (char *) token;
-            }
-        } while ((token = strtok(NULL, " ")) != NULL);
-        cmdargs[0] = newtoken;
+	/* exec failed.*/
+	die("exec");
     }
 
-    cmdargs[x] = NULL;
+    close(child_stdin[0]);
+    close(child_stdout[1]);
 
-    return cmdargs;
+    maxfd = child_stdout[0];
+    if (info->fd > maxfd)
+	maxfd = info->fd;
+
+    /* This is the parent process. Enter a "caretaker" loop that reads from the
+       socket and writes to the suprocess, and reads from the subprocess and
+       writes to the socket. */
+    for (;;) {
+	fd_set fds;
+	int r, n_r, n_w;
+
+	FD_ZERO(&fds);
+	FD_SET(info->fd, &fds);
+	FD_SET(child_stdout[0], &fds);
+
+	r = fselect(maxfd + 1, &fds, NULL, NULL, NULL);
+	if (r == -1) {
+	    if (errno == EINTR)
+		continue;
+	    else
+		break;
+	}
+	if (FD_ISSET(info->fd, &fds)) {
+	    int pending;
+
+	    do {
+		n_r = ncat_recv(info, buf, sizeof(buf), &pending);
+		if (n_r <= 0)
+		    goto loop_end;
+		n_w = write_loop(child_stdin[1], buf, n_r);
+		if (n_w < n_r)
+		    goto loop_end;
+	    } while (pending);
+	}
+	if (FD_ISSET(child_stdout[0], &fds)) {
+	    char *crlf = NULL, *wbuf;
+	    n_r = read(child_stdout[0], buf, sizeof(buf));
+	    if (n_r <= 0)
+		break;
+	    wbuf = buf;
+	    if (o.crlf) {
+		if (fix_line_endings((char *) buf, &n_r, &crlf))
+		    wbuf = crlf;
+	    }
+	    n_w = ncat_send(info, wbuf, n_r);
+	    if (crlf != NULL)
+		free(crlf);
+	    if (n_w <= 0)
+		break;
+	}
+    }
+loop_end:
+
+#ifdef HAVE_OPENSSL
+    if (info->ssl != NULL) {
+	SSL_shutdown(info->ssl);
+	SSL_free(info->ssl);
+    }
+#endif
+    close(info->fd);
+
+    exit(0);
+}
+
+/*
+ * Split a command line into an array suitable for handing to execv.
+ *
+ * A note on syntax: words are split on whitespace and '\' escapes characters.
+ * '\\' will show up as '\' and '\ ' will leave a space, combining two
+ * words.  Examples:
+ * "ncat\ experiment -l -k" will be parsed as the following tokens:
+ * "ncat experiment", "-l", "-k".
+ * "ncat\\ -l -k" will be parsed as "ncat\", "-l", "-k"
+ * See the test program, test/test-cmdline-split to see additional cases.
+ */
+char **cmdline_split(const char *cmdexec)
+{
+    const char *ptr;
+    char *cur_arg, **cmd_args;
+    int max_tokens = 0, arg_idx = 0, ptr_idx = 0;
+
+    /* Figure out the maximum number of tokens needed */
+    ptr = cmdexec;
+    while (*ptr) {
+        // Find the start of the token
+        while (('\0' != *ptr) && isspace((int) (unsigned char) *ptr)) ptr++;
+        if ('\0' == *ptr)     break;
+        max_tokens++;
+        // Find the start of the whitespace again
+        while (('\0' != *ptr) && !isspace((int) (unsigned char) *ptr)) ptr++;
+    }
+
+    /* The line is not empty so we've got something to deal with */
+    cmd_args = (char**)safe_malloc(sizeof(char*) * (max_tokens + 1));
+    cur_arg = (char*)Calloc(sizeof(char), strlen(cmdexec));
+
+    /* Get and copy the tokens */
+    ptr = cmdexec;
+    while (*ptr) {
+        while (('\0' != *ptr) && isspace((int) (unsigned char) *ptr)) ptr++;
+        if ('\0' == *ptr)     break;
+
+        while (('\0' != *ptr) && !isspace((int) (unsigned char) *ptr)) {
+            if ('\\' == *ptr) {
+                ptr++;
+                if ('\0' == *ptr)   break;
+
+                cur_arg[ptr_idx] = *ptr;
+                ptr_idx++;
+                ptr++;
+
+                if ('\\' != *(ptr - 1)) {
+                    while (('\0' != *ptr) && isspace((int) (unsigned char) *ptr)) ptr++;
+                }
+            } else {
+                cur_arg[ptr_idx] = *ptr;
+                ptr_idx++;
+                ptr++;
+            }
+        }
+        cur_arg[ptr_idx] = '\0';
+
+        cmd_args[arg_idx] = strdup(cur_arg);
+        cur_arg[0] = '\0';
+        ptr_idx = 0;
+        arg_idx++;
+    }
+
+    cmd_args[arg_idx] = NULL;
+
+    /* Clean up */
+    free(cur_arg);
+
+    return cmd_args;
 }
 
 void set_lf_mode(void)

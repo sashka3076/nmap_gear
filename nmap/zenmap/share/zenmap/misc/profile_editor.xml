@@ -30,6 +30,9 @@
 			<option option="-sO" label="IP protocol scan" short_desc="Scan IP protocols (TCP, ICMP, IGMP, etc.) to find which are supported by target machines."/>
 			<option option="-sL" label="List scan" short_desc="Do not scan any targets, just list which ones would be scanned (with reverse DNS names if available)."/>
 			<option option="-sP" label="Ping scanning" short_desc="Only perform a ping scan (host discovery), then print out the available hosts that responded to the scan."/>
+			<option option="-sY" label="SCTP INIT port scan" short_desc="SCTP is a layer 4 protocol used mostly for telephony related applications.  This is the SCTP equivalent of a TCP SYN stealth scan."/>
+			<option option="-sZ" label="SCTP cookie-echo port scan"
+short_desc="SCTP is a layer 4 protocol used mostly for telephony related applications."/>
 		</option_list>
 		<option_list label="Timing template: ">
 			<option label="None"/>
@@ -58,6 +61,7 @@
 		<option_check option="-PS" label="SYN ping" short_desc="Send one or more SYN probes to see if targets are up. Give a list of ports or leave the argument blank to use a default port." example="22,53,80"/>
 		<option_check option="-PU" label="UDP probes" short_desc="Send one or more UDP probes to see if targets are up. Give a list of ports or leave the argument blank to use a default port." example="100,31338"/>
 		<option_check option="-PO" label="IPProto probes" short_desc="Send one or more raw IP protocol probes to see if targets are up. Give a list of protocols or leave the argument blank to use a default list" example="1,2,4"/>
+		<option_check option="-PY" label="SCTP INIT ping probes" short_desc="Send SCTP INIT chunk packets to see if targets are up.  Give a list of ports or leave the argument blank to use a default port." example="20,80,179"/>
 	</Ping>
 	<Scripting label="Scripting options (NSE)">
 		<option_check option="-sC" label="Script scan" short_desc="Use the Nmap Scripting Engine to gain more information about targets after scanning them." example=""/>

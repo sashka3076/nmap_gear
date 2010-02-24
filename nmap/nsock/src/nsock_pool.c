@@ -56,7 +56,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nsock_pool.c 13069 2009-04-25 03:24:00Z david $ */
+/* $Id: nsock_pool.c 15192 2009-08-20 21:36:58Z david $ */
 
 #include "nsock_internal.h"
 #include "gh_list.h"
@@ -101,7 +101,7 @@ unsigned long nsp_getid(nsock_pool nsp) {
 }
 
 /* This next function returns the errno style error code -- which is only
-   valid if the status is NSOCK_LOOP_ERROR was returned by nsock_loop() */
+   valid if the status NSOCK_LOOP_ERROR was returned by nsock_loop() */
 int nsp_geterrorcode(nsock_pool nsp) {
   mspool *mt = (mspool *) nsp;
   return mt->errnum;
@@ -180,6 +180,8 @@ nsock_pool nsp_new(void *userdata) {
   gh_list_init(&nsp->free_iods);
   gh_list_init(&nsp->active_iods);
   nsp->next_event_serial = 1;
+
+  nsp->quit = 0;
 
 #if HAVE_OPENSSL
   nsp->sslctx = NULL;

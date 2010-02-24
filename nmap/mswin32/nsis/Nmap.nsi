@@ -6,6 +6,7 @@
  
   !include "MUI.nsh" 
   !include "AddToPath.nsh" 
+  !include "FileFunc.nsh" 
  
 ;-------------------------------- 
 ;General 
@@ -23,8 +24,8 @@
   ;Get installation folder from registry if available 
   InstallDirRegKey HKCU "Software\Nmap" "" 
  
-  !define VERSION "4.85BETA8"  
-  VIProductVersion "4.85.0.8"
+  !define VERSION "5.10BETA2"  
+  VIProductVersion "5.10.0.2"
   VIAddVersionKey /LANG=1033 "FileVersion" "${VERSION}"
   VIAddVersionKey /LANG=1033 "ProductName" "Nmap" 
   VIAddVersionKey /LANG=1033 "CompanyName" "Insecure.org" 
@@ -54,6 +55,9 @@
 ;Languages 
   
   !insertmacro MUI_LANGUAGE "English" 
+
+!insertmacro GetParameters
+!insertmacro GetOptions
 
 ;--------------------------------
 ;Variables
@@ -174,9 +178,10 @@ Section "Nmap Core Files" SecCore
   ;Store installation folder 
   WriteRegStr HKCU "Software\Nmap" "" $INSTDIR 
 
-  ;Check if VC++ 2008 runtimes are already installed:
-    ReadRegStr $0 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{FF66E9F6-83E7-3A3E-AF14-8DE9A809A6A4}" "DisplayName"
-    StrCmp $0 "Microsoft Visual C++ 2008 Redistributable - x86 9.0.21022" create_uninstaller vcredist_silent_install
+  ;Check if VC++ 2008 runtimes are already installed - NOTE Both the UID in the registry key and the DisplayName string must be updated here (and below)
+  ;whenever the Redistributable package is upgraded:
+    ReadRegStr $0 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{9A25302D-30C0-39D9-BD6F-21E6EC160475}" "DisplayName"
+    StrCmp $0 "Microsoft Visual C++ 2008 Redistributable - x86 9.0.30729.17" create_uninstaller vcredist_silent_install
 
   ;If VC++ 2008 runtimes are not installed...
   vcredist_silent_install:
@@ -184,8 +189,8 @@ Section "Nmap Core Files" SecCore
     File ..\vcredist_x86.exe
     ExecWait '"$INSTDIR\vcredist_x86.exe" /q' $0
     ;Check for successful installation of our vcredist_x86.exe...
-    ReadRegStr $0 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{FF66E9F6-83E7-3A3E-AF14-8DE9A809A6A4}" "DisplayName"
-    StrCmp $0 "Microsoft Visual C++ 2008 Redistributable - x86 9.0.21022" vcredist_success vcredist_not_present
+    ReadRegStr $0 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{9A25302D-30C0-39D9-BD6F-21E6EC160475}" "DisplayName"
+    StrCmp $0 "Microsoft Visual C++ 2008 Redistributable - x86 9.0.30729.17" vcredist_success vcredist_not_present
     vcredist_not_present:
       DetailPrint "Microsoft Visual C++ 2008 Redistributable failed to install"
       IfSilent create_uninstaller vcredist_messagebox
@@ -213,19 +218,39 @@ Section "Register Nmap Path" SecRegisterPath
   Call AddToPath 
 SectionEnd 
  
-Section "WinPcap 4.02" SecWinPcap 
+Section "WinPcap 4.1.1" SecWinPcap 
   SetOutPath "$INSTDIR" 
   SetOverwrite on 
-  File ..\winpcap\winpcap-nmap-4.02.exe 
+  File ..\winpcap\winpcap-nmap-4.11.exe 
   ; If the Nmap installer was launched using /S then pass some arguments to WinPcap
   IfSilent winpcap_silent winpcap_loud
   winpcap_silent:
-    ExecWait '"$INSTDIR\winpcap-nmap-4.02.exe" /S /D=$\""$PROGRAMFILES\WinPcap\"$\"' 
+    StrCpy $1 ""
+    ${GetParameters} $R0
+    ClearErrors
+    ${GetOptions} $R0 "/NPFSTARTUP=" $2
+    StrCmp $2 "NO" 0 NoSkipNPFStartup
+    StrCpy $1 "/NPFSTARTUP=NO $1"
+    NoSkipNPFStartup:
+
+    ; check for x64 so we install files into C:\Program Files on both platforms
+    ; as this is consistent with WinPcap 4.1 (even though rpcapd is a 32-bit
+    ; executable that probably should be in C:\Program Files (x86)\ (where we've
+    ; installed it in the past). Otherwise install in the normal x86 location.
+    System::Call "kernel32::GetCurrentProcess() i .s"
+    System::Call "kernel32::IsWow64Process(i s, *i .r0)"
+    StrCmp $0 "0" InstDir32bit InstDir64bit
+      InstDir64bit:
+        ExecWait '"$INSTDIR\winpcap-nmap-4.11.exe" $1 /S /D=$\""$PROGRAMFILES64\WinPcap\"$\"' 
+	    Goto InstDirDone
+      InstDir32bit:
+	    ExecWait '"$INSTDIR\winpcap-nmap-4.11.exe" $1 /S /D=$\""$PROGRAMFILES\WinPcap\"$\"' 
+    InstDirDone:
   Goto delete_winpcap
   winpcap_loud:
-    ExecWait '"$INSTDIR\winpcap-nmap-4.02.exe"' 
+    ExecWait '"$INSTDIR\winpcap-nmap-4.11.exe"' 
   delete_winpcap:
-  Delete "$INSTDIR\winpcap-nmap-4.02.exe" 
+  Delete "$INSTDIR\winpcap-nmap-4.11.exe" 
 SectionEnd 
 
 Section "Network Performance Improvements" SecPerfRegistryMods 
@@ -269,7 +294,7 @@ SectionEnd
   ;Component strings 
   LangString DESC_SecCore ${LANG_ENGLISH} "Installs Nmap executable, NSE scripts and Visual C++ 2008 runtime components"
   LangString DESC_SecRegisterPath ${LANG_ENGLISH} "Registers Nmap path to System path so you can execute it from any directory" 
-  LangString DESC_SecWinPcap ${LANG_ENGLISH} "Installs WinPcap 4.0 (required for most Nmap scans unless it is already installed)" 
+  LangString DESC_SecWinPcap ${LANG_ENGLISH} "Installs WinPcap 4.1 (required for most Nmap scans unless it is already installed)" 
   LangString DESC_SecPerfRegistryMods ${LANG_ENGLISH} "Modifies Windows registry values to improve TCP connect scan performance.  Recommended." 
   LangString DESC_SecZenmap ${LANG_ENGLISH} "Installs Zenmap, the official Nmap graphical user interface.  Recommended." 
   LangString DESC_SecNcat ${LANG_ENGLISH} "Installs Ncat, Nmap's Netcat replacement." 

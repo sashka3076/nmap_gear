@@ -27,22 +27,21 @@ extern "C" {
 }
 
 extern NmapOps o;
-extern int current_hosts;
 
-void set_version(lua_State *L, struct serviceDeductions sd) {
-  SCRIPT_ENGINE_PUSHSTRING_NOTNULL(sd.name, "name");
+void set_version(lua_State *L, const struct serviceDeductions *sd) {
+  SCRIPT_ENGINE_PUSHSTRING_NOTNULL(sd->name, "name");
 
-  lua_pushnumber(L, sd.name_confidence);
+  lua_pushnumber(L, sd->name_confidence);
   lua_setfield(L, -2, "name_confidence");
 
-  SCRIPT_ENGINE_PUSHSTRING_NOTNULL(sd.product, "product");
-  SCRIPT_ENGINE_PUSHSTRING_NOTNULL(sd.version, "version");
-  SCRIPT_ENGINE_PUSHSTRING_NOTNULL(sd.extrainfo, "extrainfo");
-  SCRIPT_ENGINE_PUSHSTRING_NOTNULL(sd.hostname, "hostname");
-  SCRIPT_ENGINE_PUSHSTRING_NOTNULL(sd.ostype, "ostype");
-  SCRIPT_ENGINE_PUSHSTRING_NOTNULL(sd.devicetype, "devicetype");
+  SCRIPT_ENGINE_PUSHSTRING_NOTNULL(sd->product, "product");
+  SCRIPT_ENGINE_PUSHSTRING_NOTNULL(sd->version, "version");
+  SCRIPT_ENGINE_PUSHSTRING_NOTNULL(sd->extrainfo, "extrainfo");
+  SCRIPT_ENGINE_PUSHSTRING_NOTNULL(sd->hostname, "hostname");
+  SCRIPT_ENGINE_PUSHSTRING_NOTNULL(sd->ostype, "ostype");
+  SCRIPT_ENGINE_PUSHSTRING_NOTNULL(sd->devicetype, "devicetype");
 
-  switch(sd.service_tunnel) {
+  switch(sd->service_tunnel) {
     case(SERVICE_TUNNEL_NONE):
       SCRIPT_ENGINE_PUSHSTRING_NOTNULL("none", "service_tunnel");
       break;
@@ -55,9 +54,9 @@ void set_version(lua_State *L, struct serviceDeductions sd) {
       break;
   }
 
-  SCRIPT_ENGINE_PUSHSTRING_NOTNULL(sd.service_fp, "service_fp");
+  SCRIPT_ENGINE_PUSHSTRING_NOTNULL(sd->service_fp, "service_fp");
 
-  switch(sd.dtype) {
+  switch(sd->dtype) {
     case(SERVICE_DETECTION_TABLE):
       SCRIPT_ENGINE_PUSHSTRING_NOTNULL("table", "service_fp");
       break;
@@ -70,7 +69,7 @@ void set_version(lua_State *L, struct serviceDeductions sd) {
       break;
   }
 
-  switch(sd.rpc_status) {
+  switch(sd->rpc_status) {
     case(RPC_STATUS_UNTESTED):
       SCRIPT_ENGINE_PUSHSTRING_NOTNULL("untested", "rpc_status");
       break;
@@ -89,14 +88,14 @@ void set_version(lua_State *L, struct serviceDeductions sd) {
       break;
   }
 
-  if(sd.rpc_status == RPC_STATUS_GOOD_PROG) {
-    lua_pushnumber(L, sd.rpc_program);
+  if(sd->rpc_status == RPC_STATUS_GOOD_PROG) {
+    lua_pushnumber(L, sd->rpc_program);
     lua_setfield(L, -2, "rpc_program");
 
-    lua_pushnumber(L, sd.rpc_lowver);
+    lua_pushnumber(L, sd->rpc_lowver);
     lua_setfield(L, -2, "rpc_lowver");
 
-    lua_pushnumber(L, sd.rpc_highver);
+    lua_pushnumber(L, sd->rpc_highver);
     lua_setfield(L, -2, "rpc_highver");
   }
 }
@@ -104,23 +103,25 @@ void set_version(lua_State *L, struct serviceDeductions sd) {
 /* set some port state information onto the
  * table which is currently on the stack
  * */
-void set_portinfo(lua_State *L, Port* port) {
+void set_portinfo(lua_State *L, const Target *target, const Port *port) {
   struct serviceDeductions sd;
 
-  port->getServiceDeductions(&sd);
+  target->ports.getServiceDeductions(port->portno, port->proto, &sd);
 
   lua_pushnumber(L, (double) port->portno);
   lua_setfield(L, -2, "number");
 
-  lua_pushstring(L, sd.name);
-  lua_setfield(L, -2, "service");
+  if (sd.name != NULL) {
+    lua_pushstring(L, sd.name);
+    lua_setfield(L, -2, "service");
+  }
+
+  lua_newtable(L);
+  set_version(L, &sd);
+  lua_setfield(L, -2, "version");
 
   lua_pushstring(L, IPPROTO2STR(port->proto));
   lua_setfield(L, -2, "protocol");
-
-  lua_newtable(L);
-  set_version(L, sd);
-  lua_setfield(L, -2, "version");
 
   lua_pushstring(L, statenum2str(port->state));
   lua_setfield(L, -2, "state");
@@ -140,16 +141,15 @@ void set_portinfo(lua_State *L, Port* port) {
  * */
 void set_hostinfo(lua_State *L, Target *currenths) {
   unsigned int i;
-  char hostname[1024];
 
-  lua_pushstring(L, strncpy(hostname, currenths->targetipstr(), 1024));
+  lua_pushstring(L, currenths->targetipstr());
   lua_setfield(L, -2, "ip");
 
-  lua_pushstring(L, strncpy(hostname, currenths->HostName(), 1024));
+  lua_pushstring(L, currenths->HostName());
   lua_setfield(L, -2, "name");
 
   if ( currenths->TargetName() ) { // else nil
-    lua_pushstring(L, strncpy(hostname, currenths->TargetName(), 1024));
+    lua_pushstring(L, currenths->TargetName());
     lua_setfield(L, -2, "targetname");
   }
 
@@ -167,7 +167,7 @@ void set_hostinfo(lua_State *L, Target *currenths) {
     lua_setfield(L, -2, "mac_addr_src");
   }
   if(currenths->deviceName()){
-    lua_pushstring(L, strncpy(hostname, currenths->deviceName(), 1024));
+    lua_pushstring(L, currenths->deviceName());
     lua_setfield(L, -2, "interface");
   }
   if( (u32)(currenths->v4host().s_addr) ){
@@ -241,7 +241,7 @@ static int aux_mutex (lua_State *L)
       }
       lua_pushthread(L);
       lua_rawseti(L, lua_upvalueindex(1), lua_objlen(L, lua_upvalueindex(1))+1);
-      return lua_yield(L, 0);
+      return nse_yield(L);
     case DONE:
       lua_pushthread(L);
       if (!lua_equal(L, -1, lua_upvalueindex(2)))
@@ -262,6 +262,7 @@ static int aux_mutex (lua_State *L)
         lua_State *thread = lua_tothread(L, lua_upvalueindex(2));
         lua_pushvalue(L, lua_upvalueindex(3)); // destructor key
         lua_pushvalue(L, lua_upvalueindex(4)); // destructor
+        luaL_checkstack(thread, 2, "adding destructor");
         lua_xmove(L, thread, 2);
         nse_destructor(thread, 'a');
         nse_restore(thread, 0);
@@ -272,6 +273,9 @@ static int aux_mutex (lua_State *L)
       {
         lua_pushthread(L);
         lua_replace(L, lua_upvalueindex(2));
+        lua_pushvalue(L, lua_upvalueindex(3)); // unique identifier
+        lua_pushvalue(L, lua_upvalueindex(4)); // aux_mutex_done closure
+        nse_destructor(L, 'a');
         lua_pushboolean(L, true);
       }
       else
@@ -293,6 +297,7 @@ static int aux_mutex_done (lua_State *L)
   lua_State *thread = lua_tothread(L, 1);
   lua_pushvalue(L, lua_upvalueindex(1)); // aux_mutex, actual mutex closure
   lua_pushliteral(L, "done");
+  luaL_checkstack(thread, 2, "aux_mutex_done");
   lua_xmove(L, thread, 2);
   if (lua_pcall(thread, 1, 0, 0) != 0) lua_pop(thread, 1); // pop error msg
   return 0;
@@ -322,26 +327,103 @@ static int l_mutex (lua_State *L)
   return 1; // aux_mutex closure
 }
 
+static int aux_condvar (lua_State *L)
+{
+  size_t i, n = 0;
+  enum {WAIT, SIGNAL, BROADCAST};
+  static const char * op[] = {"wait", "signal", "broadcast"};
+  switch (luaL_checkoption(L, 1, NULL, op))
+  {
+    case WAIT:
+      lua_pushthread(L);
+      lua_rawseti(L, lua_upvalueindex(1), lua_objlen(L, lua_upvalueindex(1))+1);
+      return nse_yield(L);
+    case SIGNAL:
+      n = lua_objlen(L, lua_upvalueindex(1));
+      break;
+    case BROADCAST:
+      n = 1;
+      break;
+  }
+  lua_pushvalue(L, lua_upvalueindex(1));
+  for (i = lua_objlen(L, -1); i >= n; i--)
+  {
+    lua_rawgeti(L, -1, i); /* get the thread */
+    if (lua_isthread(L, -1))
+      nse_restore(lua_tothread(L, -1), 0);
+    lua_pop(L, 1); /* pop the thread */
+    lua_pushnil(L);
+    lua_rawseti(L, -2, i);
+  }
+  return 0;
+}
+
+static int aux_condvar_done (lua_State *L)
+{
+  lua_State *thread = lua_tothread(L, 1);
+  lua_pushvalue(L, lua_upvalueindex(1)); // aux_condvar closure
+  lua_pushliteral(L, "broadcast"); // wake up all threads waiting
+  luaL_checkstack(thread, 2, "aux_condvar_done");
+  lua_xmove(L, thread, 2);
+  if (lua_pcall(thread, 1, 0, 0) != 0) lua_pop(thread, 1); // pop error msg
+  return 0;
+}
+
+static int l_condvar (lua_State *L)
+{
+  int t = lua_type(L, 1);
+  if (t == LUA_TNONE || t == LUA_TNIL || t == LUA_TBOOLEAN || t == LUA_TNUMBER)
+   luaL_argerror(L, 1, "object expected");
+  lua_pushvalue(L, 1);
+  lua_gettable(L, lua_upvalueindex(1));
+  if (lua_isnil(L, -1))
+  {
+    lua_newtable(L); // waiting threads
+    lua_pushnil(L); // placeholder for aux_mutex_done
+    lua_pushcclosure(L, aux_condvar, 2);
+    lua_pushvalue(L, -1); // aux_condvar closure
+    lua_pushcclosure(L, aux_condvar_done, 1);
+    lua_setupvalue(L, -2, 2); // replace nil upvalue with aux_condvar_done
+    lua_pushvalue(L, 1); // "condition variable object"
+    lua_pushvalue(L, -2); // condvar function
+    lua_settable(L, lua_upvalueindex(1)); // Add to condition variable table
+  }
+  lua_pushvalue(L, -1); // aux_condvar closure
+  lua_getupvalue(L, -1, 2); // aux_mutex_done closure
+  nse_destructor(L, 'a');
+  return 1; // condition variable closure
+}
+
 Target *get_target (lua_State *L, int index)
 {
+  int top = lua_gettop(L);
   Target *target;
   luaL_checktype(L, index, LUA_TTABLE);
+  lua_getfield(L, index, "targetname");
   lua_getfield(L, index, "ip");
-  if (!lua_isstring(L, -1))
-    luaL_error(L, "host table does not contain 'ip' string field");
-  lua_rawgeti(L, LUA_REGISTRYINDEX, current_hosts);
-  lua_pushvalue(L, -2); /* target ip string */
-  lua_rawget(L, -2);
+  if (!(lua_isstring(L, -2) || lua_isstring(L, -1)))
+    luaL_error(L, "host table does not have a 'ip' or 'targetname' field");
+  if (lua_isstring(L, -2)) /* targetname */
+  {
+    nse_gettarget(L, -2); /* use targetname */
+    if (lua_islightuserdata(L, -1))
+      goto done;
+    else
+      lua_pop(L, 1);
+  }
+  if (lua_isstring(L, -1)) /* ip */
+    nse_gettarget(L, -1); /* use ip */
   if (!lua_islightuserdata(L, -1))
     luaL_argerror(L, 1, "host is not being processed right now");
+done:
   target = (Target *) lua_touserdata(L, -1);
-  lua_pop(L, 3); /* target ip string, current_hosts, target luserdata */
+  lua_settop(L, top); /* reset stack */
   return target;
 }
 
-Port *get_port (lua_State *L, Target *target, int index)
+Port *get_port (lua_State *L, Target *target, Port *port, int index)
 {
-  Port *port = NULL;
+  Port *p = NULL;
   int portno, protocol;
   luaL_checktype(L, index, LUA_TTABLE);
   lua_getfield(L, index, "number");
@@ -355,11 +437,11 @@ Port *get_port (lua_State *L, Target *target, int index)
              strcmp(lua_tostring(L, -1), "udp") == 0 ? IPPROTO_UDP :
              strcmp(lua_tostring(L, -1), "sctp") == 0 ? IPPROTO_SCTP :
              luaL_error(L, "port 'protocol' field must be \"udp\", \"sctp\" or \"tcp\"");
-  while ((port = target->ports.nextPort(port, protocol, PORT_UNKNOWN)) != NULL)
-    if (port->portno == portno)
+  while ((p = target->ports.nextPort(p, port, protocol, PORT_UNKNOWN)) != NULL)
+    if (p->portno == portno)
       break;
   lua_pop(L, 2);
-  return port;
+  return p;
 }
 
 /* this function can be called from lua to obtain the port state
@@ -375,15 +457,15 @@ Port *get_port (lua_State *L, Target *target, int index)
 static int l_get_port_state (lua_State *L)
 {
   Target *target;
-  Port *port;
+  Port port, *p;
   target = get_target(L, 1);
-  port = get_port(L, target, 2);
-  if (port == NULL)
+  p = get_port(L, target, &port, 2);
+  if (p == NULL)
     lua_pushnil(L);
   else
   {
     lua_newtable(L);
-    set_portinfo(L, port);
+    set_portinfo(L, target, p);
   }
   return 1;
 }
@@ -397,26 +479,24 @@ static int l_set_port_state (lua_State *L)
   static const int opstate[] = {PORT_OPEN, PORT_CLOSED};
   static const char *op[] = {"open", "closed", NULL};
   Target *target;
-  Port *port;
+  Port port, *p;
   target = get_target(L, 1);
-  if ((port = get_port(L, target, 2)) != NULL)
+  if ((p = get_port(L, target, &port, 2)) != NULL)
   {
     switch (opstate[luaL_checkoption(L, 3, NULL, op)])
     {
       case PORT_OPEN:
-        if (port->state == PORT_OPEN)
+        if (p->state == PORT_OPEN)
           return 0;
-        target->ports.addPort(port->portno, port->proto, NULL, PORT_OPEN);
-        port->state = PORT_OPEN;
+        target->ports.setPortState(p->portno, p->proto, PORT_OPEN);
         break;
       case PORT_CLOSED:
-        if (port->state == PORT_CLOSED)
+        if (p->state == PORT_CLOSED)
           return 0;
-        target->ports.addPort(port->portno, port->proto, NULL, PORT_CLOSED);
-        port->state = PORT_CLOSED;
+        target->ports.setPortState(p->portno, p->proto, PORT_CLOSED);
         break;
     }
-    port->reason.reason_id = ER_SCRIPT;
+    target->ports.setStateReason(p->portno, p->proto, ER_SCRIPT, 0, 0);
   }
   return 0;
 }
@@ -438,13 +518,13 @@ static int l_set_port_version (lua_State *L)
     "incomplete"
   };
   Target *target;
-  Port *port;
+  Port port, *p;
   enum service_tunnel_type tunnel = SERVICE_TUNNEL_NONE;
   enum serviceprobestate probestate =
       opversion[luaL_checkoption(L, 3, "hardmatched", ops)];
 
   target = get_target(L, 1);
-  if ((port = get_port(L, target, 2)) == NULL)
+  if ((p = get_port(L, target, &port, 2)) == NULL)
     return 0; /* invalid port */
 
   lua_settop(L, 3);
@@ -469,10 +549,12 @@ static int l_set_port_version (lua_State *L)
     luaL_argerror(L, 2, "invalid value for port.version.service_tunnel");
 
   if (o.servicescan)
-    port->setServiceProbeResults(probestate, name, tunnel, product,
+    target->ports.setServiceProbeResults(p->portno, p->proto,
+        probestate, name, tunnel, product,
         version, extrainfo, hostname, ostype, devicetype, NULL);
   else
-    port->setServiceProbeResults(probestate, name, tunnel, NULL, NULL,
+    target->ports.setServiceProbeResults(p->portno, p->proto,
+        probestate, name, tunnel, NULL, NULL,
         NULL, NULL, NULL, NULL, NULL);
 
   return 0;
@@ -515,7 +597,14 @@ static int l_new_try (lua_State *L)
 
 static int l_get_verbosity (lua_State *L)
 {
-  lua_pushnumber(L, o.verbose);
+  int verbosity;
+
+  verbosity = o.verbose;
+  /* Check if script is selected by name. When a script is selected by name,
+     we lie to it and say the verbosity is one higher than it really is. */
+  verbosity += (nse_selectedbyname(L), lua_toboolean(L, -1) ? 1 : 0);
+
+  lua_pushnumber(L, verbosity);
   return 1;
 }
 
@@ -596,6 +685,14 @@ int luaopen_nmap (lua_State *L)
   lua_setmetatable(L, -2); // Allow closures to be collected (see l_mutex)
   lua_pushcclosure(L, l_mutex, 1); /* mutex function */
   lua_setfield(L, -2, "mutex");
+
+  lua_newtable(L);
+  lua_createtable(L, 0, 1);
+  lua_pushliteral(L, "v");
+  lua_setfield(L, -2, "__mode");
+  lua_setmetatable(L, -2); // Allow closures to be collected (see l_condvar)
+  lua_pushcclosure(L, l_condvar, 1); // condvar function
+  lua_setfield(L, -2, "condvar");
 
   lua_newtable(L);
   lua_setfield(L, -2, "registry");

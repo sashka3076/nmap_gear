@@ -89,7 +89,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: Target.cc 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: Target.cc 15921 2009-10-26 23:12:20Z david $ */
 
 #ifdef WIN32
 #include "nmap_winconfig.h"
@@ -116,6 +116,7 @@ void Target::Initialize() {
   FPR = NULL;
   osscan_flag = OS_NOTPERF;
   weird_responses = flags = 0;
+  traceroute_probespec.type = PS_NONE;
   memset(&to, 0, sizeof(to));
   memset(&targetsock, 0, sizeof(targetsock));
   memset(&sourcesock, 0, sizeof(sourcesock));
@@ -228,7 +229,7 @@ void Target::setTargetSockAddr(struct sockaddr_storage *ss, size_t ss_len) {
 }
 
 // Returns IPv4 host address or {0} if unavailable.
-struct in_addr Target::v4host() {
+struct in_addr Target::v4host() const {
   const struct in_addr *addy = v4hostip();
   struct in_addr in;
   if (addy) return *addy;
@@ -266,7 +267,7 @@ void Target::setSourceSockAddr(struct sockaddr_storage *ss, size_t ss_len) {
 }
 
 // Returns IPv4 host address or {0} if unavailable.
-struct in_addr Target::v4source() {
+struct in_addr Target::v4source() const {
   const struct in_addr *addy = v4sourceip();
   struct in_addr in;
   if (addy) return *addy;
@@ -275,7 +276,7 @@ struct in_addr Target::v4source() {
 }
 
 // Returns IPv4 host address or NULL if unavailable.
-const struct in_addr *Target::v4sourceip() {
+const struct in_addr *Target::v4sourceip() const {
   struct sockaddr_in *sin = (struct sockaddr_in *) &sourcesock;
   if (sin->sin_family == AF_INET) {
     return &(sin->sin_addr);
@@ -297,7 +298,7 @@ void Target::setHostName(char *name) {
     while (*p) {
       // I think only a-z A-Z 0-9 . and - are allowed, but I'll be a little more
       // generous.
-      if (!isalnum(*p) && !strchr(".-+=:_~*", *p)) {
+      if (!isalnum((int) (unsigned char) *p) && !strchr(".-+=:_~*", *p)) {
 	log_write(LOG_STDOUT, "Illegal character(s) in hostname -- replacing with '*'\n");
 	*p = '*';
       }
@@ -306,7 +307,7 @@ void Target::setHostName(char *name) {
   }
 }
 
-void Target::setTargetName(char *name) {
+void Target::setTargetName(const char *name) {
   if (targetname) {
     free(targetname);
     targetname = NULL;
@@ -324,9 +325,12 @@ void Target::setTargetName(char *name) {
 const char *Target::NameIP(char *buf, size_t buflen) {
   assert(buf);
   assert(buflen > 8);
-  if (hostname) {
+  if (targetname)
+    Snprintf(buf, buflen, "%s (%s)", targetname, targetipstring);
+  else if (hostname)
     Snprintf(buf, buflen, "%s (%s)", hostname, targetipstring);
-  } else Strncpy(buf, targetipstring, buflen);
+  else
+    Strncpy(buf, targetipstring, buflen);
   return buf;
 }
 
@@ -451,11 +455,11 @@ const u8 *Target::MACAddress() const {
   return (MACaddress_set)? MACaddress : NULL;
 }
 
-const u8 *Target::SrcMACAddress() {
+const u8 *Target::SrcMACAddress() const {
   return (SrcMACaddress_set)? SrcMACaddress : NULL;
 }
 
-const u8 *Target::NextHopMACAddress() {
+const u8 *Target::NextHopMACAddress() const {
   return (NextHopMACaddress_set)? NextHopMACaddress : NULL;
 }
 

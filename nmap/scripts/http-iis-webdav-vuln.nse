@@ -26,14 +26,14 @@ For more information on this vulnerability and script, see:
 -- @args basefolder The folder to start in; eg, "/web" will try "/web/xxx"
 -----------------------------------------------------------------------
 
-author = "Ron Bowes <ron@skullsecurity.net> and Andrew Orr <andrew@andreworr.ca>"
+author = "Ron Bowes and Andrew Orr"
 license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
 categories = {"vuln", "intrusive"}
 
 require "http"
 require "shortport"
 
-portrule = shortport.port_or_service({80, 8080}, "http")
+portrule = shortport.port_or_service({80, 443, 8080}, {"http", "https"})
 
 ---Enumeration for results
 local enum_results = 

@@ -90,7 +90,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap_rpc.h 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: nmap_rpc.h 16313 2009-12-20 03:22:19Z david $ */
 
 #ifndef NMAP_RPC_H
 #define NMAP_RPC_H
@@ -147,7 +147,7 @@ struct rpc_info {
 };
 
 struct rpcscaninfo {
-  Port *rpc_current_port;
+  const Port *rpc_current_port;
   unsigned long *rpc_progs;
   unsigned long rpc_number;
   int valid_responses_this_port; /* Number of valid (RPC wise) responses we

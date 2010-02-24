@@ -1,27 +1,95 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2005 Insecure.Com LLC.
-#
-# Author: Adriano Monteiro Marques <py.adriano@gmail.com>
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+# ***********************IMPORTANT NMAP LICENSE TERMS************************
+# *                                                                         *
+# * The Nmap Security Scanner is (C) 1996-2009 Insecure.Com LLC. Nmap is    *
+# * also a registered trademark of Insecure.Com LLC.  This program is free  *
+# * software; you may redistribute and/or modify it under the terms of the  *
+# * GNU General Public License as published by the Free Software            *
+# * Foundation; Version 2 with the clarifications and exceptions described  *
+# * below.  This guarantees your right to use, modify, and redistribute     *
+# * this software under certain conditions.  If you wish to embed Nmap      *
+# * technology into proprietary software, we sell alternative licenses      *
+# * (contact sales@insecure.com).  Dozens of software vendors already       *
+# * license Nmap technology such as host discovery, port scanning, OS       *
+# * detection, and version detection.                                       *
+# *                                                                         *
+# * Note that the GPL places important restrictions on "derived works", yet *
+# * it does not provide a detailed definition of that term.  To avoid       *
+# * misunderstandings, we consider an application to constitute a           *
+# * "derivative work" for the purpose of this license if it does any of the *
+# * following:                                                              *
+# * o Integrates source code from Nmap                                      *
+# * o Reads or includes Nmap copyrighted data files, such as                *
+# *   nmap-os-db or nmap-service-probes.                                    *
+# * o Executes Nmap and parses the results (as opposed to typical shell or  *
+# *   execution-menu apps, which simply display raw Nmap output and so are  *
+# *   not derivative works.)                                                * 
+# * o Integrates/includes/aggregates Nmap into a proprietary executable     *
+# *   installer, such as those produced by InstallShield.                   *
+# * o Links to a library or executes a program that does any of the above   *
+# *                                                                         *
+# * The term "Nmap" should be taken to also include any portions or derived *
+# * works of Nmap.  This list is not exclusive, but is meant to clarify our *
+# * interpretation of derived works with some common examples.  Our         *
+# * interpretation applies only to Nmap--we don't speak for other people's  *
+# * GPL works.                                                              *
+# *                                                                         *
+# * If you have any questions about the GPL licensing restrictions on using *
+# * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
+# * we also offer alternative license to integrate Nmap into proprietary    *
+# * applications and appliances.  These contracts have been sold to dozens  *
+# * of software vendors, and generally include a perpetual license as well  *
+# * as providing for priority support and updates as well as helping to     *
+# * fund the continued development of Nmap technology.  Please email        *
+# * sales@insecure.com for further information.                             *
+# *                                                                         *
+# * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+# * permission to link the code of this program with any version of the     *
+# * OpenSSL library which is distributed under a license identical to that  *
+# * listed in the included COPYING.OpenSSL file, and distribute linked      *
+# * combinations including the two. You must obey the GNU GPL in all        *
+# * respects for all of the code used other than OpenSSL.  If you modify    *
+# * this file, you may extend this exception to your version of the file,   *
+# * but you are not obligated to do so.                                     *
+# *                                                                         *
+# * If you received these files with a written license agreement or         *
+# * contract stating terms other than the terms above, then that            *
+# * alternative license agreement takes precedence over these comments.     *
+# *                                                                         *
+# * Source is provided to this software because we believe users have a     *
+# * right to know exactly what a program is going to do before they run it. *
+# * This also allows you to audit the software for security holes (none     *
+# * have been found so far).                                                *
+# *                                                                         *
+# * Source code also allows you to port Nmap to new platforms, fix bugs,    *
+# * and add new features.  You are highly encouraged to send your changes   *
+# * to nmap-dev@insecure.org for possible incorporation into the main       *
+# * distribution.  By sending these changes to Fyodor or one of the         *
+# * Insecure.Org development mailing lists, it is assumed that you are      *
+# * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+# * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
+# * will always be available Open Source, but this is important because the *
+# * inability to relicense code has caused devastating problems for other   *
+# * Free Software projects (such as KDE and NASM).  We also occasionally    *
+# * relicense the code to third parties as discussed above.  If you wish to *
+# * specify special license conditions of your contributions, just say so   *
+# * when you send them.                                                     *
+# *                                                                         *
+# * This program is distributed in the hope that it will be useful, but     *
+# * WITHOUT ANY WARRANTY; without even the implied warranty of              *
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
+# * General Public License v2.0 for more details at                         *
+# * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
+# * included with Nmap.                                                     *
+# *                                                                         *
+# ***************************************************************************/
 
 import gtk
 import os.path
 import re
+import copy
 
 from zenmapGUI.higwidgets.higwindows import HIGWindow
 from zenmapGUI.higwidgets.higboxes import HIGVBox
@@ -56,7 +124,7 @@ class SearchParser(object):
     is performed here. It is also responsible for adding additional directories
     to the SearchGUI object via the 'dir:' operator."""
     
-    def __init__(self, search_gui):
+    def __init__(self, search_gui, search_keywords):
         self.search_gui = search_gui
         self.search_dict = search_gui.search_dict
         
@@ -68,39 +136,7 @@ class SearchParser(object):
         # For example, if you'd like a "noodles" criteria, you need to create the method
         # SearchResult.match_noodles(self, noodles_string). To see how searches are
         # actually performed, start reading from the SearchResult.search() method.
-        self.ops2keys = dict()
-        self.ops2keys["keyword"] = "keyword"
-        self.ops2keys["profile"] = "profile"
-        self.ops2keys["pr"] = "profile"
-        self.ops2keys["target"] = "target"
-        self.ops2keys["t"] = "target"
-        self.ops2keys["option"] = "option"
-        self.ops2keys["o"] = "option"
-        self.ops2keys["date"] = "date"
-        self.ops2keys["d"] = "date"
-        self.ops2keys["after"] = "after"
-        self.ops2keys["a"] = "after"
-        self.ops2keys["before"] = "before"
-        self.ops2keys["b"] = "before"
-        self.ops2keys["os"] = "os"
-        self.ops2keys["scanned"] = "scanned"
-        self.ops2keys["sp"] = "scanned"
-        self.ops2keys["open"] = "open"
-        self.ops2keys["op"] = "open"
-        self.ops2keys["closed"] = "closed"
-        self.ops2keys["cp"] = "closed"
-        self.ops2keys["filtered"] = "filtered"
-        self.ops2keys["fp"] = "filtered"
-        self.ops2keys["unfiltered"] = "unfiltered"
-        self.ops2keys["ufp"] = "unfiltered"
-        self.ops2keys["open|filtered"] = "open_filtered"
-        self.ops2keys["ofp"] = "open_filtered"
-        self.ops2keys["closed|filtered"] = "closed_filtered"
-        self.ops2keys["cfp"] = "closed_filtered"
-        self.ops2keys["service"] = "service"
-        self.ops2keys["s"] = "service"
-        self.ops2keys["inroute"] = "in_route"
-        self.ops2keys["ir"] = "in_route"
+        self.ops2keys = copy.deepcopy(search_keywords)
         
         # This is not really an operator (see below)
         self.ops2keys["dir"] = "dir"
@@ -181,7 +217,41 @@ Warning: The database of saved scans is not available. (%s.) Use \
         # We create an empty search dictionary, since SearchParser will fill it
         # with keywords as it encounters different operators in the search string.
         self.search_dict = dict()
-        self.search_parser = SearchParser(self)
+        # We need to define our own keyword search dictionary
+        search_keywords = dict()
+        search_keywords["keyword"] = "keyword"
+        search_keywords["profile"] = "profile"
+        search_keywords["pr"] = "profile"
+        search_keywords["target"] = "target"
+        search_keywords["t"] = "target"
+        search_keywords["option"] = "option"
+        search_keywords["o"] = "option"
+        search_keywords["date"] = "date"
+        search_keywords["d"] = "date"
+        search_keywords["after"] = "after"
+        search_keywords["a"] = "after"
+        search_keywords["before"] = "before"
+        search_keywords["b"] = "before"
+        search_keywords["os"] = "os"
+        search_keywords["scanned"] = "scanned"
+        search_keywords["sp"] = "scanned"
+        search_keywords["open"] = "open"
+        search_keywords["op"] = "open"
+        search_keywords["closed"] = "closed"
+        search_keywords["cp"] = "closed"
+        search_keywords["filtered"] = "filtered"
+        search_keywords["fp"] = "filtered"
+        search_keywords["unfiltered"] = "unfiltered"
+        search_keywords["ufp"] = "unfiltered"
+        search_keywords["open|filtered"] = "open_filtered"
+        search_keywords["ofp"] = "open_filtered"
+        search_keywords["closed|filtered"] = "closed_filtered"
+        search_keywords["cfp"] = "closed_filtered"
+        search_keywords["service"] = "service"
+        search_keywords["s"] = "service"
+        search_keywords["inroute"] = "in_route"
+        search_keywords["ir"] = "in_route"
+        self.search_parser = SearchParser(self, search_keywords)
         
         # This list holds the (operator, argument) tuples, parsed from the GUI criteria rows
         self.gui_criteria_list = []
@@ -259,35 +329,7 @@ Warning: The database of saved scans is not available. (%s.) Use \
         self.expressions_btn.connect("toggled", self.expressions_clicked)
     
     def show_quick_help(self, widget=None, extra=None):
-        quick_help = _("""Entering the text into the search performs a <b>keyword search</b> - \
-the search string is matched against the entire output of each scan.
-
-To refine the search, you can use <b>operators</b> to search only within a specific part of \
-a scan. Operators can be added to the search interactively if you click on the \
-<b>Expressions</b> button, or you can enter them manually into the search field. \
-You can also use <b>operator aliases</b> if you're an experienced user who likes to \
-type in his searches quickly.
-
-<b>profile: (pr:)</b> - Profile used.
-<b>target: (t:)</b> - User-supplied target, or a rDNS result.
-<b>option: (o:)</b> - Scan options.
-<b>date: (d:)</b> - The date when scan was performed. Fuzzy matching is possible using the \
-"~" suffix. Each "~" broadens the search by one day on "each side" of the date. In addition, \
-it is possible to use the \"date:-n\" notation which means "n days ago".
-<b>after: (a:)</b> - Matches scans made after the supplied date (<i>YYYY-MM-DD</i> or <i>-n</i>).
-<b>before (b:)</b> - Matches scans made before the supplied date(<i>YYYY-MM-DD</i> or <i>-n</i>).
-<b>os:</b> - All OS-related fields.
-<b>scanned: (sp:)</b> - Matches a port if it was among those scanned.
-<b>open: (op:)</b> - Open ports discovered in a scan.
-<b>closed: (cp:)</b> - Closed ports discovered in a scan.
-<b>filtered: (fp:)</b> - Filtered ports discovered in scan.
-<b>unfiltered: (ufp:)</b> - Unfiltered ports found in a scan (using, for example, an ACK scan).
-<b>open|filtered: (ofp:)</b> - Ports in the \"open|filtered\" state.
-<b>closed|filtered: (cfp:)</b> - Ports in the \"closed|filtered\" state.
-<b>service: (s:)</b> - All service-related fields.
-<b>inroute: (ir:)</b> - Matches a router in the scan's traceroute output.
-""")
-        hint_window = HintWindow(quick_help)
+        hint_window = HintWindow(QUICK_HELP_TEXT)
         hint_window.show_all()
     
     def expressions_clicked(self, widget=None, extra=None):
@@ -845,3 +887,37 @@ class DateCalendar(gtk.Window, object):
     def kill_calendar(self, widget, method):
         method(widget)
         self.destroy()
+
+QUICK_HELP_TEXT = _("""\
+Entering the text into the search performs a <b>keyword search</b> - the \
+search string is matched against the entire output of each scan.
+
+To refine the search, you can use <b>operators</b> to search only within \
+a specific part of a scan. Operators can be added to the search \
+interactively if you click on the <b>Expressions</b> button, or you can \
+enter them manually into the search field. Most operators have a short \
+form, listed.
+
+<b>profile: (pr:)</b> - Profile used.
+<b>target: (t:)</b> - User-supplied target, or a rDNS result.
+<b>option: (o:)</b> - Scan options.
+<b>date: (d:)</b> - The date when scan was performed. Fuzzy matching is \
+possible using the "~" suffix. Each "~" broadens the search by one day \
+on "each side" of the date. In addition, it is possible to use the \
+\"date:-n\" notation which means "n days ago".
+<b>after: (a:)</b> - Matches scans made after the supplied date \
+(<i>YYYY-MM-DD</i> or <i>-n</i>).
+<b>before (b:)</b> - Matches scans made before the supplied \
+date(<i>YYYY-MM-DD</i> or <i>-n</i>).
+<b>os:</b> - All OS-related fields.
+<b>scanned: (sp:)</b> - Matches a port if it was among those scanned.
+<b>open: (op:)</b> - Open ports discovered in a scan.
+<b>closed: (cp:)</b> - Closed ports discovered in a scan.
+<b>filtered: (fp:)</b> - Filtered ports discovered in scan.
+<b>unfiltered: (ufp:)</b> - Unfiltered ports found in a scan (using, for \
+example, an ACK scan).
+<b>open|filtered: (ofp:)</b> - Ports in the \"open|filtered\" state.
+<b>closed|filtered: (cfp:)</b> - Ports in the \"closed|filtered\" state.
+<b>service: (s:)</b> - All service-related fields.
+<b>inroute: (ir:)</b> - Matches a router in the scan's traceroute output.
+""")

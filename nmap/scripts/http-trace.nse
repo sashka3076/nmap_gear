@@ -15,11 +15,11 @@ response.
 
 -- 08/31/2007
 
-author = "Kris Katterjohn <katterjohn@gmail.com>"
+author = "Kris Katterjohn"
 
 license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
 
-categories = {"discovery"}
+categories = {"discovery", "safe"}
 
 require "comm"
 require "shortport"
@@ -85,17 +85,15 @@ local validate = function(response, original)
 	return
 end
 
-portrule = shortport.port_or_service({80, 8080}, "http")
+portrule = shortport.port_or_service({80, 8080, 443}, {"http", "https"})
 
 action = function(host, port)
 	local cmd = "TRACE / HTTP/1.0\r\n\r\n"
 
-	local status, response = comm.exchange(host, port, cmd, {lines=1,timeout=5000})
-
-	if not status then
+	local sd, response = comm.tryssl(host, port, cmd, false)
+	if not sd then 
+		stdnse.print_debug("Unable to open connection") 
 		return
 	end
-
 	return validate(response, cmd)
 end
-

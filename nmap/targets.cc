@@ -89,7 +89,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: targets.cc 13888 2009-06-24 21:35:54Z fyodor $ */
+/* $Id: targets.cc 15925 2009-10-27 06:08:04Z david $ */
 
 
 #include "targets.h"
@@ -178,15 +178,16 @@ static int hostInExclude(struct sockaddr *checksock, size_t checksocklen,
   struct sockaddr_in *sin = (struct sockaddr_in *) &ss;
   size_t slen;             /* needed for funct but not used */
   unsigned long mask = 0;  /* our trusty netmask, which we convert to nbo */
-  struct sockaddr_in *checkhost;
+  struct sockaddr_in *checkhost_in;
 
   if ((TargetGroup *)0 == exclude_group)
     return 0;
 
-  assert(checksocklen >= sizeof(struct sockaddr_in));
-  checkhost = (struct sockaddr_in *) checksock;
-  if (checkhost->sin_family != AF_INET)
-    checkhost = NULL;
+  checkhost_in = NULL;
+  if (checksock->sa_family == AF_INET) {
+    assert(checksocklen >= sizeof(struct sockaddr_in));
+    checkhost_in = (struct sockaddr_in *) checksock;
+  }
 
   /* First find out what type of addresses are in the target group */
   targets_type = exclude_group[i].get_targets_type();
@@ -201,8 +202,10 @@ static int hostInExclude(struct sockaddr *checksock, size_t checksocklen,
       /* For Netmasks simply compare the network bits and move to the next
        * group if it does not compare, we don't care about the individual addrs */
       if (targets_type == TargetGroup::IPV4_NETMASK) {
+        if (checkhost_in == NULL)
+          break;
         mask = htonl((unsigned long) (0-1) << (32-exclude_group[i].get_mask()));
-        if ((tmpTarget & mask) == (checkhost->sin_addr.s_addr & mask)) {
+        if ((tmpTarget & mask) == (checkhost_in->sin_addr.s_addr & mask)) {
 	  exclude_group[i].rewind();
 	  return 1;
         }
@@ -214,16 +217,18 @@ static int hostInExclude(struct sockaddr *checksock, size_t checksocklen,
        * we should skip the rest of the addrs in the octet, thank wam for this
        * optimization */
       else if (targets_type == TargetGroup::IPV4_RANGES) {
-        if (tmpTarget == checkhost->sin_addr.s_addr) {
+        if (checkhost_in == NULL)
+          break;
+        if (tmpTarget == checkhost_in->sin_addr.s_addr) {
           exclude_group[i].rewind();
           return 1;
         }
         else { /* note these are in network byte order */
-	  if ((tmpTarget & 0x000000ff) != (checkhost->sin_addr.s_addr & 0x000000ff))
+	  if ((tmpTarget & 0x000000ff) != (checkhost_in->sin_addr.s_addr & 0x000000ff))
             exclude_group[i].skip_range(TargetGroup::FIRST_OCTET); 
-	  else if ((tmpTarget & 0x0000ff00) != (checkhost->sin_addr.s_addr & 0x0000ff00))
+	  else if ((tmpTarget & 0x0000ff00) != (checkhost_in->sin_addr.s_addr & 0x0000ff00))
             exclude_group[i].skip_range(TargetGroup::SECOND_OCTET); 
-	  else if ((tmpTarget & 0x00ff0000) != (checkhost->sin_addr.s_addr & 0x00ff0000))
+	  else if ((tmpTarget & 0x00ff0000) != (checkhost_in->sin_addr.s_addr & 0x00ff0000))
             exclude_group[i].skip_range(TargetGroup::THIRD_OCTET); 
 
           continue;
@@ -242,104 +247,99 @@ static int hostInExclude(struct sockaddr *checksock, size_t checksocklen,
   return 0;
 }
 
-/* loads an exclude file into an exclude target list  (mdmcl) */
-TargetGroup* load_exclude(FILE *fExclude, char *szExclude) {
-  int i=0;			/* loop counter */
-  int iLine=0;			/* line count */
-  int iListSz=0;		/* size of our exclude target list. 
-				 * It doubles in size as it gets
-				 *  close to filling up
-				 */
-  char acBuf[512];
-  char *p_acBuf;
-  TargetGroup *excludelist;	/* list of ptrs to excluded targets */
-  char *pc;			/* the split out exclude expressions */
-  char b_file = (char)0;        /* flag to indicate if we are using a file */
+/* Convert a vector of host specifications to an array (allocated with new[]) of
+   TargetGroups. The size of the returned array is one greater than the number
+   of host specs, to leave on uninitialized member at the end. */
+static TargetGroup *specs_to_targetgroups(const std::vector<std::string> &specs) {
+  TargetGroup *excludelist;
+  unsigned int i;
 
-  /* If there are no params return now with a NULL list */
-  if (((FILE *)0 == fExclude) && ((char *)0 == szExclude)) {
-    excludelist=NULL;
-    return excludelist;
-  }
+  excludelist = new TargetGroup[specs.size() + 1];
 
-  if ((FILE *)0 != fExclude)
-    b_file = (char)1;
-
-  /* Since I don't know of a realloc equiv in C++, we will just count
-   * the number of elements here. */
-
-  /* If the input was given to us in a file, count the number of elements
-   * in the file, and reset the file */
-  if (1 == b_file) {
-    while ((char *)0 != fgets(acBuf,sizeof(acBuf), fExclude)) {
-      /* the last line can contain no newline, then we have to check for EOF */
-      if ((char *)0 == strchr(acBuf, '\n') && !feof(fExclude)) {
-        fatal("Exclude file line %d was too long to read.  Exiting.", iLine);
-      }
-      pc=strtok(acBuf, "\t\n ");	
-      while (NULL != pc) {
-        iListSz++;
-        pc=strtok(NULL, "\t\n ");
-      }
-    }
-    rewind(fExclude);
-  } /* If the exclude file was provided via command line, count the elements here */
-  else {
-    p_acBuf=strdup(szExclude);
-    pc=strtok(p_acBuf, ",");
-    while (NULL != pc) {
-      iListSz++;
-      pc=strtok(NULL, ",");
-    }
-    free(p_acBuf);
-    p_acBuf = NULL;
-  }
-
-  /* allocate enough TargetGroups to cover our entries, plus one that
-   * remains uninitialized so we know we reached the end */
-  excludelist = new TargetGroup[iListSz + 1];
-
-  /* don't use a for loop since the counter isn't incremented if the 
-   * exclude entry isn't parsed
-   */
-  i=0;
-  if (1 == b_file) {
-    /* If we are parsing a file load the exclude list from that */
-    while ((char *)0 != fgets(acBuf, sizeof(acBuf), fExclude)) {
-      ++iLine;
-      if ((char *)0 == strchr(acBuf, '\n') && !feof(fExclude)) {
-        fatal("Exclude file line %d was too long to read.  Exiting.", iLine);
-      }
-  
-      pc=strtok(acBuf, "\t\n ");	
-  
-      while ((char *)0 != pc) {
-         if(excludelist[i].parse_expr(pc,o.af()) == 0) {
-           if (o.debugging > 1)
-             error("Loaded exclude target of: %s", pc);
-           ++i;
-         } 
-         pc=strtok(NULL, "\t\n ");
-      }
+  for (i = 0; i < specs.size(); i++) {
+    if (excludelist[i].parse_expr(specs[i].c_str(), o.af()) == 0) {
+      if (o.debugging > 1)
+        error("Loaded exclude target of: %s", specs[i].c_str());
     }
   }
-  else {
-    /* If we are parsing command line, load the exclude file from the string */
-    p_acBuf=strdup(szExclude);
-    pc=strtok(p_acBuf, ",");
 
-    while (NULL != pc) {
-      if(excludelist[i].parse_expr(pc,o.af()) == 0) {
-        if (o.debugging >1)
-          error("Loaded exclude target of: %s", pc);
-        ++i;
-      } 
-      pc=strtok(NULL, ",");
-    }
-    free(p_acBuf);
-    p_acBuf = NULL;
-  }
   return excludelist;
+}
+
+/* Load an exclude list from a file for --excludefile. */
+TargetGroup* load_exclude_file(FILE *fp) {
+  std::vector<std::string> specs;
+  char host_spec[1024];
+  size_t n;
+
+  while ((n = read_host_from_file(fp, host_spec, sizeof(host_spec))) > 0) {
+    if (n >= sizeof(host_spec))
+      fatal("One of your exclude file specifications was too long to read (>= %u chars)", (unsigned int) sizeof(host_spec));
+    specs.push_back(host_spec);
+  }
+
+  return specs_to_targetgroups(specs);
+}
+
+/* Load a comma-separated exclude list from a string, the argument to
+   --exclude. */
+TargetGroup* load_exclude_string(const char *s) {
+  std::vector<std::string> specs;
+  const char *begin, *p;
+
+  p = s;
+  while (*p != '\0') {
+    begin = p;
+    while (*p != '\0' && *p != ',')
+      p++;
+    specs.push_back(std::string(begin, p - begin));
+    if (*p == '\0')
+      break;
+    p++;
+  }
+
+  return specs_to_targetgroups(specs);
+}
+
+static inline bool is_host_separator(int c) {
+  return c == ' ' || c == '\r' || c == '\n' || c == '\t' || c == '\0';
+}
+
+/* Read a single host specification from a file, as for -iL and --excludefile.
+   It returns the length of the string read; an overflow is indicated when the
+   return value is >= n. Returns 0 if there was no specification to be read. The
+   buffer is always null-terminated. */
+size_t read_host_from_file(FILE *fp, char *buf, size_t n)
+{
+  int ch;
+  size_t i;
+
+  i = 0;
+  ch = getc(fp);
+  while (is_host_separator(ch) || ch == '#') {
+    if (ch == '#') {
+      /* Skip comments to the end of the line. */
+      while ((ch = getc(fp)) != EOF && ch != '\n')
+        ;
+    } else {
+      ch = getc(fp);
+    }
+  }
+  while (ch != EOF && !(is_host_separator(ch) || ch == '#')) {
+    if (i < n)
+      buf[i] = ch;
+    i++;
+    ch = getc(fp);
+  }
+  if (ch != EOF)
+    ungetc(ch, fp);
+  if (i < n)
+    buf[i] = '\0';
+  else if (n > 0)
+    /* Null-terminate even though it was too long. */
+    buf[n - 1] = '\0';
+
+  return i;
 }
 
 /* A debug routine to dump some information to stdout.                  (mdmcl)
@@ -458,17 +458,18 @@ do {
       hs->hostbatch[hidx] = new Target();
       hs->hostbatch[hidx]->setTargetSockAddr(&ss, sslen);
 
-      /* put target expression in target if we have a named host without netmask */
-      if ( hs->current_expression.get_targets_type() == TargetGroup::IPV4_NETMASK  &&
-	  hs->current_expression.get_namedhost() &&
-	  !strchr( hs->target_expressions[hs->next_expression-1], '/' ) ) {
-	hs->hostbatch[hidx]->setTargetName(hs->target_expressions[hs->next_expression-1]);
+      /* Special handling for the resolved address (for example whatever
+         scanme.nmap.org resolves to in scanme.nmap.org/24). */
+      if (hs->current_expression.is_resolved_address(&ss)) {
+        if (hs->current_expression.get_namedhost())
+          hs->hostbatch[hidx]->setTargetName(hs->current_expression.get_resolved_name());
+        hs->hostbatch[hidx]->resolved_addrs = hs->current_expression.get_resolved_addrs();
       }
 
       /* We figure out the source IP/device IFF
 	 1) We are r00t AND
 	 2) We are doing tcp or udp pingscan OR
-	 3) We are doing a raw-mode portscan or osscan OR
+	 3) We are doing a raw-mode portscan or osscan or traceroute OR
 	 4) We are on windows and doing ICMP ping */
       if (o.isr00t && o.af() == AF_INET && 
 	  ((pingtype & (PINGTYPE_TCP|PINGTYPE_UDP|PINGTYPE_SCTP_INIT|PINGTYPE_PROTO|PINGTYPE_ARP)) || o.RawScan()
