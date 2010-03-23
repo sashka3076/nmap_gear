@@ -1,6 +1,6 @@
 --- nmap/nmap.cc
 +++ nmap/nmap.cc
-@@ -2826,10 +2826,13 @@ int fileexistsandisreadable(const char *pathname) {
+@@ -2733,10 +2733,13 @@ int fileexistsandisreadable(const char *pathname) {
  
    struct stat st;
  

@@ -1,6 +1,6 @@
 --- nmap/ncat/Makefile.in
 +++ nmap/ncat/Makefile.in
-@@ -128,7 +128,6 @@ install: $(TARGET)
+@@ -132,7 +132,6 @@ install: $(TARGET)
  	@echo Installing Ncat;
  	$(SHTOOL) mkdir -f -p -m 755 $(DESTDIR)$(bindir) $(DESTDIR)$(pkgdatadir) $(DESTDIR)$(mandir)/man1
  	$(INSTALL) -c -m 755 -s ncat $(DESTDIR)$(bindir)/ncat
@@ -10,7 +10,7 @@
  uninstall:
 --- nmap/ncat/ncat_posix.c
 +++ nmap/ncat/ncat_posix.c
-@@ -134,28 +134,14 @@ void set_lf_mode(void)
+@@ -331,28 +331,14 @@ void set_lf_mode(void)
  }
  
  #ifdef HAVE_OPENSSL

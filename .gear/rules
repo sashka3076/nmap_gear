@@ -1,0 +1,3 @@
+tar: nmap
+copy: *.patch
+copy: zenmap.*

@@ -1,6 +1,6 @@
 Name: nmap
-Version: 5.00
-Release: alt2.1
+Version: 5.21
+Release: alt1
 Epoch: 20020501
 
 Summary: Network exploration tool and security scanner
@@ -10,32 +10,35 @@ Url: http://nmap.org/
 Packager: Dmitry V. Levin <ldv@altlinux.org>
 
 %define srcname nmap-%version
-Source: %url/dist/%srcname.tar
+# http://nmap.org/dist/%srcname.tar.bz2
+Source: %srcname.tar
+Source1: zenmap.pamd
+Source2: zenmap.security
 
-Patch1: nmap-5.00-up-20090711-ncat-error-reporting.patch
-Patch2: nmap-5.00-up-20090718-open_nse.patch
-Patch3: nmap-5.00-owl-format.patch
-Patch4: nmap-5.00-owl-nse-ldflags.patch
-Patch5: nmap-5.00-alt-owl-autoheader.patch
-Patch6: nmap-5.00-alt-owl-drop-priv.patch
-Patch7: nmap-5.00-alt-owl-dot-dir.patch
-Patch8: nmap-5.00-alt-owl-fileexistsandisreadable.patch
-Patch9: nmap-5.00-owl-include.patch
-Patch10: nmap-5.00-owl-ncat-makefile.patch
-Patch11: nmap-5.00-owl-route.patch
-Patch12: nmap-5.00-alt-ncat-certs.patch
-Patch13: nmap-5.00-alt-libdnet.patch
+Patch1: nmap-5.20-owl-nse_ldflags.patch
+Patch2: nmap-5.20-alt-owl-autoheader.patch
+Patch3: nmap-5.20-alt-owl-drop-priv.patch
+Patch4: nmap-5.20-alt-owl-dot-dir.patch
+Patch5: nmap-5.20-alt-owl-fileexistsandisreadable.patch
+Patch6: nmap-5.20-owl-include.patch
+Patch7: nmap-5.21-owl-warnings.patch
+Patch8: nmap-5.20-owl-route.patch
+Patch11: nmap-5.00-alt-ncat-certs.patch
+Patch12: nmap-5.00-alt-libdnet.patch
+Patch13: nmap-5.21-alt-zenmap-desktop.patch
+Patch14: nmap-5.21-rh-zenmap-locale.patch
 
 %def_with liblua
 %def_with ncat
 %def_with ndiff
-%def_without zenmap
+%def_with zenmap
 
 Requires: chrooted-resolv, libdnet >= 0:1.12-alt1
 BuildRequires: gcc-c++, libcap-devel, libdnet-devel >= 0:1.12-alt1
 BuildRequires: libpcap-devel >= 2:0.8, libpcre-devel, libssl-devel
 %{?_with_liblua:BuildRequires: liblua5-devel}
 %{?_with_ndiff:BuildRequires: python-devel}
+%{?_with_zenmap:BuildRequires: libpam-devel python-devel}
 
 %description
 Nmap is an utility for network exploration or security auditing.
@@ -45,6 +48,16 @@ application versions listening behind ports), and TCP/IP fingerprinting
 (remote host OS or device identification).  Nmap also offers flexible
 target and port specification, decoy/stealth scanning, Sun RPC scanning,
 and more.
+
+%package -n zenmap
+Summary: The GTK+ frontend for Nmap
+Group: Monitoring
+BuildArch: noarch
+%_python_set_noarch
+Requires: %name = %epoch:%version-%release
+
+%description -n zenmap
+This package includes zenmap, a GTK+ frontend for Nmap.
 
 %prep
 %setup -q -n %srcname
@@ -56,11 +69,10 @@ and more.
 %patch6 -p1
 %patch7 -p1
 %patch8 -p1
-%patch9 -p1
-%patch10 -p1
 %patch11 -p1
 %patch12 -p1
 %patch13 -p1
+%patch14 -p1
 bzip2 -9 CHANGELOG
 
 %build
@@ -82,7 +94,23 @@ export ac_cv_header_libiberty_h=no
 %make_build
 
 %install
-%makeinstall_std
+%makeinstall_std STRIP=:
+
+rm %buildroot%_mandir/*/man1/nmap.*
+
+%if_with zenmap
+ln -s $(relative %_libexecdir/consolehelper/helper %_bindir/) \
+	%buildroot%_bindir/zenmap-root
+install -pD -m640 %_sourcedir/zenmap.pamd \
+	%buildroot%_sysconfdir/pam.d/zenmap-root
+install -pD -m640 %_sourcedir/zenmap.security \
+	%buildroot%_sysconfdir/security/console.apps/zenmap-root
+mkdir -p %buildroot%_liconsdir
+ln -s ../../../../zenmap/pixmaps/zenmap.png %buildroot%_liconsdir/
+%find_lang zenmap
+rm %buildroot%_bindir/{nmapfe,uninstall_zenmap,xnmap}
+rm %buildroot%_datadir/zenmap/su-to-zenmap.sh
+%endif
 
 %pre
 /usr/sbin/groupadd -r -f nmapuser
@@ -102,7 +130,24 @@ export ac_cv_header_libiberty_h=no
 %endif
 %doc COPYING* CHANGELOG.bz2 docs/{README,nmap*.txt}
 
+%if_with zenmap
+%files -n zenmap -f zenmap.lang
+%config(noreplace) %_sysconfdir/pam.d/zenmap-root
+%config(noreplace) %_sysconfdir/security/console.apps/zenmap-root
+%_bindir/zenmap*
+%_datadir/zenmap
+%_man1dir/zenmap.*
+%_liconsdir/*
+%_desktopdir/zenmap*.desktop
+%python_sitelibdir/*
+%endif
+
 %changelog
+* Wed Mar 24 2010 Dmitry V. Levin <ldv@altlinux.org> 20020501:5.21-alt1
+- Updated to 5.21 (closes: #22913).
+- Synced with nmap-5.21-owl2.
+- Packaged zenmap (closes: #20872).
+
 * Thu Dec 03 2009 Eugeny A. Rostovtsev (REAL) <real at altlinux.org> 20020501:5.00-alt2.1
 - Rebuilt with python 2.6
 

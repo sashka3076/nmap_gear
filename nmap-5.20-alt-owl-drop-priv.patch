@@ -1,6 +1,6 @@
 --- nmap/MACLookup.cc
 +++ nmap/MACLookup.cc
-@@ -98,6 +98,7 @@
+@@ -99,6 +99,7 @@
  #include "nmap.h"
  #include "nmap_error.h"
  #include "charpool.h"
@@ -8,8 +8,8 @@
  
  extern NmapOps o;
  
-@@ -123,7 +124,7 @@ static inline int MACTableHash(int prefix, int table_capacity) {
-   return prefix % table_capacity;
+@@ -108,7 +109,7 @@ static inline int MacCharPrefix2Key(const u8 *prefix) {
+   return (prefix[0] << 16) + (prefix[1] << 8) + prefix[2];
  }
  
 -static void mac_prefix_init() {
@@ -19,24 +19,24 @@
    initialized = 1;
 --- nmap/Makefile.in
 +++ nmap/Makefile.in
-@@ -77,11 +77,11 @@ NSE_OBJS+=nse_openssl.o
+@@ -87,11 +87,11 @@ NSE_OBJS+=nse_openssl.o nse_ssl_cert.o
  endif
  endif
  
--export SRCS = main.cc nmap.cc targets.cc tcpip.cc nmap_error.cc utils.cc idle_scan.cc osscan.cc osscan2.cc output.cc scan_engine.cc timing.cc charpool.cc services.cc protocols.cc nmap_rpc.cc portlist.cc NmapOps.cc TargetGroup.cc Target.cc FingerPrintResults.cc service_scan.cc NmapOutputTable.cc MACLookup.cc nmap_tty.cc nmap_dns.cc traceroute.cc portreasons.cc $(NSE_SRC) @COMPAT_SRCS@
-+export SRCS = main.cc nmap.cc targets.cc tcpip.cc nmap_error.cc utils.cc idle_scan.cc osscan.cc osscan2.cc output.cc scan_engine.cc timing.cc charpool.cc services.cc protocols.cc nmap_rpc.cc portlist.cc NmapOps.cc TargetGroup.cc Target.cc FingerPrintResults.cc service_scan.cc NmapOutputTable.cc MACLookup.cc nmap_tty.cc nmap_dns.cc traceroute.cc portreasons.cc droppriv.cc $(NSE_SRC) @COMPAT_SRCS@
+-export SRCS = main.cc nmap.cc targets.cc tcpip.cc nmap_error.cc utils.cc idle_scan.cc osscan.cc osscan2.cc output.cc payload.cc scan_engine.cc timing.cc charpool.cc services.cc protocols.cc nmap_rpc.cc portlist.cc NmapOps.cc TargetGroup.cc Target.cc FingerPrintResults.cc service_scan.cc NmapOutputTable.cc MACLookup.cc nmap_tty.cc nmap_dns.cc traceroute.cc portreasons.cc $(NSE_SRC) @COMPAT_SRCS@
++export SRCS = main.cc nmap.cc targets.cc tcpip.cc nmap_error.cc utils.cc idle_scan.cc osscan.cc osscan2.cc output.cc payload.cc scan_engine.cc timing.cc charpool.cc services.cc protocols.cc nmap_rpc.cc portlist.cc NmapOps.cc TargetGroup.cc Target.cc FingerPrintResults.cc service_scan.cc NmapOutputTable.cc MACLookup.cc nmap_tty.cc nmap_dns.cc traceroute.cc portreasons.cc droppriv.cc $(NSE_SRC) @COMPAT_SRCS@
  
--export HDRS = charpool.h FingerPrintResults.h global_structures.h idle_scan.h MACLookup.h nmap_amigaos.h nmap_dns.h nmap_error.h nmap.h NmapOps.h NmapOutputTable.h nmap_rpc.h nmap_tty.h nmap_winconfig.h osscan.h osscan2.h output.h portlist.h protocols.h scan_engine.h service_scan.h services.h TargetGroup.h Target.h targets.h tcpip.h timing.h utils.h traceroute.h portreasons.h $(NSE_HDRS)
-+export HDRS = charpool.h FingerPrintResults.h global_structures.h idle_scan.h MACLookup.h nmap_amigaos.h nmap_dns.h nmap_error.h nmap.h NmapOps.h NmapOutputTable.h nmap_rpc.h nmap_tty.h nmap_winconfig.h osscan.h osscan2.h output.h portlist.h protocols.h scan_engine.h service_scan.h services.h TargetGroup.h Target.h targets.h tcpip.h timing.h utils.h traceroute.h portreasons.h droppriv.h $(NSE_HDRS)
+-export HDRS = charpool.h FingerPrintResults.h global_structures.h idle_scan.h MACLookup.h nmap_amigaos.h nmap_dns.h nmap_error.h nmap.h NmapOps.h NmapOutputTable.h nmap_rpc.h nmap_tty.h nmap_winconfig.h osscan.h osscan2.h output.h payload.h portlist.h protocols.h scan_engine.h service_scan.h services.h TargetGroup.h Target.h targets.h tcpip.h timing.h utils.h traceroute.h portreasons.h $(NSE_HDRS)
++export HDRS = charpool.h FingerPrintResults.h global_structures.h idle_scan.h MACLookup.h nmap_amigaos.h nmap_dns.h nmap_error.h nmap.h NmapOps.h NmapOutputTable.h nmap_rpc.h nmap_tty.h nmap_winconfig.h osscan.h osscan2.h output.h payload.h portlist.h protocols.h scan_engine.h service_scan.h services.h TargetGroup.h Target.h targets.h tcpip.h timing.h utils.h traceroute.h portreasons.h droppriv.h $(NSE_HDRS)
  
--OBJS = main.o nmap.o targets.o tcpip.o nmap_error.o utils.o idle_scan.o osscan.o osscan2.o output.o scan_engine.o timing.o charpool.o services.o protocols.o nmap_rpc.o portlist.o NmapOps.o TargetGroup.o Target.o FingerPrintResults.o service_scan.o NmapOutputTable.o MACLookup.o nmap_tty.o nmap_dns.o  traceroute.o portreasons.o $(NSE_OBJS) @COMPAT_OBJS@
-+OBJS = main.o nmap.o targets.o tcpip.o nmap_error.o utils.o idle_scan.o osscan.o osscan2.o output.o scan_engine.o timing.o charpool.o services.o protocols.o nmap_rpc.o portlist.o NmapOps.o TargetGroup.o Target.o FingerPrintResults.o service_scan.o NmapOutputTable.o MACLookup.o nmap_tty.o nmap_dns.o  traceroute.o portreasons.o droppriv.o $(NSE_OBJS) @COMPAT_OBJS@
+-OBJS = main.o nmap.o targets.o tcpip.o nmap_error.o utils.o idle_scan.o osscan.o osscan2.o output.o payload.o scan_engine.o timing.o charpool.o services.o protocols.o nmap_rpc.o portlist.o NmapOps.o TargetGroup.o Target.o FingerPrintResults.o service_scan.o NmapOutputTable.o MACLookup.o nmap_tty.o nmap_dns.o  traceroute.o portreasons.o $(NSE_OBJS) @COMPAT_OBJS@
++OBJS = main.o nmap.o targets.o tcpip.o nmap_error.o utils.o idle_scan.o osscan.o osscan2.o output.o payload.o scan_engine.o timing.o charpool.o services.o protocols.o nmap_rpc.o portlist.o NmapOps.o TargetGroup.o Target.o FingerPrintResults.o service_scan.o NmapOutputTable.o MACLookup.o nmap_tty.o nmap_dns.o  traceroute.o portreasons.o droppriv.o $(NSE_OBJS) @COMPAT_OBJS@
  
  # %.o : %.cc -- nope this is a GNU extension
  .cc.o:
 --- nmap/configure.ac
 +++ nmap/configure.ac
-@@ -731,6 +731,50 @@ if test $ac_cv_ip_has_ip_sum = yes ; then
+@@ -713,6 +713,50 @@ if test $ac_cv_ip_has_ip_sum = yes ; then
          AC_DEFINE(HAVE_IP_IP_SUM, 1, [Define to 1 for ip_sum member])
  fi
  
@@ -211,7 +211,7 @@
  #include "NmapOps.h"
  #include "MACLookup.h"
  #include "traceroute.h"
-@@ -1495,6 +1496,20 @@ int nmap_main(int argc, char *argv[]) {
+@@ -1487,6 +1488,20 @@ int nmap_main(int argc, char *argv[]) {
        o.sendpref = PACKET_SEND_ETH_STRONG;
    }
  
@@ -219,7 +219,7 @@
 +  if(o.scriptupdatedb) {
 +	script_updatedb();
 +	// disable warnings
-+  	o.max_ips_to_scan = o.numhosts_scanned;
++  	o.max_ips_to_scan = o.numhosts_scanned; 
 +  }
 +  if (o.servicescan)
 +    o.scriptversion = 1;
@@ -229,25 +229,25 @@
 +
 +  drop_priv();
 +
-   /* By now, we've got our port lists.  Give the user a warning if no 
+   /* By now, we've got our port lists.  Give the user a warning if no
     * ports are specified for the type of scan being requested.  Other things
     * (such as OS ident scan) might break cause no ports were specified,  but
-@@ -1674,18 +1689,6 @@ int nmap_main(int argc, char *argv[]) {
-       free(exclude_spec);
+@@ -1671,18 +1686,6 @@ int nmap_main(int argc, char *argv[]) {
+       dumpExclude(exclude_group);
    }
  
 -#ifndef NOLUA
--  if(o.scriptupdatedb) {
--	script_updatedb();
--	// disable warnings
--  	o.max_ips_to_scan = o.numhosts_scanned; 
+-  if (o.scriptupdatedb) {
+-    script_updatedb();
+-    // disable warnings
+-    o.max_ips_to_scan = o.numhosts_scanned;
 -  }
 -  if (o.servicescan)
 -    o.scriptversion = 1;
 -  if (o.scriptversion || o.script)
 -    open_nse();
 -#endif
--  
+-
    /* Time to create a hostgroup state object filled with all the requested
       machines. The list is initially empty. It is refilled inside the loop
       whenever it is empty. */
@@ -261,7 +261,7 @@
  #include "NmapOps.h"
  #include "nmap_dns.h"
  #include "nsock.h"
-@@ -1070,7 +1071,7 @@ const char *lookup_cached_host(u32 ip) {
+@@ -1076,7 +1077,7 @@ const char *lookup_cached_host(u32 ip) {
    return tmp;
  }
  
@@ -292,7 +292,7 @@
 --- nmap/protocols.cc
 +++ nmap/protocols.cc
 @@ -91,6 +91,7 @@
- /* $Id: protocols.cc 13888 2009-06-24 21:35:54Z fyodor $ */
+ /* $Id: protocols.cc 14789 2009-08-06 15:10:00Z josh $ */
  
  #include "protocols.h"
 +#include "droppriv.h"
@@ -337,7 +337,7 @@
  #include "NmapOps.h"
  #include "Target.h"
  #include "utils.h"
-@@ -2744,6 +2745,14 @@ void set_pcap_filter(const char *device,
+@@ -2873,6 +2874,14 @@ void set_pcap_filter(const char *device, pcap_t *pd, const char *bpf, ...) {
    pcap_freecode(&fcode);
  }
  
@@ -352,24 +352,26 @@
  /* The 'dev' passed in must be at least 32 bytes long. Returns 0 on success. */
  int ipaddr2devname(char *dev, const struct in_addr *addr) {
    struct interface_info *ifaces;
-@@ -3302,7 +3311,6 @@ static struct sys_route *getsysroutes_dnet(int *howmany) {
+@@ -3492,7 +3501,6 @@ static struct sys_route *getsysroutes_dnet(int *howmany) {
  struct sys_route *getsysroutes(int *howmany) {
    static struct sys_route *routes = NULL;
    static int numroutes = 0;
 -  FILE *routefp;
    int i;
  
-   if (!howmany) fatal("NULL howmany ptr passed to %s()", __func__);
-@@ -3314,7 +3322,7 @@ struct sys_route *getsysroutes(int *howmany) {
+   if (!howmany)
+@@ -3505,16 +3513,18 @@ struct sys_route *getsysroutes(int *howmany) {
    }
  
    /* First let us try Linux-style /proc/net/route */
 -  routefp = fopen("/proc/net/route", "r");
 +  routethrough_init();
-   if (routefp)
+   if (routefp) {
      routes = getsysroutes_proc(routefp, howmany);
-   else
-@@ -3322,6 +3330,9 @@ struct sys_route *getsysroutes(int *howmany) {
+-    fclose(routefp);
+   } else {
+     routes = getsysroutes_dnet(howmany);
+   }
  
    numroutes = *howmany;
  
@@ -377,5 +379,5 @@
 +  routefp = NULL;
 +
    /* Ensure that the route array is sorted by netmask */
-   for(i=1; i < numroutes; i++) {
-     if (ntohl(routes[i].netmask) > ntohl(routes[i-1].netmask)) 
+   for (i = 1; i < numroutes; i++) {
+     if (ntohl(routes[i].netmask) > ntohl(routes[i - 1].netmask))

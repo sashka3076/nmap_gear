@@ -1,6 +1,6 @@
 --- nmap/configure.ac
 +++ nmap/configure.ac
-@@ -107,6 +107,7 @@ AC_PATH_TOOL([STRIP], [strip], [/bin/true])
+@@ -87,6 +87,7 @@ AC_PATH_TOOL([STRIP], [strip], [/bin/true])
  needs_cpp_precomp=no
  
  LUA_CFLAGS="-DLUA_USE_POSIX -DLUA_USE_DLOPEN"
@@ -8,7 +8,7 @@
  
  case "$host" in
    *alpha-dec-osf*)
-@@ -114,15 +115,15 @@ case "$host" in
+@@ -94,15 +95,15 @@ case "$host" in
      ;;
    *-netbsd* | *-knetbsd*-gnu)
      AC_DEFINE(NETBSD)
@@ -27,7 +27,7 @@
      ;;
    *-bsdi*)
      AC_DEFINE(BSDI)
-@@ -177,7 +178,7 @@ case "$host" in
+@@ -157,7 +158,7 @@ case "$host" in
      ;;
    *-linux*)
      AC_DEFINE(LINUX)
@@ -36,7 +36,7 @@
      ;;
    *-apple-darwin*)
      AC_DEFINE(MACOSX)
-@@ -612,6 +613,7 @@ else
+@@ -594,6 +595,7 @@ else
    fi
  
    INSTALLNSE="install-nse"
