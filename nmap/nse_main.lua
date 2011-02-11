@@ -303,6 +303,7 @@ do
     local script_type = assert(NSE_SCRIPT_RULES[rule]);
     if not self[rule] then return nil end -- No rule for this script?
     local file_closure = self.file_closure;
+    -- Rebuild the environment for the running thread.
     local env = {
         SCRIPT_PATH = self.filename,
         SCRIPT_NAME = self.short_basename,
@@ -366,10 +367,15 @@ do
           "Warning: Loading '%s' -- the recommended file extension is '.nse'.",
           filename);
     end
+    local basename = match(filename, "[/\\]([^/\\]-)$") or filename;
+    local short_basename = match(filename, "[/\\]([^/\\]-)%.nse$") or
+                       match(filename, "[/\\]([^/\\]-)%.[^.]*$") or
+                       filename;
     local file_closure = assert(loadfile(filename));
     -- Give the closure its own environment, with global access
     local env = {
-      filename = filename,
+      SCRIPT_PATH = filename,
+      SCRIPT_NAME = short_basename,
       dependencies = {},
     };
     setmetatable(env, {__index = _G});
@@ -412,11 +418,9 @@ do
     -- Return the script
     local script = {
       filename = filename,
-      basename = match(filename, "[/\\]([^/\\]-)$") or filename,
-      short_basename = match(filename, "[/\\]([^/\\]-)%.nse$") or
-                       match(filename, "[/\\]([^/\\]-)%.[^.]*$") or
-                       filename,
-      id = match(filename, "^.-[/\\]([^\\/]-)%.nse$") or filename,
+      basename = basename,
+      short_basename = short_basename,
+      id = match(filename, "^.-[/\\]([^\\/]-)%.nse$") or short_basename,
       file_closure = file_closure,
       prerule = prerule,
       hostrule = hostrule,
@@ -627,7 +631,7 @@ end
 -- Arguments:
 --   threads  An array of threads (a runlevel) to run.
 --   scantype  A string that indicates the current script scan phase.
-local function run (threads_iter, scantype)
+local function run (threads_iter, scantype, hosts)
   -- running scripts may be resumed at any time. waiting scripts are
   -- yielded until Nsock wakes them. After being awakened with
   -- nse_restore, waiting threads become pending and later are moved all
@@ -722,6 +726,18 @@ local function run (threads_iter, scantype)
   end
   if num_threads == 0 then
     return
+  end
+
+  if (scantype == NSE_PRE_SCAN) then
+    print_verbose(1, "Script Pre-scanning.");
+  elseif (scantype == NSE_SCAN) then
+    if #hosts > 1 then
+      print_verbose(1, "Script scanning %d hosts.", #hosts);
+    elseif #hosts == 1 then
+      print_verbose(1, "Script scanning %s.", hosts[1].ip);
+    end
+  elseif (scantype == NSE_POST_SCAN) then
+    print_verbose(1, "Script Post-scanning.");
   end
 
   local progress = cnse.scan_progress_meter(NAME);
@@ -1043,18 +1059,6 @@ local function main (hosts, scantype)
     insert(runlevels[script.runlevel], script);
   end
 
-  if (scantype == NSE_PRE_SCAN) then
-    print_verbose(1, "Script Pre-scanning.");
-  elseif (scantype == NSE_SCAN) then
-    if #hosts > 1 then
-      print_verbose(1, "Script scanning %d hosts.", #hosts);
-    elseif #hosts == 1 then
-      print_verbose(1, "Script scanning %s.", hosts[1].ip);
-    end
-  elseif (scantype == NSE_POST_SCAN) then
-    print_verbose(1, "Script Post-scanning.");
-  end
-
   for runlevel, scripts in ipairs(runlevels) do
     -- This iterator is passed to the run function. It returns one new script
     -- thread on demand until exhausted.
@@ -1101,8 +1105,8 @@ local function main (hosts, scantype)
         end
       end
     end
-    print_verbose(1, "Starting runlevel %u (of %u) scan.", runlevel, #runlevels);
-    run(wrap(threads_iter), scantype)
+    print_verbose(2, "Starting runlevel %u (of %u) scan.", runlevel, #runlevels);
+    run(wrap(threads_iter), scantype, hosts)
   end
 
   collectgarbage "collect";

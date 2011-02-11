@@ -708,8 +708,9 @@ There was an error while parsing the XML file generated from the scan:
         self.refresh_port_output()
         # Switch nmap output to show first host occourrence
         model, selection = self.host_view_selection.get_selected_rows()
-        if len(selection) > 0:
-            self.go_to_host(model[0][2])
+        for path in selection:
+            self.go_to_host(model[path][2])
+            break
 
     def service_selection_changed(self, widget):
         self.refresh_host_output()

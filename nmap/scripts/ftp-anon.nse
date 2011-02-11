@@ -78,11 +78,11 @@ local function list(socket, target, max_lines)
 	local listing = {}
 	while not max_lines or #listing < max_lines do
 		local status, data = list_socket:receive_buf("\r?\n", false)
+		if (not status and data == "EOF") or data == "" then
+			break
+		end
 		if not status then
 			return status, data
-		end
-		if data == "" then
-			break
 		end
 		listing[#listing + 1] = data
 	end
@@ -162,18 +162,22 @@ action = function(host, port)
 	result[#result + 1] = "Anonymous FTP login allowed (FTP code " .. code .. ")"
 
 	if not max_list or max_list > 0 then
-		local listing = try(list(socket, host, max_list))
+		local status, listing = list(socket, host, max_list)
 		socket:close()
 	
-		for _, item in ipairs(listing) do
-			-- Just a quick passive check on user rights.
-			if string.match(item, "^[d-].......w.") then
-				item = item .. " [NSE: writeable]"
+		if not status then
+			result[#result + 1] = "Can't get directory listing: " .. listing
+		else
+			for _, item in ipairs(listing) do
+				-- Just a quick passive check on user rights.
+				if string.match(item, "^[d-].......w.") then
+					item = item .. " [NSE: writeable]"
+				end
+				result[#result + 1] = item
 			end
-			result[#result + 1] = item
-		end
-		if max_list and #listing == max_list then
-			result[#result + 1] = string.format("Only %d shown. Use --script-args %s.maxlist=-1 to see all.", #listing, SCRIPT_NAME)
+			if max_list and #listing == max_list then
+				result[#result + 1] = string.format("Only %d shown. Use --script-args %s.maxlist=-1 to see all.", #listing, SCRIPT_NAME)
+			end
 		end
 	end
 

@@ -9,7 +9,7 @@
 #     --define "openssl /usr/local/ssl"
 
 %define name nmap
-%define version 5.50
+%define version 5.51
 %define release 1
 %define _prefix /usr
 

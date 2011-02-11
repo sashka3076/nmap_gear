@@ -96,6 +96,7 @@
 #include "output.h"
 #include "NpingOps.h"
 #include "ProbeMode.h"
+#include <signal.h>
 
 extern NpingOps o;
 extern EchoServer es;

@@ -1,4 +1,49 @@
-# Nmap Changelog ($Id: CHANGELOG 22072 2011-01-28 01:10:25Z fyodor $); -*-text-*-
+# Nmap Changelog ($Id: CHANGELOG 22229 2011-02-11 21:20:23Z fyodor $); -*-text-*-
+
+Nmap 5.51 [2011-02-11]
+
+o [Ndiff] Added support for prerule and postrule scripts. [David]
+
+o [NSE] Fixed a bug which caused some NSE scripts to fail due to the
+  absence of the NSE SCRIPT_NAME environment variable when loaded.
+  Michael Pattrick reported the problem. [Djalal]
+
+o [Zenmap] Selecting one of the scan targets in the left pane is
+  supposed to jump to that host in the Nmap Output in the right pane
+  (but it wasn't).  Brian Krebs reported this bug. [David]
+
+o Fixed an obscure bug in Windows interface matching. If the MAC
+  address of an interface couldn't be retrieved, it might have been
+  used instead of the correct interface. Alexander Khodyrev reported
+  the problem.  [David]
+
+o [NSE] Fixed portrules in dns-zone-transfer and ftp-proftpd-backdoor
+  that used shortport functions incorrectly and always returned
+  true. [Jost Krieger]
+
+o [Ndiff] Fixed ndiff.dtd to include two elements that can be diffed:
+  status and address. [Daniel Miller]
+
+o [Ndiff] Fixed the ordering of hostscript-related elements in XML
+  output. [Daniel Miller]
+
+o [NSE] Fixed a bug in the nrpe-enum script that would make it run for
+  every port (when it was selected--it isn't by default).  Daniel
+  Miller reported the bug. [Patrick]
+
+o [NSE] When an NSE script sets a negative socket timeout, it now
+  causes a controlled Lua stack trace instead of a fatal error.
+  Vlatko Kosturjak reported the bug. [David]
+
+o [Zenmap] Worked around an error that caused the py2app bootstrap
+  executable to be non-universal even when the rest of the application
+  was universal. This prevented the binary .dmg from working on
+  PowerPC. Yxynaxen reported the problem. [David]
+
+o [Ndiff] Fixed an output line that wasn't being redirected to a file
+  when all other output was. [Daniel Miller]
+
+Nmap 5.50 [2011-01-28]
 
 o [Zenmap] Added a new script selection interface, allowing you to
   choose scripts and arguments from a list which includes descriptions
@@ -575,6 +620,10 @@ o The command line in XML output (/nmaprun/@args attribute) now does
 
 o Added a service detection probe for master servers of Quake 3 and
   related games.  [Toni Ruottu]
+
+o [Zenmap] Fixed an crash when printing a scan that had no output
+  (like a scan made by command-line Nmap). Henri Doreau noticed the
+  error. [David]
 
 Nmap 5.35DC1 [2010-07-16]
 

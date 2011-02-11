@@ -180,10 +180,10 @@ class NmapOutputViewer (gtk.VBox):
         start_iter, end_iter = buff.get_bounds()
 
         output = buff.get_text(start_iter, end_iter).split("\n")
-        re_host = re.compile("%s\s{0,1}:" % re.escape(host))
+        re_host = re.compile(r'^Nmap scan report for %s\s*$' % re.escape(host))
 
         for i in xrange(len(output)):
-            if re_host.search(output[i]):
+            if re_host.match(output[i]):
                 self.text_view.scroll_to_iter(buff.get_iter_at_line(i), 0, True, 0, 0)
                 break
 

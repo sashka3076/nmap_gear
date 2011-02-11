@@ -89,7 +89,7 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: nmap.h 21947 2011-01-21 23:10:38Z fyodor $ */
+/* $Id: nmap.h 22228 2011-02-11 21:09:04Z fyodor $ */
 
 #ifndef NMAP_H
 #define NMAP_H
@@ -252,8 +252,8 @@ void *realloc();
 #ifndef NMAP_VERSION
 /* Edit this definition only within the quotes, because it is read from this
    file by the makefiles. */
-#define NMAP_VERSION "5.50"
-#define NMAP_NUM_VERSION "5.50.0.0"
+#define NMAP_VERSION "5.51"
+#define NMAP_NUM_VERSION "5.51.0.0"
 #endif
 
 /* User configurable #defines: */
