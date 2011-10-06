@@ -1,14 +1,14 @@
 --- nmap/MACLookup.cc
 +++ nmap/MACLookup.cc
-@@ -99,6 +99,7 @@
- #include "nmap.h"
+@@ -100,6 +100,7 @@
+ #include "NmapOps.h"
  #include "nmap_error.h"
  #include "charpool.h"
 +#include "droppriv.h"
  
  extern NmapOps o;
  
-@@ -108,7 +109,7 @@ static inline int MacCharPrefix2Key(const u8 *prefix) {
+@@ -109,7 +110,7 @@ static inline int MacCharPrefix2Key(const u8 *prefix) {
    return (prefix[0] << 16) + (prefix[1] << 8) + prefix[2];
  }
  
@@ -19,24 +19,24 @@
    initialized = 1;
 --- nmap/Makefile.in
 +++ nmap/Makefile.in
-@@ -87,11 +87,11 @@ NSE_OBJS+=nse_openssl.o nse_ssl_cert.o
+@@ -93,11 +93,11 @@ NSE_OBJS+=nse_openssl.o nse_ssl_cert.o
  endif
  endif
  
--export SRCS = main.cc nmap.cc targets.cc tcpip.cc nmap_error.cc utils.cc idle_scan.cc osscan.cc osscan2.cc output.cc payload.cc scan_engine.cc timing.cc charpool.cc services.cc protocols.cc nmap_rpc.cc portlist.cc NmapOps.cc TargetGroup.cc Target.cc FingerPrintResults.cc service_scan.cc NmapOutputTable.cc MACLookup.cc nmap_tty.cc nmap_dns.cc traceroute.cc portreasons.cc $(NSE_SRC) @COMPAT_SRCS@
-+export SRCS = main.cc nmap.cc targets.cc tcpip.cc nmap_error.cc utils.cc idle_scan.cc osscan.cc osscan2.cc output.cc payload.cc scan_engine.cc timing.cc charpool.cc services.cc protocols.cc nmap_rpc.cc portlist.cc NmapOps.cc TargetGroup.cc Target.cc FingerPrintResults.cc service_scan.cc NmapOutputTable.cc MACLookup.cc nmap_tty.cc nmap_dns.cc traceroute.cc portreasons.cc droppriv.cc $(NSE_SRC) @COMPAT_SRCS@
+-export SRCS = main.cc nmap.cc targets.cc tcpip.cc nmap_error.cc utils.cc idle_scan.cc osscan.cc osscan2.cc output.cc payload.cc scan_engine.cc timing.cc charpool.cc services.cc protocols.cc nmap_rpc.cc portlist.cc NmapOps.cc TargetGroup.cc Target.cc FingerPrintResults.cc service_scan.cc NmapOutputTable.cc MACLookup.cc nmap_tty.cc nmap_dns.cc traceroute.cc portreasons.cc xml.cc $(NSE_SRC) @COMPAT_SRCS@
++export SRCS = main.cc nmap.cc targets.cc tcpip.cc nmap_error.cc utils.cc idle_scan.cc osscan.cc osscan2.cc output.cc payload.cc scan_engine.cc timing.cc charpool.cc services.cc protocols.cc nmap_rpc.cc portlist.cc NmapOps.cc TargetGroup.cc Target.cc FingerPrintResults.cc service_scan.cc NmapOutputTable.cc MACLookup.cc nmap_tty.cc nmap_dns.cc traceroute.cc portreasons.cc xml.cc droppriv.cc $(NSE_SRC) @COMPAT_SRCS@
  
--export HDRS = charpool.h FingerPrintResults.h global_structures.h idle_scan.h MACLookup.h nmap_amigaos.h nmap_dns.h nmap_error.h nmap.h NmapOps.h NmapOutputTable.h nmap_rpc.h nmap_tty.h nmap_winconfig.h osscan.h osscan2.h output.h payload.h portlist.h protocols.h scan_engine.h service_scan.h services.h TargetGroup.h Target.h targets.h tcpip.h timing.h utils.h traceroute.h portreasons.h $(NSE_HDRS)
-+export HDRS = charpool.h FingerPrintResults.h global_structures.h idle_scan.h MACLookup.h nmap_amigaos.h nmap_dns.h nmap_error.h nmap.h NmapOps.h NmapOutputTable.h nmap_rpc.h nmap_tty.h nmap_winconfig.h osscan.h osscan2.h output.h payload.h portlist.h protocols.h scan_engine.h service_scan.h services.h TargetGroup.h Target.h targets.h tcpip.h timing.h utils.h traceroute.h portreasons.h droppriv.h $(NSE_HDRS)
+-export HDRS = charpool.h FingerPrintResults.h global_structures.h idle_scan.h MACLookup.h nmap_amigaos.h nmap_dns.h nmap_error.h nmap.h NmapOps.h NmapOutputTable.h nmap_rpc.h nmap_tty.h nmap_winconfig.h osscan.h osscan2.h output.h payload.h portlist.h protocols.h scan_engine.h service_scan.h services.h TargetGroup.h Target.h targets.h tcpip.h timing.h utils.h traceroute.h portreasons.h xml.h $(NSE_HDRS)
++export HDRS = charpool.h FingerPrintResults.h global_structures.h idle_scan.h MACLookup.h nmap_amigaos.h nmap_dns.h nmap_error.h nmap.h NmapOps.h NmapOutputTable.h nmap_rpc.h nmap_tty.h nmap_winconfig.h osscan.h osscan2.h output.h payload.h portlist.h protocols.h scan_engine.h service_scan.h services.h TargetGroup.h Target.h targets.h tcpip.h timing.h utils.h traceroute.h portreasons.h xml.h droppriv.h $(NSE_HDRS)
  
--OBJS = main.o nmap.o targets.o tcpip.o nmap_error.o utils.o idle_scan.o osscan.o osscan2.o output.o payload.o scan_engine.o timing.o charpool.o services.o protocols.o nmap_rpc.o portlist.o NmapOps.o TargetGroup.o Target.o FingerPrintResults.o service_scan.o NmapOutputTable.o MACLookup.o nmap_tty.o nmap_dns.o  traceroute.o portreasons.o $(NSE_OBJS) @COMPAT_OBJS@
-+OBJS = main.o nmap.o targets.o tcpip.o nmap_error.o utils.o idle_scan.o osscan.o osscan2.o output.o payload.o scan_engine.o timing.o charpool.o services.o protocols.o nmap_rpc.o portlist.o NmapOps.o TargetGroup.o Target.o FingerPrintResults.o service_scan.o NmapOutputTable.o MACLookup.o nmap_tty.o nmap_dns.o  traceroute.o portreasons.o droppriv.o $(NSE_OBJS) @COMPAT_OBJS@
+-OBJS = main.o nmap.o targets.o tcpip.o nmap_error.o utils.o idle_scan.o osscan.o osscan2.o output.o payload.o scan_engine.o timing.o charpool.o services.o protocols.o nmap_rpc.o portlist.o NmapOps.o TargetGroup.o Target.o FingerPrintResults.o service_scan.o NmapOutputTable.o MACLookup.o nmap_tty.o nmap_dns.o  traceroute.o portreasons.o xml.o $(NSE_OBJS) @COMPAT_OBJS@
++OBJS = main.o nmap.o targets.o tcpip.o nmap_error.o utils.o idle_scan.o osscan.o osscan2.o output.o payload.o scan_engine.o timing.o charpool.o services.o protocols.o nmap_rpc.o portlist.o NmapOps.o TargetGroup.o Target.o FingerPrintResults.o service_scan.o NmapOutputTable.o MACLookup.o nmap_tty.o nmap_dns.o  traceroute.o portreasons.o xml.o droppriv.o $(NSE_OBJS) @COMPAT_OBJS@
  
  # %.o : %.cc -- nope this is a GNU extension
  .cc.o:
 --- nmap/configure.ac
 +++ nmap/configure.ac
-@@ -713,6 +713,50 @@ if test $ac_cv_ip_has_ip_sum = yes ; then
+@@ -745,6 +745,50 @@ if test $ac_cv_ip_has_ip_sum = yes ; then
          AC_DEFINE(HAVE_IP_IP_SUM, 1, [Define to 1 for ip_sum member])
  fi
  
@@ -89,7 +89,7 @@
  RECVFROM_ARG6_TYPE
 --- /dev/null
 +++ nmap/droppriv.cc
-@@ -0,0 +1,95 @@
+@@ -0,0 +1,96 @@
 +#include "nmap.h"
 +#include "service_scan.h"
 +#include "utils.h"
@@ -149,6 +149,7 @@
 +	AllProbes::service_scan_init();
 +	routethrough_init();
 +	mac_prefix_init();
++	init_payloads();
 +	if (!o.noresolve) etchosts_init();
 +
 +	if (setgroups(0, 0) < 0)
@@ -187,7 +188,7 @@
 +#endif /* NMAP_USER */
 --- /dev/null
 +++ nmap/droppriv.h
-@@ -0,0 +1,13 @@
+@@ -0,0 +1,14 @@
 +#ifndef NMAP_DROPPRIV_H__
 +#define NMAP_DROPPRIV_H__
 +
@@ -199,8 +200,52 @@
 +extern void routethrough_init(void);
 +extern void mac_prefix_init(void);
 +extern void etchosts_init(void);
++extern void init_payloads(void);
 +
 +#endif /* NMAP_DROPPRIV_H__ */
+--- nmap/libnetutil/netutil.cc
++++ nmap/libnetutil/netutil.cc
+@@ -1258,6 +1258,13 @@ struct interface_info *getinterfaces(int *howmany, char *errstr, size_t errstrle
+   return mydevs;
+ }
+ 
++static FILE *routefp;
++
++void routethrough_init(void)
++{
++  if (!routefp)
++     routefp = fopen("/proc/net/route", "r");
++}
+ 
+ /* The 'dev' passed in must be at least 32 bytes long. Returns 0 on success. */
+ int ipaddr2devname(char *dev, const struct in_addr *addr) {
+@@ -1610,7 +1617,6 @@ static struct sys_route *getsysroutes_dnet(int *howmany, char *errstr, size_t er
+ struct sys_route *getsysroutes(int *howmany, char *errstr, size_t errstrlen) {
+   static struct sys_route *routes = NULL;
+   static int numroutes = 0;
+-  FILE *routefp;
+   assert(howmany);
+   
+   if (routes != NULL) {
+@@ -1620,14 +1626,16 @@ struct sys_route *getsysroutes(int *howmany, char *errstr, size_t errstrlen) {
+   }
+ 
+   /* First let us try Linux-style /proc/net/route */
+-  routefp = fopen("/proc/net/route", "r");
++  routethrough_init();
+   if (routefp) {
+     routes = getsysroutes_proc(routefp, howmany, errstr, errstrlen);
+-    fclose(routefp);
+   } else {
+     routes = getsysroutes_dnet(howmany, errstr, errstrlen);
+   }
+ 
++  fclose(routefp);
++  routefp = NULL;
++
+   /* Check if we managed to get the routes and sort them if we did */
+   if(routes==NULL){
+     *howmany=-1;
 --- nmap/nmap.cc
 +++ nmap/nmap.cc
 @@ -96,6 +96,7 @@
@@ -211,20 +256,27 @@
  #include "NmapOps.h"
  #include "MACLookup.h"
  #include "traceroute.h"
-@@ -1487,6 +1488,20 @@ int nmap_main(int argc, char *argv[]) {
+@@ -1414,6 +1415,27 @@ int nmap_main(int argc, char *argv[]) {
        o.sendpref = PACKET_SEND_ETH_STRONG;
    }
  
 +#ifndef NOLUA
-+  if(o.scriptupdatedb) {
-+	script_updatedb();
-+	// disable warnings
-+  	o.max_ips_to_scan = o.numhosts_scanned; 
++  if (o.scriptupdatedb) {
++    o.max_ips_to_scan = o.numhosts_scanned; // disable warnings?
 +  }
 +  if (o.servicescan)
 +    o.scriptversion = 1;
-+  if (o.scriptversion || o.script)
++  if (o.scriptversion || o.script || o.scriptupdatedb)
 +    open_nse();
++
++  /* Run the script pre-scanning phase */
++  if (o.script) {
++    new_targets = NewTargets::get();
++    script_scan_results = get_script_scan_results_obj();
++    script_scan(Targets, SCRIPT_PRE_SCAN);
++    printscriptresults(script_scan_results, SCRIPT_PRE_SCAN);
++    script_scan_results->clear();
++  }
 +#endif
 +
 +  drop_priv();
@@ -232,20 +284,27 @@
    /* By now, we've got our port lists.  Give the user a warning if no
     * ports are specified for the type of scan being requested.  Other things
     * (such as OS ident scan) might break cause no ports were specified,  but
-@@ -1671,18 +1686,6 @@ int nmap_main(int argc, char *argv[]) {
+@@ -1612,25 +1634,6 @@ int nmap_main(int argc, char *argv[]) {
        dumpExclude(exclude_group);
    }
  
 -#ifndef NOLUA
 -  if (o.scriptupdatedb) {
--    script_updatedb();
--    // disable warnings
--    o.max_ips_to_scan = o.numhosts_scanned;
+-    o.max_ips_to_scan = o.numhosts_scanned; // disable warnings?
 -  }
 -  if (o.servicescan)
 -    o.scriptversion = 1;
--  if (o.scriptversion || o.script)
+-  if (o.scriptversion || o.script || o.scriptupdatedb)
 -    open_nse();
+-
+-  /* Run the script pre-scanning phase */
+-  if (o.script) {
+-    new_targets = NewTargets::get();
+-    script_scan_results = get_script_scan_results_obj();
+-    script_scan(Targets, SCRIPT_PRE_SCAN);
+-    printscriptresults(script_scan_results, SCRIPT_PRE_SCAN);
+-    script_scan_results->clear();
+-  }
 -#endif
 -
    /* Time to create a hostgroup state object filled with all the requested
@@ -253,8 +312,8 @@
       whenever it is empty. */
 --- nmap/nmap_dns.cc
 +++ nmap/nmap_dns.cc
-@@ -155,6 +155,7 @@
- #include <algorithm>
+@@ -149,6 +149,7 @@
+ #endif
  
  #include "nmap.h"
 +#include "droppriv.h"
@@ -280,7 +339,7 @@
  #include "NmapOps.h"
  #include "Target.h"
  #include "charpool.h"
-@@ -113,7 +114,7 @@ static unsigned long rpc_xid_base = (unsigned long) -1;
+@@ -114,7 +115,7 @@ static unsigned long rpc_xid_base = (unsigned long) -1;
  static size_t tcp_readlen=0; /* used in get_rpc_results but can be reset in 
  			    send_rpc_query */
  
@@ -292,7 +351,7 @@
 --- nmap/protocols.cc
 +++ nmap/protocols.cc
 @@ -91,6 +91,7 @@
- /* $Id: protocols.cc 14789 2009-08-06 15:10:00Z josh $ */
+ /* $Id: protocols.cc 21904 2011-01-21 00:04:16Z fyodor $ */
  
  #include "protocols.h"
 +#include "droppriv.h"
@@ -310,17 +369,17 @@
    char filename[512];
 --- nmap/services.cc
 +++ nmap/services.cc
-@@ -94,6 +94,7 @@
- #include <map>
+@@ -92,6 +92,7 @@
  
+ #include "nmap.h"
  #include "services.h"
 +#include "droppriv.h"
  #include "NmapOps.h"
  #include "charpool.h"
  #include "nmap_error.h"
-@@ -137,7 +138,7 @@ static std::list<service_node> services_by_ratio;
- static int services_initialized = 0;
- static int ratio_format = 0; // 0 = /etc/services no-ratio format. 1 = new nmap format
+@@ -138,7 +139,7 @@ static std::list<service_node> services_by_ratio;
+ static int services_initialized;
+ static int ratio_format; // 0 = /etc/services no-ratio format. 1 = new nmap format
  
 -static int nmap_services_init() {
 +int nmap_services_init() {
@@ -329,55 +388,11 @@
    char filename[512];
 --- nmap/tcpip.cc
 +++ nmap/tcpip.cc
-@@ -96,6 +96,7 @@
- #include "portreasons.h"
+@@ -99,6 +99,7 @@
  #include <dnet.h>
+ #include <net/if_arp.h>
  #include "tcpip.h"
 +#include "droppriv.h"
  #include "NmapOps.h"
  #include "Target.h"
  #include "utils.h"
-@@ -2873,6 +2874,14 @@ void set_pcap_filter(const char *device, pcap_t *pd, const char *bpf, ...) {
-   pcap_freecode(&fcode);
- }
- 
-+static FILE *routefp;
-+
-+void routethrough_init(void)
-+{
-+  if (!routefp)
-+     routefp = fopen("/proc/net/route", "r");
-+}
-+
- /* The 'dev' passed in must be at least 32 bytes long. Returns 0 on success. */
- int ipaddr2devname(char *dev, const struct in_addr *addr) {
-   struct interface_info *ifaces;
-@@ -3492,7 +3501,6 @@ static struct sys_route *getsysroutes_dnet(int *howmany) {
- struct sys_route *getsysroutes(int *howmany) {
-   static struct sys_route *routes = NULL;
-   static int numroutes = 0;
--  FILE *routefp;
-   int i;
- 
-   if (!howmany)
-@@ -3505,16 +3513,18 @@ struct sys_route *getsysroutes(int *howmany) {
-   }
- 
-   /* First let us try Linux-style /proc/net/route */
--  routefp = fopen("/proc/net/route", "r");
-+  routethrough_init();
-   if (routefp) {
-     routes = getsysroutes_proc(routefp, howmany);
--    fclose(routefp);
-   } else {
-     routes = getsysroutes_dnet(howmany);
-   }
- 
-   numroutes = *howmany;
- 
-+  fclose(routefp);
-+  routefp = NULL;
-+
-   /* Ensure that the route array is sorted by netmask */
-   for (i = 1; i < numroutes; i++) {
-     if (ntohl(routes[i].netmask) > ntohl(routes[i - 1].netmask))

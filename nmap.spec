@@ -15,18 +15,21 @@ Source: %srcname.tar
 Source1: zenmap.pamd
 Source2: zenmap.security
 
-Patch1: nmap-5.20-owl-nse_ldflags.patch
-Patch2: nmap-5.20-alt-owl-autoheader.patch
-Patch3: nmap-5.20-alt-owl-drop-priv.patch
-Patch4: nmap-5.20-alt-owl-dot-dir.patch
-Patch5: nmap-5.20-alt-owl-fileexistsandisreadable.patch
-Patch6: nmap-5.20-owl-include.patch
-Patch7: nmap-5.21-owl-warnings.patch
-Patch8: nmap-5.20-owl-route.patch
-Patch11: nmap-5.00-alt-ncat-certs.patch
-Patch12: nmap-5.00-alt-libdnet.patch
-Patch13: nmap-5.21-alt-zenmap-desktop.patch
-Patch14: nmap-5.21-rh-zenmap-locale.patch
+Patch0: nmap-5.51-owl-nse_ldflags.patch
+Patch1: nmap-5.51-alt-owl-autoheader.patch
+Patch2: nmap-5.51-alt-nsock-autoheader.patch
+Patch3: nmap-5.51-alt-owl-drop-priv.patch
+Patch4: nmap-5.51-alt-owl-dot-dir.patch
+Patch5: nmap-5.51-alt-owl-fileexistsandisreadable.patch
+Patch6: nmap-5.51-owl-warnings.patch
+Patch7: nmap-5.51-owl-build.patch
+Patch8: nmap-5.51-owl-nping-drop-priv.patch
+Patch9: nmap-5.51-owl-nping-autoheader.patch
+Patch10: nmap-5.51-alt-sctp_chunkhdr.patch
+Patch11: nmap-5.51-alt-ncat-certs.patch
+Patch12: nmap-5.51-alt-libdnet.patch
+Patch13: nmap-5.51-alt-zenmap-desktop.patch
+Patch14: nmap-5.51-rh-zenmap-locale.patch
 
 %def_with liblua
 %def_with ncat
@@ -61,6 +64,7 @@ This package includes zenmap, a GTK+ frontend for Nmap.
 
 %prep
 %setup -q -n %srcname
+%patch0 -p1
 %patch1 -p1
 %patch2 -p1
 %patch3 -p1
@@ -69,6 +73,8 @@ This package includes zenmap, a GTK+ frontend for Nmap.
 %patch6 -p1
 %patch7 -p1
 %patch8 -p1
+%patch9 -p1
+%patch10 -p1
 %patch11 -p1
 %patch12 -p1
 %patch13 -p1

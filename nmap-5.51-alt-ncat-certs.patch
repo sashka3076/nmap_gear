@@ -1,16 +1,16 @@
 --- nmap/ncat/Makefile.in
 +++ nmap/ncat/Makefile.in
-@@ -132,7 +132,6 @@ install: $(TARGET)
- 	@echo Installing Ncat;
- 	$(SHTOOL) mkdir -f -p -m 755 $(DESTDIR)$(bindir) $(DESTDIR)$(pkgdatadir) $(DESTDIR)$(mandir)/man1
- 	$(INSTALL) -c -m 755 -s ncat $(DESTDIR)$(bindir)/ncat
--	$(INSTALL) -c -m 644 $(DATAFILES) $(DESTDIR)$(pkgdatadir)/
- 	$(INSTALL) -c -m 644 docs/$(TARGET).1 $(DESTDIR)$(mandir)/man1/$(TARGET).1
+@@ -75,7 +75,6 @@ DATAFILES =
+ ifneq ($(HAVE_OPENSSL),)
+ SRCS += http_digest.c
+ OBJS += http_digest.o
+-DATAFILES = certs/ca-bundle.crt
+ endif
  
- uninstall:
+ TARGET = ncat
 --- nmap/ncat/ncat_posix.c
 +++ nmap/ncat/ncat_posix.c
-@@ -331,28 +331,14 @@ void set_lf_mode(void)
+@@ -330,28 +330,14 @@ void set_lf_mode(void)
  }
  
  #ifdef HAVE_OPENSSL
