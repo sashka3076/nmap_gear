@@ -1,13 +1,12 @@
 Name: nmap
-Version: 5.21
-Release: alt2
+Version: 5.51
+Release: alt1
 Epoch: 20020501
 
 Summary: Network exploration tool and security scanner
 License: GPLv2
 Group: Monitoring
 Url: http://nmap.org/
-Packager: Dmitry V. Levin <ldv@altlinux.org>
 
 %define srcname nmap-%version
 # http://nmap.org/dist/%srcname.tar.bz2
@@ -34,6 +33,7 @@ Patch14: nmap-5.51-rh-zenmap-locale.patch
 %def_with liblua
 %def_with ncat
 %def_with ndiff
+%def_with nping
 %def_with zenmap
 
 Requires: chrooted-resolv, libdnet >= 0:1.12-alt1
@@ -63,7 +63,7 @@ Requires: %name = %epoch:%version-%release
 This package includes zenmap, a GTK+ frontend for Nmap.
 
 %prep
-%setup -q -n %srcname
+%setup -n %srcname
 %patch0 -p1
 %patch1 -p1
 %patch2 -p1
@@ -79,18 +79,24 @@ This package includes zenmap, a GTK+ frontend for Nmap.
 %patch12 -p1
 %patch13 -p1
 %patch14 -p1
+rm -r libdnet-stripped liblua libpcap libpcre
 bzip2 -9 CHANGELOG
 
 %build
-aclocal
-autoheader
-autoconf
+for d in . nping; do
+	pushd $d
+	aclocal
+	autoheader
+	autoconf
+	popd
+done
 
 export ac_cv_header_libiberty_h=no
 %configure \
 	%{subst_with liblua} \
 	%{subst_with ncat} \
 	%{subst_with ndiff} \
+	%{subst_with nping} \
 	%{subst_with zenmap} \
 	--with-libdnet=/usr \
 	--with-user=nmapuser \
@@ -134,6 +140,10 @@ rm %buildroot%_datadir/zenmap/su-to-zenmap.sh
 %_bindir/ndiff
 %_man1dir/ndiff.*
 %endif
+%if_with nping
+%_bindir/nping
+%_man1dir/nping.*
+%endif
 %doc COPYING* CHANGELOG.bz2 docs/{README,nmap*.txt}
 
 %if_with zenmap
@@ -149,6 +159,10 @@ rm %buildroot%_datadir/zenmap/su-to-zenmap.sh
 %endif
 
 %changelog
+* Thu Oct 06 2011 Dmitry V. Levin <ldv@altlinux.org> 20020501:5.51-alt1
+- Updated to 5.51.
+- Synced with nmap-5.51-owl1.
+
 * Fri Oct 01 2010 Dmitry V. Levin <ldv@altlinux.org> 20020501:5.21-alt2
 - Rebuilt with libssl.so.10.
 
