@@ -1,6 +1,6 @@
 Name: nmap
 Version: 5.51
-Release: alt1
+Release: alt1.1
 Epoch: 20020501
 
 Summary: Network exploration tool and security scanner
@@ -159,6 +159,9 @@ rm %buildroot%_datadir/zenmap/su-to-zenmap.sh
 %endif
 
 %changelog
+* Sat Oct 22 2011 Vitaly Kuznetsov <vitty@altlinux.ru> 20020501:5.51-alt1.1
+- Rebuild with Python-2.7
+
 * Thu Oct 06 2011 Dmitry V. Levin <ldv@altlinux.org> 20020501:5.51-alt1
 - Updated to 5.51.
 - Synced with nmap-5.51-owl1.
