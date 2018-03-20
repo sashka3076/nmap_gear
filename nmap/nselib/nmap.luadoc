@@ -4,8 +4,8 @@
 -- The <code>nmap</code> module is an interface with Nmap's internal functions
 -- and data structures. The API provides target host details such as port
 -- states and version detection results. It also offers an interface to the
--- Nsock library for efficient network I/O. 
--- @copyright Same as Nmap--See http://nmap.org/book/man-legal.html
+-- Nsock library for efficient network I/O.
+-- @copyright Same as Nmap--See https://nmap.org/book/man-legal.html
 
 module "nmap"
 
@@ -18,9 +18,30 @@ function debugging()
 
 --- Determines whether Nmap was compiled with SSL support.
 --
--- This can be used to avoid sending SSL probes when SSL is not available. 
+-- This can be used to avoid sending SSL probes when SSL is not available.
 -- @return True if Nmap was compiled with SSL support, false otherwise.
 function have_ssl()
+
+--- Returns the version intensity as a non-negative integer.
+--
+-- The version intensity can be set for all version probes with the
+-- <code>--version-intensity</code> option. The intensity for version scripts
+-- can be overridden with the <code>script-intensity</code> script argument.
+-- If overridden, nmap.version_intensity() returns the overridden value
+-- automatically. If neither <code>--version-intensity</code> nor the script
+-- argument <code>script-intensity</code> are used, the version intensity
+-- defaults to 7.
+-- When a version script is given by name with the <code>--script</code>
+-- option, as opposed to being selected automatically due to <code>-sV</code>,
+-- its version intensity is automatically set to maximum (9).
+-- @return The version intensity.
+-- @usage
+-- portrule = function(host, port)
+--   return ...
+--          ...
+--          and nmap.version_intensity() >= 7
+--   end
+function version_intensity()
 
 --- Returns the verbosity level as a non-negative integer.
 --
@@ -61,8 +82,92 @@ function resolve(host, family)
 -- @usage local family = nmap.address_family()
 function address_family()
 
---- Searches for the specified file and returns a string containing its path if
--- it is found and readable (to the process).
+--- Returns the interface name (dnet-style) that Nmap is using.
+--
+-- For example in the pre-scanning (<code>"prerule"</code> scripts) phase
+-- if Nmap is run with the <code>-e eth0</code>, then "eth0" can be
+-- returned, however Nmap can return an other interface name since it
+-- can determine the best interface suited for the job.
+-- Other <code>"hostrule"</code> and <code>"portrule"</code> scripts
+-- should use the interface field of the <code>host</code> table:
+-- <code>host.interface</code>.
+--
+-- The result of this function can be used to get the interface information
+-- table, example: <code>nmap.get_interface_info("eth0")</code>.
+--
+-- @return A string containing the interface name (dnet-style) on
+-- success, or a nil value on failures.
+-- @usage local interface_name = nmap.get_interface()
+function get_interface()
+
+--- Gets the interface network information.
+--
+-- This function takes a dnet-style interface name and returns a table
+-- containing the network information of the interface.
+--
+-- Keys of the returned table:
+-- * <code>device</code> The interface name, can be an interface alias.
+-- * <code>shortname</code> A simple short name of the device.
+-- * <code>netmask</code> The netmask bits (CIDR) of the interface.
+-- * <code>address</code> The string representing the IP address assigned to the interface.
+-- * <code>link</code> The string representing the hardware type of the interface. Possible values are: <code>"ethernet"</code>, <code>"loopback"</code>, <code>"p2p"</code> or <code>"other"</code>.
+-- * <code>mac</code> MAC address (six-byte-long binary string) of the interface if the type of the interface is <code>"ethernet"</code>, otherwise it is <code>nil</code>.
+-- * <code>broadcast</code> The string representing the broadcast address assigned to the interface if the interface type is <code>"ethernet"</code> and if the used address is IPv4, otherwise it is <code>nil</code>.
+-- * <code>up</code> The state of the interface, possible values are <code>"up"</code> or <code>"down"</code>.
+-- * <code>mtu</code> The MTU size of the interface.
+--
+-- @param interface_name The name of the interface.
+-- @return Table containing the network information of the interface on
+--  success, or nil and an error message on failures.
+-- @usage local iface, err = nmap.get_interface_info("eth0")
+function get_interface_info(interface_name)
+
+--- Lists network interfaces
+--
+-- This script enumerates all network interfaces and returns a list of tables
+-- containing information about every interface.
+--
+-- Keys of each table:
+-- * <code>device</code> The interface name, can be an interface alias.
+-- * <code>shortname</code> A simple short name of the device.
+-- * <code>netmask</code> The netmask bits (CIDR) of the interface.
+-- * <code>address</code> The string representing the IP address assigned to the interface.
+-- * <code>link</code> The string representing the hardware type of the interface. Possible values are: <code>"ethernet"</code>, <code>"loopback"</code>, <code>"p2p"</code> or <code>"other"</code>.
+-- * <code>mac</code> MAC address (six-byte-long binary string) of the interface if the type of the interface is <code>"ethernet"</code>, otherwise it is <code>nil</code>.
+-- * <code>broadcast</code> The string representing the broadcast address assigned to the interface if the interface type is <code>"ethernet"</code> and if the used address is IPv4, otherwise it is <code>nil</code>.
+-- * <code>up</code> The state of the interface, possible values are <code>"up"</code> or <code>"down"</code>.
+-- * <code>mtu</code> The MTU size of the interface.
+--
+-- @return Array of tables containing information about every discovered interface.
+-- @usage local interfaces, err = nmap.list_interfaces()
+function list_interfaces()
+
+--- Returns the TTL (time to live) value selected by the --ttl option
+--
+-- If there is no value specified or if the value specified with the --ttl
+-- option is out of the range 0 to 255 (inclusive) this function returns 64,
+-- which is the default TTL for an IP packet. This function would be most
+-- useful in crafting packets, which we want to comply with the selected
+-- Nmap TTL value.
+--
+-- @return A number containing the TTL value
+-- @usage local ttl = nmap.get_ttl()
+function get_ttl()
+
+--- Returns the payload data length selected with the --data-length option
+--
+-- Used when a script is crafting ICMP packets and needs to comply with the
+-- selected payload data length. If there is no value specified this function
+-- returns 0 which is the default length of the ICMP payload for Nmap.
+--
+-- @return A number containing the value of the payload length
+-- @usage local payload_length = nmap.get_payload_length
+function get_payload_length()
+
+--- Searches for the specified file relative to Nmap's search paths and returns
+-- a string containing its path if it is found and readable (to the process).
+-- Absolute paths and paths relative to the current directory will not be
+-- searched.
 --
 -- If the file is not found, not readable, or is a directory, <code>nil</code>
 -- is returned.
@@ -150,8 +255,8 @@ function set_port_state(host, port, state)
 -- information to set. The version detection fields this function looks at are
 -- <code>name</code>, <code>product</code>, <code>version</code>,
 -- <code>extrainfo</code>, <code>hostname</code>, <code>ostype</code>,
--- <code>devicetype</code>, and <code>service_tunnel</code>. All these keys are
--- optional.
+-- <code>devicetype</code>, <code>service_tunnel</code>, and <code>cpe</code>.
+-- All these keys are optional.
 --
 -- The <code>probestate</code> argument describes the state in which the script
 -- completed. It is a string, one of: <code>"hardmatched"</code>,
@@ -181,18 +286,6 @@ function clock()
 -- 01/01/1970).
 -- @usage local now = nmap.clock_ms()
 function clock_ms()
-
---- Gets the link-level hardware type of an interface.
---
--- This function takes a dnet-style interface name and returns a string
--- representing the hardware type of the interface. Possible return values are
--- <code>"ethernet"</code>, <code>"loopback"</code>, <code>"p2p"</code>, or
--- <code>nil</code> if none of the other types apply.
--- @param interface_name The name of the interface.
--- @return <code>"ethernet"</code>, <code>"loopback"</code>,
--- <code>"p2p"</code>, or <code>nil</code>.
--- @usage iface_type = nmap.get_interface_link("eth0")
-function get_interface_link(interface_name)
 
 --- Create a mutex on an object.
 --
@@ -298,7 +391,7 @@ function condvar(object)
 -- @param handler User cleanup function (optional).
 -- @usage
 -- local result, socket, try, catch
--- 
+--
 -- result = ""
 -- socket = nmap.new_socket()
 -- catch = function()
@@ -361,10 +454,10 @@ function bind(addr, port)
 -- <code>"tcp"</code>.
 --
 -- If <code>host</code> is a host table, it must contain at least one of the
--- keys <code>addr</code> or <code>targetname</code>. If <code>targetname</code>
+-- keys <code>ip</code> or <code>name</code>. If <code>name</code>
 -- is given, it is used to request the correct certificate in SSL connections.
--- Passing a string instead of a host table acts like <code>host.addr</code> and
--- <code>host.targetname</code> were set to the same value. If <code>port</code>
+-- Passing a string instead of a host table acts like <code>host.ip</code> and
+-- <code>host.name</code> were set to the same value. If <code>port</code>
 -- is a table, it must contain the <code>number</code> key.
 --
 -- On success the function returns a true value. On failure it returns a false
@@ -443,18 +536,17 @@ function send(data)
 -- success the function returns a true value. If the send operation fails, the
 -- function returns a false value (<code>false</code> or <code>nil</code>) along
 -- with an error string. The error strings are
--- * <code>"Trying to send through a closed socket"</code>: There was no call to <code>socket:connect</code> before the send operation.
 -- * <code>"TIMEOUT"</code>: The operation took longer than the specified timeout for the socket.
 -- * <code>"ERROR"</code>: An error occurred inside the underlying Nsock library.
 -- * <code>"CANCELLED"</code>: The operation was cancelled.
 -- * <code>"KILL"</code>: For example the script scan is aborted due to a faulty script.
 -- * <code>"EOF"</code>: An EOF was read (probably will not occur for a send operation).
--- @param host The hostname or IP address to send to. 
+-- @param host The hostname or IP address to send to.
 -- @param port The port number to send to.
 -- @param data The data to send.
 -- @return Status (true or false).
 -- @return Error code (if status is false).
--- @usage local status, err = socket:send(data)
+-- @usage local status, err = socket:sendto(host, port, data)
 function sendto(host, port, data)
 
 --- Receives data from an open socket.
@@ -523,6 +615,12 @@ function receive_bytes(n)
 -- matching against regular expressions or byte counts. These functions are
 -- suitable as arguments to <code>receive_buf</code>.
 --
+-- NOTE: If a pattern is used, receive_buf will continue to receive data until
+-- the pattern matches or there is a timeout. If the service never stops
+-- sending non-matching data, receive_buf will never return. Using
+-- <code>match.pattern_limit</code> can avoid this by imposing a limit on how
+-- many bytes to read before returning the entire non-matching buffer.
+--
 -- The second argument to <code>receive_buf</code> is a Boolean value
 -- controlling whether the delimiting string is returned along with the
 -- received data (true) or discarded (false).
@@ -537,6 +635,7 @@ function receive_bytes(n)
 -- @return Status (true or false).
 -- @return Data (if status is true) or error string (if status is false).
 -- @see new_socket
+-- @see match
 -- @usage local status, line = socket:receive_buf("\r?\n", false)
 function receive_buf(delimiter, keeppattern)
 
@@ -639,9 +738,15 @@ function pcap_close()
 -- pem = "-----BEGIN CERTIFICATE-----\nMIIFxzCCBK+gAwIBAgIQX02QuADDB7CVj..."
 -- </code>
 --
+-- If the <code>pubkey</code> is type <code>"rsa"</code>, it will also have an
+-- <code>exponent</code> member, containing the public exponent as a bignum. If
+-- the type is <code>"ec"</code>, it will have an <code>ecdhparams.curve_params</code>
+-- member, containing a table with <code>ec_curve_type</code> and
+-- <code>curve</code> keys as strings.
+--
 -- It also has the following member functions:
 --
--- * <code>digest(algorithm)</code> returns the digest of the certificate using the given digest algorithm, which is any of the strings returned by <code>openssl.supported_digests</code>, typicaly something like <code>"md5"</code> or <code>"sha1"</code>.
+-- * <code>digest(algorithm)</code> returns the digest of the certificate using the given digest algorithm, which is any of the strings returned by <code>openssl.supported_digests</code>, typically something like <code>"md5"</code> or <code>"sha1"</code>.
 --
 -- The <code>"subject"</code> and <code>"issuer"</code> fields hold each
 -- distinguished name. Fields with an unknown OID are represented as an array
@@ -704,15 +809,19 @@ function ethernet_close()
 -- @usage dnet:ip_open()
 function ip_open()
 
---- Sends a raw IPv4 packet.
+--- Sends a raw IPv4 or IPv6 packet.
 --
 -- The dnet object must be associated with a previously opened socket. The
 -- packet must begin with an IP header. If there was no previous valid call
 -- to <code>ip_open</code> an error is thrown.
 -- @param packet An IP packet to send.
+-- @param dst A destination address, as a host table or string. If omitted, the
+-- destination address is read from the packet; however this is deprecated, because
+-- the packet does not contain the scope ID required to send to certain IPv6
+-- addresses.
 -- @see new_dnet
--- @usage dnet:ip_send(packet)
-function ip_send(packet)
+-- @usage dnet:ip_send(packet, dst)
+function ip_send(packet, dst)
 
 --- Closes a raw IPv4 socket.
 -- @see new_dnet, ip_open
@@ -722,7 +831,7 @@ function ip_close()
 --- Writes to a log file.
 --
 -- Writes <code>string</code> to <code>file</code> ("stdout" or "stderr").
--- Use stdnse.print_debug to print debug information based on the
+-- Use stdnse.debug to print debug information based on the
 -- debugging level.
--- @see stdnse.print_debug
+-- @see stdnse.debug
 function log_write(file, string)

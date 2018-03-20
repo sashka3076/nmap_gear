@@ -1,3 +1,11 @@
+local nmap = require "nmap"
+local shortport = require "shortport"
+local sslcert = require "sslcert"
+local stdnse = require "stdnse"
+local string = require "string"
+local tls = require "tls"
+local unicode = require "unicode"
+
 description = [[
 Retrieves a server's SSL certificate. The amount of information printed
 about the certificate depends on the verbosity level. With no extra
@@ -6,24 +14,27 @@ organizationName, stateOrProvinceName, and countryName of the subject.
 
 <code>
 443/tcp open  https
-|  ssl-cert: Subject: commonName=www.paypal.com/organizationName=PayPal, Inc.\
+| ssl-cert: Subject: commonName=www.paypal.com/organizationName=PayPal, Inc.\
 /stateOrProvinceName=California/countryName=US
-|  Not valid before: 2009-05-28 00:00:00
-|_ Not valid after:  2010-05-01 23:59:59
+| Not valid before: 2011-03-23 00:00:00
+|_Not valid after:  2013-04-01 23:59:59
 </code>
 
 With <code>-v</code> it adds the issuer name and fingerprints.
 
 <code>
 443/tcp open  https
-|  ssl-cert: Subject: commonName=www.paypal.com/organizationName=PayPal, Inc.\
+| ssl-cert: Subject: commonName=www.paypal.com/organizationName=PayPal, Inc.\
 /stateOrProvinceName=California/countryName=US
-|  Issuer: commonName=VeriSign Class 3 Extended Validation SSL CA\
+| Issuer: commonName=VeriSign Class 3 Extended Validation SSL CA\
 /organizationName=VeriSign, Inc./countryName=US
-|  Not valid before: 2009-05-28 00:00:00
-|  Not valid after:  2010-05-01 23:59:59
-|  MD5:   c5b8 7ddd ccc7 537f 8861 b476 078d e8fd
-|_ SHA-1: dc5a cb8b 9eb9 b5de 7117 c536 8c15 0e75 ba88 702e
+| Public Key type: rsa
+| Public Key bits: 2048
+| Signature Algorithm: sha1WithRSAEncryption
+| Not valid before: 2011-03-23 00:00:00
+| Not valid after:  2013-04-01 23:59:59
+| MD5:   bf47 ceca d861 efa7 7d14 88ad 4a73 cb5b
+|_SHA-1: d846 5221 467a 0d15 3df0 9f2e af6d 4390 0213 9a68
 </code>
 
 With <code>-vv</code> it adds the PEM-encoded contents of the entire
@@ -31,223 +42,240 @@ certificate.
 
 <code>
 443/tcp open  https
-|  ssl-cert: Subject: commonName=www.paypal.com/organizationName=PayPal, Inc.\
-/stateOrProvinceName=California/countryName=US/serialNumber=3014267\
-/1.3.6.1.4.1.311.60.2.1.3=US/streetAddress=2211 N 1st St\
-/1.3.6.1.4.1.311.60.2.1.2=Delaware/postalCode=95131-2021\
-/localityName=San Jose/organizationalUnitName=Information Systems\
-/2.5.4.15=V1.0, Clause 5.(b)
-|  Issuer: commonName=VeriSign Class 3 Extended Validation SSL CA\
+| ssl-cert: Subject: commonName=www.paypal.com/organizationName=PayPal, Inc.\
+/stateOrProvinceName=California/countryName=US/1.3.6.1.4.1.311.60.2.1.2=Delaware\
+/postalCode=95131-2021/localityName=San Jose/serialNumber=3014267\
+/streetAddress=2211 N 1st St/1.3.6.1.4.1.311.60.2.1.3=US\
+/organizationalUnitName=PayPal Production/businessCategory=Private Organization
+| Issuer: commonName=VeriSign Class 3 Extended Validation SSL CA\
 /organizationName=VeriSign, Inc./countryName=US\
 /organizationalUnitName=Terms of use at https://www.verisign.com/rpa (c)06
-|  Not valid before: 2009-05-28 00:00:00
-|  Not valid after:  2010-05-01 23:59:59
-|  MD5:   c5b8 7ddd ccc7 537f 8861 b476 078d e8fd
-|  SHA-1: dc5a cb8b 9eb9 b5de 7117 c536 8c15 0e75 ba88 702e
-|  -----BEGIN CERTIFICATE-----
-|  MIIFxzCCBK+gAwIBAgIQX02QuADDB7CVjZdooVge+zANBgkqhkiG9w0BAQUFADCB
+| Public Key type: rsa
+| Public Key bits: 2048
+| Signature Algorithm: sha1WithRSAEncryption
+| Not valid before: 2011-03-23 00:00:00
+| Not valid after:  2013-04-01 23:59:59
+| MD5:   bf47 ceca d861 efa7 7d14 88ad 4a73 cb5b
+| SHA-1: d846 5221 467a 0d15 3df0 9f2e af6d 4390 0213 9a68
+| -----BEGIN CERTIFICATE-----
+| MIIGSzCCBTOgAwIBAgIQLjOHT2/i1B7T//819qTJGDANBgkqhkiG9w0BAQUFADCB
 ...
+| 9YDR12XLZeQjO1uiunCsJkDIf9/5Mqpu57pw8v1QNA==
+|_-----END CERTIFICATE-----
 </code>
 ]]
 
 ---
+-- @see ssl-cert-intaddr
+--
 -- @output
 -- 443/tcp open  https
--- |  ssl-cert: Subject: commonName=www.paypal.com/organizationName=PayPal, Inc.\
+-- | ssl-cert: Subject: commonName=www.paypal.com/organizationName=PayPal, Inc.\
 -- /stateOrProvinceName=California/countryName=US
--- |  Not valid before: 2009-05-28 00:00:00
--- |_ Not valid after:  2010-05-01 23:59:59
+-- | Not valid before: 2011-03-23 00:00:00
+-- |_Not valid after:  2013-04-01 23:59:59
+--
+-- @xmloutput
+-- <table key="subject">
+--   <elem key="1.3.6.1.4.1.311.60.2.1.2">Delaware</elem>
+--   <elem key="1.3.6.1.4.1.311.60.2.1.3">US</elem>
+--   <elem key="postalCode">95131-2021</elem>
+--   <elem key="localityName">San Jose</elem>
+--   <elem key="serialNumber">3014267</elem>
+--   <elem key="countryName">US</elem>
+--   <elem key="stateOrProvinceName">California</elem>
+--   <elem key="streetAddress">2211 N 1st St</elem>
+--   <elem key="organizationalUnitName">PayPal Production</elem>
+--   <elem key="commonName">www.paypal.com</elem>
+--   <elem key="organizationName">PayPal, Inc.</elem>
+--   <elem key="businessCategory">Private Organization</elem>
+-- </table>
+-- <table key="issuer">
+--   <elem key="organizationalUnitName">Terms of use at https://www.verisign.com/rpa (c)06</elem>
+--   <elem key="organizationName">VeriSign, Inc.</elem>
+--   <elem key="commonName">VeriSign Class 3 Extended Validation SSL CA</elem>
+--   <elem key="countryName">US</elem>
+-- </table>
+-- <table key="pubkey">
+--   <elem key="type">rsa</elem>
+--   <elem key="bits">2048</elem>
+-- </table>
+-- <elem key="sig_algo">sha1WithRSAEncryption</elem>
+-- <table key="validity">
+--   <elem key="notBefore">2011-03-23T00:00:00+00:00</elem>
+--   <elem key="notAfter">2013-04-01T23:59:59+00:00</elem>
+-- </table>
+-- <elem key="md5">bf47cecad861efa77d1488ad4a73cb5b</elem>
+-- <elem key="sha1">d8465221467a0d153df09f2eaf6d439002139a68</elem>
+-- <elem key="pem">-----BEGIN CERTIFICATE-----
+-- MIIGSzCCBTOgAwIBAgIQLjOHT2/i1B7T//819qTJGDANBgkqhkiG9w0BAQUFADCB
+-- ...
+-- 9YDR12XLZeQjO1uiunCsJkDIf9/5Mqpu57pw8v1QNA==
+-- -----END CERTIFICATE-----
+-- </elem>
 
 author = "David Fifield"
 
-license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
+license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
 
-categories = { "safe", "discovery" }
+categories = { "default", "safe", "discovery" }
 
-require("nmap")
-require("nsedebug")
-require("stdnse")
-
-local stringify_name
-local date_to_string
-local table_find
-local s
-
-local LIKELY_SSL_PORTS = { 443, 465, 989, 990, 992, 993, 994, 995, 587, 8443 }
-local STARTTLS_PORTS = { 25, 587 }
 
 portrule = function(host, port)
-    return port.version.service_tunnel == "ssl"
-        or table_find(LIKELY_SSL_PORTS, port.number) or table_find(STARTTLS_PORTS, port.number)
-end
-
-action = function(host, port)
-    s = nmap.new_socket()
-
-    if table_find(STARTTLS_PORTS, port.number) then
-        local status = starttls_negotiate(host,port)
-
-        if not status then
-            return nil
-        end
-    else
-        local status, error = s:connect(host, port, "ssl")
-        
-        if not status then
-            if nmap.verbosity() > 0 then
-                return error
-            else
-                return nil
-            end
-        end    
-
-    end 
-
-    local cert = s:get_ssl_certificate()
-    s:close()
-
-    local lines = {}
-    lines[#lines + 1] = "Subject: " .. stringify_name(cert.subject)
-
-    if nmap.verbosity() > 0 then
-        lines[#lines + 1] = "Issuer: " .. stringify_name(cert.issuer)
-    end
-
-    if nmap.verbosity() > 0 then
-        lines[#lines + 1] = "Public Key type: " .. cert.pubkey.type
-        lines[#lines + 1] = "Public Key bits: " .. cert.pubkey.bits
-    end
-
-    lines[#lines + 1] = "Not valid before: " ..
-        date_to_string(cert.validity.notBefore)
-    lines[#lines + 1] = "Not valid after:  " ..
-        date_to_string(cert.validity.notAfter)
-
-    if nmap.verbosity() > 0 then
-        lines[#lines + 1] = "MD5:   " .. stdnse.tohex(cert:digest("md5"), { separator = " ", group = 4 })
-        lines[#lines + 1] = "SHA-1: " .. stdnse.tohex(cert:digest("sha1"), { separator = " ", group = 4 })
-	end
-
-    if nmap.verbosity() > 1 then
-        lines[#lines + 1] = cert.pem
-    end
-
-    return stdnse.strjoin("\n", lines)
+  return shortport.ssl(host, port) or sslcert.isPortSupported(port) or sslcert.getPrepareTLSWithoutReconnect(port)
 end
 
 -- Find the index of a value in an array.
 function table_find(t, value)
-    local i, v
-    for i, v in ipairs(t) do
-        if v == value then
-            return i
-        end
+  local i, v
+  for i, v in ipairs(t) do
+    if v == value then
+      return i
     end
-    return nil
+  end
+  return nil
+end
+
+function date_to_string(date)
+  if not date then
+    return "MISSING"
+  end
+  if type(date) == "string" then
+    return string.format("Can't parse; string is \"%s\"", date)
+  else
+    return stdnse.format_timestamp(date)
+  end
 end
 
 -- These are the subject/issuer name fields that will be shown, in this order,
 -- without a high verbosity.
 local NON_VERBOSE_FIELDS = { "commonName", "organizationName",
-    "stateOrProvinceName", "countryName" }
+"stateOrProvinceName", "countryName" }
+
+-- Test to see if the string is UTF-16 and transcode it if possible
+local function maybe_decode(str)
+  -- If length is not even, then return as-is
+  if #str < 2 or #str % 2 == 1 then
+    return str
+  end
+  if str:byte(1) > 0 and str:byte(2) == 0 then
+    -- little-endian UTF-16
+    return unicode.transcode(str, unicode.utf16_dec, unicode.utf8_enc, false, nil)
+  elseif str:byte(1) == 0 and str:byte(2) > 0 then
+    -- big-endian UTF-16
+    return unicode.transcode(str, unicode.utf16_dec, unicode.utf8_enc, true, nil)
+  else
+    return str
+  end
+end
 
 function stringify_name(name)
-    local fields = {}
-    local _, k, v
-    if not name then
-        return nil
+  local fields = {}
+  local _, k, v
+  if not name then
+    return nil
+  end
+  for _, k in ipairs(NON_VERBOSE_FIELDS) do
+    v = name[k]
+    if v then
+      fields[#fields + 1] = string.format("%s=%s", k, maybe_decode(v) or '')
     end
-    for _, k in ipairs(NON_VERBOSE_FIELDS) do
-        v = name[k]
-        if v then
-            fields[#fields + 1] = string.format("%s=%s", k, v)
+  end
+  if nmap.verbosity() > 1 then
+    for k, v in pairs(name) do
+      -- Don't include a field twice.
+      if not table_find(NON_VERBOSE_FIELDS, k) then
+        if type(k) == "table" then
+          k = stdnse.strjoin(".", k)
         end
+        fields[#fields + 1] = string.format("%s=%s", k, maybe_decode(v) or '')
+      end
     end
-    if nmap.verbosity() > 1 then
-        for k, v in pairs(name) do
-            -- Don't include a field twice.
-            if not table_find(NON_VERBOSE_FIELDS, k) then
-                if type(k) == "table" then
-                    k = stdnse.strjoin(".", k)
-                end
-                fields[#fields + 1] = string.format("%s=%s", k, v)
-            end
-        end
-    end
-    return stdnse.strjoin("/", fields)
+  end
+  return stdnse.strjoin("/", fields)
 end
 
-function date_to_string(date)
-    if not date then
-        return "MISSING"
+local function name_to_table(name)
+  local output = {}
+  for k, v in pairs(name) do
+    if type(k) == "table" then
+      k = stdnse.strjoin(".", k)
     end
-    if type(date) == "string" then
-        return string.format("Can't parse; string is \"%s\"", date)
+    output[k] = v
+  end
+  return output
+end
+
+local function output_tab(cert)
+  local o = stdnse.output_table()
+  o.subject = name_to_table(cert.subject)
+  o.issuer = name_to_table(cert.issuer)
+  o.pubkey = cert.pubkey
+  o.extensions = cert.extensions
+  o.sig_algo = cert.sig_algorithm
+  o.validity = {}
+  for k, v in pairs(cert.validity) do
+    if type(v)=="string" then
+      o.validity[k] = v
     else
-        return os.date("%Y-%m-%d %H:%M:%S", os.time(date))
+      o.validity[k] = stdnse.format_timestamp(v)
     end
+  end
+  o.md5 = stdnse.tohex(cert:digest("md5"))
+  o.sha1 = stdnse.tohex(cert:digest("sha1"))
+  o.pem = cert.pem
+  return o
 end
 
-function starttls_negotiate(host, port)
-    -- Attempt to negotiate TLS over SMTP for services that support it
-    -- Works for SMTP (25) and SMTP Submission (587)
+local function output_str(cert)
+  local lines = {}
 
-    -- Open a standard TCP socket
-    local status, error = s:connect(host, port, "tcp")  
-        
-    if not status then   
-        return nil
-    else 
-    
-        -- Loop until the service presents a banner to deal with server
-        -- load and timing issues.  There may be a better way to handle this.
-        local i = 0
-        repeat
-            status, resultEHLO = s:receive_lines(1)
-            i = i + 1
-        until string.match(resultEHLO, "^220") or i == 5
+  lines[#lines + 1] = "Subject: " .. stringify_name(cert.subject)
+  if cert.extensions then
+    for _, e in ipairs(cert.extensions) do
+      if e.name == "X509v3 Subject Alternative Name" then
+        lines[#lines + 1] = "Subject Alternative Name: " .. e.value
+        break
+      end
+    end
+  end
 
-        -- Send EHLO because the the server expects it
-        -- We are not going to check for STARTTLS in the capabilities
-        -- list, sometimes it is not advertised.
-        local query = "EHLO example.org\r\n"
-        status = s:send(query)
-        status, resultEHLO = s:receive_lines(1)
+  if nmap.verbosity() > 0 then
+    lines[#lines + 1] = "Issuer: " .. stringify_name(cert.issuer)
+  end
 
-        if not (string.match(resultEHLO, "^250")) then
-            stdnse.print_debug("1","%s",resultEHLO)
-            stdnse.print_debug("1","EHLO with errors or timeout.  Enable --script-trace to see what is happening.")
-            return nil
-        end
+  if nmap.verbosity() > 0 then
+    lines[#lines + 1] = "Public Key type: " .. cert.pubkey.type
+    lines[#lines + 1] = "Public Key bits: " .. cert.pubkey.bits
+    lines[#lines + 1] = "Signature Algorithm: " .. cert.sig_algorithm
+  end
 
-        resultEHLO = ""
-        
-        -- Send STARTTLS command ask the service to start encryption    
-        local query = "STARTTLS\r\n"
-        status = s:send(query)
-        status, resultEHLO = s:receive_lines(1)
-        
-        if not (string.match(resultEHLO, "^220")) then
-            stdnse.print_debug("1","%s",resultEHLO)
-            stdnse.print_debug("1","STARTTLS failed or unavailable.  Enable --script-trace to see what is happening.")
-            
-            -- Send QUIT to clean up server side connection
-            local query = "QUIT\r\n"
-            status = s:send(query)        
-            resultEHLO = ""
-                
-            return nil
-        end
-        
-        -- Service supports STARTTLS, tell NSE start SSL negotiation
-        status, error = s:reconnect_ssl()
-        if not status then
-            stdnse.print_debug("1","Could not establish SSL session after STARTTLS command.")
-            s:close()
-            return nil
-        end 
-                
-    end    
-    -- Should have a solid TLS over SMTP session now...
-    return "Connected"
-end 
+  lines[#lines + 1] = "Not valid before: " ..
+  date_to_string(cert.validity.notBefore)
+  lines[#lines + 1] = "Not valid after:  " ..
+  date_to_string(cert.validity.notAfter)
+
+  if nmap.verbosity() > 0 then
+    lines[#lines + 1] = "MD5:   " .. stdnse.tohex(cert:digest("md5"), { separator = " ", group = 4 })
+    lines[#lines + 1] = "SHA-1: " .. stdnse.tohex(cert:digest("sha1"), { separator = " ", group = 4 })
+  end
+
+  if nmap.verbosity() > 1 then
+    lines[#lines + 1] = cert.pem
+  end
+  return stdnse.strjoin("\n", lines)
+end
+
+action = function(host, port)
+  host.targetname = tls.servername(host)
+  local status, cert = sslcert.getCertificate(host, port)
+  if ( not(status) ) then
+    stdnse.debug1("getCertificate error: %s", cert or "unknown")
+    return
+  end
+
+  return output_tab(cert), output_str(cert)
+end
+
+
+

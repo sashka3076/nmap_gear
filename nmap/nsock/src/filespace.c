@@ -1,11 +1,10 @@
-
 /***************************************************************************
  * filespace.c -- a simple mechanism for storing dynamic amounts of data   *
  * in a simple to use, and quick to append-to structure.                   *
  *                                                                         *
  ***********************IMPORTANT NSOCK LICENSE TERMS***********************
  *                                                                         *
- * The nsock parallel socket event library is (C) 1999-2011 Insecure.Com   *
+ * The nsock parallel socket event library is (C) 1999-2018 Insecure.Com   *
  * LLC This library is free software; you may redistribute and/or          *
  * modify it under the terms of the GNU General Public License as          *
  * published by the Free Software Foundation; Version 2.  This guarantees  *
@@ -29,22 +28,22 @@
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
  * right to know exactly what a program is going to do before they run it. *
- * This also allows you to audit the software for security holes (none     *
- * have been found so far).                                                *
+ * This also allows you to audit the software for security holes.          *
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to nmap-dev@insecure.org for possible incorporation into the main       *
- * distribution.  By sending these changes to Fyodor or one of the         *
- * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
- * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
- * will always be available Open Source, but this is important because the *
- * inability to relicense code has caused devastating problems for other   *
- * Free Software projects (such as KDE and NASM).  We also occasionally    *
- * relicense the code to third parties as discussed above.  If you wish to *
- * specify special license conditions of your contributions, just say so   *
- * when you send them.                                                     *
+ * to the dev@nmap.org mailing list for possible incorporation into the    *
+ * main distribution.  By sending these changes to Fyodor or one of the    *
+ * Insecure.Org development mailing lists, or checking them into the Nmap  *
+ * source code repository, it is understood (unless you specify otherwise) *
+ * that you are offering the Nmap Project (Insecure.Com LLC) the           *
+ * unlimited, non-exclusive right to reuse, modify, and relicense the      *
+ * code.  Nmap will always be available Open Source, but this is important *
+ * because the inability to relicense code has caused devastating problems *
+ * for other Free Software projects (such as KDE and NASM).  We also       *
+ * occasionally relicense the code to third parties as discussed above.    *
+ * If you wish to specify special license conditions of your               *
+ * contributions, just say so when you send them.                          *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
@@ -54,77 +53,66 @@
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: filespace.c 21905 2011-01-21 00:04:51Z fyodor $ */
+/* $Id: filespace.c 37126 2018-01-28 21:18:17Z fyodor $ */
 
 #include "nsock_internal.h"
 #include "filespace.h"
 
 #include <string.h>
 
+#define FS_INITSIZE_DEFAULT 1024
+
+
 /* Assumes space for fs has already been allocated */
 int filespace_init(struct filespace *fs, int initial_size) {
-  
   memset(fs, 0, sizeof(struct filespace));
   if (initial_size == 0)
-    initial_size = 1024;
+    initial_size = FS_INITSIZE_DEFAULT;
+
   fs->current_alloc = initial_size;
-  fs->str = (char *) safe_malloc(fs->current_alloc);
+  fs->str = (char *)safe_malloc(fs->current_alloc);
   fs->str[0] = '\0';
   fs->pos = fs->str;
   return 0;
 }
 
-/* Used when you want to start over with a filespace you have been
-   using (it sets the length to zero and the pointers to the beginning
-   of memory , etc */
-int fs_clear(struct filespace *fs) {
-  fs->current_size = 0;
-  fs->pos = fs->str;
-  fs->str[0] = '\0'; /* Not necessary, possible help with debugging */
-  return 0;
-}
-
-
 int fs_free(struct filespace *fs) {
-  if (fs->str) free(fs->str);
+  if (fs->str)
+    free(fs->str);
+
   fs->current_alloc = fs->current_size = 0;
   fs->pos = fs->str = NULL;
   return 0;
 }
 
-/* Prepend an n-char string to a filespace */
-int fs_prepend(char *str, int len, struct filespace *fs)  {
-char *tmpstr;
+/* Concatenate a string to the end of a filespace */
+int fs_cat(struct filespace *fs, const char *str, int len) {
+  if (len < 0)
+    return -1;
 
-if (len < 0) return -1;
-if (len == 0) return 0;
+  if (len == 0)
+    return 0;
 
   if (fs->current_alloc - fs->current_size < len + 2) {
-    fs->current_alloc = (int) (fs->current_alloc * 1.4 + 1 );
+    char *tmpstr;
+
+    fs->current_alloc = (int)(fs->current_alloc * 1.4 + 1);
     fs->current_alloc += 100 + len;
-    tmpstr = (char *) safe_malloc(fs->current_alloc);
+
+    tmpstr = (char *)safe_malloc(fs->current_alloc);
     memcpy(tmpstr, fs->str, fs->current_size);
+
     fs->pos = (fs->pos - fs->str) + tmpstr;
-    if (fs->str) free(fs->str);
-    fs->str = tmpstr; 
+
+    if (fs->str)
+      free(fs->str);
+
+    fs->str = tmpstr;
   }
-  if (fs->current_size > 0)   
-    memmove(fs->str + len, fs->str, fs->current_size);
-  memcpy(fs->str, str, len);
+  memcpy(fs->str + fs->current_size, str, len);
 
   fs->current_size += len;
   fs->str[fs->current_size] = '\0';
   return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
 

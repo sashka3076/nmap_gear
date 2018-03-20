@@ -3,265 +3,239 @@
 
 # ***********************IMPORTANT NMAP LICENSE TERMS************************
 # *                                                                         *
-# * The Nmap Security Scanner is (C) 1996-2011 Insecure.Com LLC. Nmap is    *
-# * also a registered trademark of Insecure.Com LLC.  This program is free  *
-# * software; you may redistribute and/or modify it under the terms of the  *
-# * GNU General Public License as published by the Free Software            *
-# * Foundation; Version 2 with the clarifications and exceptions described  *
-# * below.  This guarantees your right to use, modify, and redistribute     *
-# * this software under certain conditions.  If you wish to embed Nmap      *
-# * technology into proprietary software, we sell alternative licenses      *
-# * (contact sales@insecure.com).  Dozens of software vendors already       *
-# * license Nmap technology such as host discovery, port scanning, OS       *
-# * detection, and version detection.                                       *
+# * The Nmap Security Scanner is (C) 1996-2018 Insecure.Com LLC ("The Nmap  *
+# * Project"). Nmap is also a registered trademark of the Nmap Project.     *
+# * This program is free software; you may redistribute and/or modify it    *
+# * under the terms of the GNU General Public License as published by the   *
+# * Free Software Foundation; Version 2 ("GPL"), BUT ONLY WITH ALL OF THE   *
+# * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
+# * right to use, modify, and redistribute this software under certain      *
+# * conditions.  If you wish to embed Nmap technology into proprietary      *
+# * software, we sell alternative licenses (contact sales@nmap.com).        *
+# * Dozens of software vendors already license Nmap technology such as      *
+# * host discovery, port scanning, OS detection, version detection, and     *
+# * the Nmap Scripting Engine.                                              *
 # *                                                                         *
-# * Note that the GPL places important restrictions on "derived works", yet *
-# * it does not provide a detailed definition of that term.  To avoid       *
-# * misunderstandings, we consider an application to constitute a           *
-# * "derivative work" for the purpose of this license if it does any of the *
-# * following:                                                              *
-# * o Integrates source code from Nmap                                      *
-# * o Reads or includes Nmap copyrighted data files, such as                *
-# *   nmap-os-db or nmap-service-probes.                                    *
-# * o Executes Nmap and parses the results (as opposed to typical shell or  *
-# *   execution-menu apps, which simply display raw Nmap output and so are  *
-# *   not derivative works.)                                                *
-# * o Integrates/includes/aggregates Nmap into a proprietary executable     *
-# *   installer, such as those produced by InstallShield.                   *
-# * o Links to a library or executes a program that does any of the above   *
+# * Note that the GPL places important restrictions on "derivative works",  *
+# * yet it does not provide a detailed definition of that term.  To avoid   *
+# * misunderstandings, we interpret that term as broadly as copyright law   *
+# * allows.  For example, we consider an application to constitute a        *
+# * derivative work for the purpose of this license if it does any of the   *
+# * following with any software or content covered by this license          *
+# * ("Covered Software"):                                                   *
 # *                                                                         *
-# * The term "Nmap" should be taken to also include any portions or derived *
-# * works of Nmap.  This list is not exclusive, but is meant to clarify our *
-# * interpretation of derived works with some common examples.  Our         *
-# * interpretation applies only to Nmap--we don't speak for other people's  *
-# * GPL works.                                                              *
+# * o Integrates source code from Covered Software.                         *
 # *                                                                         *
-# * If you have any questions about the GPL licensing restrictions on using *
-# * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
-# * we also offer alternative license to integrate Nmap into proprietary    *
-# * applications and appliances.  These contracts have been sold to dozens  *
-# * of software vendors, and generally include a perpetual license as well  *
-# * as providing for priority support and updates as well as helping to     *
-# * fund the continued development of Nmap technology.  Please email        *
-# * sales@insecure.com for further information.                             *
+# * o Reads or includes copyrighted data files, such as Nmap's nmap-os-db   *
+# * or nmap-service-probes.                                                 *
 # *                                                                         *
-# * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+# * o Is designed specifically to execute Covered Software and parse the    *
+# * results (as opposed to typical shell or execution-menu apps, which will *
+# * execute anything you tell them to).                                     *
+# *                                                                         *
+# * o Includes Covered Software in a proprietary executable installer.  The *
+# * installers produced by InstallShield are an example of this.  Including *
+# * Nmap with other software in compressed or archival form does not        *
+# * trigger this provision, provided appropriate open source decompression  *
+# * or de-archiving software is widely available for no charge.  For the    *
+# * purposes of this license, an installer is considered to include Covered *
+# * Software even if it actually retrieves a copy of Covered Software from  *
+# * another source during runtime (such as by downloading it from the       *
+# * Internet).                                                              *
+# *                                                                         *
+# * o Links (statically or dynamically) to a library which does any of the  *
+# * above.                                                                  *
+# *                                                                         *
+# * o Executes a helper program, module, or script to do any of the above.  *
+# *                                                                         *
+# * This list is not exclusive, but is meant to clarify our interpretation  *
+# * of derived works with some common examples.  Other people may interpret *
+# * the plain GPL differently, so we consider this a special exception to   *
+# * the GPL that we apply to Covered Software.  Works which meet any of     *
+# * these conditions must conform to all of the terms of this license,      *
+# * particularly including the GPL Section 3 requirements of providing      *
+# * source code and allowing free redistribution of the work as a whole.    *
+# *                                                                         *
+# * As another special exception to the GPL terms, the Nmap Project grants  *
 # * permission to link the code of this program with any version of the     *
 # * OpenSSL library which is distributed under a license identical to that  *
 # * listed in the included docs/licenses/OpenSSL.txt file, and distribute   *
-# * linked combinations including the two. You must obey the GNU GPL in all *
-# * respects for all of the code used other than OpenSSL.  If you modify    *
-# * this file, you may extend this exception to your version of the file,   *
-# * but you are not obligated to do so.                                     *
+# * linked combinations including the two.                                  *
 # *                                                                         *
-# * If you received these files with a written license agreement or         *
-# * contract stating terms other than the terms above, then that            *
-# * alternative license agreement takes precedence over these comments.     *
+# * The Nmap Project has permission to redistribute Npcap, a packet         *
+# * capturing driver and library for the Microsoft Windows platform.        *
+# * Npcap is a separate work with it's own license rather than this Nmap    *
+# * license.  Since the Npcap license does not permit redistribution        *
+# * without special permission, our Nmap Windows binary packages which      *
+# * contain Npcap may not be redistributed without special permission.      *
+# *                                                                         *
+# * Any redistribution of Covered Software, including any derived works,    *
+# * must obey and carry forward all of the terms of this license, including *
+# * obeying all GPL rules and restrictions.  For example, source code of    *
+# * the whole work must be provided and free redistribution must be         *
+# * allowed.  All GPL references to "this License", are to be treated as    *
+# * including the terms and conditions of this license text as well.        *
+# *                                                                         *
+# * Because this license imposes special exceptions to the GPL, Covered     *
+# * Work may not be combined (even as part of a larger work) with plain GPL *
+# * software.  The terms, conditions, and exceptions of this license must   *
+# * be included as well.  This license is incompatible with some other open *
+# * source licenses as well.  In some cases we can relicense portions of    *
+# * Nmap or grant special permissions to use it in other open source        *
+# * software.  Please contact fyodor@nmap.org with any such requests.       *
+# * Similarly, we don't incorporate incompatible open source software into  *
+# * Covered Software without special permission from the copyright holders. *
+# *                                                                         *
+# * If you have any questions about the licensing restrictions on using     *
+# * Nmap in other works, we are happy to help.  As mentioned above, we also *
+# * offer an alternative license to integrate Nmap into proprietary         *
+# * applications and appliances.  These contracts have been sold to dozens  *
+# * of software vendors, and generally include a perpetual license as well  *
+# * as providing support and updates.  They also fund the continued         *
+# * development of Nmap.  Please email sales@nmap.com for further           *
+# * information.                                                            *
+# *                                                                         *
+# * If you have received a written license agreement or contract for        *
+# * Covered Software stating terms other than these, you may choose to use  *
+# * and redistribute Covered Software under those terms instead of these.   *
 # *                                                                         *
 # * Source is provided to this software because we believe users have a     *
 # * right to know exactly what a program is going to do before they run it. *
-# * This also allows you to audit the software for security holes (none     *
-# * have been found so far).                                                *
+# * This also allows you to audit the software for security holes.          *
 # *                                                                         *
 # * Source code also allows you to port Nmap to new platforms, fix bugs,    *
 # * and add new features.  You are highly encouraged to send your changes   *
-# * to nmap-dev@insecure.org for possible incorporation into the main       *
-# * distribution.  By sending these changes to Fyodor or one of the         *
-# * Insecure.Org development mailing lists, it is assumed that you are      *
-# * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+# * to the dev@nmap.org mailing list for possible incorporation into the    *
+# * main distribution.  By sending these changes to Fyodor or one of the    *
+# * Insecure.Org development mailing lists, or checking them into the Nmap  *
+# * source code repository, it is understood (unless you specify            *
+# * otherwise) that you are offering the Nmap Project the unlimited,        *
 # * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
-# * will always be available Open Source, but this is important because the *
-# * inability to relicense code has caused devastating problems for other   *
-# * Free Software projects (such as KDE and NASM).  We also occasionally    *
-# * relicense the code to third parties as discussed above.  If you wish to *
-# * specify special license conditions of your contributions, just say so   *
-# * when you send them.                                                     *
+# * will always be available Open Source, but this is important because     *
+# * the inability to relicense code has caused devastating problems for     *
+# * other Free Software projects (such as KDE and NASM).  We also           *
+# * occasionally relicense the code to third parties as discussed above.    *
+# * If you wish to specify special license conditions of your               *
+# * contributions, just say so when you send them.                          *
 # *                                                                         *
 # * This program is distributed in the hope that it will be useful, but     *
 # * WITHOUT ANY WARRANTY; without even the implied warranty of              *
-# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
-# * General Public License v2.0 for more details at                         *
-# * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
-# * included with Nmap.                                                     *
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the Nmap      *
+# * license file for more details (it's in a COPYING file included with     *
+# * Nmap, and also available from https://svn.nmap.org/nmap/COPYING)        *
 # *                                                                         *
 # ***************************************************************************/
 
 import sys
 import gtk
-import gobject
-import urllib2
-import webbrowser
+import traceback
 
-from zenmapGUI.higwidgets.higdialogs import HIGAlertDialog
-from zenmapGUI.higwidgets.higlabels import HIGSectionLabel, HIGHintSectionLabel
-from zenmapGUI.higwidgets.higtables import HIGTable
-from zenmapGUI.higwidgets.higwindows import HIGWindow
-from zenmapGUI.higwidgets.higboxes import HIGHBox, HIGVBox
+from zenmapGUI.higwidgets.higdialogs import HIGDialog
+from zenmapGUI.higwidgets.higboxes import HIGHBox
 
 from zenmapCore.Name import APP_DISPLAY_NAME
-from zenmapCore.BugRegister import BugRegister
+from zenmapCore.Version import VERSION
 import zenmapCore.I18N
 
-class CrashReport(HIGWindow):
-    def __init__(self, summary, description):
-        HIGWindow.__init__(self)
+
+# Prevent loading PyXML
+import xml
+xml.__path__ = [x for x in xml.__path__ if "_xmlplus" not in x]
+
+# For escaping text in marked-up labels.
+from xml.sax.saxutils import escape
+
+
+class CrashReport(HIGDialog):
+    def __init__(self, type, value, tb):
+        HIGDialog.__init__(self)
         gtk.Window.__init__(self)
         self.set_title(_('Crash Report'))
         self.set_position(gtk.WIN_POS_CENTER_ALWAYS)
-
-        self.response_id = False
 
         self._create_widgets()
         self._pack_widgets()
         self._connect_widgets()
 
-        self.summary = summary
-        self.description = "\n----\n" + description
+        trace = "".join(traceback.format_exception(type, value, tb))
+        text = "Version: " + VERSION + "\n" + trace
+        self.description_text.get_buffer().set_text(text)
 
     def _create_widgets(self):
-        self.vbox = HIGVBox()
         self.button_box = gtk.HButtonBox()
+        self.button_box_ok = gtk.HButtonBox()
 
-        self.email_label = gtk.Label(_("""\
-An email address is optional. Sometimes we use it to get more information. If \
-you provide an email address your report will be marked private so only \
-project developers can read it.\
-"""))
-        self.email_entry = gtk.Entry()
-
-        self.summary_entry = gtk.Entry()
-
-        self.description_label = gtk.Label(_("\
-What were you doing when the crash happened?\
-"))
         self.description_scrolled = gtk.ScrolledWindow()
         self.description_text = gtk.TextView()
+        self.description_text.set_editable(False)
 
-        self.bug_text = gtk.Label(_("""\
-An unhandled exception has crashed Zenmap. This dialog allows you to tell us \
-what you did to cause the crash and help us to fix it. Submitting the report \
-will open a description of the new bug at the bug tracker. Feel free to edit \
-the report to remove any identifying information such as your home directory.\
-"""))
-
+        self.bug_text = gtk.Label()
+        self.bug_text.set_markup(_('An unexpected error has crashed '
+            '%(app_name)s. Please copy the stack trace below and send it to '
+            'the <a href="mailto:dev@nmap.org">dev@nmap.org</a> mailing list. '
+            '(<a href="http://seclists.org/nmap-dev/">More about the list.</a>'
+            ') The developers will see your report and try to fix the problem.'
+            ) % {"app_name": escape(APP_DISPLAY_NAME)})
+        self.email_frame = gtk.Frame()
+        self.email_label = gtk.Label()
+        self.email_label.set_markup(_('<b>Copy and email to '
+            '<a href="mailto:dev@nmap.org">dev@nmap.org</a>:</b>'))
+        self.btn_copy = gtk.Button(stock=gtk.STOCK_COPY)
         self.btn_ok = gtk.Button(stock=gtk.STOCK_OK)
-        self.btn_cancel = gtk.Button(stock=gtk.STOCK_CANCEL)
 
         self.hbox = HIGHBox()
-        self.table = HIGTable()
 
     def _pack_widgets(self):
-        self.description_label.set_line_wrap(True)
-        self.description_label.set_alignment(0.0, 0.5)
         self.description_scrolled.add(self.description_text)
-        self.description_scrolled.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        self.description_scrolled.set_policy(
+                gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         self.description_scrolled.set_size_request(400, 150)
         self.description_text.set_wrap_mode(gtk.WRAP_WORD)
 
-        self.email_label.set_line_wrap(True)
-        self.email_label.set_alignment(0.0, 0.5)
-
         self.bug_text.set_line_wrap(True)
+        self.email_label.set_line_wrap(True)
 
-        self.hbox.set_border_width(12)
+        self.email_frame.set_label_widget(self.email_label)
+        self.email_frame.set_shadow_type(gtk.SHADOW_NONE)
+
+        self.hbox.set_border_width(6)
         self.vbox.set_border_width(6)
-
-        self.table.attach_label(gtk.Label(_("Summary")), 0, 1, 0, 1)
-        self.table.attach_entry(self.summary_entry, 1, 2, 0, 1)
-
-        self.table.attach_entry(self.description_label, 0, 2, 1, 2)
-        self.table.attach_entry(self.description_scrolled, 0, 2, 2, 3)
-
-        self.table.attach(self.email_label, 0, 2, 3, 4)
-        self.table.attach_label(gtk.Label(_("Email")), 0, 1, 4, 5)
-        self.table.attach_entry(self.email_entry, 1, 2, 4, 5)
 
         self.hbox._pack_expand_fill(self.bug_text)
 
-        self.button_box.set_layout(gtk.BUTTONBOX_END)
-        self.button_box.pack_start(self.btn_ok)
-        self.button_box.pack_start(self.btn_cancel)
+        self.button_box.set_layout(gtk.BUTTONBOX_START)
+        self.button_box_ok.set_layout(gtk.BUTTONBOX_END)
 
-        self.vbox._pack_noexpand_nofill(self.hbox)
-        self.vbox._pack_expand_fill(self.table)
-        self.vbox._pack_noexpand_nofill(self.button_box)
-        self.add(self.vbox)
+        self.button_box.pack_start(self.btn_copy)
+        self.button_box_ok.pack_start(self.btn_ok)
+
+        self.vbox.pack_start(self.hbox)
+        self.vbox.pack_start(self.email_frame)
+        self.vbox.pack_start(self.description_scrolled)
+        self.vbox.pack_start(self.button_box)
+        self.action_area.pack_start(self.button_box_ok)
 
     def _connect_widgets(self):
-        self.btn_ok.connect("clicked", self.send_report)
-        self.btn_cancel.connect("clicked", self.close)
+        self.btn_ok.connect("clicked", self.close)
+        self.btn_copy.connect("clicked", self.copy)
         self.connect("delete-event", self.close)
 
-    def send_report(self, widget):
-        bug_register = BugRegister()
-        description_text = self.description
-        private = False
-        if self.email != "":
-            description_text += "\n\n" + self.email
-            private = True
-        report_url = bug_register.get_report_url(self.summary,
-            description_text, private = private)
+    def get_description(self):
+        buff = self.description_text.get_buffer()
+        return buff.get_text(buff.get_start_iter(), buff.get_end_iter())
 
-        # First we try reporting the bug with a web browser because that gives
-        # better feedback on what happened. If that doesn't work try with
-        # urllib2.
-        try:
-            webbrowser.open(report_url)
-        except webbrowser.Error:
-            try:
-                urllib2.urlopen(report_url)
-                ok_dialog = HIGAlertDialog(type=gtk.MESSAGE_INFO,
-                    message_format=_("Bug reported"),
-                    secondary_text=_("The bug was successfully reported."))
-                ok_dialog.run()
-                ok_dialog.destroy()
-            except urllib2.URLError, e:
-                cancel_dialog = HIGAlertDialog(type=gtk.MESSAGE_ERROR,
-                    message_format=_("Bug not reported"),
-                    secondary_text=_("This error occurred while trying to report the bug:\n\n" + str(e)))
-                cancel_dialog.run()
-                cancel_dialog.destroy()
-
-        self.close()
+    def copy(self, widget=None, event=None):
+        clipboard = gtk.clipboard_get()
+        clipboard.set_text(self.get_description())
+        clipboard.store()
 
     def close(self, widget=None, event=None):
         self.destroy()
         gtk.main_quit()
         sys.exit(0)
 
-    def get_summary(self):
-        return self.summary_entry.get_text()
-
-    def set_summary(self, summary):
-        summary = summary.decode("UTF-8", "replace")
-        self.summary_entry.set_text(summary)
-
-    def get_description(self):
-        buff = self.description_text.get_buffer()
-        return buff.get_text(buff.get_start_iter(), buff.get_end_iter())
-
-    def set_description(self, description):
-        description = description.decode("UTF-8", "replace")
-        self.description_text.get_buffer().set_text(description)
-
-    def get_email(self):
-        return self.email_entry.get_text()
-
-    def set_email(self, email):
-        self.email_entry.set_text(email)
-
-    def run_unblocked(self):
-        if not self.modal:
-            self.set_modal(True)
-        self.show_all()
-
-    summary = property(get_summary, set_summary)
-    description = property(get_description, set_description)
-    email = property(get_email, set_email)
-
-
 if __name__ == "__main__":
-    c = CrashReport("Sumariu", "Descricao")
+    c = CrashReport(None, None, None)
     c.show_all()
     c.connect("delete-event", lambda x, y: gtk.main_quit())
 

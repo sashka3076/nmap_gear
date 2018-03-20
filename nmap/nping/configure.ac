@@ -1,11 +1,10 @@
 # Require autoconf 2.13 -*- mode: fundamental; -*-
 AC_PREREQ(2.13)
 
-# Include macros in Nbase
-sinclude(nbase/configlocal.m4)
-
 dnl Process this file with autoconf to produce a configure script.
 AC_INIT(nping.cc)
+
+m4_include([../acinclude.m4])
 
 AC_ARG_WITH(localdirs,
 AC_HELP_STRING([--with-localdirs], [Explicitly ask compiler to use /usr/local/{include,libs} if they exist ]),
@@ -25,8 +24,7 @@ if test "$user_localdirs" = 1; then
      LDFLAGS="$LDFLAGS -L/usr/local/lib"
      fi
    if test -d /usr/local/include; then
-     CFLAGS="$CFLAGS -I/usr/local/include"
-     CXXFLAGS="$CFLAGS -I/usr/local/include"
+     CPPFLAGS="$CPPFLAGS -I/usr/local/include"
    fi
 fi
 
@@ -80,6 +78,7 @@ fi
 
 # Remember that all following tests will run with this CXXFLAGS by default
 AC_MSG_CHECKING(for __func__)
+AH_TEMPLATE(__func__, [C99-specified function identifier])
 AC_TRY_COMPILE([
 #include <stdio.h>
 ],[printf ("%s", __func__);],
@@ -102,9 +101,6 @@ have_function=yes, have_function=no)
    fi
 fi
 
-AC_SUBST(COMPAT_OBJS)
-AC_SUBST(COMPAT_SRCS)
-
 AC_PATH_TOOL([STRIP], [strip], [/bin/true])
 
 needs_cpp_precomp=no
@@ -115,6 +111,12 @@ AC_CHECK_HEADERS(pwd.h termios.h sys/sockio.h)
 dnl If any socket libraries needed
 AC_SEARCH_LIBS(setsockopt, socket)
 AC_SEARCH_LIBS(gethostbyname, nsl)
+
+# OpenSSL and NSE C modules can require dlopen
+AC_SEARCH_LIBS(dlopen, dl)
+
+# libpcap can require libnl
+AC_SEARCH_LIBS(nl_handle_alloc, nl)
 
 # We test whether they specified openssl desires explicitly
 use_openssl="yes"
@@ -171,10 +173,10 @@ fi
 
 OPENSSL_LIBS=
 if test "$use_openssl" = "yes"; then
-  AC_DEFINE(HAVE_OPENSSL)
+  AC_DEFINE(HAVE_OPENSSL, 1, [Have OpenSSL library])
   OPENSSL_LIBS="-lssl -lcrypto"
   LIBS_TMP="$LIBS"
-  LIBS="$LIBS $OPENSSL_LIBS"
+  LIBS="$OPENSSL_LIBS $LIBS"
   # Check whether the installed OpenSSL supports SHA-256 (ver 0.9.8 or later).
   AC_CHECK_FUNC(EVP_sha256,, AC_MSG_ERROR([Your version of OpenSSL does not support SHA-256. Please install OpenSSL 0.9.8 or later.]))
   LIBS="$LIBS_TMP"
@@ -201,7 +203,7 @@ AC_HELP_STRING([--with-libpcap=included], [Always use version included with Nmap
     have_libpcap=no
    ;;
   *)
-    _cppflags=$CXXFLAGS
+    _cppflags=$CPPFLAGS
     _ldflags=$LDFLAGS
 
     CPPFLAGS="-I$with_libpcap/include $CPPFLAGS"
@@ -214,7 +216,7 @@ AC_HELP_STRING([--with-libpcap=included], [Always use version included with Nmap
 	LIBPCAP_LIB=$with_libpcap/lib])])
 
     LDFLAGS=$_ldflags
-    CXXFLAGS=$_cppflags
+    CPPFLAGS=$_cppflags
     ;;
   esac]
 )
@@ -225,9 +227,6 @@ fi
 
 if test $have_libpcap = yes; then
   if test "${LIBPCAP_INC+set}" = "set"; then
-    _cflags=$CXXFLAGS
-    _ldflags=$LDFLAGS
-
     CPPFLAGS="-I$LIBPCAP_INC $CPPFLAGS"
     LDFLAGS="-L$LIBPCAP_LIB $LDFLAGS"
   fi
@@ -241,17 +240,19 @@ fi
 
 if test $have_libpcap != yes; then
   if test "${LIBPCAP_INC+set}" = "set"; then
+    LDFLAGS="-L$libpcapdir $_ldflags"
     CPPFLAGS="$CPPFLAGS -I$LIBPCAP_INC"
   else
+    LDFLAGS="-L$libpcapdir $LDFLAGS"
     CPPFLAGS="$CPPFLAGS -I$libpcapdir"
   fi
   LIBPCAP_LIBS='$(LIBPCAPDIR)/libpcap.a'
   PCAP_DEPENDS='$(LIBPCAPDIR)/libpcap.a'
-  PCAP_BUILD="pcap_build"
-  PCAP_CLEAN="pcap_clean"
-  PCAP_DIST_CLEAN="pcap_dist_clean"
+  PCAP_BUILD="build-pcap"
+  PCAP_CLEAN="clean-pcap"
+  PCAP_DIST_CLEAN="distclean-pcap"
 else
-  AC_DEFINE(HAVE_LIBPCAP)
+  AC_DEFINE(HAVE_LIBPCAP, 1, [Have libpcap library])
   LIBPCAP_LIBS="-lpcap"
   PCAP_DEPENDS=""
   PCAP_BUILD=""
@@ -301,9 +302,9 @@ if test $have_dnet != yes ; then
   CPPFLAGS="-I$LIBDNETDIR/include $CPPFLAGS"
   LIBDNET_LIBS="$LIBDNETDIR/src/.libs/libdnet.a"
   DNET_DEPENDS="$LIBDNETDIR/src/.libs/libdnet.a"
-  DNET_BUILD="dnet_build"
-  DNET_CLEAN="dnet_clean"
-  DNET_DIST_CLEAN="dnet_dist_clean"
+  DNET_BUILD="build-dnet"
+  DNET_CLEAN="clean-dnet"
+  DNET_DIST_CLEAN="distclean-dnet"
 else
   LIBDNET_LIBS="-ldnet"
   DNET_DEPENDS=""
@@ -320,13 +321,6 @@ AC_SUBST(DNET_CLEAN)
 AC_SUBST(DNET_DIST_CLEAN)
 
 
-# OpenSSL and NSE C modules can require dlopen
-AC_SEARCH_LIBS(dlopen, dl)
-
-# libpcap can require libnl
-AC_SEARCH_LIBS(nl_handle_alloc, nl)
-
-
 dnl This test is from the configure.in of Unix Network Programming second
 dnl edition example code by W. Richard Stevens
 dnl ##################################################################
@@ -340,7 +334,7 @@ AC_CACHE_CHECK(if sockaddr{} has sa_len member, ac_cv_sockaddr_has_sa_len,
         ac_cv_sockaddr_has_sa_len=yes,
         ac_cv_sockaddr_has_sa_len=no))
 if test $ac_cv_sockaddr_has_sa_len = yes ; then
-        AC_DEFINE(HAVE_SOCKADDR_SA_LEN)
+        AC_DEFINE(HAVE_SOCKADDR_SA_LEN, 1, [struct sockaddr has sa_len member])
 fi
 
 
@@ -357,7 +351,7 @@ AC_CACHE_CHECK(if sockaddr_in{} has sin_len member, ac_cv_sockaddr_in_has_sin_le
         ac_cv_sockaddr_in_has_sin_len=yes,
         ac_cv_sockaddr_in_has_sin_len=no))
 if test $ac_cv_sockaddr_in_has_sin_len = yes ; then
-        AC_DEFINE(HAVE_SOCKADDR_IN_SIN_LEN)
+        AC_DEFINE(HAVE_SOCKADDR_IN_SIN_LEN, 1, [struct sockaddr_in has sin_len member])
 fi
 
 
@@ -374,7 +368,7 @@ AC_CACHE_CHECK(if sockaddr_in6{} has sin6_len member, ac_cv_sockaddr_in6_has_sin
         ac_cv_sockaddr_in6_has_sin6_len=yes,
         ac_cv_sockaddr_in6_has_sin6_len=no))
 if test $ac_cv_sockaddr_in6_has_sin6_len = yes ; then
-        AC_DEFINE(HAVE_SOCKADDR_IN6_SIN6_LEN)
+        AC_DEFINE(HAVE_SOCKADDR_IN6_SIN6_LEN, 1, [struct sockaddr_in6 has sin6_len member])
 fi
 
 
@@ -382,6 +376,7 @@ fi
 AC_C_BIGENDIAN
 
 AC_MSG_CHECKING([if struct in_addr is a wacky huge structure (some Sun boxes)])
+AH_TEMPLATE(IN_ADDR_DEEPSTRUCT, [], [struct in_addr is a wacky huge structure (some Sun boxes)])
 
 AC_TRY_COMPILE([#include <netinet/in.h>], struct in_addr i; i._S_un._S_addr;, \
              AC_DEFINE(IN_ADDR_DEEPSTRUCT) \
@@ -442,7 +437,7 @@ AC_CACHE_CHECK(if struct ip has ip_sum member, ac_cv_ip_has_ip_sum,
         ac_cv_ip_has_ip_sum=yes,
         ac_cv_ip_has_ip_sum=no))
 if test $ac_cv_ip_has_ip_sum = yes ; then
-        AC_DEFINE(HAVE_IP_IP_SUM)
+        AC_DEFINE(HAVE_IP_IP_SUM, 1, [struct ip has ip_sum member])
 fi
 
 AC_CACHE_CHECK(if function signal is accessible, ac_cv_have_signal,
@@ -463,33 +458,36 @@ AC_CACHE_CHECK(if function signal is accessible, ac_cv_have_signal,
         ac_cv_have_signal=yes,
         ac_cv_have_signal=no))
 if test $ac_cv_have_signal = yes ; then
-        AC_DEFINE(HAVE_SIGNAL)
+        AC_DEFINE(HAVE_SIGNAL, 1, [ssignal function is accessible])
 fi
 
 
 
 
+AH_TEMPLATE(SOLARIS, [Sun/Oracle Solaris])
+AH_TEMPLATE(STUPID_SOLARIS_CHECKSUM_BUG, [],
+            [A bug in Solaris causing incorrect IP checksums])
 case "$host" in
   *alpha-dec-osf*)
-    AC_DEFINE(DEC)
+    AC_DEFINE(DEC, 1, [DEC Alpha])
     ;;
   *-netbsd* | *-knetbsd*-gnu)
-    AC_DEFINE(NETBSD)
+    AC_DEFINE(NETBSD, 1, [NetBSD])
     ;;
   *-openbsd*)
-    AC_DEFINE(OPENBSD)
+    AC_DEFINE(OPENBSD, 1, [OpenBSD])
     ;;
   *-freebsd* | *-kfreebsd*-gnu | *-dragonfly*)
-    AC_DEFINE(FREEBSD)
+    AC_DEFINE(FREEBSD, 1, [FreeBSD])
     ;;
   *-bsdi*)
-    AC_DEFINE(BSDI)
+    AC_DEFINE(BSDI, 1, [BSD/OS])
     ;;
   *-sgi-irix5* | *-sgi-irix6*)
-    AC_DEFINE(IRIX)
+    AC_DEFINE(IRIX, 1, [IRIX])
     ;;
   *-hpux*)
-    AC_DEFINE(HPUX)
+    AC_DEFINE(HPUX, 1, [HP-UX])
     # To link with libnet and NM (/usr/lib/libnm.sl) library
     # on HP-UX 11.11 (other versions?) Mikhail Zakharov (zmey20000@yahoo.com)
     AC_CHECK_LIB(nm, open_mib)
@@ -498,6 +496,7 @@ case "$host" in
     # use some AIX specific libraries
     AC_CHECK_LIB(odm, odm_initialize)	
     AC_CHECK_LIB(cfg, _system_configuration)
+    AC_CHECK_LIB(crypt, crypt_r)
     ;;
   *-solaris2.0*)  
     AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
@@ -530,14 +529,15 @@ case "$host" in
     AC_DEFINE(SOLARIS)
     ;;
   *-sunos4*)
-    AC_DEFINE(SUNOS)
-    AC_DEFINE(SPRINTF_RETURNS_STRING)
+    AC_DEFINE(SUNOS, 1, [SunOS 4])
+    AC_DEFINE(SPRINTF_RETURNS_STRING, 1,
+              [sprintf(9f) returns its first argument, not the number of characters printed])
     ;;
   *-linux*)
-    AC_DEFINE(LINUX)
+    AC_DEFINE(LINUX, 1, [Linux])
     ;;
   *-apple-darwin*)
-    AC_DEFINE(MACOSX)
+    AC_DEFINE(MACOSX, 1, [Apple OS X])
     dnl on Mac OSX the math library seems to contain unwanted getopt cruft
     AC_CHECK_LIB(m, main)
     needs_cpp_precomp=yes

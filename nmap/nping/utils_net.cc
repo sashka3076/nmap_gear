@@ -1,90 +1,130 @@
 
 /***************************************************************************
- * utils_net.cc -- Miscellanious network-related functions that perform    *
+ * utils_net.cc -- Miscellaneous network-related functions that perform    *
  * various tasks.                                                          *
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2011 Insecure.Com LLC. Nmap is    *
- * also a registered trademark of Insecure.Com LLC.  This program is free  *
- * software; you may redistribute and/or modify it under the terms of the  *
- * GNU General Public License as published by the Free Software            *
- * Foundation; Version 2 with the clarifications and exceptions described  *
- * below.  This guarantees your right to use, modify, and redistribute     *
- * this software under certain conditions.  If you wish to embed Nmap      *
- * technology into proprietary software, we sell alternative licenses      *
- * (contact sales@insecure.com).  Dozens of software vendors already       *
- * license Nmap technology such as host discovery, port scanning, OS       *
- * detection, and version detection.                                       *
+ * The Nmap Security Scanner is (C) 1996-2018 Insecure.Com LLC ("The Nmap  *
+ * Project"). Nmap is also a registered trademark of the Nmap Project.     *
+ * This program is free software; you may redistribute and/or modify it    *
+ * under the terms of the GNU General Public License as published by the   *
+ * Free Software Foundation; Version 2 ("GPL"), BUT ONLY WITH ALL OF THE   *
+ * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
+ * right to use, modify, and redistribute this software under certain      *
+ * conditions.  If you wish to embed Nmap technology into proprietary      *
+ * software, we sell alternative licenses (contact sales@nmap.com).        *
+ * Dozens of software vendors already license Nmap technology such as      *
+ * host discovery, port scanning, OS detection, version detection, and     *
+ * the Nmap Scripting Engine.                                              *
  *                                                                         *
- * Note that the GPL places important restrictions on "derived works", yet *
- * it does not provide a detailed definition of that term.  To avoid       *
- * misunderstandings, we consider an application to constitute a           *
- * "derivative work" for the purpose of this license if it does any of the *
- * following:                                                              *
- * o Integrates source code from Nmap                                      *
- * o Reads or includes Nmap copyrighted data files, such as                *
- *   nmap-os-db or nmap-service-probes.                                    *
- * o Executes Nmap and parses the results (as opposed to typical shell or  *
- *   execution-menu apps, which simply display raw Nmap output and so are  *
- *   not derivative works.)                                                *
- * o Integrates/includes/aggregates Nmap into a proprietary executable     *
- *   installer, such as those produced by InstallShield.                   *
- * o Links to a library or executes a program that does any of the above   *
+ * Note that the GPL places important restrictions on "derivative works",  *
+ * yet it does not provide a detailed definition of that term.  To avoid   *
+ * misunderstandings, we interpret that term as broadly as copyright law   *
+ * allows.  For example, we consider an application to constitute a        *
+ * derivative work for the purpose of this license if it does any of the   *
+ * following with any software or content covered by this license          *
+ * ("Covered Software"):                                                   *
  *                                                                         *
- * The term "Nmap" should be taken to also include any portions or derived *
- * works of Nmap.  This list is not exclusive, but is meant to clarify our *
- * interpretation of derived works with some common examples.  Our         *
- * interpretation applies only to Nmap--we don't speak for other people's  *
- * GPL works.                                                              *
+ * o Integrates source code from Covered Software.                         *
  *                                                                         *
- * If you have any questions about the GPL licensing restrictions on using *
- * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
- * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to dozens  *
- * of software vendors, and generally include a perpetual license as well  *
- * as providing for priority support and updates as well as helping to     *
- * fund the continued development of Nmap technology.  Please email        *
- * sales@insecure.com for further information.                             *
+ * o Reads or includes copyrighted data files, such as Nmap's nmap-os-db   *
+ * or nmap-service-probes.                                                 *
  *                                                                         *
- * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * o Is designed specifically to execute Covered Software and parse the    *
+ * results (as opposed to typical shell or execution-menu apps, which will *
+ * execute anything you tell them to).                                     *
+ *                                                                         *
+ * o Includes Covered Software in a proprietary executable installer.  The *
+ * installers produced by InstallShield are an example of this.  Including *
+ * Nmap with other software in compressed or archival form does not        *
+ * trigger this provision, provided appropriate open source decompression  *
+ * or de-archiving software is widely available for no charge.  For the    *
+ * purposes of this license, an installer is considered to include Covered *
+ * Software even if it actually retrieves a copy of Covered Software from  *
+ * another source during runtime (such as by downloading it from the       *
+ * Internet).                                                              *
+ *                                                                         *
+ * o Links (statically or dynamically) to a library which does any of the  *
+ * above.                                                                  *
+ *                                                                         *
+ * o Executes a helper program, module, or script to do any of the above.  *
+ *                                                                         *
+ * This list is not exclusive, but is meant to clarify our interpretation  *
+ * of derived works with some common examples.  Other people may interpret *
+ * the plain GPL differently, so we consider this a special exception to   *
+ * the GPL that we apply to Covered Software.  Works which meet any of     *
+ * these conditions must conform to all of the terms of this license,      *
+ * particularly including the GPL Section 3 requirements of providing      *
+ * source code and allowing free redistribution of the work as a whole.    *
+ *                                                                         *
+ * As another special exception to the GPL terms, the Nmap Project grants  *
  * permission to link the code of this program with any version of the     *
  * OpenSSL library which is distributed under a license identical to that  *
  * listed in the included docs/licenses/OpenSSL.txt file, and distribute   *
- * linked combinations including the two. You must obey the GNU GPL in all *
- * respects for all of the code used other than OpenSSL.  If you modify    *
- * this file, you may extend this exception to your version of the file,   *
- * but you are not obligated to do so.                                     *
+ * linked combinations including the two.                                  *
  *                                                                         *
- * If you received these files with a written license agreement or         *
- * contract stating terms other than the terms above, then that            *
- * alternative license agreement takes precedence over these comments.     *
+ * The Nmap Project has permission to redistribute Npcap, a packet         *
+ * capturing driver and library for the Microsoft Windows platform.        *
+ * Npcap is a separate work with it's own license rather than this Nmap    *
+ * license.  Since the Npcap license does not permit redistribution        *
+ * without special permission, our Nmap Windows binary packages which      *
+ * contain Npcap may not be redistributed without special permission.      *
+ *                                                                         *
+ * Any redistribution of Covered Software, including any derived works,    *
+ * must obey and carry forward all of the terms of this license, including *
+ * obeying all GPL rules and restrictions.  For example, source code of    *
+ * the whole work must be provided and free redistribution must be         *
+ * allowed.  All GPL references to "this License", are to be treated as    *
+ * including the terms and conditions of this license text as well.        *
+ *                                                                         *
+ * Because this license imposes special exceptions to the GPL, Covered     *
+ * Work may not be combined (even as part of a larger work) with plain GPL *
+ * software.  The terms, conditions, and exceptions of this license must   *
+ * be included as well.  This license is incompatible with some other open *
+ * source licenses as well.  In some cases we can relicense portions of    *
+ * Nmap or grant special permissions to use it in other open source        *
+ * software.  Please contact fyodor@nmap.org with any such requests.       *
+ * Similarly, we don't incorporate incompatible open source software into  *
+ * Covered Software without special permission from the copyright holders. *
+ *                                                                         *
+ * If you have any questions about the licensing restrictions on using     *
+ * Nmap in other works, we are happy to help.  As mentioned above, we also *
+ * offer an alternative license to integrate Nmap into proprietary         *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing support and updates.  They also fund the continued         *
+ * development of Nmap.  Please email sales@nmap.com for further           *
+ * information.                                                            *
+ *                                                                         *
+ * If you have received a written license agreement or contract for        *
+ * Covered Software stating terms other than these, you may choose to use  *
+ * and redistribute Covered Software under those terms instead of these.   *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
  * right to know exactly what a program is going to do before they run it. *
- * This also allows you to audit the software for security holes (none     *
- * have been found so far).                                                *
+ * This also allows you to audit the software for security holes.          *
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to nmap-dev@insecure.org for possible incorporation into the main       *
- * distribution.  By sending these changes to Fyodor or one of the         *
- * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * to the dev@nmap.org mailing list for possible incorporation into the    *
+ * main distribution.  By sending these changes to Fyodor or one of the    *
+ * Insecure.Org development mailing lists, or checking them into the Nmap  *
+ * source code repository, it is understood (unless you specify            *
+ * otherwise) that you are offering the Nmap Project the unlimited,        *
  * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
- * will always be available Open Source, but this is important because the *
- * inability to relicense code has caused devastating problems for other   *
- * Free Software projects (such as KDE and NASM).  We also occasionally    *
- * relicense the code to third parties as discussed above.  If you wish to *
- * specify special license conditions of your contributions, just say so   *
- * when you send them.                                                     *
+ * will always be available Open Source, but this is important because     *
+ * the inability to relicense code has caused devastating problems for     *
+ * other Free Software projects (such as KDE and NASM).  We also           *
+ * occasionally relicense the code to third parties as discussed above.    *
+ * If you wish to specify special license conditions of your               *
+ * contributions, just say so when you send them.                          *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
- * General Public License v2.0 for more details at                         *
- * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
- * included with Nmap.                                                     *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the Nmap      *
+ * license file for more details (it's in a COPYING file included with     *
+ * Nmap, and also available from https://svn.nmap.org/nmap/COPYING)        *
  *                                                                         *
  ***************************************************************************/
 #include "nping.h"
@@ -103,7 +143,7 @@ extern NpingOps o;
 int atoIP(const char *hostname, struct in_addr *dst){
   struct sockaddr_in i;
   unsigned int stlen=0;
-  if ( resolve(hostname, 0, 0, (sockaddr_storage*)&i, (size_t *)&stlen , PF_INET) == 0 )
+  if ( resolve(hostname, 0, (sockaddr_storage*)&i, (size_t *)&stlen , PF_INET) != 0 )
     return OP_FAILURE;
   *dst=i.sin_addr;
   return OP_SUCCESS;
@@ -115,7 +155,7 @@ int atoIP(const char *hostname, struct sockaddr_storage *ss, int family){
     return OP_FAILURE;
   if(family!=AF_INET && family!=AF_INET6)
     return OP_FAILURE;
-  if ( resolve(hostname, 0, 0, ss, &stlen , family) == 0 )
+  if ( resolve(hostname, 0, ss, &stlen , family) != 0 )
     return OP_FAILURE;
   return OP_SUCCESS;
 } /* End of atoIP */
@@ -275,6 +315,31 @@ u16 sockaddr2port(struct sockaddr_in6 *s6){
 }
 
 
+/* Sets the address family member of the supplied sockaddr. */
+int setsockaddrfamily(struct sockaddr_storage *ss, int family){
+  struct sockaddr_in *s4=(struct sockaddr_in *)ss;
+  s4->sin_family=family;
+  return OP_SUCCESS;
+} /* End of setsockaddrfamily() */
+
+
+/* Sets the special INADDR_ANY or in6addr_an constant on the sin_family or
+ * sin6_addr member of the supplied sockaddr. Note that for this to work,
+ * the supplied sockaddr_storage MUST have a correct address family set 
+ * already (sin_family or sin6_family). */
+int setsockaddrany(struct sockaddr_storage *ss){
+  struct sockaddr_in *s4=(struct sockaddr_in *)ss;
+  struct sockaddr_in6 *s6=(struct sockaddr_in6 *)ss;
+  if(s4->sin_family==AF_INET)
+    s4->sin_addr.s_addr=INADDR_ANY;
+  else if(s6->sin6_family==AF_INET6)
+    s6->sin6_addr=in6addr_any;
+  else
+    return OP_FAILURE;
+  return OP_SUCCESS;
+} /* End of setsockaddrany() */
+
+
 /** Returns true if supplied value corresponds to a valid RFC compliant ICMP
  *  Code. Otherwise it returns false.
  *  @warning The fact that a given value matches a standard code does not
@@ -389,7 +454,7 @@ int getPacketStrInfo(const char *proto, const u8 *packet, u32 len, u8 *dstbuff,
   int detail;
 
   if ( dstbuff == NULL || dstlen < 512 )
-    outFatal(QT_3,"safe_ippackethdrinfo() Invalid values supplied.");
+    nping_fatal(QT_3,"safe_ippackethdrinfo() Invalid values supplied.");
 
   if(o.getVerbosity()>=VB_2)
     detail=HIGH_DETAIL;
@@ -398,7 +463,7 @@ int getPacketStrInfo(const char *proto, const u8 *packet, u32 len, u8 *dstbuff,
   else
     detail=LOW_DETAIL;
 
-  if( !strcasecmp(proto, "IP") || !strcasecmp(proto, "IPv4") ){
+  if( !strcasecmp(proto, "IP") || !strcasecmp(proto, "IPv4") || !strcasecmp(proto, "IPv6")){
     b=(char *)ippackethdrinfo(packet, len, detail);
     strncpy((char*)dstbuff, b, dstlen);
     dstbuff[dstlen-1]=0; /* Just to be sure, NULL-terminate the last position*/
@@ -410,9 +475,9 @@ int getPacketStrInfo(const char *proto, const u8 *packet, u32 len, u8 *dstbuff,
     else if ( o.getMode()==UDP )
         return  udppackethdrinfo(packet, len, dstbuff, dstlen, detail, ss_src, ss_dst);
     else
-        outFatal(QT_3, "getPacketStrInfo(): Unable to determinate transport layer protocol");
+        nping_fatal(QT_3, "getPacketStrInfo(): Unable to determinate transport layer protocol");
   }else{
-    outFatal(QT_3, "getPacketStrInfo(): Unkwnown protocol");
+    nping_fatal(QT_3, "getPacketStrInfo(): Unknown protocol");
   }
   return OP_SUCCESS;
 } /* getPacketStrInfo() */
@@ -478,7 +543,7 @@ int getNetworkInterfaceName(u32 destination, char *dev){
   struct sockaddr_in dst, src;
   bool result=false;
   if(dev==NULL)
-    outFatal(QT_3, "getNetworkInterfaceName(): NULL value supplied.");
+    nping_fatal(QT_3, "getNetworkInterfaceName(): NULL value supplied.");
   memset(&rnfo, 0, sizeof(struct route_nfo) );
   memset(&dst, 0, sizeof(struct sockaddr_in) );
   memset(&src, 0, sizeof(struct sockaddr_in) );
@@ -502,7 +567,7 @@ int getNetworkInterfaceName(struct sockaddr_storage *dst, char *dev){
   struct sockaddr_storage src;
   bool result=false;
   if(dev==NULL)
-    outFatal(QT_3, "getNetworkInterfaceName(): NULL value supplied.");
+    nping_fatal(QT_3, "getNetworkInterfaceName(): NULL value supplied.");
   memset(&rnfo, 0, sizeof(struct route_nfo) );
   memset(&src, 0, sizeof(struct sockaddr_in) );
   result=route_dst(dst, &rnfo, NULL, NULL); 
@@ -530,55 +595,55 @@ int resolveCached(char *host, struct sockaddr_storage *ss, size_t *sslen, int pf
 
   /* Used for debug. When called with NULL,0x1337, print stats */
   if(host==NULL && pf == 1337){
-	outPrint(DBG_4, "resolveCached(): MISSES: %d,  HITS: %d\n", misses, hits);
+	nping_print(DBG_4, "resolveCached(): MISSES: %d,  HITS: %d\n", misses, hits);
 	return OP_SUCCESS;
   }
 
 
   if( ss==NULL || sslen==NULL || host==NULL)
-	outFatal(QT_3, "resolveCached(): NULL values supplied");
-	
+	nping_fatal(QT_3, "resolveCached(): NULL values supplied");
+
   /* First we check if we have the host already cached */
   for(int i=0; i<MAX_CACHED_HOSTS && i<cached_count; i++){
     if( !strcasecmp( archive[i].hostname , host ) ){ /* Cache hit */
 		*sslen=archive[i].sslen;
 		memcpy(ss, &(archive[i].ss) , *sslen);
 		hits++;
-		outPrint(DBG_4, "resolveCached(): Cache hit %d for %s\n", hits, host);
+		nping_print(DBG_4, "resolveCached(): Cache hit %d for %s\n", hits, host);
 		return OP_SUCCESS;		
 	}
   }
 
   /* Cache miss */
   misses++;
-  outPrint(DBG_4, "resolveCached(): Cache miss %d for %s\n", misses, host);
+  nping_print(DBG_4, "resolveCached(): Cache miss %d for %s\n", misses, host);
 
-  if( (result=resolve(host, 0, 0, ss, sslen, pf)) == 1 ){
-	
+  if( (result=resolve(host, 0, ss, sslen, pf)) == 0 ){
+
 	  /* Increment count */
 	  if( cached_count < MAX_CACHED_HOSTS )
 		cached_count++;
-		
+
       /* Store info */
 	  memset(&(archive[current_index]), 0, sizeof(cached_host_t) );
 	  strncpy(archive[current_index].hostname, host, MAX_CACHED_HOSTNAME_LEN);
 	  archive[current_index].sslen = *sslen;
 	  memcpy(&(archive[current_index].ss), ss, *sslen);
 
-	
+
 	  /* I run some tests to see what is the best approach when the cache
-	   * is full. The thing is that in Nping, we are likeley to call
+	   * is full. The thing is that in Nping, we are likely to call
 	   * this function over and over with specifying the same hosts. Deleting
 	   * the oldest entry results in 100% cache misses. I also tried to start
-	   * overwritting entries first backwards and then upwards. That showed
+	   * overwriting entries first backwards and then upwards. That showed
 	   * much better results. However, if we simply overwrite the last
 	   * cache entry over an over we get the best results. */
 	  if( current_index < MAX_CACHED_HOSTS-1 )
 		  current_index++;					
 	  return 0;
-	
 
-	
+
+
 	  ///* Watch out for the overflow. If cache is full,  */
 	  //if( cached_count == MAX_CACHED_HOSTS ){
 			//if( way%2==1 ){
@@ -601,9 +666,9 @@ int resolveCached(char *host, struct sockaddr_storage *ss, size_t *sslen, int pf
 	  //else
 		//current_index++;		
 	  //return OP_SUCCESS;
-	
+
   }else{
-		outError(QT_2, "Error resolving %s\n",host);
+		nping_warning(QT_2, "Error resolving %s\n",host);
 		return OP_FAILURE;
   }
 } /* End of resolveCached() */
@@ -624,23 +689,23 @@ struct hostent *gethostbynameCached(char *host){
   int i=0;
 
   if( host==NULL)
-	outFatal(QT_3, "gethostbynameCached(): NULL values supplied");
+	nping_fatal(QT_3, "gethostbynameCached(): NULL values supplied");
 
   /* First we check if we have the host already cached */
   for(i=0; i<MAX_CACHED_HOSTS && i<cached_count; i++){
     if( !strcasecmp( archive[i].hostname , host ) ){ /* Cache hit */
 		hits++;
-		outPrint(DBG_4, "gethostbynameCached(): Cache hit %d for %s", hits, host);
+		nping_print(DBG_4, "gethostbynameCached(): Cache hit %d for %s", hits, host);
 		return  archive[i].h;
 	}
   }
 
   /* Cache miss */
   misses++;
-  outPrint(DBG_4, "gethostbynameCached(): Cache miss %d for %s", misses, host);
+  nping_print(DBG_4, "gethostbynameCached(): Cache miss %d for %s", misses, host);
 
   if( (result=gethostbyname(host) ) != NULL ){
-	
+
 	  /* Increment cache entry count */
 	  if( cached_count < MAX_CACHED_HOSTS )
 		cached_count++;
@@ -650,7 +715,7 @@ struct hostent *gethostbynameCached(char *host){
        * one in its place */
       if ( current_index==MAX_CACHED_HOSTS-1 && archive[current_index].h != NULL )
         hostentfree( archive[current_index].h );
-        
+
       /* Store the hostent entry in the cache */   
 	  memset(&(archive[current_index]), 0, sizeof(gethostbynamecached_t) );
 	  strncpy(archive[current_index].hostname, host, MAX_CACHED_HOSTNAME_LEN);
@@ -664,7 +729,7 @@ struct hostent *gethostbynameCached(char *host){
 	  else{
 		  return  archive[current_index].h;
 	  }
-	
+
   }else{
     return NULL;
   }
@@ -762,7 +827,7 @@ int hostentfree(struct hostent *src){
  *  The "txt" parameter may take the special value "rand" or "random",
  *  in which case, 6 random bytes will be stored in "targetbuff".
  *  @return OP_SUCCESS on success and OP_FAILURE in case of error.
- *  Buffer targetbuff is NOT modified if "txt" does not have the propper
+ *  Buffer targetbuff is NOT modified if "txt" does not have the proper
  *  format */
 int parseMAC(const char *txt, u8 *targetbuff){
   u8 mac_data[6];
@@ -826,7 +891,7 @@ char *MACtoa(u8 *mac){
 const char *arppackethdrinfo(const u8 *packet, u32 len, int detail){
   static char protoinfo[512];
   if (packet==NULL)
-    outFatal(QT_3, "arppackethdrinfo(): NULL value supplied");
+    nping_fatal(QT_3, "arppackethdrinfo(): NULL value supplied");
   if( len < 28 )
     return "BOGUS!  Packet too short.";
   u16 *htype = (u16 *)packet;
@@ -868,7 +933,7 @@ int arppackethdrinfo(const u8 *packet, u32 len, u8 *dstbuff, u32 dstlen){
   int detail=0;
 
   if ( dstbuff == NULL || dstlen < 512 )
-    outFatal(QT_3,"safe_arppackethdrinfo() Invalid values supplied.");
+    nping_fatal(QT_3,"safe_arppackethdrinfo() Invalid values supplied.");
 
   /* Determine level of detail in packet output from current verbosity level */
   if(o.getVerbosity()>=VB_2)
@@ -902,7 +967,7 @@ int tcppackethdrinfo(const u8 *packet, size_t len, u8 *dstbuff, size_t dstlen,
   struct sockaddr_in6 *d6=(struct sockaddr_in6 *)dst;
   char srcipstring[128];
   char dstipstring[128];
-  
+
  assert(packet);
  assert(dstbuff);
  assert(len>=20);
@@ -913,7 +978,7 @@ int tcppackethdrinfo(const u8 *packet, size_t len, u8 *dstbuff, size_t dstlen,
   if( detail!=LOW_DETAIL && detail!=MEDIUM_DETAIL && detail!=HIGH_DETAIL)
     detail=LOW_DETAIL;
 
-    
+
   /* Determine target IP address */
   if(src!=NULL){
     if( s4->sin_family==AF_INET ){
@@ -1000,7 +1065,7 @@ int tcppackethdrinfo(const u8 *packet, size_t len, u8 *dstbuff, size_t dstlen,
   strncpy((char*)dstbuff, protoinfo, dstlen);
 
   return OP_SUCCESS;
-  
+
 } /* End of tcppackethdrinfo() */
 
 
@@ -1017,7 +1082,7 @@ int udppackethdrinfo(const u8 *packet, size_t len, u8 *dstbuff, size_t dstlen,
   struct sockaddr_in6 *d6=(struct sockaddr_in6 *)dst;
   char srcipstring[128];
   char dstipstring[128];
-  
+
  assert(packet);
  assert(dstbuff);
  assert(len>=8);
@@ -1028,7 +1093,7 @@ int udppackethdrinfo(const u8 *packet, size_t len, u8 *dstbuff, size_t dstlen,
   if( detail!=LOW_DETAIL && detail!=MEDIUM_DETAIL && detail!=HIGH_DETAIL)
     detail=LOW_DETAIL;
 
-    
+
   /* Determine target IP address */
   if(src!=NULL){
     if( s4->sin_family==AF_INET ){
@@ -1072,7 +1137,7 @@ int udppackethdrinfo(const u8 *packet, size_t len, u8 *dstbuff, size_t dstlen,
   strncpy((char*)dstbuff, protoinfo, dstlen);
 
   return OP_SUCCESS;
-  
+
 } /* End of udppackethdrinfo() */
 
 
@@ -1129,14 +1194,14 @@ int send_packet(NpingTarget *target, int rawfd, u8 *pkt, size_t pktLen){
             if(dport!=NULL)
                 s6.sin6_port = *dport;
             else
-                outFatal(QT_3, "send_packet(): Could not determine TCP destination port.");
+                nping_fatal(QT_3, "send_packet(): Could not determine TCP destination port.");
         }
         else if( o.getMode()==UDP){
             dport=getDstPortFromUDPHeader(pkt, pktLen);
             if(dport!=NULL)
                 s6.sin6_port = *dport;
             else
-                outFatal(QT_3, "send_packet(): Could not determine UDP destination port.");
+                nping_fatal(QT_3, "send_packet(): Could not determine UDP destination port.");
         }
         */
 
@@ -1148,11 +1213,21 @@ int send_packet(NpingTarget *target, int rawfd, u8 *pkt, size_t pktLen){
          s6.sin6_port=0;
 
         res = Sendto("send_packet", rawfd, pkt, pktLen, 0, (struct sockaddr *)&s6, (int) sizeof(struct sockaddr_in6));
+        /*Sendto returns errors as -1 according to netutil.cc so lets catch that and return OP_FAILURE*/
+        if (res == -1) return OP_FAILURE;
     }else{ /* IPv4 */
+        struct sockaddr_storage dst;
+        size_t dstlen;
+
+        dstlen = sizeof(dst);
+        target->getTargetSockAddr(&dst, &dstlen);
+        assert(dst.ss_family == AF_INET);
         if( o.issetMTU() == true )
-            res = send_frag_ip_packet(rawfd, NULL, pkt, pktLen, o.getMTU() );
+            res = send_frag_ip_packet(rawfd, NULL, (struct sockaddr_in *) &dst, pkt, pktLen, o.getMTU() );
         else
-            res = send_ip_packet_sd(rawfd, pkt, pktLen);
+            res = send_ip_packet_sd(rawfd, (struct sockaddr_in *) &dst, pkt, pktLen);
+        /*send_ip_packet_sd calls Sendto which returns errors as -1 according to netutil.cc so lets catch that and return OP_FAILURE*/
+        if (res == -1) return OP_FAILURE;
     }
   }
   return OP_SUCCESS;
@@ -1222,36 +1297,6 @@ struct sockaddr_storage *getSrcSockAddrFromIPPacket(u8 *pkt, size_t pktLen){
 } /* End of getSrcSockAddrFromPacket() */
 
 
-struct sockaddr_storage *getDestAddrFromICMPPacket(u8 *pkt, size_t pktLen){
-  static struct sockaddr_storage ss;
-  struct sockaddr_in *s_ip4=(struct sockaddr_in *)&ss;
-  struct ip *i4=(struct ip*)pkt;
-  struct ip *orig_i4=NULL;
-  memset(&ss, 0, sizeof(struct sockaddr_storage));
-
-  if(pkt==NULL || pktLen < 48) /* 48 = First IP hdr + ICMP pkt + Embedded IP hdr */
-    return NULL;
-
-  if( i4->ip_v == 4 ){
-    /* Let's make sure we can trust i4->ip_hl field. We just check if we
-     * have enough bytes to access the DST Addr of the original IP header that
-     * is included in the ICMP packet. */
-    if ( (size_t)(i4->ip_hl*4 + 8 + 16 + 4) > pktLen )
-        return NULL;
-    /* Let's make sure the ICMP pkt contains an IPv4 packet */
-    orig_i4=(struct ip*)( pkt + (8 + i4->ip_hl*4) );
-    if( orig_i4->ip_v != 4 )
-        return NULL;
-    s_ip4->sin_family=AF_INET;    
-    memcpy(&(s_ip4->sin_addr.s_addr), pkt + i4->ip_hl*4 + 8 + 16, 4);
-    return &ss;
-  }
-  else {
-    return NULL;
-  }
-} /* End of getDestAddrFromICMPPacket */
-
-
 
 
 
@@ -1313,7 +1358,7 @@ u8 *getTCPheaderLocation(u8 *pkt, size_t pktLen){
   }
 
   return NULL;
-  
+
 } /* End of getTCPHeaderLocation() */
 
 
@@ -1356,7 +1401,7 @@ u16 *getSrcPortFromIPPacket(u8 *pkt, size_t pktLen){
   if((header=getTCPheaderLocation(pkt, pktLen))==NULL){
     if ((header=getUDPheaderLocation(pkt, pktLen))==NULL)
       return NULL;
-    
+
   }
   pnt=(u16*)&(header[0]);
   port= ntohs(*pnt);
@@ -1419,43 +1464,43 @@ int obtainRawSocket(){
 
   if( o.ipv6() ){
     switch( o.getMode() ){
-        
+
         case TCP:
             protocol = IPPROTO_TCP;
         break;
-        
+
         case UDP:
             protocol = IPPROTO_UDP;
         break;
-        
+
         case ICMP:
             protocol = IPPROTO_ICMPV6;
         break;
-        
+
         case ARP:
-            outError(QT_2,"Warning: createRawSocket() should not be called in ARP mode.");
+            nping_warning(QT_2,"Warning: createRawSocket() should not be called in ARP mode.");
             return 0;
         break;
-        
+
         default:
-            outFatal(QT_3, "createRawSocket(): NpingOps::getMode() does not return a valid mode. Please report this bug.");
+            nping_fatal(QT_3, "createRawSocket(): NpingOps::getMode() does not return a valid mode. Please report this bug.");
         break;
 
     }
     if ((rawipsd = socket(AF_INET6, SOCK_RAW, protocol)) < 0 )
-        outFatal(QT_3,"Couldn't acquire IPv6 raw socket. Are you root?");
+        nping_fatal(QT_3,"Couldn't acquire IPv6 raw socket. Are you root?");
 
   }else{
     if ((rawipsd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0 )
-        outFatal(QT_3,"Couldn't acquire IPv4 raw socket. Are you root?");
-        /* Tell the kernel we are including our own IP Header (call to 
-        * setsockopt passing option IP_HDRINCL)                             */
-        sethdrinclude(rawipsd);
+        nping_fatal(QT_3,"Couldn't acquire IPv4 raw socket. Are you root?");
+    /* Tell the kernel we are including our own IP Header (call to
+     * setsockopt passing option IP_HDRINCL) */
+    sethdrinclude(rawipsd);
   }
 
   /* Allow broadcast addresses */
   if (setsockopt(rawipsd, SOL_SOCKET, SO_BROADCAST, (const char *)&one, sizeof(int)) == -1)
-      outError(QT_2,"Failed to set SO_BROADCAST on raw socket.");
+      nping_warning(QT_2,"Failed to set SO_BROADCAST on raw socket.");
 
   return rawipsd;
 } /* End of obtainRawSocket() */
@@ -1501,24 +1546,24 @@ int getinterfaces_inet6_linux(if6_t *ifbuf, int max_ifaces){
   memset(buffer, 0, sizeof(buffer));
 
   if(ifbuf==NULL || max_ifaces<=0)
-    outFatal(QT_3,"getinterfaces_inet6_linux() NULL values supplied");
- 
+    nping_fatal(QT_3,"getinterfaces_inet6_linux() NULL values supplied");
+
   /* TODO: Do we fatal() or should we just error and return OP_FAILURE? */
-  if ( !fileexistsandisreadable(PATH_PROC_IFINET6) )
-    outFatal(QT_3, "Couldn't get IPv6 interface information. File %s does not exist or you don't have read permissions.", PATH_PROC_IFINET6);
+  if ( !file_is_readable(PATH_PROC_IFINET6) )
+    nping_fatal(QT_3, "Couldn't get IPv6 interface information. File %s does not exist or you don't have read permissions.", PATH_PROC_IFINET6);
   if( (if6file=fopen(PATH_PROC_IFINET6, "r"))==NULL )
-    outFatal(QT_3, "Failed to open %s.", PATH_PROC_IFINET6);
+    nping_fatal(QT_3, "Failed to open %s.", PATH_PROC_IFINET6);
 
   while( fgets(buffer,sizeof(buffer), if6file) ){
 
       if(parsed_ifs>=max_ifaces)
         break;
 
-    outPrint(DBG_4, "Read %s:%d: %s\n", PATH_PROC_IFINET6, ++readlines, buffer);
+    nping_print(DBG_4, "Read %s:%d: %s\n", PATH_PROC_IFINET6, ++readlines, buffer);
 
     /* Check the line has the expected format ********************************/
     /* Some versions of the kernel include colons in the IPv6 address, some
-     * others dont. E.g:
+     * others don't. E.g:
      * fe80:0000:0000:0000:0333:a5ff:4444:9306 03 40 20 80 wlan0
      * fe800000000000000333a5ff44449306 03 40 20 80 wlan0
      * So what we do is to remove the colons so we can process the line
@@ -1638,7 +1683,7 @@ int getinterfaces_inet6_linux(if6_t *ifbuf, int max_ifaces){
     printf(" %02x", dev_flags); 
     printf(" %8s\n", devname);        
  */
-    
+
   } /* End of loop */
 
   /* Cleanup */
@@ -1695,34 +1740,34 @@ int getroutes_inet6_linux(route6_t *rtbuf, int max_routes){
   memset(buffer, 0, sizeof(buffer));
 
   if(rtbuf==NULL || max_routes<=0)
-    outFatal(QT_3,"getroutes_inet6_linux() NULL values supplied");
- 
+    nping_fatal(QT_3,"getroutes_inet6_linux() NULL values supplied");
+
   /* TODO: Do we fatal() or should we just error and return OP_FAILURE? */
-  if ( !fileexistsandisreadable(PATH_PROC_IPV6ROUTE) )
-    outFatal(QT_3, "Couldn't get IPv6 route information. File %s does not exist or you don't have read permissions.", PATH_PROC_IPV6ROUTE);
+  if ( !file_is_readable(PATH_PROC_IPV6ROUTE) )
+    nping_fatal(QT_3, "Couldn't get IPv6 route information. File %s does not exist or you don't have read permissions.", PATH_PROC_IPV6ROUTE);
   if( (route6file=fopen(PATH_PROC_IPV6ROUTE, "r"))==NULL )
-    outFatal(QT_3, "Failed to open %s.", PATH_PROC_IPV6ROUTE);
+    nping_fatal(QT_3, "Failed to open %s.", PATH_PROC_IPV6ROUTE);
 
   while( fgets(buffer,sizeof(buffer), route6file) ){
 
       if(parsed_routes>=max_routes)
         break;
 
-    outPrint(DBG_4, "Read %s:%d: %s\n",PATH_PROC_IPV6ROUTE, ++readlines, buffer);
+    nping_print(DBG_4, "Read %s:%d: %s\n",PATH_PROC_IPV6ROUTE, ++readlines, buffer);
 
     /* Check the line has the expected format ********************************/
     /* Some versions of the kernel include colons in the IPv6 address, some
-     * others dont. So what we do is to remove the colons so we can process
+     * others don't. So what we do is to remove the colons so we can process
      * the line no matter the format of the IPv6 addresses.
      *
      * TODO: Can interfaces with format eth0:1 appear on /proc/net/ipv6_route?
      * If they can, then we need to change the code to skip the last : */
     removecolon(buffer);
-    
+
     /* 1. Check it has the correct length.  */
     size_t min_len=0;
     min_len += 3*32; /* Three IPv6 addresses in hex */
-    min_len += 2*2;  /* Two 8bit hex values (prefiex lengths) */
+    min_len += 2*2;  /* Two 8bit hex values (prefix lengths) */
     min_len += 4*8;  /* Four 32-bit hex values */
     min_len += 1;    /* I guess one char is the min for a device len */
     min_len += 9;    /* 9 spaces */
@@ -1869,12 +1914,12 @@ int getroutes_inet6_linux(route6_t *rtbuf, int max_routes){
  *
     for(i=0; i<16; i++)
         printf("%02x", rtbuf[parsed_routes].dst_net.s6_addr[i]);
-        
+
     printf(" %02x ", rtbuf[parsed_routes].dst_prefix);
 
     for(i=0; i<16; i++)
         printf("%02x", rtbuf[parsed_routes].src_net.s6_addr[i]);
-        
+
     printf(" %02x ", rtbuf[parsed_routes].src_prefix);
 
     for(i=0; i<16; i++)
@@ -1887,7 +1932,7 @@ int getroutes_inet6_linux(route6_t *rtbuf, int max_routes){
     printf(" %8s\n", rtbuf[parsed_routes].devname);        
 */
    parsed_routes++;
-    
+
   } /* End of loop */
 
   /* Cleanup */
@@ -1919,7 +1964,7 @@ route6_t *route_dst_ipv6_linux(const struct sockaddr_storage *const dst){
   u8 zero_addr[16];                  /* Just to compare route to addr "::"     */
   memset(zero_addr, 0, 16);
   dstsin6=(struct sockaddr_in6 *)dst;
-   
+
   if(dst==NULL) return NULL;
   if(dstsin6->sin6_family!=AF_INET6) return NULL;
 

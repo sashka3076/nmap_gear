@@ -6,111 +6,157 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2011 Insecure.Com LLC. Nmap is    *
- * also a registered trademark of Insecure.Com LLC.  This program is free  *
- * software; you may redistribute and/or modify it under the terms of the  *
- * GNU General Public License as published by the Free Software            *
- * Foundation; Version 2 with the clarifications and exceptions described  *
- * below.  This guarantees your right to use, modify, and redistribute     *
- * this software under certain conditions.  If you wish to embed Nmap      *
- * technology into proprietary software, we sell alternative licenses      *
- * (contact sales@insecure.com).  Dozens of software vendors already       *
- * license Nmap technology such as host discovery, port scanning, OS       *
- * detection, and version detection.                                       *
+ * The Nmap Security Scanner is (C) 1996-2018 Insecure.Com LLC ("The Nmap  *
+ * Project"). Nmap is also a registered trademark of the Nmap Project.     *
+ * This program is free software; you may redistribute and/or modify it    *
+ * under the terms of the GNU General Public License as published by the   *
+ * Free Software Foundation; Version 2 ("GPL"), BUT ONLY WITH ALL OF THE   *
+ * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
+ * right to use, modify, and redistribute this software under certain      *
+ * conditions.  If you wish to embed Nmap technology into proprietary      *
+ * software, we sell alternative licenses (contact sales@nmap.com).        *
+ * Dozens of software vendors already license Nmap technology such as      *
+ * host discovery, port scanning, OS detection, version detection, and     *
+ * the Nmap Scripting Engine.                                              *
  *                                                                         *
- * Note that the GPL places important restrictions on "derived works", yet *
- * it does not provide a detailed definition of that term.  To avoid       *
- * misunderstandings, we consider an application to constitute a           *
- * "derivative work" for the purpose of this license if it does any of the *
- * following:                                                              *
- * o Integrates source code from Nmap                                      *
- * o Reads or includes Nmap copyrighted data files, such as                *
- *   nmap-os-db or nmap-service-probes.                                    *
- * o Executes Nmap and parses the results (as opposed to typical shell or  *
- *   execution-menu apps, which simply display raw Nmap output and so are  *
- *   not derivative works.)                                                *
- * o Integrates/includes/aggregates Nmap into a proprietary executable     *
- *   installer, such as those produced by InstallShield.                   *
- * o Links to a library or executes a program that does any of the above   *
+ * Note that the GPL places important restrictions on "derivative works",  *
+ * yet it does not provide a detailed definition of that term.  To avoid   *
+ * misunderstandings, we interpret that term as broadly as copyright law   *
+ * allows.  For example, we consider an application to constitute a        *
+ * derivative work for the purpose of this license if it does any of the   *
+ * following with any software or content covered by this license          *
+ * ("Covered Software"):                                                   *
  *                                                                         *
- * The term "Nmap" should be taken to also include any portions or derived *
- * works of Nmap.  This list is not exclusive, but is meant to clarify our *
- * interpretation of derived works with some common examples.  Our         *
- * interpretation applies only to Nmap--we don't speak for other people's  *
- * GPL works.                                                              *
+ * o Integrates source code from Covered Software.                         *
  *                                                                         *
- * If you have any questions about the GPL licensing restrictions on using *
- * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
- * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to dozens  *
- * of software vendors, and generally include a perpetual license as well  *
- * as providing for priority support and updates as well as helping to     *
- * fund the continued development of Nmap technology.  Please email        *
- * sales@insecure.com for further information.                             *
+ * o Reads or includes copyrighted data files, such as Nmap's nmap-os-db   *
+ * or nmap-service-probes.                                                 *
  *                                                                         *
- * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * o Is designed specifically to execute Covered Software and parse the    *
+ * results (as opposed to typical shell or execution-menu apps, which will *
+ * execute anything you tell them to).                                     *
+ *                                                                         *
+ * o Includes Covered Software in a proprietary executable installer.  The *
+ * installers produced by InstallShield are an example of this.  Including *
+ * Nmap with other software in compressed or archival form does not        *
+ * trigger this provision, provided appropriate open source decompression  *
+ * or de-archiving software is widely available for no charge.  For the    *
+ * purposes of this license, an installer is considered to include Covered *
+ * Software even if it actually retrieves a copy of Covered Software from  *
+ * another source during runtime (such as by downloading it from the       *
+ * Internet).                                                              *
+ *                                                                         *
+ * o Links (statically or dynamically) to a library which does any of the  *
+ * above.                                                                  *
+ *                                                                         *
+ * o Executes a helper program, module, or script to do any of the above.  *
+ *                                                                         *
+ * This list is not exclusive, but is meant to clarify our interpretation  *
+ * of derived works with some common examples.  Other people may interpret *
+ * the plain GPL differently, so we consider this a special exception to   *
+ * the GPL that we apply to Covered Software.  Works which meet any of     *
+ * these conditions must conform to all of the terms of this license,      *
+ * particularly including the GPL Section 3 requirements of providing      *
+ * source code and allowing free redistribution of the work as a whole.    *
+ *                                                                         *
+ * As another special exception to the GPL terms, the Nmap Project grants  *
  * permission to link the code of this program with any version of the     *
  * OpenSSL library which is distributed under a license identical to that  *
  * listed in the included docs/licenses/OpenSSL.txt file, and distribute   *
- * linked combinations including the two. You must obey the GNU GPL in all *
- * respects for all of the code used other than OpenSSL.  If you modify    *
- * this file, you may extend this exception to your version of the file,   *
- * but you are not obligated to do so.                                     *
+ * linked combinations including the two.                                  *
  *                                                                         *
- * If you received these files with a written license agreement or         *
- * contract stating terms other than the terms above, then that            *
- * alternative license agreement takes precedence over these comments.     *
+ * The Nmap Project has permission to redistribute Npcap, a packet         *
+ * capturing driver and library for the Microsoft Windows platform.        *
+ * Npcap is a separate work with it's own license rather than this Nmap    *
+ * license.  Since the Npcap license does not permit redistribution        *
+ * without special permission, our Nmap Windows binary packages which      *
+ * contain Npcap may not be redistributed without special permission.      *
+ *                                                                         *
+ * Any redistribution of Covered Software, including any derived works,    *
+ * must obey and carry forward all of the terms of this license, including *
+ * obeying all GPL rules and restrictions.  For example, source code of    *
+ * the whole work must be provided and free redistribution must be         *
+ * allowed.  All GPL references to "this License", are to be treated as    *
+ * including the terms and conditions of this license text as well.        *
+ *                                                                         *
+ * Because this license imposes special exceptions to the GPL, Covered     *
+ * Work may not be combined (even as part of a larger work) with plain GPL *
+ * software.  The terms, conditions, and exceptions of this license must   *
+ * be included as well.  This license is incompatible with some other open *
+ * source licenses as well.  In some cases we can relicense portions of    *
+ * Nmap or grant special permissions to use it in other open source        *
+ * software.  Please contact fyodor@nmap.org with any such requests.       *
+ * Similarly, we don't incorporate incompatible open source software into  *
+ * Covered Software without special permission from the copyright holders. *
+ *                                                                         *
+ * If you have any questions about the licensing restrictions on using     *
+ * Nmap in other works, we are happy to help.  As mentioned above, we also *
+ * offer an alternative license to integrate Nmap into proprietary         *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing support and updates.  They also fund the continued         *
+ * development of Nmap.  Please email sales@nmap.com for further           *
+ * information.                                                            *
+ *                                                                         *
+ * If you have received a written license agreement or contract for        *
+ * Covered Software stating terms other than these, you may choose to use  *
+ * and redistribute Covered Software under those terms instead of these.   *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
  * right to know exactly what a program is going to do before they run it. *
- * This also allows you to audit the software for security holes (none     *
- * have been found so far).                                                *
+ * This also allows you to audit the software for security holes.          *
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to nmap-dev@insecure.org for possible incorporation into the main       *
- * distribution.  By sending these changes to Fyodor or one of the         *
- * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * to the dev@nmap.org mailing list for possible incorporation into the    *
+ * main distribution.  By sending these changes to Fyodor or one of the    *
+ * Insecure.Org development mailing lists, or checking them into the Nmap  *
+ * source code repository, it is understood (unless you specify            *
+ * otherwise) that you are offering the Nmap Project the unlimited,        *
  * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
- * will always be available Open Source, but this is important because the *
- * inability to relicense code has caused devastating problems for other   *
- * Free Software projects (such as KDE and NASM).  We also occasionally    *
- * relicense the code to third parties as discussed above.  If you wish to *
- * specify special license conditions of your contributions, just say so   *
- * when you send them.                                                     *
+ * will always be available Open Source, but this is important because     *
+ * the inability to relicense code has caused devastating problems for     *
+ * other Free Software projects (such as KDE and NASM).  We also           *
+ * occasionally relicense the code to third parties as discussed above.    *
+ * If you wish to specify special license conditions of your               *
+ * contributions, just say so when you send them.                          *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
- * General Public License v2.0 for more details at                         *
- * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
- * included with Nmap.                                                     *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the Nmap      *
+ * license file for more details (it's in a COPYING file included with     *
+ * Nmap, and also available from https://svn.nmap.org/nmap/COPYING)        *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: targets.cc 21904 2011-01-21 00:04:16Z fyodor $ */
+/* $Id: targets.cc 37126 2018-01-28 21:18:17Z fyodor $ */
 
 
+#include "nbase/nbase_addrset.h"
 #include "targets.h"
 #include "timing.h"
+#include "tcpip.h"
 #include "NmapOps.h"
-#include "TargetGroup.h"
+#include "NewTargets.h"
 #include "Target.h"
 #include "scan_engine.h"
 #include "nmap_dns.h"
-#include "nmap_tty.h"
 #include "utils.h"
+#include "nmap_error.h"
+#include "xml.h"
 
-using namespace std;
 extern NmapOps o;
+#ifdef WIN32
+/* from libdnet's intf-win32.c */
+extern "C" int g_has_npcap_loopback;
+#endif
 
 /* Conducts an ARP ping sweep of the given hosts to determine which ones
    are up on a local ethernet network */
 static void arpping(Target *hostbatch[], int num_hosts) {
-  /* First I change hostbatch into a vector<Target *>, which is what ultra_scan
+  /* First I change hostbatch into a std::vector<Target *>, which is what ultra_scan
      takes.  I remove hosts that cannot be ARP scanned (such as localhost) */
-  vector<Target *> targets;
+  std::vector<Target *> targets;
   int targetno;
   targets.reserve(num_hosts);
 
@@ -119,16 +165,16 @@ static void arpping(Target *hostbatch[], int num_hosts) {
     /* Default timout should be much lower for arp */
     hostbatch[targetno]->to.timeout = MAX(o.minRttTimeout(), MIN(o.initialRttTimeout(), INITIAL_ARP_RTT_TIMEOUT)) * 1000;
     if (!hostbatch[targetno]->SrcMACAddress()) {
-      bool islocal = islocalhost(hostbatch[targetno]->v4hostip());
+      bool islocal = islocalhost(hostbatch[targetno]->TargetSockAddr());
       if (islocal) {
-        log_write(LOG_STDOUT|LOG_NORMAL, 
+        log_write(LOG_STDOUT|LOG_NORMAL,
                   "ARP ping: Considering %s UP because it is a local IP, despite no MAC address for device %s\n",
                   hostbatch[targetno]->NameIP(), hostbatch[targetno]->deviceName());
         hostbatch[targetno]->flags = HOST_UP;
       } else {
-        log_write(LOG_STDOUT|LOG_NORMAL, 
+        log_write(LOG_STDOUT|LOG_NORMAL,
                   "ARP ping: Considering %s DOWN because no MAC address found for device %s.\n",
-                  hostbatch[targetno]->NameIP(), 
+                  hostbatch[targetno]->NameIP(),
                   hostbatch[targetno]->deviceName());
         hostbatch[targetno]->flags = HOST_DOWN;
       }
@@ -136,8 +182,12 @@ static void arpping(Target *hostbatch[], int num_hosts) {
     }
     targets.push_back(hostbatch[targetno]);
   }
-  if (!targets.empty())
-    ultra_scan(targets, NULL, PING_SCAN_ARP);
+  if (!targets.empty()) {
+    if (targets[0]->af() == AF_INET)
+      ultra_scan(targets, NULL, PING_SCAN_ARP);
+    else
+      ultra_scan(targets, NULL, PING_SCAN_ND);
+  }
   return;
 }
 
@@ -155,120 +205,38 @@ void returnhost(HostGroupState *hs) {
 
 /* Is the host passed as Target to be excluded? Much of this logic had
    to be rewritten from wam's original code to allow for the objects */
-static int hostInExclude(struct sockaddr *checksock, size_t checksocklen, 
-                  TargetGroup *exclude_group) {
-  unsigned long tmpTarget; /* ip we examine */
-  int i=0;                 /* a simple index */
-  char targets_type;       /* what is the address type of the Target Group */
-  struct sockaddr_storage ss; 
-  struct sockaddr_in *sin = (struct sockaddr_in *) &ss;
-  size_t slen;             /* needed for funct but not used */
-  unsigned long mask = 0;  /* our trusty netmask, which we convert to nbo */
-  struct sockaddr_in *checkhost_in;
-
-  if ((TargetGroup *)0 == exclude_group)
+static int hostInExclude(struct sockaddr *checksock, size_t checksocklen,
+                  const addrset *exclude_group) {
+  if (exclude_group == NULL)
     return 0;
 
-  checkhost_in = NULL;
-  if (checksock->sa_family == AF_INET) {
-    assert(checksocklen >= sizeof(struct sockaddr_in));
-    checkhost_in = (struct sockaddr_in *) checksock;
-  }
+  if (checksock == NULL)
+    return 0;
 
-  /* First find out what type of addresses are in the target group */
-  targets_type = exclude_group[i].get_targets_type();
-
-  /* Lets go through the targets until we reach our uninitialized placeholder */
-  while (exclude_group[i].get_targets_type() != TargetGroup::TYPE_NONE) { 
-    /* while there are still hosts in the target group */
-    while (exclude_group[i].get_next_host(&ss, &slen) == 0) {
-      tmpTarget = sin->sin_addr.s_addr; 
-
-      /* For Netmasks simply compare the network bits and move to the next
-       * group if it does not compare, we don't care about the individual addrs */
-      if (targets_type == TargetGroup::IPV4_NETMASK) {
-        if (checkhost_in == NULL)
-          break;
-        mask = htonl((unsigned long) (0-1) << (32-exclude_group[i].get_mask()));
-        if ((tmpTarget & mask) == (checkhost_in->sin_addr.s_addr & mask)) {
-          exclude_group[i].rewind();
-          return 1;
-        } else {
-          break;
-        }
-      } 
-      /* For ranges we need to be a little more slick, if we don't find a match
-       * we should skip the rest of the addrs in the octet, thank wam for this
-       * optimization */
-      else if (targets_type == TargetGroup::IPV4_RANGES) {
-        if (checkhost_in == NULL)
-          break;
-        if (tmpTarget == checkhost_in->sin_addr.s_addr) {
-          exclude_group[i].rewind();
-          return 1;
-        } else {
-          /* note these are in network byte order */
-          if ((tmpTarget & 0x000000ff) != (checkhost_in->sin_addr.s_addr & 0x000000ff))
-            exclude_group[i].skip_range(TargetGroup::FIRST_OCTET); 
-          else if ((tmpTarget & 0x0000ff00) != (checkhost_in->sin_addr.s_addr & 0x0000ff00))
-            exclude_group[i].skip_range(TargetGroup::SECOND_OCTET); 
-          else if ((tmpTarget & 0x00ff0000) != (checkhost_in->sin_addr.s_addr & 0x00ff0000))
-            exclude_group[i].skip_range(TargetGroup::THIRD_OCTET); 
-
-          continue;
-        }
-      }
-#if HAVE_IPV6
-      else if (targets_type == TargetGroup::IPV6_ADDRESS) {
-        fatal("exclude file not supported for IPV6 -- If it is important to you, send a mail to fyodor@insecure.org so I can guage support\n");
-      }
-#endif
-    }
-    exclude_group[i++].rewind();
-  }
-
-  /* we did not find the host */
+  if (addrset_contains(exclude_group,checksock))
+    return 1;
   return 0;
 }
 
-/* Convert a vector of host specifications to an array (allocated with new[]) of
-   TargetGroups. The size of the returned array is one greater than the number
-   of host specs, to leave on uninitialized member at the end. */
-static TargetGroup *specs_to_targetgroups(const std::vector<std::string> &specs) {
-  TargetGroup *excludelist;
-  unsigned int i;
-
-  excludelist = new TargetGroup[specs.size() + 1];
-
-  for (i = 0; i < specs.size(); i++) {
-    if (excludelist[i].parse_expr(specs[i].c_str(), o.af()) == 0) {
-      if (o.debugging > 1)
-        error("Loaded exclude target of: %s", specs[i].c_str());
-    }
-  }
-
-  return excludelist;
-}
-
 /* Load an exclude list from a file for --excludefile. */
-TargetGroup* load_exclude_file(FILE *fp) {
-  std::vector<std::string> specs;
+int load_exclude_file(addrset *excludelist, FILE *fp) {
   char host_spec[1024];
   size_t n;
 
   while ((n = read_host_from_file(fp, host_spec, sizeof(host_spec))) > 0) {
     if (n >= sizeof(host_spec))
       fatal("One of your exclude file specifications was too long to read (>= %u chars)", (unsigned int) sizeof(host_spec));
-    specs.push_back(host_spec);
+    if(!addrset_add_spec(excludelist, host_spec, o.af(), 1)){
+      fatal("Invalid address specification:");
+    }
   }
 
-  return specs_to_targetgroups(specs);
+  return 1;
 }
 
 /* Load a comma-separated exclude list from a string, the argument to
    --exclude. */
-TargetGroup* load_exclude_string(const char *s) {
-  std::vector<std::string> specs;
+int load_exclude_string(addrset *excludelist, const char *s) {
   const char *begin, *p;
 
   p = s;
@@ -276,62 +244,30 @@ TargetGroup* load_exclude_string(const char *s) {
     begin = p;
     while (*p != '\0' && *p != ',')
       p++;
-    specs.push_back(std::string(begin, p - begin));
+    std::string addr_str = std::string(begin, p - begin);
+    if (!addrset_add_spec(excludelist, addr_str.c_str(), o.af(), 1)) {
+        fatal("Invalid address specification: %s", addr_str.c_str());
+    }
     if (*p == '\0')
       break;
     p++;
-  }
+  };
 
-  return specs_to_targetgroups(specs);
+  return 1;
 }
 
 
 /* A debug routine to dump some information to stdout. Invoked if debugging is
-   set to 3 or higher. I had to make significant changes from wam's code.
-   Although wam displayed much more detail, alot of this is now hidden inside of
-   the Target Group Object. Rather than writing a bunch of methods to return
-   private attributes, which would only be used for debugging, I went for the
-   method below. */
-int dumpExclude(TargetGroup *exclude_group) {
-  int i=0, debug_save=0, type=TargetGroup::TYPE_NONE;
-  unsigned int mask = 0;
-  struct sockaddr_storage ss;
-  struct sockaddr_in *sin = (struct sockaddr_in *) &ss;
-  size_t slen;
+   set to 4 or higher. */
+int dumpExclude(addrset *exclude_group) {
+  const struct addrset_elem *elem;
 
-  /* shut off debugging for now, this is a debug routine in itself, we don't
-     want to see all the debug messages inside of the object */
-  debug_save = o.debugging;
-  o.debugging = 0;
+  for (elem = exclude_group->head; elem != NULL; elem = elem->next)
+    addrset_elem_print(stdout, elem);
 
-  while ((type = exclude_group[i].get_targets_type()) != TargetGroup::TYPE_NONE) {
-    switch (type) {
-      case TargetGroup::IPV4_NETMASK:
-        exclude_group[i].get_next_host(&ss, &slen);
-        mask = exclude_group[i].get_mask();
-        error("exclude host group %d is %s/%d", i, inet_ntoa(sin->sin_addr), mask);
-        break;
-
-      case TargetGroup::IPV4_RANGES:
-        while (exclude_group[i].get_next_host(&ss, &slen) == 0) 
-          error("exclude host group %d is %s", i, inet_ntoa(sin->sin_addr));
-        break;
-
-      case TargetGroup::IPV6_ADDRESS:
-        fatal("IPV6 addresses are not supported in the exclude file\n");
-        break;
-
-      default:
-        fatal("Unknown target type in exclude file.\n");
-    }
-    exclude_group[i++].rewind();
-  }
-
-  /* return debugging to what it was */
-  o.debugging = debug_save; 
   return 1;
 }
- 
+
 static void massping(Target *hostbatch[], int num_hosts, struct scan_lists *ports) {
   static struct timeout_info group_to = { 0, 0, 0 };
   static char prev_device_name[16] = "";
@@ -371,144 +307,282 @@ static void massping(Target *hostbatch[], int num_hosts, struct scan_lists *port
      2. it uses a different source address, or
      3. it is directly connected when the other hosts are not, or vice versa, or
      4. it has the same IP address as another target already in the group.
-   These restrictions only apply for raw scans. This function is similar to one
-   of the same name in nmap.cc. That one is for port scanning, this one is for
-   ping scanning. */
-static bool target_needs_new_hostgroup(const HostGroupState *hs, const Target *target) {
-  int i;
+   These restrictions only apply for raw scans, including host discovery. */
+bool target_needs_new_hostgroup(Target **targets, int targets_sz, const Target *target) {
+  int i = 0;
 
   /* We've just started a new hostgroup, so any target is acceptable. */
-  if (hs->current_batch_sz == 0)
+  if (targets_sz == 0)
     return false;
 
   /* There are no restrictions on non-root scans. */
-  if (!(o.af() == AF_INET && o.isr00t && target->deviceName() != NULL))
+  if (!(o.isr00t && target->deviceName() != NULL))
     return false;
 
+  /* Different address family? */
+  if (targets[0]->af() != target->af())
+    return true;
+
   /* Different interface name? */
-  if (hs->hostbatch[0]->deviceName() != NULL &&
-      strcmp(hs->hostbatch[0]->deviceName(), target->deviceName()) != 0) {
+  if (targets[0]->deviceName() != NULL &&
+      target->deviceName() != NULL &&
+      strcmp(targets[0]->deviceName(), target->deviceName()) != 0) {
     return true;
   }
 
   /* Different source address? */
-  if (hs->hostbatch[0]->v4source().s_addr != target->v4source().s_addr)
+  if (sockaddr_storage_cmp(targets[0]->SourceSockAddr(), target->SourceSockAddr()) != 0)
     return true;
 
   /* Different direct connectedness? */
-  if (hs->hostbatch[0]->directlyConnected() != target->directlyConnected())
+  if (targets[0]->directlyConnected() != target->directlyConnected())
     return true;
 
   /* Is there already a target with this same IP address? ultra_scan doesn't
      cope with that, because it uses IP addresses to look up targets from
      replies. What happens is one target gets the replies for all probes
      referring to the same IP address. */
-  for (i = 0; i < hs->current_batch_sz; i++) {
-    if (hs->hostbatch[0]->v4host().s_addr == target->v4host().s_addr)
+  for (i = 0; i < targets_sz; i++) {
+    if (sockaddr_storage_cmp(targets[i]->TargetSockAddr(), target->TargetSockAddr()) == 0)
       return true;
   }
 
   return false;
 }
 
-Target *nexthost(HostGroupState *hs, TargetGroup *exclude_group,
-                 struct scan_lists *ports, int pingtype) {
-  int i;
+/* Lookahead is the number of hosts that can be
+   checked (such as ping scanned) in advance.  Randomize causes each
+   group of up to lookahead hosts to be internally shuffled around.
+   The target_expressions array MUST REMAIN VALID IN MEMORY as long as
+   this class instance is used -- the array is NOT copied.
+ */
+HostGroupState::HostGroupState(int lookahead, int rnd, int argc, const char **argv) {
+  assert(lookahead > 0);
+  this->argc = argc;
+  this->argv = argv;
+  hostbatch = (Target **) safe_zalloc(sizeof(Target *) * lookahead);
+  defer_buffer = std::list<Target *>();
+  undeferred = std::list<Target *>();
+  max_batch_sz = lookahead;
+  current_batch_sz = 0;
+  next_batch_no = 0;
+  randomize = rnd;
+}
+
+HostGroupState::~HostGroupState() {
+  free(hostbatch);
+}
+
+/* Returns true iff the defer buffer is not yet full. */
+bool HostGroupState::defer(Target *t) {
+  this->defer_buffer.push_back(t);
+  return this->defer_buffer.size() < HostGroupState::DEFER_LIMIT;
+}
+
+void HostGroupState::undefer() {
+  this->undeferred.splice(this->undeferred.end(), this->defer_buffer);
+}
+
+const char *HostGroupState::next_expression() {
+  if (o.max_ips_to_scan == 0 || o.numhosts_scanned + this->current_batch_sz < o.max_ips_to_scan) {
+    const char *expr;
+    expr = grab_next_host_spec(o.inputfd, o.generate_random_ips, this->argc, this->argv);
+    if (expr != NULL)
+      return expr;
+  }
+
+#ifndef NOLUA
+  /* Add any new NSE discovered targets to the scan queue */
+  static char buf[1024];
+
+  NewTargets *new_targets = NewTargets::get();
+  if (o.script && new_targets != NULL) {
+    if (new_targets->get_queued() > 0) {
+      std::string expr_string;
+      expr_string = new_targets->read().c_str();
+      if (o.debugging > 3) {
+        log_write(LOG_PLAIN,
+                  "New targets in the scanned cache: %ld, pending ones: %ld.\n",
+                  new_targets->get_scanned(), new_targets->get_queued());
+      }
+      if (!expr_string.empty()) {
+        Strncpy(buf, expr_string.c_str(), sizeof(buf));
+        return buf;
+      }
+    }
+  }
+#endif
+
+  return NULL;
+}
+
+/* Add a <target> element to the XML stating that a target specification was
+   ignored. This can be because of, for example, a DNS resolution failure, or a
+   syntax error. */
+static void log_bogus_target(const char *expr) {
+  xml_open_start_tag("target");
+  xml_attribute("specification", "%s", expr);
+  xml_attribute("status", "skipped");
+  xml_attribute("reason", "invalid");
+  xml_close_empty_tag();
+  xml_newline();
+}
+
+/* Returns a newly allocated Target with the given address. Handles all the
+   details like setting the Target's address and next hop. */
+static Target *setup_target(const HostGroupState *hs,
+                            const struct sockaddr_storage *ss, size_t sslen,
+                            int pingtype) {
+  struct route_nfo rnfo;
+  Target *t;
+
+  t = new Target();
+
+  t->setTargetSockAddr(ss, sslen);
+
+  /* Special handling for the resolved address (for example whatever
+     scanme.nmap.org resolves to in scanme.nmap.org/24). */
+  if (hs->current_group.is_resolved_address(ss)) {
+    if (hs->current_group.get_namedhost())
+      t->setTargetName(hs->current_group.get_resolved_name());
+    t->unscanned_addrs = hs->current_group.get_unscanned_addrs();
+  }
+
+  /* We figure out the source IP/device IFF
+     1) We are r00t AND
+     2) We are doing tcp or udp pingscan OR
+     3) We are doing a raw-mode portscan or osscan or traceroute OR
+     4) We are on windows and doing ICMP ping */
+  if (o.isr00t &&
+      ((pingtype & (PINGTYPE_TCP|PINGTYPE_UDP|PINGTYPE_SCTP_INIT|PINGTYPE_PROTO|PINGTYPE_ARP)) || o.RawScan()
+#ifdef WIN32
+       || (pingtype & (PINGTYPE_ICMP_PING|PINGTYPE_ICMP_MASK|PINGTYPE_ICMP_TS))
+#endif // WIN32
+      )) {
+    if (!nmap_route_dst(ss, &rnfo)) {
+      log_bogus_target(inet_ntop_ez(ss, sslen));
+      error("%s: failed to determine route to %s", __func__, t->NameIP());
+      goto bail;
+    }
+    if (rnfo.direct_connect) {
+      t->setDirectlyConnected(true);
+    } else {
+      t->setDirectlyConnected(false);
+      t->setNextHop(&rnfo.nexthop, sizeof(rnfo.nexthop));
+    }
+    t->setIfType(rnfo.ii.device_type);
+    if (rnfo.ii.device_type == devt_ethernet) {
+      if (o.spoofMACAddress())
+        t->setSrcMACAddress(o.spoofMACAddress());
+      else
+        t->setSrcMACAddress(rnfo.ii.mac);
+    }
+#ifdef WIN32
+    else if (g_has_npcap_loopback && rnfo.ii.device_type == devt_loopback) {
+      if (o.spoofMACAddress())
+        t->setSrcMACAddress(o.spoofMACAddress());
+      else
+        t->setSrcMACAddress(rnfo.ii.mac);
+      t->setNextHopMACAddress(t->SrcMACAddress());
+    }
+#endif
+    t->setSourceSockAddr(&rnfo.srcaddr, sizeof(rnfo.srcaddr));
+    if (hs->current_batch_sz == 0) /* Because later ones can have different src addy and be cut off group */
+      o.decoys[o.decoyturn] = t->source();
+    t->setDeviceNames(rnfo.ii.devname, rnfo.ii.devfullname);
+    t->setMTU(rnfo.ii.mtu);
+    // printf("Target %s %s directly connected, goes through local iface %s, which %s ethernet\n", t->NameIP(), t->directlyConnected()? "IS" : "IS NOT", t->deviceName(), (t->ifType() == devt_ethernet)? "IS" : "IS NOT");
+  }
+
+  return t;
+
+bail:
+  delete t;
+  return NULL;
+}
+
+static Target *next_target(HostGroupState *hs, const addrset *exclude_group,
+  struct scan_lists *ports, int pingtype) {
   struct sockaddr_storage ss;
   size_t sslen;
-  struct route_nfo rnfo;
+  Target *t;
+
+  /* First handle targets deferred in the last batch. */
+  if (!hs->undeferred.empty()) {
+    t = hs->undeferred.front();
+    hs->undeferred.pop_front();
+    return t;
+  }
+
+tryagain:
+
+  if (hs->current_group.get_next_host(&ss, &sslen) != 0) {
+    const char *expr;
+    /* We are going to have to pop in another expression. */
+    for (;;) {
+      expr = hs->next_expression();
+      if (expr == NULL)
+        /* That's the last of them. */
+        return NULL;
+      if (hs->current_group.parse_expr(expr, o.af()) == 0)
+        break;
+      else
+        log_bogus_target(expr);
+    }
+    goto tryagain;
+  }
+
+  assert(ss.ss_family == o.af());
+
+  /* If we are resuming from a previous scan, we have already finished scanning
+     up to o.resume_ip.  */
+  if (ss.ss_family == AF_INET && o.resume_ip.s_addr) {
+    if (o.resume_ip.s_addr == ((struct sockaddr_in *) &ss)->sin_addr.s_addr)
+      /* We will continue starting with the next IP. */
+      o.resume_ip.s_addr = 0;
+    goto tryagain;
+  }
+
+  /* Check exclude list. */
+  if (hostInExclude((struct sockaddr *) &ss, sslen, exclude_group))
+    goto tryagain;
+
+  t = setup_target(hs, &ss, sslen, pingtype);
+  if (t == NULL)
+    goto tryagain;
+
+  return t;
+}
+
+static void refresh_hostbatch(HostGroupState *hs, const addrset *exclude_group,
+  struct scan_lists *ports, int pingtype) {
+  int i;
   bool arpping_done = false;
   struct timeval now;
 
-  if (hs->next_batch_no < hs->current_batch_sz) {
-    /* Woop!  This is easy -- we just pass back the next host struct */
-    return hs->hostbatch[hs->next_batch_no++];
-  }
-  /* Doh, we need to refresh our array */
-  /* for (i=0; i < hs->max_batch_sz; i++) hs->hostbatch[i] = new Target(); */
-
   hs->current_batch_sz = hs->next_batch_no = 0;
-  do {
-    /* Grab anything we have in our current_expression */
-    while (hs->current_batch_sz < hs->max_batch_sz && 
-        hs->current_expression.get_next_host(&ss, &sslen) == 0) {
-      Target *t;
+  hs->undefer();
+  while (hs->current_batch_sz < hs->max_batch_sz) {
+    Target *t;
 
-      if (hostInExclude((struct sockaddr *)&ss, sslen, exclude_group)) {
-        continue; /* Skip any hosts the user asked to exclude */
-      }
-      t = new Target();
-      t->setTargetSockAddr(&ss, sslen);
+    t = next_target(hs, exclude_group, ports, pingtype);
+    if (t == NULL)
+      break;
 
-      /* Special handling for the resolved address (for example whatever
-         scanme.nmap.org resolves to in scanme.nmap.org/24). */
-      if (hs->current_expression.is_resolved_address(&ss)) {
-        if (hs->current_expression.get_namedhost())
-          t->setTargetName(hs->current_expression.get_resolved_name());
-        t->resolved_addrs = hs->current_expression.get_resolved_addrs();
-      }
-
-      /* We figure out the source IP/device IFF
-         1) We are r00t AND
-         2) We are doing tcp or udp pingscan OR
-         3) We are doing a raw-mode portscan or osscan or traceroute OR
-         4) We are on windows and doing ICMP ping */
-      if (o.isr00t && o.af() == AF_INET && 
-          ((pingtype & (PINGTYPE_TCP|PINGTYPE_UDP|PINGTYPE_SCTP_INIT|PINGTYPE_PROTO|PINGTYPE_ARP)) || o.RawScan()
-#ifdef WIN32
-           || (pingtype & (PINGTYPE_ICMP_PING|PINGTYPE_ICMP_MASK|PINGTYPE_ICMP_TS))
-#endif // WIN32
-          )) {
-        t->TargetSockAddr(&ss, &sslen);
-        if (!nmap_route_dst(&ss, &rnfo)) {
-          fatal("%s: failed to determine route to %s", __func__, t->NameIP());
-        }
-        if (rnfo.direct_connect) {
-          t->setDirectlyConnected(true);
-        } else {
-          t->setDirectlyConnected(false);
-          t->setNextHop(&rnfo.nexthop, sizeof(rnfo.nexthop));
-        }
-        t->setIfType(rnfo.ii.device_type);
-        if (rnfo.ii.device_type == devt_ethernet) {
-          if (o.spoofMACAddress())
-            t->setSrcMACAddress(o.spoofMACAddress());
-          else
-            t->setSrcMACAddress(rnfo.ii.mac);
-        }
-        t->setSourceSockAddr(&rnfo.srcaddr, sizeof(rnfo.srcaddr));
-        if (hs->current_batch_sz == 0) /* Because later ones can have different src addy and be cut off group */
-          o.decoys[o.decoyturn] = t->v4source();
-        t->setDeviceNames(rnfo.ii.devname, rnfo.ii.devfullname);
-        t->setMTU(rnfo.ii.mtu);
-        // printf("Target %s %s directly connected, goes through local iface %s, which %s ethernet\n", t->NameIP(), t->directlyConnected()? "IS" : "IS NOT", t->deviceName(), (t->ifType() == devt_ethernet)? "IS" : "IS NOT");
-      }
-
-      /* Does this target need to go in a separate host group? */
-      if (target_needs_new_hostgroup(hs, t)) {
-        /* Cancel everything!  This guy must go in the next group and we are
-           out of here */
-        hs->current_expression.return_last_host();
-        delete t;
-        goto batchfull;
-      }
-
-      hs->hostbatch[hs->current_batch_sz++] = t;
+    /* Does this target need to go in a separate host group? */
+    if (target_needs_new_hostgroup(hs->hostbatch, hs->current_batch_sz, t)) {
+      if (hs->defer(t))
+        continue;
+      else
+        break;
     }
 
-    if (hs->current_batch_sz < hs->max_batch_sz &&
-        hs->next_expression < hs->num_expressions) {
-      /* We are going to have to pop in another expression. */
-      while(hs->current_expression.parse_expr(hs->target_expressions[hs->next_expression++], o.af()) != 0) 
-        if (hs->next_expression >= hs->num_expressions)
-          break;
-    } else break;
-  } while(1);
-
-batchfull:
+    o.decoys[o.decoyturn] = t->source();
+    hs->hostbatch[hs->current_batch_sz++] = t;
+  }
 
   if (hs->current_batch_sz == 0)
-    return NULL;
+    return;
 
   /* OK, now we have our complete batch of entries.  The next step is to
      randomize them (if requested) */
@@ -519,29 +593,40 @@ batchfull:
   /* First I'll do the ARP ping if all of the machines in the group are
      directly connected over ethernet.  I may need the MAC addresses
      later anyway. */
-  if (hs->hostbatch[0]->ifType() == devt_ethernet && 
-      hs->hostbatch[0]->directlyConnected() && 
-      o.sendpref != PACKET_SEND_IP_STRONG) {
+  if (hs->hostbatch[0]->ifType() == devt_ethernet &&
+      hs->hostbatch[0]->af() == AF_INET &&
+      hs->hostbatch[0]->directlyConnected() &&
+      o.sendpref != PACKET_SEND_IP_STRONG &&
+      (pingtype == PINGTYPE_ARP || o.implicitARPPing)) {
+    arpping(hs->hostbatch, hs->current_batch_sz);
+    arpping_done = true;
+  }
+
+  /* No other interface types are supported by ND ping except devt_ethernet
+     at the moment. */
+  if (hs->hostbatch[0]->ifType() == devt_ethernet &&
+      hs->hostbatch[0]->af() == AF_INET6 &&
+      hs->hostbatch[0]->directlyConnected() &&
+      o.sendpref != PACKET_SEND_IP_STRONG &&
+      (pingtype == PINGTYPE_ARP || o.implicitARPPing)) {
     arpping(hs->hostbatch, hs->current_batch_sz);
     arpping_done = true;
   }
 
   gettimeofday(&now, NULL);
-  if ((o.sendpref & PACKET_SEND_ETH) && 
+  if ((o.sendpref & PACKET_SEND_ETH) &&
       hs->hostbatch[0]->ifType() == devt_ethernet) {
     for (i=0; i < hs->current_batch_sz; i++) {
-      if (!(hs->hostbatch[i]->flags & HOST_DOWN) && 
+      if (!(hs->hostbatch[i]->flags & HOST_DOWN) &&
           !hs->hostbatch[i]->timedOut(&now)) {
         if (!setTargetNextHopMAC(hs->hostbatch[i])) {
-          fatal("%s: Failed to determine dst MAC address for target %s", 
+          fatal("%s: Failed to determine dst MAC address for target %s",
               __func__, hs->hostbatch[i]->NameIP());
         }
       }
     }
   }
 
-  /* TODO: Maybe I should allow real ping scan of directly connected
-     ethernet hosts? */
   /* Then we do the mass ping (if required - IP-level pings) */
   if ((pingtype == PINGTYPE_NONE && !arpping_done) || hs->hostbatch[0]->ifType() == devt_loopback) {
     for (i=0; i < hs->current_batch_sz; i++) {
@@ -560,6 +645,14 @@ batchfull:
 
   if (!o.noresolve)
     nmap_mass_rdns(hs->hostbatch, hs->current_batch_sz);
+}
+
+Target *nexthost(HostGroupState *hs, const addrset *exclude_group,
+                 struct scan_lists *ports, int pingtype) {
+  if (hs->next_batch_no >= hs->current_batch_sz)
+    refresh_hostbatch(hs, exclude_group, ports, pingtype);
+  if (hs->next_batch_no >= hs->current_batch_sz)
+    return NULL;
 
   return hs->hostbatch[hs->next_batch_no++];
 }

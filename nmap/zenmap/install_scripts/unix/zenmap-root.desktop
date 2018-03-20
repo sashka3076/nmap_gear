@@ -1,5 +1,4 @@
 [Desktop Entry]
-Encoding=UTF-8
 Name=Zenmap (as root)
 GenericName=GUI Port Scanner
 TryExec=su-to-zenmap.sh
@@ -7,5 +6,6 @@ Exec=su-to-zenmap.sh %F
 Terminal=false
 Icon=zenmap
 Type=Application
-Categories=Application;Network;Security
+Categories=Application;Network;Security;
 Comment=A cross-platform GUI for the Nmap Security Scanner.
+Keywords=network;scan;scanner;IP;security;

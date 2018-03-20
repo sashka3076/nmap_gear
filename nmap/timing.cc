@@ -7,95 +7,139 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2011 Insecure.Com LLC. Nmap is    *
- * also a registered trademark of Insecure.Com LLC.  This program is free  *
- * software; you may redistribute and/or modify it under the terms of the  *
- * GNU General Public License as published by the Free Software            *
- * Foundation; Version 2 with the clarifications and exceptions described  *
- * below.  This guarantees your right to use, modify, and redistribute     *
- * this software under certain conditions.  If you wish to embed Nmap      *
- * technology into proprietary software, we sell alternative licenses      *
- * (contact sales@insecure.com).  Dozens of software vendors already       *
- * license Nmap technology such as host discovery, port scanning, OS       *
- * detection, and version detection.                                       *
+ * The Nmap Security Scanner is (C) 1996-2018 Insecure.Com LLC ("The Nmap  *
+ * Project"). Nmap is also a registered trademark of the Nmap Project.     *
+ * This program is free software; you may redistribute and/or modify it    *
+ * under the terms of the GNU General Public License as published by the   *
+ * Free Software Foundation; Version 2 ("GPL"), BUT ONLY WITH ALL OF THE   *
+ * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
+ * right to use, modify, and redistribute this software under certain      *
+ * conditions.  If you wish to embed Nmap technology into proprietary      *
+ * software, we sell alternative licenses (contact sales@nmap.com).        *
+ * Dozens of software vendors already license Nmap technology such as      *
+ * host discovery, port scanning, OS detection, version detection, and     *
+ * the Nmap Scripting Engine.                                              *
  *                                                                         *
- * Note that the GPL places important restrictions on "derived works", yet *
- * it does not provide a detailed definition of that term.  To avoid       *
- * misunderstandings, we consider an application to constitute a           *
- * "derivative work" for the purpose of this license if it does any of the *
- * following:                                                              *
- * o Integrates source code from Nmap                                      *
- * o Reads or includes Nmap copyrighted data files, such as                *
- *   nmap-os-db or nmap-service-probes.                                    *
- * o Executes Nmap and parses the results (as opposed to typical shell or  *
- *   execution-menu apps, which simply display raw Nmap output and so are  *
- *   not derivative works.)                                                *
- * o Integrates/includes/aggregates Nmap into a proprietary executable     *
- *   installer, such as those produced by InstallShield.                   *
- * o Links to a library or executes a program that does any of the above   *
+ * Note that the GPL places important restrictions on "derivative works",  *
+ * yet it does not provide a detailed definition of that term.  To avoid   *
+ * misunderstandings, we interpret that term as broadly as copyright law   *
+ * allows.  For example, we consider an application to constitute a        *
+ * derivative work for the purpose of this license if it does any of the   *
+ * following with any software or content covered by this license          *
+ * ("Covered Software"):                                                   *
  *                                                                         *
- * The term "Nmap" should be taken to also include any portions or derived *
- * works of Nmap.  This list is not exclusive, but is meant to clarify our *
- * interpretation of derived works with some common examples.  Our         *
- * interpretation applies only to Nmap--we don't speak for other people's  *
- * GPL works.                                                              *
+ * o Integrates source code from Covered Software.                         *
  *                                                                         *
- * If you have any questions about the GPL licensing restrictions on using *
- * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
- * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to dozens  *
- * of software vendors, and generally include a perpetual license as well  *
- * as providing for priority support and updates as well as helping to     *
- * fund the continued development of Nmap technology.  Please email        *
- * sales@insecure.com for further information.                             *
+ * o Reads or includes copyrighted data files, such as Nmap's nmap-os-db   *
+ * or nmap-service-probes.                                                 *
  *                                                                         *
- * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * o Is designed specifically to execute Covered Software and parse the    *
+ * results (as opposed to typical shell or execution-menu apps, which will *
+ * execute anything you tell them to).                                     *
+ *                                                                         *
+ * o Includes Covered Software in a proprietary executable installer.  The *
+ * installers produced by InstallShield are an example of this.  Including *
+ * Nmap with other software in compressed or archival form does not        *
+ * trigger this provision, provided appropriate open source decompression  *
+ * or de-archiving software is widely available for no charge.  For the    *
+ * purposes of this license, an installer is considered to include Covered *
+ * Software even if it actually retrieves a copy of Covered Software from  *
+ * another source during runtime (such as by downloading it from the       *
+ * Internet).                                                              *
+ *                                                                         *
+ * o Links (statically or dynamically) to a library which does any of the  *
+ * above.                                                                  *
+ *                                                                         *
+ * o Executes a helper program, module, or script to do any of the above.  *
+ *                                                                         *
+ * This list is not exclusive, but is meant to clarify our interpretation  *
+ * of derived works with some common examples.  Other people may interpret *
+ * the plain GPL differently, so we consider this a special exception to   *
+ * the GPL that we apply to Covered Software.  Works which meet any of     *
+ * these conditions must conform to all of the terms of this license,      *
+ * particularly including the GPL Section 3 requirements of providing      *
+ * source code and allowing free redistribution of the work as a whole.    *
+ *                                                                         *
+ * As another special exception to the GPL terms, the Nmap Project grants  *
  * permission to link the code of this program with any version of the     *
  * OpenSSL library which is distributed under a license identical to that  *
  * listed in the included docs/licenses/OpenSSL.txt file, and distribute   *
- * linked combinations including the two. You must obey the GNU GPL in all *
- * respects for all of the code used other than OpenSSL.  If you modify    *
- * this file, you may extend this exception to your version of the file,   *
- * but you are not obligated to do so.                                     *
+ * linked combinations including the two.                                  *
  *                                                                         *
- * If you received these files with a written license agreement or         *
- * contract stating terms other than the terms above, then that            *
- * alternative license agreement takes precedence over these comments.     *
+ * The Nmap Project has permission to redistribute Npcap, a packet         *
+ * capturing driver and library for the Microsoft Windows platform.        *
+ * Npcap is a separate work with it's own license rather than this Nmap    *
+ * license.  Since the Npcap license does not permit redistribution        *
+ * without special permission, our Nmap Windows binary packages which      *
+ * contain Npcap may not be redistributed without special permission.      *
+ *                                                                         *
+ * Any redistribution of Covered Software, including any derived works,    *
+ * must obey and carry forward all of the terms of this license, including *
+ * obeying all GPL rules and restrictions.  For example, source code of    *
+ * the whole work must be provided and free redistribution must be         *
+ * allowed.  All GPL references to "this License", are to be treated as    *
+ * including the terms and conditions of this license text as well.        *
+ *                                                                         *
+ * Because this license imposes special exceptions to the GPL, Covered     *
+ * Work may not be combined (even as part of a larger work) with plain GPL *
+ * software.  The terms, conditions, and exceptions of this license must   *
+ * be included as well.  This license is incompatible with some other open *
+ * source licenses as well.  In some cases we can relicense portions of    *
+ * Nmap or grant special permissions to use it in other open source        *
+ * software.  Please contact fyodor@nmap.org with any such requests.       *
+ * Similarly, we don't incorporate incompatible open source software into  *
+ * Covered Software without special permission from the copyright holders. *
+ *                                                                         *
+ * If you have any questions about the licensing restrictions on using     *
+ * Nmap in other works, we are happy to help.  As mentioned above, we also *
+ * offer an alternative license to integrate Nmap into proprietary         *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing support and updates.  They also fund the continued         *
+ * development of Nmap.  Please email sales@nmap.com for further           *
+ * information.                                                            *
+ *                                                                         *
+ * If you have received a written license agreement or contract for        *
+ * Covered Software stating terms other than these, you may choose to use  *
+ * and redistribute Covered Software under those terms instead of these.   *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
  * right to know exactly what a program is going to do before they run it. *
- * This also allows you to audit the software for security holes (none     *
- * have been found so far).                                                *
+ * This also allows you to audit the software for security holes.          *
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to nmap-dev@insecure.org for possible incorporation into the main       *
- * distribution.  By sending these changes to Fyodor or one of the         *
- * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * to the dev@nmap.org mailing list for possible incorporation into the    *
+ * main distribution.  By sending these changes to Fyodor or one of the    *
+ * Insecure.Org development mailing lists, or checking them into the Nmap  *
+ * source code repository, it is understood (unless you specify            *
+ * otherwise) that you are offering the Nmap Project the unlimited,        *
  * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
- * will always be available Open Source, but this is important because the *
- * inability to relicense code has caused devastating problems for other   *
- * Free Software projects (such as KDE and NASM).  We also occasionally    *
- * relicense the code to third parties as discussed above.  If you wish to *
- * specify special license conditions of your contributions, just say so   *
- * when you send them.                                                     *
+ * will always be available Open Source, but this is important because     *
+ * the inability to relicense code has caused devastating problems for     *
+ * other Free Software projects (such as KDE and NASM).  We also           *
+ * occasionally relicense the code to third parties as discussed above.    *
+ * If you wish to specify special license conditions of your               *
+ * contributions, just say so when you send them.                          *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
- * General Public License v2.0 for more details at                         *
- * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
- * included with Nmap.                                                     *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the Nmap      *
+ * license file for more details (it's in a COPYING file included with     *
+ * Nmap, and also available from https://svn.nmap.org/nmap/COPYING)        *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: timing.cc 21904 2011-01-21 00:04:16Z fyodor $ */
+/* $Id: timing.cc 37126 2018-01-28 21:18:17Z fyodor $ */
 
 #include "timing.h"
 #include "NmapOps.h"
 #include "utils.h"
+#include "nmap_error.h"
 #include "xml.h"
+
+#include <math.h>
+#include <limits>
 
 extern NmapOps o;
 
@@ -107,7 +151,7 @@ void initialize_timeout_info(struct timeout_info *to) {
   to->timeout = o.initialRttTimeout() * 1000;
 }
 
-/* Adjust our timeout values based on the time the latest probe took for a 
+/* Adjust our timeout values based on the time the latest probe took for a
    response.  We update our RTT averages, etc. */
 void adjust_timeouts(struct timeval sent, struct timeout_info *to) {
   struct timeval received;
@@ -121,9 +165,9 @@ void adjust_timeouts(struct timeval sent, struct timeout_info *to) {
  the receive time too (which could be because it was received a while
  back or it could be for efficiency because the caller already knows
  the current time */
-void adjust_timeouts2(const struct timeval *sent, 
-		      const struct timeval *received, 
-		      struct timeout_info *to) {
+void adjust_timeouts2(const struct timeval *sent,
+                      const struct timeval *received,
+                      struct timeout_info *to) {
   long delta = 0;
 
   if (o.debugging > 3) {
@@ -148,34 +192,35 @@ void adjust_timeouts2(const struct timeval *sent,
     to->srtt = delta;
     to->rttvar = MAX(5000, MIN(to->srtt, 2000000));
     to->timeout = to->srtt + (to->rttvar << 2);
-  }
-  else {
+  } else {
+    long rttdelta;
+
     if (delta >= 8000000 || delta < 0) {
       if (o.verbose)
-	error("%s: packet supposedly had rtt of %ld microseconds.  Ignoring time.", __func__, delta);
+        error("%s: packet supposedly had rtt of %ld microseconds.  Ignoring time.", __func__, delta);
       return;
     }
-    delta -= to->srtt;
+    rttdelta = delta - to->srtt;
     /* sanity check 2*/
-    if (delta > 1500000 && delta > 3 * to->srtt + 2 * to->rttvar) {
+    if (rttdelta > 1500000 && rttdelta > 3 * to->srtt + 2 * to->rttvar) {
       if (o.debugging) {
-	log_write(LOG_STDOUT, "Bogus delta: %ld (srtt %d) ... ignoring\n", delta, to->srtt);
+        log_write(LOG_STDOUT, "Bogus rttdelta: %ld (srtt %d) ... ignoring\n", rttdelta, to->srtt);
       }
       return;
     }
-    to->srtt += delta >> 3;
-    to->rttvar += (ABS(delta) - to->rttvar) >> 2;
-    to->timeout = to->srtt + (to->rttvar << 2);  
+    to->srtt += rttdelta >> 3;
+    to->rttvar += (ABS(rttdelta) - to->rttvar) >> 2;
+    to->timeout = to->srtt + (to->rttvar << 2);
   }
   if (to->rttvar > 2300000) {
     error("RTTVAR has grown to over 2.3 seconds, decreasing to 2.0");
     to->rttvar = 2000000;
   }
-  
+
   /* It hurts to do this ... it really does ... but otherwise we are being
      too risky */
-  to->timeout = box(o.minRttTimeout() * 1000, o.maxRttTimeout() * 1000,  
-		    to->timeout);
+  to->timeout = box(o.minRttTimeout() * 1000, o.maxRttTimeout() * 1000,
+                    to->timeout);
 
   if (o.scan_delay)
     to->timeout = MAX((unsigned) to->timeout, o.scan_delay * 1000);
@@ -184,7 +229,7 @@ void adjust_timeouts2(const struct timeval *sent,
     log_write(LOG_STDOUT, "delta %ld ==> srtt: %d rttvar: %d to: %d\n", delta, to->srtt, to->rttvar, to->timeout);
   }
 
-  /* if (to->srtt < 0 || to->rttvar < 0 || to->timeout < 0 || delta < -50000000 || 
+  /* if (to->srtt < 0 || to->rttvar < 0 || to->timeout < 0 || delta < -50000000 ||
       sent->tv_sec == 0 || received->tv_sec == 0 ) {
     fatal("Serious time computation problem in adjust_timeout ... received = (%ld, %ld) sent=(%ld,%ld) delta = %ld srtt = %d rttvar = %d to = %d", (long) received->tv_sec, (long)received->tv_usec, (long) sent->tv_sec, (long) sent->tv_usec, delta, to->srtt, to->rttvar, to->timeout);
   } */
@@ -214,7 +259,7 @@ void enforce_scan_delay(struct timeval *tv) {
 
   gettimeofday(&now, NULL);
   time_diff = TIMEVAL_MSEC_SUBTRACT(now, lastcall);
-  if (time_diff < (int) o.scan_delay) {  
+  if (time_diff < (int) o.scan_delay) {
     if (o.debugging > 1) {
       log_write(LOG_PLAIN, "Sleeping for %d milliseconds in %s()\n", o.scan_delay - time_diff, __func__);
     }
@@ -226,7 +271,94 @@ void enforce_scan_delay(struct timeval *tv) {
     memcpy(tv, &lastcall, sizeof(struct timeval));
   }
 
-  return;    
+  return;
+}
+
+
+/* Returns the scaling factor to use when incrementing the congestion
+   window. */
+double ultra_timing_vals::cc_scale(const struct scan_performance_vars *perf) {
+  double ratio;
+
+  assert(num_replies_received > 0);
+  ratio = (double) num_replies_expected / num_replies_received;
+
+  return MIN(ratio, perf->cc_scale_max);
+}
+
+/* Update congestion variables for the receipt of a reply. */
+void ultra_timing_vals::ack(const struct scan_performance_vars *perf, double scale) {
+  num_replies_received++;
+
+  if (cwnd < ssthresh) {
+    /* In slow start mode. "During slow start, a TCP increments cwnd by at most
+       SMSS bytes for each ACK received that acknowledges new data." */
+    cwnd += perf->slow_incr * cc_scale(perf) * scale;
+    if (cwnd > ssthresh)
+      cwnd = ssthresh;
+  } else {
+    /* Congestion avoidance mode. "During congestion avoidance, cwnd is
+       incremented by 1 full-sized segment per round-trip time (RTT). The
+       equation
+         cwnd += SMSS*SMSS/cwnd
+       provides an acceptable approximation to the underlying principle of
+       increasing cwnd by 1 full-sized segment per RTT." */
+    cwnd += perf->ca_incr / cwnd * cc_scale(perf) * scale;
+  }
+  if (cwnd > perf->max_cwnd)
+    cwnd = perf->max_cwnd;
+}
+
+/* Update congestion variables for a detected drop. */
+void ultra_timing_vals::drop(unsigned in_flight,
+  const struct scan_performance_vars *perf, const struct timeval *now) {
+  /* "When a TCP sender detects segment loss using the retransmission timer, the
+     value of ssthresh MUST be set to no more than the value
+       ssthresh = max (FlightSize / 2, 2*SMSS)
+     Furthermore, upon a timeout cwnd MUST be set to no more than the loss
+     window, LW, which equals 1 full-sized segment (regardless of the value of
+     IW)." */
+  cwnd = perf->low_cwnd;
+  ssthresh = (int) MAX(in_flight / perf->host_drop_ssthresh_divisor, 2);
+  last_drop = *now;
+}
+
+/* Update congestion variables for a detected drop, but less aggressively for
+   group congestion control. */
+void ultra_timing_vals::drop_group(unsigned in_flight,
+  const struct scan_performance_vars *perf, const struct timeval *now) {
+  cwnd = MAX(perf->low_cwnd, cwnd / perf->group_drop_cwnd_divisor);
+  ssthresh = (int) MAX(in_flight / perf->group_drop_ssthresh_divisor, 2);
+  last_drop = *now;
+}
+
+/* Do initialization after the global NmapOps table has been filled in. */
+void scan_performance_vars::init() {
+  /* TODO: I should revisit these values for tuning.  They should probably
+     at least be affected by -T. */
+  low_cwnd = o.min_parallelism ? o.min_parallelism : 1;
+  max_cwnd = MAX(low_cwnd, o.max_parallelism ? o.max_parallelism : 300);
+  group_initial_cwnd = box(low_cwnd, max_cwnd, 10);
+  host_initial_cwnd = group_initial_cwnd;
+  slow_incr = 1;
+  /* The congestion window grows faster with more aggressive timing. */
+  if (o.timing_level < 4)
+    ca_incr = 1;
+  else
+    ca_incr = 2;
+  cc_scale_max = 50;
+  initial_ssthresh = 75;
+  group_drop_cwnd_divisor = 2.0;
+  /* Change the amount that ssthresh drops based on the timing level. */
+  double ssthresh_divisor;
+  if (o.timing_level <= 3)
+    ssthresh_divisor = (3.0 / 2.0);
+  else if (o.timing_level <= 4)
+    ssthresh_divisor = (4.0 / 3.0);
+  else
+    ssthresh_divisor = (5.0 / 4.0);
+  group_drop_ssthresh_divisor = ssthresh_divisor;
+  host_drop_ssthresh_divisor = ssthresh_divisor;
 }
 
 /* current_rate_history defines how far back (in seconds) we look when
@@ -314,7 +446,7 @@ void RateMeter::update(double amount, const struct timeval *now) {
     interval = MAX(current_rate_history, diff);
   else
     interval = TIMEVAL_SUBTRACT(*now, start_tv) / 1000000.0;
-  assert(diff <= interval);
+  assert(diff <= interval + std::numeric_limits<double>::epsilon());
   /* If we record an amount in the very same instant that the timer is started,
      there's no way to calculate meaningful rates. Ignore it. */
   if (interval == 0.0)
@@ -471,7 +603,7 @@ bool ScanProgressMeter::mayBePrinted(const struct timeval *now) {
       return true;
     else
       return false;
-  } 
+  }
 
   if (difftime(now->tv_sec, last_print_test.tv_sec) < 3)
     return false;  /* No point even checking too often */
@@ -501,8 +633,8 @@ static double estimate_time_left(double perc_done,
    so if mayBePrinted() is true, and it seems reasonable to do so
    because the estimate has changed significantly.  Returns whether
    or not a line was printed.*/
-bool ScanProgressMeter::printStatsIfNecessary(double perc_done, 
-					       const struct timeval *now) {
+bool ScanProgressMeter::printStatsIfNecessary(double perc_done,
+                                               const struct timeval *now) {
   struct timeval tvtmp;
   double time_left_s;
   bool printit = false;
@@ -545,13 +677,13 @@ bool ScanProgressMeter::printStatsIfNecessary(double perc_done,
 
   if (printit) {
      return printStats(perc_done, now);
-  } 
+  }
 
   return false;
 }
 
 /* Prints an estimate of when this scan will complete.  */
-bool ScanProgressMeter::printStats(double perc_done, 
+bool ScanProgressMeter::printStats(double perc_done,
                                    const struct timeval *now) {
   struct timeval tvtmp;
   double time_left_s;
@@ -584,13 +716,22 @@ bool ScanProgressMeter::printStats(double perc_done,
   /* Get the estimated time of day at completion */
   timet = last_est.tv_sec;
   ltime = localtime(&timet);
-  assert(ltime);
 
-  log_write(LOG_STDOUT, "%s Timing: About %.2f%% done; ETC: %02d:%02d (%.f:%02.f:%02.f remaining)\n",
-      scantypestr, perc_done * 100, ltime->tm_hour, ltime->tm_min,
-      floor(time_left_s / 60.0 / 60.0),
-      floor(fmod(time_left_s / 60.0, 60.0)),
-      floor(fmod(time_left_s, 60.0)));
+  if (ltime) {
+    log_write(LOG_STDOUT, "%s Timing: About %.2f%% done; ETC: %02d:%02d (%.f:%02.f:%02.f remaining)\n",
+        scantypestr, perc_done * 100, ltime->tm_hour, ltime->tm_min,
+        floor(time_left_s / 60.0 / 60.0),
+        floor(fmod(time_left_s / 60.0, 60.0)),
+        floor(fmod(time_left_s, 60.0)));
+  }
+  else {
+    log_write(LOG_STDERR, "Timing error: localtime(%f) is NULL\n", (double) timet);
+    log_write(LOG_STDOUT, "%s Timing: About %.2f%% done; ETC: Unknown (%.f:%02.f:%02.f remaining)\n",
+        scantypestr, perc_done * 100,
+        floor(time_left_s / 60.0 / 60.0),
+        floor(fmod(time_left_s / 60.0, 60.0)),
+        floor(fmod(time_left_s, 60.0)));
+  }
   xml_open_start_tag("taskprogress");
   xml_attribute("task", "%s", scantypestr);
   xml_attribute("time", "%lu", (unsigned long) now->tv_sec);
@@ -600,7 +741,7 @@ bool ScanProgressMeter::printStats(double perc_done,
   xml_close_empty_tag();
   xml_newline();
   log_flush(LOG_STDOUT|LOG_XML);
- 
+
   return true;
 }
 

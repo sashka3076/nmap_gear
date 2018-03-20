@@ -3,12 +3,27 @@
 # Unit tests for Ndiff.
 
 import subprocess
+import sys
 import unittest
+
+# Prevent loading PyXML
+import xml
+xml.__path__ = [x for x in xml.__path__ if "_xmlplus" not in x]
+
 import xml.dom.minidom
+
+import imp
+dont_write_bytecode = sys.dont_write_bytecode
+sys.dont_write_bytecode = True
+ndiff = imp.load_source("ndiff", "ndiff.py")
+for x in dir(ndiff):
+    if not x.startswith("_"):
+        globals()[x] = getattr(ndiff, x)
+sys.dont_write_bytecode = dont_write_bytecode
+del dont_write_bytecode
+
 import StringIO
 
-# The ndiff.py symlink exists so we can do this.
-from ndiff import *
 
 class scan_test(unittest.TestCase):
     """Test the Scan class."""
@@ -46,7 +61,16 @@ class scan_test(unittest.TestCase):
         scan.load_from_file("test-scans/complex.xml")
         host = scan.hosts[0]
         self.assertEqual(len(host.ports), 6)
-        self.assertEqual(set(host.extraports.items()), set([("filtered", 95), ("open|filtered", 99)]))
+        self.assertEqual(set(host.extraports.items()),
+                set([("filtered", 95), ("open|filtered", 99)]))
+
+    def test_nmaprun(self):
+        """Test that nmaprun information is recorded."""
+        scan = Scan()
+        scan.load_from_file("test-scans/empty.xml")
+        self.assertEqual(scan.scanner, u"nmap")
+        self.assertEqual(scan.version, u"4.90RC2")
+        self.assertEqual(scan.args, u"nmap -oX empty.xml -p 1-100")
 
     def test_addresses(self):
         """Test that addresses are recorded."""
@@ -78,17 +102,19 @@ class scan_test(unittest.TestCase):
         self.assertTrue(len(host.ports[(22, u"tcp")].script_results) > 0)
 
 # This test is commented out because Nmap XML doesn't store any information
-# about down hosts, not even the fact that they are down. Recovering the list of
-# scanned hosts to infer which ones are down would involve parsing the targets
-# out of the /nmaprun/@args attribute (which is non-trivial) and possibly
-# looking up their addresses.
+# about down hosts, not even the fact that they are down. Recovering the list
+# of scanned hosts to infer which ones are down would involve parsing the
+# targets out of the /nmaprun/@args attribute (which is non-trivial) and
+# possibly looking up their addresses.
 #    def test_down_state(self):
-#        """Test that hosts that are not marked "up" are in the "down" state."""
+#        """Test that hosts that are not marked "up" are in the "down"
+#        state."""
 #        scan = Scan()
 #        scan.load_from_file("test-scans/down.xml")
 #        self.assertTrue(len(scan.hosts) == 1)
 #        host = scan.hosts[0]
 #        self.assertTrue(host.state == "down")
+
 
 class host_test(unittest.TestCase):
     """Test the Host class."""
@@ -175,6 +201,7 @@ class host_test(unittest.TestCase):
         self.assertEqual(h.extraports.values()[0], 95)
         self.assertEqual(h.state, "up")
 
+
 class address_test(unittest.TestCase):
     """Test the Address class."""
     def test_ipv4_new(self):
@@ -209,6 +236,7 @@ class address_test(unittest.TestCase):
         self.assertEqual(e, e)
         self.assertNotEqual(a, e)
 
+
 class port_test(unittest.TestCase):
     """Test the Port class."""
     def test_spec_string(self):
@@ -220,6 +248,7 @@ class port_test(unittest.TestCase):
     def test_state_string(self):
         p = Port((10, "tcp"))
         self.assertEqual(p.state_string(), u"unknown")
+
 
 class service_test(unittest.TestCase):
     """Test the Service class."""
@@ -262,29 +291,66 @@ class service_test(unittest.TestCase):
         serv.product = u"FooBar"
         serv.version = u"1.2.3"
         # Must match Nmap output.
-        self.assertEqual(serv.version_string(), u"%s %s" % (serv.product, serv.version))
+        self.assertEqual(serv.version_string(),
+                u"%s %s" % (serv.product, serv.version))
         serv.extrainfo = u"misconfigured"
-        self.assertEqual(serv.version_string(), u"%s %s (%s)" % (serv.product, serv.version, serv.extrainfo))
+        self.assertEqual(serv.version_string(),
+                u"%s %s (%s)" % (serv.product, serv.version, serv.extrainfo))
+
+
+class ScanDiffSub(ScanDiff):
+    """A subclass of ScanDiff that counts diffs for testing."""
+    def __init__(self, scan_a, scan_b, f=sys.stdout):
+        ScanDiff.__init__(self, scan_a, scan_b, f)
+        self.pre_script_result_diffs = []
+        self.post_script_result_diffs = []
+        self.host_diffs = []
+
+    def output_beginning(self):
+        pass
+
+    def output_pre_scripts(self, pre_script_result_diffs):
+        self.pre_script_result_diffs = pre_script_result_diffs
+
+    def output_post_scripts(self, post_script_result_diffs):
+        self.post_script_result_diffs = post_script_result_diffs
+
+    def output_host_diff(self, h_diff):
+        self.host_diffs.append(h_diff)
+
+    def output_ending(self):
+        pass
+
 
 class scan_diff_test(unittest.TestCase):
     """Test the ScanDiff class."""
+    def setUp(self):
+        self.blackhole = open("/dev/null", "w")
+
+    def tearDown(self):
+        self.blackhole.close()
+
     def test_self(self):
         scan = Scan()
         scan.load_from_file("test-scans/complex.xml")
-        diff = ScanDiff(scan, scan)
-        self.assertEqual(len(diff.host_diffs), 0)
-        self.assertEqual(set(diff.hosts), set(diff.host_diffs.keys()))
+        diff = ScanDiffText(scan, scan, self.blackhole)
+        cost = diff.output()
+        self.assertEqual(cost, 0)
+        diff = ScanDiffXML(scan, scan, self.blackhole)
+        cost = diff.output()
+        self.assertEqual(cost, 0)
 
     def test_unknown_up(self):
         a = Scan()
         a.load_from_file("test-scans/empty.xml")
         b = Scan()
         b.load_from_file("test-scans/simple.xml")
-        diff = ScanDiff(a, b)
-        self.assertTrue(len(diff.hosts) >= 1)
+        diff = ScanDiffSub(a, b, self.blackhole)
+        diff.output()
+        self.assertEqual(len(diff.pre_script_result_diffs), 0)
+        self.assertEqual(len(diff.post_script_result_diffs), 0)
         self.assertEqual(len(diff.host_diffs), 1)
-        self.assertEqual(set(diff.hosts), set(diff.host_diffs.keys()))
-        h_diff = diff.host_diffs.values()[0]
+        h_diff = diff.host_diffs[0]
         self.assertEqual(h_diff.host_a.state, None)
         self.assertEqual(h_diff.host_b.state, "up")
 
@@ -293,11 +359,12 @@ class scan_diff_test(unittest.TestCase):
         a.load_from_file("test-scans/simple.xml")
         b = Scan()
         b.load_from_file("test-scans/empty.xml")
-        diff = ScanDiff(a, b)
-        self.assertTrue(len(diff.hosts) >= 1)
+        diff = ScanDiffSub(a, b, self.blackhole)
+        diff.output()
+        self.assertEqual(len(diff.pre_script_result_diffs), 0)
+        self.assertEqual(len(diff.post_script_result_diffs), 0)
         self.assertEqual(len(diff.host_diffs), 1)
-        self.assertEqual(set(diff.hosts), set(diff.host_diffs.keys()))
-        h_diff = diff.host_diffs.values()[0]
+        h_diff = diff.host_diffs[0]
         self.assertEqual(h_diff.host_a.state, "up")
         self.assertEqual(h_diff.host_b.state, None)
 
@@ -319,11 +386,11 @@ class scan_diff_test(unittest.TestCase):
             a.load_from_file("test-scans/%s.xml" % pair[0])
             b = Scan()
             b.load_from_file("test-scans/%s.xml" % pair[1])
-            diff = ScanDiff(a, b)
+            diff = ScanDiffSub(a, b)
             scan_apply_diff(a, diff)
-            diff = ScanDiff(a, b)
-            self.assertEqual(diff.host_diffs, {})
-            self.assertEqual(set(diff.hosts), set(diff.host_diffs.keys()))
+            diff = ScanDiffSub(a, b)
+            self.assertEqual(diff.host_diffs, [])
+
 
 class host_diff_test(unittest.TestCase):
     """Test the HostDiff class."""
@@ -482,8 +549,8 @@ class host_diff_test(unittest.TestCase):
 
     def test_diff_is_effective(self):
         """Test that a host diff is effective.
-        This means that if the recommended changes are applied to the first host
-        the hosts become the same."""
+        This means that if the recommended changes are applied to the first
+        host the hosts become the same."""
         a = Host()
         b = Host()
 
@@ -520,6 +587,7 @@ class host_diff_test(unittest.TestCase):
         self.assertFalse(diff.extraports_changed)
         self.assertEqual(diff.cost, 0)
 
+
 class port_diff_test(unittest.TestCase):
     """Test the PortDiff class."""
     def test_equal(self):
@@ -554,6 +622,7 @@ class port_diff_test(unittest.TestCase):
         self.assertTrue(diff.cost > 0)
         self.assertEqual(PortDiff(a, diff.port_a).cost, 0)
         self.assertEqual(PortDiff(b, diff.port_b).cost, 0)
+
 
 class table_test(unittest.TestCase):
     """Test the table class."""
@@ -627,15 +696,16 @@ class table_test(unittest.TestCase):
         t.append(("b"))
         self.assertFalse(str(t).endswith("\n"))
 
+
 class scan_diff_xml_test(unittest.TestCase):
     def setUp(self):
         a = Scan()
         a.load_from_file("test-scans/empty.xml")
         b = Scan()
         b.load_from_file("test-scans/simple.xml")
-        self.scan_diff = ScanDiff(a, b)
         f = StringIO.StringIO()
-        self.scan_diff.print_xml(f)
+        self.scan_diff = ScanDiffXML(a, b, f)
+        self.scan_diff.output()
         self.xml = f.getvalue()
         f.close()
 
@@ -643,14 +713,18 @@ class scan_diff_xml_test(unittest.TestCase):
         try:
             document = xml.dom.minidom.parseString(self.xml)
         except Exception, e:
-            fail(u"Parsing XML diff output caused the exception: %s" % str(e))
+            self.fail(u"Parsing XML diff output caused the exception: %s"
+                    % str(e))
+
 
 def scan_apply_diff(scan, diff):
     """Apply a scan diff to the given scan."""
-    for host in diff.hosts:
+    for h_diff in diff.host_diffs:
+        host = h_diff.host_a or h_diff.host_b
         if host not in scan.hosts:
             scan.hosts.append(host)
-        host_apply_diff(host, diff.host_diffs[host])
+        host_apply_diff(host, h_diff)
+
 
 def host_apply_diff(host, diff):
     """Apply a host diff to the given host."""
@@ -689,30 +763,32 @@ def host_apply_diff(host, diff):
             host.script_results[host.script_results.index(sr_a)] = sr_b
     host.script_results.sort()
 
+
 def call_quiet(args, **kwargs):
     """Run a command with subprocess.call and hide its output."""
-    return subprocess.call(args, stdout = subprocess.PIPE,
-        stderr = subprocess.STDOUT, **kwargs)
+    return subprocess.call(args, stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT, env={'PYTHONPATH': "."}, **kwargs)
+
 
 class exit_code_test(unittest.TestCase):
-    NDIFF = "./ndiff"
+    NDIFF = "./scripts/ndiff"
 
     def test_exit_equal(self):
         """Test that the exit code is 0 when the diff is empty."""
         for format in ("--text", "--xml"):
-            code = call_quiet([self.NDIFF, format, 
+            code = call_quiet([self.NDIFF, format,
                 "test-scans/simple.xml", "test-scans/simple.xml"])
             self.assertEqual(code, 0)
         # Should be independent of verbosity.
         for format in ("--text", "--xml"):
-            code = call_quiet([self.NDIFF, "-v", format, 
+            code = call_quiet([self.NDIFF, "-v", format,
                 "test-scans/simple.xml", "test-scans/simple.xml"])
             self.assertEqual(code, 0)
 
     def test_exit_different(self):
         """Test that the exit code is 1 when the diff is not empty."""
         for format in ("--text", "--xml"):
-            code = call_quiet([self.NDIFF, format, 
+            code = call_quiet([self.NDIFF, format,
                 "test-scans/simple.xml", "test-scans/complex.xml"])
             self.assertEqual(code, 1)
 

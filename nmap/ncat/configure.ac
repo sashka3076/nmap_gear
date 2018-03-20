@@ -4,7 +4,9 @@
 AC_PREREQ(2.59)
 AC_INIT(ncat_main.c)
 
-AM_CONFIG_HEADER(config.h)
+AC_CONFIG_HEADER(config.h)
+
+m4_include([../acinclude.m4])
 
 AC_CANONICAL_HOST
 
@@ -20,7 +22,7 @@ AC_ARG_WITH(openssl,[  --with-openssl=DIR    Use optional openssl libs and inclu
   *)
     specialssldir="$with_openssl"
     LDFLAGS="$LDFLAGS -L$with_openssl/lib"
-    CFLAGS="-I$with_openssl/include $CFLAGS"
+    CPPFLAGS="-I$with_openssl/include $CPPFLAGS"
   ;;
   esac]
 )
@@ -37,7 +39,7 @@ AC_PATH_TOOL([STRIP], [strip], [/bin/true])
 # Checks for header files.
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS([fcntl.h limits.h netdb.h netinet/in.h stdlib.h string.h strings.h sys/param.h sys/socket.h sys/time.h sys/timeb.h unistd.h])
+AC_CHECK_HEADERS([fcntl.h limits.h netdb.h netinet/in.h stdlib.h string.h strings.h sys/param.h sys/socket.h sys/time.h sys/timeb.h unistd.h sys/un.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STAT
@@ -46,12 +48,10 @@ AC_HEADER_TIME
 
 # Checks for library functions.
 AC_FUNC_FORK
-AC_FUNC_MALLOC
-AC_FUNC_REALLOC
 AC_FUNC_SELECT_ARGTYPES
 AC_TYPE_SIGNAL
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS([dup2 gettimeofday inet_ntoa memset select socket strcasecmp strchr strdup strerror strncasecmp strtol])
+AC_CHECK_FUNCS([dup2 gettimeofday inet_ntoa memset mkstemp select socket strcasecmp strchr strdup strerror strncasecmp strtol])
 AC_SEARCH_LIBS(setsockopt, socket)
 # Ncat does not call gethostbyname directly, but some of the libraries
 # it links to (such as libpcap) do. Instead it calls getaddrinfo. At
@@ -67,7 +67,7 @@ AC_SEARCH_LIBS(dlopen, dl)
 if test "$use_openssl" = "yes" -a -z "$specialssldir" ; then
 	AC_CHECK_HEADER(openssl/ssl.h,,
 			[ use_openssl="no"
-        AC_MSG_WARN([Failed to find openssl/ssl.h so OpenSSL will not be used. 
+        AC_MSG_WARN([Failed to find openssl/ssl.h so OpenSSL will not be used.
 	If it is installed you can try the --with-openssl=DIR argument]) ])
 
 	if test "$use_openssl" = "yes"; then
@@ -86,18 +86,19 @@ if test "$use_openssl" = "yes" -a -z "$specialssldir" ; then
 
 	if test "$use_openssl" = "yes"; then
 	 AC_CHECK_LIB(crypto, BIO_int_ctrl,
-	   [],
+	   [ use_openssl="yes"],
 	   [ use_openssl="no"
 	   AC_MSG_WARN([Failed to find libcrypto so OpenSSL will not be used.
 	    If it is installed you can try the --with-openssl=DIR argument]) ])
 	fi
-										     
+
 	if test "$use_openssl" = "yes"; then
 	   AC_CHECK_LIB(ssl, SSL_new,
-	   [],
+	   [ use_openssl="yes"],
 	   [ use_openssl="no"
-	   AC_MSG_WARN([Failed to find libssl so OpenSSL will not be used. 
-If it is installed you can try the --with-openssl=DIR argument]) ])
+	   AC_MSG_WARN([Failed to find libssl so OpenSSL will not be used.
+If it is installed you can try the --with-openssl=DIR argument]) ],
+     [ -lcrypto ])
 	fi
 fi
 
@@ -111,7 +112,7 @@ if test "$use_openssl" = "yes"; then
   AC_SUBST(HAVE_OPENSSL)
 fi
 
-AC_SUBST(OPENSSL_LIBS)    
+AC_SUBST(OPENSSL_LIBS)
 
 libpcapdir=../libpcap
 AC_SUBST(libpcapdir)
@@ -165,25 +166,8 @@ if test $have_libpcap = yes; then
   # link with -lpcap for the purposes of this test
   LIBS_OLD="$LIBS"
   LIBS="$LIBS -lpcap"
-  AC_MSG_CHECKING(if libpcap version is recent enough)
-  AC_TRY_RUN([
-#include <stdio.h>
-extern char pcap_version[];
-int main() {
-  int major, minor1, minor2;
-  sscanf(pcap_version,"%d.%d.%d", &major, &minor1, &minor2);
-  if (major > 0) 
-    exit(0);
-  if (minor1 < 9)
-    exit(1);
-  if (minor2 < 4)
-    exit(1);
-  exit(0);
-}],
-[AC_MSG_RESULT(yes); have_libpcap=yes],
-[AC_MSG_RESULT(no); have_libpcap=no],
-[AC_MSG_RESULT(cross-compiling -- assuming yes); have_libpcap=yes])
-LIBS="$LIBS_OLD"
+  PCAP_IS_SUITABLE([have_libpcap=yes], [have_libpcap=no], [have_libpcap=yes])
+  LIBS="$LIBS_OLD"
 fi
 
 PCAP_LIBS="-lpcap"
@@ -192,7 +176,7 @@ if test $have_libpcap = yes; then
   PCAP_BUILD=""
   PCAP_CLEAN=""
   PCAP_DIST_CLEAN=""
-  AC_DEFINE(HAVE_LIBPCAP)
+  AC_DEFINE([HAVE_LIBPCAP], [1], [Define to 1 if you have libpcap])
 else
   if test "${LIBPCAP_INC+set}" = "set"; then
     LDFLAGS="-L$libpcapdir $_ldflags"
@@ -202,9 +186,9 @@ else
     CPPFLAGS="$CPPFLAGS -I$libpcapdir"
   fi
   PCAP_DEPENDS='$(LIBPCAPDIR)/libpcap.a'
-  PCAP_BUILD="pcap_build"
-  PCAP_CLEAN="pcap_clean"
-  PCAP_DIST_CLEAN="pcap_dist_clean"
+  PCAP_BUILD="build-pcap"
+  PCAP_CLEAN="clean-pcap"
+  PCAP_DIST_CLEAN="distclean-pcap"
 fi
 
 AC_SUBST(PCAP_DEPENDS)
@@ -213,10 +197,117 @@ AC_SUBST(PCAP_CLEAN)
 AC_SUBST(PCAP_DIST_CLEAN)
 AC_SUBST(PCAP_LIBS)
 
+# Needed on AIX.
+AC_CHECK_LIB(odm, odm_initialize)
+
+# Needed on AIX.
+AC_CHECK_LIB(odm, odm_initialize)
+AC_CHECK_LIB(cfg, _system_configuration)
+
+
+
+LIBLUADIR=../liblua
+
+have_lua=no
+requested_included_lua=no
+no_lua=no
+
+# First we test whether they specified liblua explicitly
+AC_ARG_WITH(liblua,
+AC_HELP_STRING([--with-liblua=DIR], [Use an existing (compiled) lua lib from DIR/include and DIR/lib.])
+AC_HELP_STRING([--with-liblua=included], [Use the liblua version included with Nmap])
+AC_HELP_STRING([--without-liblua], [Compile without lua (this will exclude all of NSE from compilation)]),
+[  case "$with_liblua" in
+  yes)
+  ;;
+  included)
+    CPPFLAGS="-I\$(top_srcdir)/$LIBLUADIR $CPPFLAGS"
+    LIBLUA_LIBS="\$(top_srcdir)/$LIBLUADIR/liblua.a"
+    LUA_DEPENDS="\$(top_srcdir)/$LIBLUADIR/liblua.a"
+    LUA_BUILD="build-lua"
+    LUA_CLEAN="clean-lua"
+    LUA_DIST_CLEAN="distclean-lua"
+	have_lua="yes"
+
+  ;;
+  no)
+    no_lua="yes"
+  ;;
+  *)
+    CPPFLAGS="-I$with_liblua/include $CPPFLAGS"
+    LDFLAGS="-L$with_liblua/lib $LDFLAGS"
+  ;;
+  esac]
+)
+
+LUA_CFLAGS="-DLUA_USE_POSIX -DLUA_USE_DLOPEN"
+AC_SUBST(LUA_CFLAGS)
+
+# They don't want lua
+if test "$no_lua" = "yes"; then
+  CPPFLAGS="-DNOLUA $CPPFLAGS"
+  LIBLUA_LIBS=""
+  LUA_DEPENDS=""
+  LUA_BUILD=""
+  LUA_CLEAN=""
+  LUA_DIST_CLEAN=""
+  INSTALLNSE=""
+
+else
+
+  # If they didn't specify it, we try to find it
+  if test $have_lua != yes; then
+    AC_CHECK_HEADERS([lua5.3/lua.h lua/5.3/lua.h lua.h lua/lua.h],
+      AC_CHECK_LIB(lua5.3, lua_isyieldable, [have_lua=yes; LIBLUA_LIBS="-llua5.3"; CPPFLAGS="-I/usr/include/lua5.3 $CPPFLAGS"; break],, [-lm])
+      AC_CHECK_LIB(lua53, lua_isyieldable, [have_lua=yes; LIBLUA_LIBS="-llua53"; CPPFLAGS="-I/usr/include/lua53 $CPPFLAGS"; break],, [-lm])
+      AC_CHECK_LIB(lua, lua_isyieldable, [have_lua=yes; LIBLUA_LIBS="-llua"; CPPFLAGS="-I/usr/include/lua $CPPFLAGS"; break],, [-lm])
+    )
+
+    AC_LANG_PUSH(C++)
+    AC_MSG_CHECKING([for lua version >= 503])
+    AC_RUN_IFELSE([ AC_LANG_PROGRAM(
+      [[#include <lua.h>]],
+      [[if(LUA_VERSION_NUM < 503) return 1;]])],
+      have_lua=yes, have_lua=no, AC_MSG_RESULT(cross-compiling -- assuming yes); have_lua=yes)
+    AC_LANG_POP(C++)
+
+    LUA_DEPENDS=""
+    LUA_BUILD=""
+    LUA_CLEAN=""
+    LUA_DIST_CLEAN=""
+  fi
+
+  # if we didn't find we use our own
+  if test $have_lua != yes; then
+    AC_MSG_RESULT(no)
+    CPPFLAGS="-I\$(top_srcdir)/$LIBLUADIR $CPPFLAGS"
+    LIBLUA_LIBS="\$(top_srcdir)/$LIBLUADIR/liblua.a"
+    LUA_DEPENDS="\$(top_srcdir)/$LIBLUADIR/liblua.a"
+    LUA_BUILD="build-lua"
+    LUA_CLEAN="clean-lua"
+    LUA_DIST_CLEAN="distclean-lua"
+    AC_DEFINE([LUA_INCLUDED], [1], [Define to 1 if you have LUA])
+  else
+    AC_MSG_RESULT(yes)
+  fi
+
+  INSTALLNSE="install-nse"
+fi
+
+AC_SUBST(LIBLUA_LIBS)
+AC_SUBST(LIBLUADIR)
+AC_SUBST(LUA_DEPENDS)
+AC_SUBST(LUA_BUILD)
+AC_SUBST(LUA_CLEAN)
+AC_SUBST(LUA_DIST_CLEAN)
+
+
+
 AC_CONFIG_FILES(Makefile)
 AC_OUTPUT
 # NCAT ASCII ART
 if test -f docs/ncat-ascii-art.txt; then
 	cat docs/ncat-ascii-art.txt
 fi
+
 echo "Configuration complete."

@@ -2,7 +2,7 @@ dnl # -*- mode: fundamental; -*-
 dnl # Autoconf configuration file for Nbase
 dnl #
 dnl # Process this file with autoconf to produce a configure script.
-dnl # $Id: configure.ac 17970 2010-06-10 03:11:17Z david $
+dnl # $Id: configure.ac 36993 2017-09-19 17:01:39Z dmiller $
 
 # Because nbase is usually distributed with Nmap, the necessary files
 # config.guess, config.guess, and install-sh are not distributed with
@@ -12,7 +12,7 @@ dnl # $Id: configure.ac 17970 2010-06-10 03:11:17Z david $
 AC_PREREQ(2.13)
 
 # Include my own macros
-sinclude(configlocal.m4)
+m4_include([acinclude.m4])
 
 AC_INIT(nbase.h)
 
@@ -34,7 +34,7 @@ if test "$user_localdirs" = 1; then
      LDFLAGS="$LDFLAGS -L/usr/local/lib"
      fi
    if test -d /usr/local/include; then
-     CFLAGS="$CFLAGS -I/usr/local/include"
+     CPPFLAGS="$CPPFLAGS -I/usr/local/include"
    fi
 fi
 
@@ -50,9 +50,6 @@ AC_PROG_CC
 AC_PROG_RANLIB
 dnl AC_PROG_INSTALL
 dnl AC_PATH_PROG(MAKEDEPEND, makedepend)
-
-AC_SUBST(COMPAT_OBJS)
-AC_SUBST(COMPAT_SRCS)
 
 dnl Host specific hacks
 AC_CANONICAL_HOST
@@ -70,7 +67,7 @@ esac
 
 dnl Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS( string.h getopt.h strings.h sys/param.h sys/time.h unistd.h errno.h sys/types.h sys/socket.h netinet/in.h arpa/inet.h sys/stat.h netdb.h sys/wait.h fcntl.h sys/resource.h inttypes.h)
+AC_CHECK_HEADERS( string.h getopt.h strings.h sys/param.h sys/time.h unistd.h errno.h sys/select.h sys/types.h sys/socket.h netinet/in.h arpa/inet.h sys/stat.h netdb.h sys/wait.h fcntl.h sys/resource.h inttypes.h mach-o/dyld.h)
 AC_HEADER_TIME
 dnl A special check required for <net/if.h> on Darwin. See
 dnl http://www.gnu.org/software/autoconf/manual/html_node/Header-Portability.html.
@@ -118,6 +115,23 @@ AC_MSG_RESULT($ac_cv___attribute__)
 
 AC_SUBST(CFLAGS)
 
+
+dnl This test is from the configure.in of Unix Network Programming second
+dnl edition example code by W. Richard Stevens
+dnl ##################################################################
+dnl Check if sockaddr{} has sa_len member.
+dnl
+AC_CACHE_CHECK(if sockaddr{} has sa_len member, ac_cv_sockaddr_has_sa_len,
+        AC_TRY_COMPILE([
+               #include <sys/types.h>
+               #include <sys/socket.h>],
+                [unsigned int i = sizeof(((struct sockaddr *)0)->sa_len)],
+        ac_cv_sockaddr_has_sa_len=yes,
+        ac_cv_sockaddr_has_sa_len=no))
+if test $ac_cv_sockaddr_has_sa_len = yes ; then
+        AC_DEFINE(HAVE_SOCKADDR_SA_LEN, 1, [define if sockaddr has sa_len member])
+fi
+
 dnl check endedness
 AC_C_BIGENDIAN
 
@@ -157,6 +171,7 @@ AC_LIBOBJ([nbase_str])
 AC_LIBOBJ([nbase_misc])
 AC_LIBOBJ([nbase_memalloc])
 AC_LIBOBJ([nbase_rnd])
+AC_LIBOBJ([nbase_addrset])
 
 # Check for IPv6 support -- modified from Apache 2.0.40:
 
@@ -210,7 +225,7 @@ AC_LIBOBJ([getnameinfo])
 fi
 
 if test "$have_ipv6" = "1"; then
-  AC_DEFINE(HAVE_IPV6)
+  AC_DEFINE(HAVE_IPV6, 1, [define if IPv6 is available])
 fi
 
 # First we test whether they specified openssl desires explicitly
@@ -271,9 +286,10 @@ talled you can try the --with-openssl=DIR argument]) ])
 fi
 
 if test "$use_openssl" = "yes"; then
-  AC_DEFINE(HAVE_OPENSSL)
+  AC_DEFINE(HAVE_OPENSSL, 1, [define if libssl is available])
 fi
 
+CHECK_PROC_SELF_EXE
 
 AC_OUTPUT(Makefile)
 

@@ -3,102 +3,150 @@
 
 # ***********************IMPORTANT NMAP LICENSE TERMS************************
 # *                                                                         *
-# * The Nmap Security Scanner is (C) 1996-2011 Insecure.Com LLC. Nmap is    *
-# * also a registered trademark of Insecure.Com LLC.  This program is free  *
-# * software; you may redistribute and/or modify it under the terms of the  *
-# * GNU General Public License as published by the Free Software            *
-# * Foundation; Version 2 with the clarifications and exceptions described  *
-# * below.  This guarantees your right to use, modify, and redistribute     *
-# * this software under certain conditions.  If you wish to embed Nmap      *
-# * technology into proprietary software, we sell alternative licenses      *
-# * (contact sales@insecure.com).  Dozens of software vendors already       *
-# * license Nmap technology such as host discovery, port scanning, OS       *
-# * detection, and version detection.                                       *
+# * The Nmap Security Scanner is (C) 1996-2018 Insecure.Com LLC ("The Nmap  *
+# * Project"). Nmap is also a registered trademark of the Nmap Project.     *
+# * This program is free software; you may redistribute and/or modify it    *
+# * under the terms of the GNU General Public License as published by the   *
+# * Free Software Foundation; Version 2 ("GPL"), BUT ONLY WITH ALL OF THE   *
+# * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
+# * right to use, modify, and redistribute this software under certain      *
+# * conditions.  If you wish to embed Nmap technology into proprietary      *
+# * software, we sell alternative licenses (contact sales@nmap.com).        *
+# * Dozens of software vendors already license Nmap technology such as      *
+# * host discovery, port scanning, OS detection, version detection, and     *
+# * the Nmap Scripting Engine.                                              *
 # *                                                                         *
-# * Note that the GPL places important restrictions on "derived works", yet *
-# * it does not provide a detailed definition of that term.  To avoid       *
-# * misunderstandings, we consider an application to constitute a           *
-# * "derivative work" for the purpose of this license if it does any of the *
-# * following:                                                              *
-# * o Integrates source code from Nmap                                      *
-# * o Reads or includes Nmap copyrighted data files, such as                *
-# *   nmap-os-db or nmap-service-probes.                                    *
-# * o Executes Nmap and parses the results (as opposed to typical shell or  *
-# *   execution-menu apps, which simply display raw Nmap output and so are  *
-# *   not derivative works.)                                                *
-# * o Integrates/includes/aggregates Nmap into a proprietary executable     *
-# *   installer, such as those produced by InstallShield.                   *
-# * o Links to a library or executes a program that does any of the above   *
+# * Note that the GPL places important restrictions on "derivative works",  *
+# * yet it does not provide a detailed definition of that term.  To avoid   *
+# * misunderstandings, we interpret that term as broadly as copyright law   *
+# * allows.  For example, we consider an application to constitute a        *
+# * derivative work for the purpose of this license if it does any of the   *
+# * following with any software or content covered by this license          *
+# * ("Covered Software"):                                                   *
 # *                                                                         *
-# * The term "Nmap" should be taken to also include any portions or derived *
-# * works of Nmap.  This list is not exclusive, but is meant to clarify our *
-# * interpretation of derived works with some common examples.  Our         *
-# * interpretation applies only to Nmap--we don't speak for other people's  *
-# * GPL works.                                                              *
+# * o Integrates source code from Covered Software.                         *
 # *                                                                         *
-# * If you have any questions about the GPL licensing restrictions on using *
-# * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
-# * we also offer alternative license to integrate Nmap into proprietary    *
-# * applications and appliances.  These contracts have been sold to dozens  *
-# * of software vendors, and generally include a perpetual license as well  *
-# * as providing for priority support and updates as well as helping to     *
-# * fund the continued development of Nmap technology.  Please email        *
-# * sales@insecure.com for further information.                             *
+# * o Reads or includes copyrighted data files, such as Nmap's nmap-os-db   *
+# * or nmap-service-probes.                                                 *
 # *                                                                         *
-# * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+# * o Is designed specifically to execute Covered Software and parse the    *
+# * results (as opposed to typical shell or execution-menu apps, which will *
+# * execute anything you tell them to).                                     *
+# *                                                                         *
+# * o Includes Covered Software in a proprietary executable installer.  The *
+# * installers produced by InstallShield are an example of this.  Including *
+# * Nmap with other software in compressed or archival form does not        *
+# * trigger this provision, provided appropriate open source decompression  *
+# * or de-archiving software is widely available for no charge.  For the    *
+# * purposes of this license, an installer is considered to include Covered *
+# * Software even if it actually retrieves a copy of Covered Software from  *
+# * another source during runtime (such as by downloading it from the       *
+# * Internet).                                                              *
+# *                                                                         *
+# * o Links (statically or dynamically) to a library which does any of the  *
+# * above.                                                                  *
+# *                                                                         *
+# * o Executes a helper program, module, or script to do any of the above.  *
+# *                                                                         *
+# * This list is not exclusive, but is meant to clarify our interpretation  *
+# * of derived works with some common examples.  Other people may interpret *
+# * the plain GPL differently, so we consider this a special exception to   *
+# * the GPL that we apply to Covered Software.  Works which meet any of     *
+# * these conditions must conform to all of the terms of this license,      *
+# * particularly including the GPL Section 3 requirements of providing      *
+# * source code and allowing free redistribution of the work as a whole.    *
+# *                                                                         *
+# * As another special exception to the GPL terms, the Nmap Project grants  *
 # * permission to link the code of this program with any version of the     *
 # * OpenSSL library which is distributed under a license identical to that  *
 # * listed in the included docs/licenses/OpenSSL.txt file, and distribute   *
-# * linked combinations including the two. You must obey the GNU GPL in all *
-# * respects for all of the code used other than OpenSSL.  If you modify    *
-# * this file, you may extend this exception to your version of the file,   *
-# * but you are not obligated to do so.                                     *
+# * linked combinations including the two.                                  *
 # *                                                                         *
-# * If you received these files with a written license agreement or         *
-# * contract stating terms other than the terms above, then that            *
-# * alternative license agreement takes precedence over these comments.     *
+# * The Nmap Project has permission to redistribute Npcap, a packet         *
+# * capturing driver and library for the Microsoft Windows platform.        *
+# * Npcap is a separate work with it's own license rather than this Nmap    *
+# * license.  Since the Npcap license does not permit redistribution        *
+# * without special permission, our Nmap Windows binary packages which      *
+# * contain Npcap may not be redistributed without special permission.      *
+# *                                                                         *
+# * Any redistribution of Covered Software, including any derived works,    *
+# * must obey and carry forward all of the terms of this license, including *
+# * obeying all GPL rules and restrictions.  For example, source code of    *
+# * the whole work must be provided and free redistribution must be         *
+# * allowed.  All GPL references to "this License", are to be treated as    *
+# * including the terms and conditions of this license text as well.        *
+# *                                                                         *
+# * Because this license imposes special exceptions to the GPL, Covered     *
+# * Work may not be combined (even as part of a larger work) with plain GPL *
+# * software.  The terms, conditions, and exceptions of this license must   *
+# * be included as well.  This license is incompatible with some other open *
+# * source licenses as well.  In some cases we can relicense portions of    *
+# * Nmap or grant special permissions to use it in other open source        *
+# * software.  Please contact fyodor@nmap.org with any such requests.       *
+# * Similarly, we don't incorporate incompatible open source software into  *
+# * Covered Software without special permission from the copyright holders. *
+# *                                                                         *
+# * If you have any questions about the licensing restrictions on using     *
+# * Nmap in other works, we are happy to help.  As mentioned above, we also *
+# * offer an alternative license to integrate Nmap into proprietary         *
+# * applications and appliances.  These contracts have been sold to dozens  *
+# * of software vendors, and generally include a perpetual license as well  *
+# * as providing support and updates.  They also fund the continued         *
+# * development of Nmap.  Please email sales@nmap.com for further           *
+# * information.                                                            *
+# *                                                                         *
+# * If you have received a written license agreement or contract for        *
+# * Covered Software stating terms other than these, you may choose to use  *
+# * and redistribute Covered Software under those terms instead of these.   *
 # *                                                                         *
 # * Source is provided to this software because we believe users have a     *
 # * right to know exactly what a program is going to do before they run it. *
-# * This also allows you to audit the software for security holes (none     *
-# * have been found so far).                                                *
+# * This also allows you to audit the software for security holes.          *
 # *                                                                         *
 # * Source code also allows you to port Nmap to new platforms, fix bugs,    *
 # * and add new features.  You are highly encouraged to send your changes   *
-# * to nmap-dev@insecure.org for possible incorporation into the main       *
-# * distribution.  By sending these changes to Fyodor or one of the         *
-# * Insecure.Org development mailing lists, it is assumed that you are      *
-# * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+# * to the dev@nmap.org mailing list for possible incorporation into the    *
+# * main distribution.  By sending these changes to Fyodor or one of the    *
+# * Insecure.Org development mailing lists, or checking them into the Nmap  *
+# * source code repository, it is understood (unless you specify            *
+# * otherwise) that you are offering the Nmap Project the unlimited,        *
 # * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
-# * will always be available Open Source, but this is important because the *
-# * inability to relicense code has caused devastating problems for other   *
-# * Free Software projects (such as KDE and NASM).  We also occasionally    *
-# * relicense the code to third parties as discussed above.  If you wish to *
-# * specify special license conditions of your contributions, just say so   *
-# * when you send them.                                                     *
+# * will always be available Open Source, but this is important because     *
+# * the inability to relicense code has caused devastating problems for     *
+# * other Free Software projects (such as KDE and NASM).  We also           *
+# * occasionally relicense the code to third parties as discussed above.    *
+# * If you wish to specify special license conditions of your               *
+# * contributions, just say so when you send them.                          *
 # *                                                                         *
 # * This program is distributed in the hope that it will be useful, but     *
 # * WITHOUT ANY WARRANTY; without even the implied warranty of              *
-# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
-# * General Public License v2.0 for more details at                         *
-# * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
-# * included with Nmap.                                                     *
+# * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the Nmap      *
+# * license file for more details (it's in a COPYING file included with     *
+# * Nmap, and also available from https://svn.nmap.org/nmap/COPYING)        *
 # *                                                                         *
 # ***************************************************************************/
 
-import re
 import locale
 import os
 import os.path
 import time
 import socket
-import StringIO
 import copy
+
+# Use the faster cStringIO if available, fallback on StringIO if not
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
+
+# Prevent loading PyXML
+import xml
+xml.__path__ = [x for x in xml.__path__ if "_xmlplus" not in x]
 
 from types import StringTypes
 from xml.sax import make_parser
 from xml.sax import SAXException
-from xml.sax.handler import ContentHandler
+from xml.sax.handler import ContentHandler, EntityResolver
 from xml.sax.saxutils import XMLGenerator
 from xml.sax.xmlreader import AttributesImpl as Attributes
 
@@ -108,13 +156,13 @@ from zenmapCore.NmapOptions import NmapOptions, split_quoted, join_quoted
 from zenmapCore.StringPool import unique
 
 # The version of the Nmap DTD this file understands and emits.
-XML_OUTPUT_VERSION = "1.03"
+XML_OUTPUT_VERSION = "1.04"
+
 
 class HostInfo(object):
     def __init__(self):
-        self.comment = None;
+        self.comment = None
         self._tcpsequence = {}
-        self._osclasses = []
         self._osmatches = []
         self._ports = []
         self._ports_used = []
@@ -134,8 +182,7 @@ class HostInfo(object):
         clone = HostInfo()
         clone.comment = self.comment
         clone._tcpsequence = copy.deepcopy(self._tcpsequence)
-        clone._osclasses = map(lambda d: copy.deepcopy(d), self._osclasses)
-        clone._osmatches = self._osmatches
+        clone._osmatches = copy.deepcopy(self._osmatches)
         clone._ports = copy.deepcopy(self._ports)
         clone._ports_used = self._ports_used
         clone._extraports = self._extraports
@@ -185,17 +232,12 @@ class HostInfo(object):
             return self._ipidsequence
         return {}
 
-    # osclasses is a list containing dicts of the form
+    # osmatches is a list of dicts of the form
+    # {'name': u'Linux 2.6.24', 'accuracy': u'98', 'line': u'1000',
+    #  'osclasses': ...}
+    # where each 'osclasses' element is a dict of the form
     # {'vendor': u'Linux', 'osfamily': u'Linux', 'type': u'general purpose',
     #  'osgen': u'2.6.X', 'accuracy': u'98'}
-    def set_osclasses(self, classes):
-        self._osclasses = classes
-
-    def get_osclasses(self):
-        return self._osclasses
-
-    # osmatches is a list of dicts of the form
-    # {'name': u'Linux 2.6.24', 'accuracy': u'98', 'line': u'1000'}
     def set_osmatches(self, matches):
         self._osmatches = matches
 
@@ -203,37 +245,17 @@ class HostInfo(object):
         return self._osmatches
 
     def get_best_osmatch(self):
-        """Return the OS match with the highest accuracy. If there is a tie, one
-        of the best matches will be returned."""
+        """Return the OS match with the highest accuracy."""
         if not self._osmatches:
             return None
+
         def osmatch_key(osmatch):
-            # Sort first by accuracy, then by name so it's deterministic.
             try:
-                accuracy = float(osmatch.get("accuracy", ""))
+                return -float(osmatch["accuracy"])
             except ValueError:
-                accuracy = 0
-            return (accuracy, osmatch.get("name"))
-        osmatches = self.osmatches[:]
-        osmatches.sort(cmp = lambda a, b: cmp(osmatch_key(a), osmatch_key(b)))
-        return osmatches[-1]
+                return 0
 
-
-    def get_best_osclass(self):
-        """Return the OS class with the highest accuracy. If there is a tie, one
-        of the best matches will be returned."""
-        if not self._osclasses:
-            return None
-        def osclass_key(osclass):
-            # Sort first by accuracy, then by name so it's deterministic.
-            try:
-                accuracy = float(osclass.get("accuracy", ""))
-            except ValueError:
-                accuracy = 0
-            return (accuracy, osclass.get("name"))
-        osclasses = self.osclasses[:]
-        osclasses.sort(cmp = lambda a, b: cmp(osclass_key(a), osclass_key(b)))
-        return osclasses[-1]
+        return sorted(self._osmatches, key=osmatch_key)[0]
 
     # ports_used is a list like
     # [{'state': u'open', 'portid': u'22', 'proto': u'tcp'},
@@ -256,7 +278,7 @@ class HostInfo(object):
             return self._uptime
 
         # Avoid empty dict return
-        return {"seconds":"", "lastboot":""}
+        return {"seconds": "", "lastboot": ""}
 
     # ports is an array containing dicts of the form
     # {'port_state': u'open', 'portid': u'22', 'protocol': u'tcp',
@@ -317,14 +339,16 @@ class HostInfo(object):
             l.append((1, socket.inet_aton(self.ip["addr"])))
         if self.ipv6:
             try:
-                l.append((1, socket.inet_pton(socket.AF_INET6, self.ipv6["addr"])))
+                l.append((1,
+                    socket.inet_pton(socket.AF_INET6, self.ipv6["addr"])))
             except AttributeError:
                 # Windows doesn't have socket.inet_pton. Go alphabetical.
                 # Encode to a byte string for possible comparison with binary
                 # address strings (which can't be converted to unicode).
                 l.append((1, self.ipv6["addr"].encode("utf-8")))
         if self.mac:
-            l.append((3, "".join([chr(int(x, 16)) for x in self.mac["addr"].split(":")])))
+            l.append((3, "".join(
+                chr(int(x, 16)) for x in self.mac["addr"].split(":"))))
         l.sort()
         return l
 
@@ -380,7 +404,8 @@ class HostInfo(object):
         return self.get_port_count_by_states(('open', 'open|filtered'))
 
     def get_filtered_ports(self):
-        return self.get_port_count_by_states(('filtered', 'open|filtered', 'closed|filtered'))
+        return self.get_port_count_by_states(
+                ('filtered', 'open|filtered', 'closed|filtered'))
 
     def get_closed_ports(self):
         return self.get_port_count_by_states(('closed', 'closed|filtered'))
@@ -389,7 +414,7 @@ class HostInfo(object):
         scanned = 0
 
         for p in self.ports:
-            scanned+=1
+            scanned += 1
 
         for extra in self.get_extraports():
             scanned += int(extra["count"])
@@ -399,14 +424,16 @@ class HostInfo(object):
     def get_services(self):
         services = []
         for p in self.ports:
-            services.append({"service_name":p.get("service_name", _("unknown")),
-                             "portid":p.get("portid", ""),
-                             "service_version":p.get("service_version",
-                                                     _("Unknown version")),
-                             "service_product":p.get("service_product", ""),
-                             "service_extrainfo":p.get("service_extrainfo", ""),
-                             "port_state":p.get("port_state", _("Unknown")),
-                             "protocol":p.get("protocol", "")})
+            services.append({
+                "service_name": p.get("service_name", _("unknown")),
+                "portid": p.get("portid", ""),
+                "service_version": p.get("service_version",
+                    _("Unknown version")),
+                "service_product": p.get("service_product", ""),
+                "service_extrainfo": p.get("service_extrainfo", ""),
+                "port_state": p.get("port_state", _("Unknown")),
+                "protocol": p.get("protocol", "")
+                })
         return services
 
     def get_trace(self):
@@ -426,7 +453,6 @@ class HostInfo(object):
 
     # Properties
     tcpsequence = property(get_tcpsequence, set_tcpsequence)
-    osclasses = property(get_osclasses, set_osclasses)
     osmatches = property(get_osmatches, set_osmatches)
     ports = property(get_ports, set_ports)
     ports_used = property(get_ports_used, set_ports_used)
@@ -443,22 +469,25 @@ class HostInfo(object):
     services = property(get_services)
     trace = property(get_trace, set_trace)
 
+
 class ParserBasics(object):
-    def __init__ (self):
+    def __init__(self):
         # This flag informs us whether the XML output file is temporary (True),
         # or user specified (False). If any of them is user-specified, it
         # doesn't get stripped out of the command string in set_nmap_command.
         self.xml_is_temp = True
 
-        self.nmap = {'nmaprun':{},\
-                     'scaninfo':[],\
-                     'verbose':'',\
-                     'debugging':'',\
-                     'hosts':[],\
-                     'runstats':{}}
+        self.nmap = {
+                'nmaprun': {},
+                'scaninfo': [],
+                'verbose': '',
+                'debugging': '',
+                'hosts': [],
+                'runstats': {}
+                }
 
         self.ops = NmapOptions()
-        self._nmap_output = None
+        self._nmap_output = StringIO()
 
     def set_xml_is_temp(self, xml_is_temp):
         # This flag is False if a user has specified his own -oX option - in
@@ -480,18 +509,25 @@ class ParserBasics(object):
         self.ops.target_specs = targets
 
     def get_nmap_output(self):
-        return self._nmap_output
+        return self._nmap_output.getvalue()
 
     def set_nmap_output(self, nmap_output):
-        self._nmap_output = nmap_output
+        self._nmap_output.close()
+        del self._nmap_output
+        self._nmap_output = StringIO()
+        self._nmap_output.write(nmap_output)
 
-    def get_debugging_level (self):
+    def del_nmap_output(self):
+        self._nmap_output.close()
+        del _nmap_output
+
+    def get_debugging_level(self):
         return self.nmap.get('debugging', '')
 
     def set_debugging_level(self, level):
         self.nmap['debugging'] = level
 
-    def get_verbose_level (self):
+    def get_verbose_level(self):
         return self.nmap.get('verbose', '')
 
     def set_verbose_level(self, level):
@@ -503,8 +539,8 @@ class ParserBasics(object):
     def set_scaninfo(self, info):
         self.nmap['scaninfo'] = info
 
-    def get_services_scanned (self):
-        if self._services_scanned == None:
+    def get_services_scanned(self):
+        if self._services_scanned is None:
             return self._services_scanned
 
         services = []
@@ -514,10 +550,10 @@ class ParserBasics(object):
         self._services_scanned = ','.join(services)
         return self._services_scanned
 
-    def set_services_scanned (self, services_scanned):
+    def set_services_scanned(self, services_scanned):
         self._services_scanned = services_scanned
 
-    def get_nmap_command (self):
+    def get_nmap_command(self):
         return self.ops.render_string()
 
     def set_nmap_command(self, command):
@@ -526,20 +562,20 @@ class ParserBasics(object):
             self.ops["-oX"] = None
         self.nmap['nmaprun']['args'] = self.ops.render_string()
 
-    def get_scan_type (self):
+    def get_scan_type(self):
         types = []
         for t in self.nmap.get('scaninfo', []):
             types.append(t['type'])
         return types
 
-    def get_protocol (self):
+    def get_protocol(self):
         protocols = []
         for proto in self.nmap.get('scaninfo', []):
             protocols.append(proto['protocol'])
         return protocols
 
-    def get_num_services (self):
-        if self._num_services == None:
+    def get_num_services(self):
+        if self._num_services is None:
             return self._num_services
 
         num = 0
@@ -549,12 +585,12 @@ class ParserBasics(object):
         self._num_services = num
         return self._num_services
 
-    def set_num_services (self, num_services):
+    def set_num_services(self, num_services):
         self._num_services = num_services
 
-    def get_date (self):
+    def get_date(self):
         epoch = int(self.nmap['nmaprun'].get('start', '0'))
-        return time.localtime (epoch)
+        return time.localtime(epoch)
 
     def get_start(self):
         return self.nmap['nmaprun'].get('start', '0')
@@ -594,15 +630,20 @@ in epoch format!")
         return ports
 
     def get_formatted_date(self):
-        return time.strftime("%B %d, %Y - %H:%M", self.get_date())
+        try:
+            return time.strftime("%B %d, %Y - %H:%M", self.get_date()).decode(
+                locale.getpreferredencoding())
+        except LookupError:
+            # encoding or locale not found
+            return time.asctime(self.get_date()).decode('ascii')
 
-    def get_scanner (self):
+    def get_scanner(self):
         return self.nmap['nmaprun'].get('scanner', '')
 
     def set_scanner(self, scanner):
         self.nmap['nmaprun']['scanner'] = scanner
 
-    def get_scanner_version (self):
+    def get_scanner_version(self):
         return self.nmap['nmaprun'].get('version', '')
 
     def set_scanner_version(self, version):
@@ -629,7 +670,7 @@ in epoch format!")
             return []
         return [host.ipv6 for host in hosts if host.ipv6 is not None]
 
-    def get_hostnames (self):
+    def get_hostnames(self):
         hostnames = []
         for host in self.nmap.get('hosts', []):
             hostnames += host.get_hostnames()
@@ -662,7 +703,7 @@ in epoch format!")
     def set_hosts_scanned(self, scanned):
         self.nmap['runstats']['hosts_scanned'] = int(scanned)
 
-    def get_finish_time (self):
+    def get_finish_time(self):
         return time.localtime(int(self.nmap['runstats'].get('finished_time',
                                                             '0')))
 
@@ -681,7 +722,8 @@ in epoch format!")
         if scan_name:
             return scan_name
         if self.profile_name and self.get_targets():
-            return _("%s on %s") % (self.profile_name, join_quoted(self.get_targets()))
+            return _("%s on %s") % (self.profile_name,
+                    join_quoted(self.get_targets()))
         return self.get_nmap_command()
 
     def set_scan_name(self, scan_name):
@@ -690,8 +732,30 @@ in epoch format!")
     def get_formatted_finish_date(self):
         return time.strftime("%B %d, %Y - %H:%M", self.get_finish_time())
 
+    def get_port_protocol_dict(self):
+        #Create a dict of port -> protocol for all ports scanned
+        ports = {}
+        for scaninfo in self.scaninfo:
+            services_string = scaninfo['services'].strip()
+            if services_string == "":
+                services_array = []
+            else:
+                services_array = services_string.split(',')
+            for item in services_array:
+                if item.find('-') == -1:
+                    if int(item) not in ports:
+                        ports[int(item)] = []
+                    ports[int(item)].append(scaninfo['protocol'])
+                else:
+                    begin, end = item.split('-')
+                    for port in range(int(begin), int(end) + 1):
+                        if int(port) not in ports:
+                            ports[int(port)] = []
+                        ports[int(port)].append(scaninfo['protocol'])
+        return ports
+
     profile_name = property(get_profile_name, set_profile_name)
-    nmap_output = property(get_nmap_output, set_nmap_output)
+    nmap_output = property(get_nmap_output, set_nmap_output, del_nmap_output)
     debugging_level = property(get_debugging_level, set_debugging_level)
     verbose_level = property(get_verbose_level, set_verbose_level)
     scaninfo = property(get_scaninfo, set_scaninfo)
@@ -724,6 +788,7 @@ in epoch format!")
 
     _num_services = None
     _services_scanned = None
+
 
 class NmapParserSAX(ParserBasics, ContentHandler):
     def __init__(self):
@@ -766,14 +831,15 @@ class NmapParserSAX(ParserBasics, ContentHandler):
     def _parse_nmaprun(self, attrs):
         run_tag = "nmaprun"
 
-        if self._nmap_output is None and attrs.has_key("nmap_output"):
-            self._nmap_output = attrs["nmap_output"]
+        if self.nmap_output == "" and "nmap_output" in attrs:
+            self.nmap_output = attrs["nmap_output"]
         self.nmap[run_tag]["profile_name"] = attrs.get("profile_name", "")
         self.nmap[run_tag]["start"] = attrs.get("start", "")
         self.nmap[run_tag]["args"] = attrs.get("args", "")
         self.nmap[run_tag]["scanner"] = attrs.get("scanner", "")
         self.nmap[run_tag]["version"] = attrs.get("version", "")
-        self.nmap[run_tag]["xmloutputversion"] = attrs.get("xmloutputversion", "")
+        self.nmap[run_tag]["xmloutputversion"] = attrs.get(
+                "xmloutputversion", "")
 
         self.nmap_command = self.nmap[run_tag]["args"]
 
@@ -817,9 +883,9 @@ class NmapParserSAX(ParserBasics, ContentHandler):
         self.host_info.set_state(unique(attrs.get("state", "")))
 
     def _parse_host_address(self, attrs):
-        address_attributes = {"type":unique(attrs.get("addrtype", "")),
-                              "vendor":attrs.get("vendor", ""),
-                              "addr":attrs.get("addr", "")}
+        address_attributes = {"type": unique(attrs.get("addrtype", "")),
+                              "vendor": attrs.get("vendor", ""),
+                              "addr": attrs.get("addr", "")}
 
         if address_attributes["type"] == "ipv4":
             self.host_info.set_ip(address_attributes)
@@ -829,16 +895,16 @@ class NmapParserSAX(ParserBasics, ContentHandler):
             self.host_info.set_mac(address_attributes)
 
     def _parse_host_hostname(self, attrs):
-        self.list_hostnames.append({"hostname":attrs.get("name", ""),
-                                    "hostname_type":attrs.get("type", "")})
+        self.list_hostnames.append({"hostname": attrs.get("name", ""),
+                                    "hostname_type": attrs.get("type", "")})
 
     def _parse_host_extraports(self, attrs):
-        self.list_extraports.append({"state":unique(attrs.get("state", "")),
-                                     "count":attrs.get("count", "")})
+        self.list_extraports.append({"state": unique(attrs.get("state", "")),
+                                     "count": attrs.get("count", "")})
 
     def _parse_host_port(self, attrs):
-        self.dic_port = {"protocol":unique(attrs.get("protocol", "")),
-                         "portid":unique(attrs.get("portid", ""))}
+        self.dic_port = {"protocol": unique(attrs.get("protocol", "")),
+                         "portid": unique(attrs.get("portid", ""))}
 
     def _parse_host_port_state(self, attrs):
         self.dic_port["port_state"] = unique(attrs.get("state", ""))
@@ -854,17 +920,21 @@ class NmapParserSAX(ParserBasics, ContentHandler):
         self.dic_port["service_extrainfo"] = attrs.get("extrainfo", "")
 
     def _parse_host_osmatch(self, attrs):
-        self.list_osmatch.append(self._parsing(attrs, [], ['name', 'accuracy', 'line']))
+        osmatch = self._parsing(attrs, [], ['name', 'accuracy', 'line'])
+        osmatch['osclasses'] = []
+        self.list_osmatch.append(osmatch)
 
     def _parse_host_portused(self, attrs):
-        self.list_portused.append(self._parsing(attrs, ['state', 'proto', 'portid'], []))
+        self.list_portused.append(self._parsing(
+            attrs, ['state', 'proto', 'portid'], []))
 
     def _parse_host_osclass(self, attrs):
-        self.list_osclass.append(self._parsing(attrs, ['type', 'vendor', 'osfamily', 'osgen'], ['accuracy']))
+        self.list_osclass.append(self._parsing(
+            attrs, ['type', 'vendor', 'osfamily', 'osgen'], ['accuracy']))
 
     def _parsing(self, attrs, unique_names, other_names):
         # Returns a dict with the attributes of a given tag with the
-        # atributes names as keys and their respective values
+        # attributes names as keys and their respective values
         dic = {}
         for at in unique_names:
             dic[at] = unique(attrs.get(at, ""))
@@ -873,17 +943,20 @@ class NmapParserSAX(ParserBasics, ContentHandler):
         return dic
 
     def _parse_host_uptime(self, attrs):
-        self.host_info.set_uptime(self._parsing(attrs, [], ["seconds", "lastboot"]))
-
+        self.host_info.set_uptime(self._parsing(
+            attrs, [], ["seconds", "lastboot"]))
 
     def _parse_host_tcpsequence(self, attrs):
-        self.host_info.set_tcpsequence(self._parsing(attrs, ['difficulty'], ['index', 'values']))
+        self.host_info.set_tcpsequence(self._parsing(
+            attrs, ['difficulty'], ['index', 'values']))
 
     def _parse_host_tcptssequence(self, attrs):
-        self.host_info.set_tcptssequence(self._parsing(attrs, ['class'], ['values']))
+        self.host_info.set_tcptssequence(self._parsing(
+            attrs, ['class'], ['values']))
 
     def _parse_host_ipidsequence(self, attrs):
-        self.host_info.set_ipidsequence(self._parsing(attrs, ['class'], ['values']))
+        self.host_info.set_ipidsequence(self._parsing(
+            attrs, ['class'], ['values']))
 
     def _parse_host_trace(self, attrs):
         trace = {}
@@ -950,12 +1023,12 @@ class NmapParserSAX(ParserBasics, ContentHandler):
             self.in_os = True
             self.list_portused = []
             self.list_osmatch = []
-            self.list_osclass = []
         elif self.in_host and self.in_os and name == "osmatch":
             self._parse_host_osmatch(attrs)
         elif self.in_host and self.in_os and name == "portused":
             self._parse_host_portused(attrs)
         elif self.in_host and self.in_os and name == "osclass":
+            self.list_osclass = []
             self._parse_host_osclass(attrs)
         elif self.in_host and name == "uptime":
             self._parse_host_uptime(attrs)
@@ -973,9 +1046,8 @@ class NmapParserSAX(ParserBasics, ContentHandler):
         elif self.in_host and self.in_trace and name == "error":
             self._parse_host_trace_error(attrs)
 
-
     def endElement(self, name):
-        if name == "runstats":
+        if name == "output":
             self.in_interactive_output = False
         elif name == "runstats":
             self.in_run_stats = False
@@ -993,26 +1065,27 @@ class NmapParserSAX(ParserBasics, ContentHandler):
             self.in_port = False
             self.list_ports.append(self.dic_port)
             del(self.dic_port)
+        elif self.in_host and self.in_os and name == "osmatch":
+            self.list_osmatch[-1]['osclasses'].extend(self.list_osclass)
+            self.list_osclass = []
         elif self.in_host and self.in_os and name == "os":
             self.in_os = False
             self.host_info.set_ports_used(self.list_portused)
             self.host_info.set_osmatches(self.list_osmatch)
-            self.host_info.set_osclasses(self.list_osclass)
 
             del(self.list_portused)
             del(self.list_osmatch)
-            del(self.list_osclass)
         elif self.in_host and self.in_trace and name == "trace":
             self.in_trace = False
 
     def characters(self, content):
         if self.in_interactive_output:
-            self.nmap_output += content
+            self._nmap_output.write(content)
 
     def write_text(self, f):
         """Write the Nmap text output of this object to the file-like object
         f."""
-        if self._nmap_output is None:
+        if self.nmap_output == "":
             return
         f.write(self.nmap_output)
 
@@ -1022,7 +1095,8 @@ class NmapParserSAX(ParserBasics, ContentHandler):
         writer = XMLGenerator(f)
         writer.startDocument()
         if self.xml_stylesheet_data is not None:
-            writer.processingInstruction("xml-stylesheet", self.xml_stylesheet_data)
+            writer.processingInstruction(
+                    "xml-stylesheet", self.xml_stylesheet_data)
         self._write_nmaprun(writer)
         self._write_scaninfo(writer)
         self._write_verbose(writer)
@@ -1035,7 +1109,7 @@ class NmapParserSAX(ParserBasics, ContentHandler):
 
     def get_xml(self):
         """Return a string containing the XML representation of this scan."""
-        buffer = StringIO.StringIO()
+        buffer = StringIO()
         self.write_xml(buffer)
         string = buffer.getvalue()
         buffer.close()
@@ -1049,7 +1123,7 @@ class NmapParserSAX(ParserBasics, ContentHandler):
         fd.close()
 
     def _write_output(self, writer):
-        if self._nmap_output is None:
+        if self.nmap_output == "":
             return
         writer.startElement("output", Attributes({"type": "interactive"}))
         writer.characters(self.nmap_output)
@@ -1062,17 +1136,17 @@ class NmapParserSAX(ParserBasics, ContentHandler):
 
         ## Finished element
         writer.startElement("finished",
-                        Attributes(dict(time = str(self.finish_epoc_time),
-                                        timestr = time.ctime(time.mktime(self.get_finish_time())))))
+                        Attributes(dict(time=str(self.finish_epoc_time),
+                                        timestr=time.ctime(time.mktime(
+                                            self.get_finish_time())))))
         writer.endElement("finished")
 
         ## Hosts element
         writer.startElement("hosts",
-                            Attributes(dict(up = str(self.hosts_up),
-                                            down = str(self.hosts_down),
-                                            total = str(self.hosts_scanned))))
+                            Attributes(dict(up=str(self.hosts_up),
+                                            down=str(self.hosts_down),
+                                            total=str(self.hosts_scanned))))
         writer.endElement("hosts")
-
 
         writer.endElement("runstats")
         # End of Runstats element
@@ -1088,7 +1162,6 @@ class NmapParserSAX(ParserBasics, ContentHandler):
             writer.startElement("status",
                                 Attributes(dict(state=host.state)))
             writer.endElement("status")
-
 
             ##################
             # Address elements
@@ -1118,22 +1191,20 @@ class NmapParserSAX(ParserBasics, ContentHandler):
             # End of Address elements
             #########################
 
-
             ###################
             # Hostnames element
             writer.startElement("hostnames", Attributes({}))
 
             for hname in host.hostnames:
                 writer.startElement("hostname",
-                        Attributes(dict(name = hname.get("hostname", ""),
-                                    type = hname.get("hostname_type", ""))))
+                        Attributes(dict(name=hname.get("hostname", ""),
+                                    type=hname.get("hostname_type", ""))))
 
                 writer.endElement("hostname")
 
             writer.endElement("hostnames")
             # End of Hostnames element
             ##########################
-
 
             ###############
             # Ports element
@@ -1142,15 +1213,15 @@ class NmapParserSAX(ParserBasics, ContentHandler):
             ## Extraports elements
             for ext in host.get_extraports():
                 writer.startElement("extraports",
-                    Attributes(dict(count = ext.get("count", ""),
-                                    state = ext.get("state", ""))))
+                    Attributes(dict(count=ext.get("count", ""),
+                                    state=ext.get("state", ""))))
                 writer.endElement("extraports")
 
             ## Port elements
             for p in host.ports:
                 writer.startElement("port",
-                    Attributes(dict(portid = p.get("portid", ""),
-                                    protocol = p.get("protocol", ""))))
+                    Attributes(dict(portid=p.get("portid", ""),
+                                    protocol=p.get("protocol", ""))))
 
                 ### Port state
                 writer.startElement("state",
@@ -1178,7 +1249,6 @@ class NmapParserSAX(ParserBasics, ContentHandler):
             # End of Ports element
             ######################
 
-
             ############
             # OS element
             writer.startElement("os", Attributes({}))
@@ -1186,27 +1256,26 @@ class NmapParserSAX(ParserBasics, ContentHandler):
             ## Ports used elements
             for pu in host.ports_used:
                 writer.startElement("portused",
-                            Attributes(dict(state = pu.get("state", ""),
-                                            proto = pu.get("proto", ""),
-                                            portid = pu.get("portid", ""))))
+                            Attributes(dict(state=pu.get("state", ""),
+                                            proto=pu.get("proto", ""),
+                                            portid=pu.get("portid", ""))))
                 writer.endElement("portused")
-
-            ## Osclass elements
-            for oc in host.osclasses:
-                writer.startElement("osclass",
-                    Attributes(dict(vendor = oc.get("vendor", ""),
-                                    osfamily = oc.get("osfamily", ""),
-                                    type = oc.get("type", ""),
-                                    osgen = oc.get("osgen", ""),
-                                    accuracy = oc.get("accuracy", ""))))
-                writer.endElement("osclass")
 
             ## Osmatch elements
             for om in host.osmatches:
                 writer.startElement("osmatch",
-                    Attributes(dict(name = om.get("name", ""),
-                                    accuracy = om.get("accuracy", ""),
-                                    line = om.get("line", ""))))
+                    Attributes(dict(name=om.get("name", ""),
+                                    accuracy=om.get("accuracy", ""),
+                                    line=om.get("line", ""))))
+                ## Osclass elements
+                for oc in om['osclasses']:
+                    writer.startElement("osclass",
+                        Attributes(dict(vendor=oc.get("vendor", ""),
+                                        osfamily=oc.get("osfamily", ""),
+                                        type=oc.get("type", ""),
+                                        osgen=oc.get("osgen", ""),
+                                        accuracy=oc.get("accuracy", ""))))
+                    writer.endElement("osclass")
                 writer.endElement("osmatch")
 
             writer.endElement("os")
@@ -1215,30 +1284,30 @@ class NmapParserSAX(ParserBasics, ContentHandler):
 
             # Uptime element
             writer.startElement("uptime",
-                Attributes(dict(seconds = host.uptime.get("seconds", ""),
-                            lastboot = host.uptime.get("lastboot", ""))))
+                Attributes(dict(seconds=host.uptime.get("seconds", ""),
+                            lastboot=host.uptime.get("lastboot", ""))))
             writer.endElement("uptime")
 
             #####################
-            # Sequences elementes
+            # Sequences elements
             ## TCP Sequence element
             # Cannot use dict() here, because of the 'class' attribute.
             writer.startElement("tcpsequence",
-                Attributes({"index":host.tcpsequence.get("index", ""),
-                        "difficulty":host.tcpsequence.get("difficulty", ""),
-                        "values":host.tcpsequence.get("values", "")}))
+                Attributes({"index": host.tcpsequence.get("index", ""),
+                        "difficulty": host.tcpsequence.get("difficulty", ""),
+                        "values": host.tcpsequence.get("values", "")}))
             writer.endElement("tcpsequence")
 
             ## IP ID Sequence element
             writer.startElement("ipidsequence",
-                Attributes({"class":host.ipidsequence.get("class", ""),
-                            "values":host.ipidsequence.get("values", "")}))
+                Attributes({"class": host.ipidsequence.get("class", ""),
+                            "values": host.ipidsequence.get("values", "")}))
             writer.endElement("ipidsequence")
 
             ## TCP TS Sequence element
             writer.startElement("tcptssequence",
-                Attributes({"class":host.tcptssequence.get("class", ""),
-                        "values":host.tcptssequence.get("values", "")}))
+                Attributes({"class": host.tcptssequence.get("class", ""),
+                        "values": host.tcptssequence.get("values", "")}))
             writer.endElement("tcptssequence")
             # End of sequences elements
             ###########################
@@ -1246,21 +1315,21 @@ class NmapParserSAX(ParserBasics, ContentHandler):
             ## Trace element
             if len(host.trace) > 0:
                 writer.startElement("trace",
-                    Attributes({"proto":host.trace.get("proto", ""),
-                                "port":host.trace.get("port", "")}))
+                    Attributes({"proto": host.trace.get("proto", ""),
+                                "port": host.trace.get("port", "")}))
 
                 if "hops" in host.trace:
                     for hop in host.trace["hops"]:
                         writer.startElement("hop",
-                            Attributes({"ttl":hop["ttl"],
-                                        "rtt":hop["rtt"],
-                                        "ipaddr":hop["ipaddr"],
-                                        "host":hop["host"]}))
+                            Attributes({"ttl": hop["ttl"],
+                                        "rtt": hop["rtt"],
+                                        "ipaddr": hop["ipaddr"],
+                                        "host": hop["host"]}))
                         writer.endElement("hop")
 
                 if "error" in host.trace:
                     writer.startElement("error",
-                        Attributes({"errorstr":host.trace["error"]}))
+                        Attributes({"errorstr": host.trace["error"]}))
                     writer.endElement("error")
 
                 writer.endElement("trace")
@@ -1283,21 +1352,22 @@ class NmapParserSAX(ParserBasics, ContentHandler):
     def _write_scaninfo(self, writer):
         for scan in self.scaninfo:
             writer.startElement("scaninfo",
-                Attributes(dict(type = scan.get("type", ""),
-                                protocol = scan.get("protocol", ""),
-                                numservices = scan.get("numservices", ""),
-                                services = scan.get("services", ""))))
+                Attributes(dict(type=scan.get("type", ""),
+                                protocol=scan.get("protocol", ""),
+                                numservices=scan.get("numservices", ""),
+                                services=scan.get("services", ""))))
             writer.endElement("scaninfo")
 
     def _write_nmaprun(self, writer):
         writer.startElement("nmaprun",
-                Attributes(dict(args = str(self.nmap_command),
-                                profile_name = str(self.profile_name),
-                                scanner = str(self.scanner),
-                                start = str(self.start),
-                                startstr = time.ctime(time.mktime(self.get_date())),
-                                version = str(self.scanner_version),
-                                xmloutputversion = str(XML_OUTPUT_VERSION))))
+                Attributes(dict(args=str(self.nmap_command),
+                                profile_name=str(self.profile_name),
+                                scanner=str(self.scanner),
+                                start=str(self.start),
+                                startstr=time.ctime(
+                                    time.mktime(self.get_date())),
+                                version=str(self.scanner_version),
+                                xmloutputversion=str(XML_OUTPUT_VERSION))))
 
     def set_unsaved(self):
         self.unsaved = True
@@ -1305,16 +1375,28 @@ class NmapParserSAX(ParserBasics, ContentHandler):
     def is_unsaved(self):
         return self.unsaved
 
+
+class OverrideEntityResolver(EntityResolver):
+    """This class overrides the default behavior of xml.sax to download
+    remote DTDs, instead returning blank strings"""
+    empty = StringIO()
+
+    def resolveEntity(self, publicId, systemId):
+        return OverrideEntityResolver.empty
+
+
 def nmap_parser_sax():
     parser = make_parser()
     nmap_parser = NmapParserSAX()
 
     parser.setContentHandler(nmap_parser)
+    parser.setEntityResolver(OverrideEntityResolver())
     nmap_parser.set_parser(parser)
 
     return nmap_parser
 
 NmapParser = nmap_parser_sax
+
 
 if __name__ == '__main__':
     import sys
@@ -1336,7 +1418,7 @@ if __name__ == '__main__':
         for p in host.ports:
             print "\t%s" % repr(p)
         print "  Ports used:", repr(host.ports_used)
-        print "  OS Class:", repr(host.osclasses)
+        print "  OS Matches:", repr(host.osmatches)
         print "  Hostnames:", repr(host.hostnames)
         print "  IP:", repr(host.ip)
         print "  IPv6:", repr(host.ipv6)

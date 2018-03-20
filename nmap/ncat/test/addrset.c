@@ -1,11 +1,12 @@
 /*
     Usage: ./addrset [<specification> ...]
 
-    This program tests the addrset functions in ncat_hostmatch.c, the
-    ones that maintain the lists of addresses for --allow and --deny. It
-    takes as arguments specifications that are added to an addrset. It
-    then reads whitespace-separated host names or IP addresses from
-    standard input and echoes only those that are in the addrset.
+    This program tests the addrset functions in nbase/nbase_addrset.c,
+    the ones that maintain the lists of addresses for --allow and
+    --deny. It takes as arguments specifications that are added to an
+    addrset. It then reads whitespace-separated host names or IP
+    addresses from standard input and echoes only those that are in the
+    addrset.
 
     David Fifield
 
@@ -20,7 +21,23 @@
 #include <stdlib.h>
 
 #include "ncat_core.h"
-#include "ncat_hostmatch.h"
+
+#ifdef WIN32
+#include "../nsock/src/error.h"
+#endif
+
+
+#ifdef WIN32
+static void win_init(void)
+{
+  WSADATA data;
+  int rc;
+
+  rc = WSAStartup(MAKEWORD(2,2), &data);
+  if (rc)
+    fatal("failed to start winsock: %s\n", socket_strerror(rc));
+}
+#endif
 
 static int resolve_name(const char *name, struct addrinfo **result)
 {
@@ -38,12 +55,16 @@ int main(int argc, char *argv[])
     char line[1024];
     int i;
 
+#ifdef WIN32
+    win_init();
+#endif
+
     addrset_init(&set);
 
     options_init();
 
     for (i = 1; i < argc; i++) {
-        if (!addrset_add_spec(&set, argv[i])) {
+        if (!addrset_add_spec(&set, argv[i], o.af, !o.nodns)) {
             fprintf(stderr, "Error adding spec \"%s\".\n", argv[i]);
             exit(1);
         }
