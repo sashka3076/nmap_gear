@@ -93,7 +93,7 @@ prefix = get_prefix()
 # These lines are overwritten by the installer to hard-code the installed
 # locations.
 CONFIG_DIR = join(prefix, "share", APP_NAME, "config")
-LOCALE_DIR = join(prefix, "share", APP_NAME, "locale")
+LOCALE_DIR = join(prefix, "share", "locale")
 MISC_DIR = join(prefix, "share", APP_NAME, "misc")
 PIXMAPS_DIR = join(prefix, "share", "zenmap", "pixmaps")
 DOCS_DIR = join(prefix, "share", APP_NAME, "docs")

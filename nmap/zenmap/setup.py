@@ -88,7 +88,7 @@ INSTALLED_FILES_NAME = "INSTALLED_FILES"
 # These directories are relative to the installation or dist directory
 data_dir = os.path.join('share', APP_NAME)
 pixmaps_dir = os.path.join(data_dir, 'pixmaps')
-locale_dir = os.path.join(data_dir, 'locale')
+locale_dir = os.path.join('share', 'locale')
 config_dir = os.path.join(data_dir, 'config')
 docs_dir = os.path.join(data_dir, 'docs')
 misc_dir = os.path.join(data_dir, 'misc')
@@ -199,9 +199,9 @@ class my_install(install):
             installed_files.append(os.path.join(self.install_lib, dir))
         # Recursively include all the directories in data_dir (share/zenmap).
         # This is mainly for convenience in listing locale directories.
-        installed_files.append(os.path.join(self.install_data, data_dir))
+        installed_files.append(os.path.join(self.install_data, "share"))
         for dirpath, dirs, files in os.walk(
-                os.path.join(self.install_data, data_dir)):
+                os.path.join(self.install_data, "share")):
             for dir in dirs:
                 installed_files.append(os.path.join(dirpath, dir))
         installed_files.append(
