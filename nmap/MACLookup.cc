@@ -140,6 +140,7 @@
 #include "NmapOps.h"
 #include "nmap_error.h"
 #include "charpool.h"
+#include "droppriv.h"
 
 extern NmapOps o;
 
@@ -149,7 +150,7 @@ static inline int MacCharPrefix2Key(const u8 *prefix) {
   return (prefix[0] << 16) + (prefix[1] << 8) + prefix[2];
 }
 
-static void mac_prefix_init() {
+void mac_prefix_init() {
   static int initialized = 0;
   if (initialized) return;
   initialized = 1;

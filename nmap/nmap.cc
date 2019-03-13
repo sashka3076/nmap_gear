@@ -142,6 +142,7 @@
 #include "scan_engine.h"
 #include "FPEngine.h"
 #include "idle_scan.h"
+#include "droppriv.h"
 #include "NmapOps.h"
 #include "MACLookup.h"
 #include "traceroute.h"
@@ -2050,6 +2051,7 @@ int nmap_main(int argc, char *argv[]) {
     }
   }
 #endif
+  drop_priv();
 
   if (o.ping_group_sz < o.minHostGroupSz())
     o.ping_group_sz = o.minHostGroupSz();

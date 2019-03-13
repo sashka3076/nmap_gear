@@ -188,6 +188,7 @@
 #endif
 
 #include "nmap.h"
+#include "droppriv.h"
 #include "NmapOps.h"
 #include "nmap_dns.h"
 #include "nsock.h"
@@ -1074,7 +1075,7 @@ static void parse_etchosts(const char *fname) {
   fclose(fp);
 }
 
-static void etchosts_init(void) {
+void etchosts_init(void) {
   static int initialized = 0;
   if (initialized) return;
   initialized = 1;
