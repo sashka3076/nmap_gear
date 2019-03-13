@@ -63,6 +63,7 @@
 /* $Id: protocols.cc 38078 2020-10-02 16:12:22Z dmiller $ */
 
 #include "protocols.h"
+#include "droppriv.h"
 #include "NmapOps.h"
 #include "charpool.h"
 #include "nmap_error.h"
@@ -73,7 +74,7 @@ static int numipprots = 0;
 static struct protocol_list *protocol_table[PROTOCOL_TABLE_SIZE];
 static int protocols_initialized = 0;
 
-static int nmap_protocols_init() {
+int nmap_protocols_init() {
   if (protocols_initialized) return 0;
 
   char filename[512];

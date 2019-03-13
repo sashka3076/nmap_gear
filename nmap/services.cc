@@ -64,6 +64,7 @@
 
 #include "scan_lists.h"
 #include "services.h"
+#include "droppriv.h"
 #include "NmapOps.h"
 #include "charpool.h"
 #include "nmap_error.h"
@@ -110,7 +111,7 @@ static std::list<service_node> services_by_ratio;
 static int services_initialized;
 static int ratio_format; // 0 = /etc/services no-ratio format. 1 = new nmap format
 
-static int nmap_services_init() {
+int nmap_services_init() {
   if (services_initialized) return 0;
 
   char filename[512];

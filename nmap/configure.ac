@@ -1012,6 +1012,50 @@ if test $ac_cv_ip_has_ip_sum = yes ; then
         AC_DEFINE(HAVE_IP_IP_SUM, 1, [struct ip has ip_sum member])
 fi
 
+try_drop_priv=no
+AC_CHECK_HEADERS(grp.h sys/capability.h sys/prctl.h)
+AC_CHECK_FUNC(chroot)
+AC_CHECK_FUNC(prctl,
+  [AC_CHECK_FUNC(setgid,
+    [AC_CHECK_FUNC(setgroups,
+      [AC_CHECK_FUNC(setreuid,
+        [try_drop_priv=yes
+	AC_CHECK_LIB(cap, cap_from_text, , [try_drop_priv=no])]
+      )]
+    )]
+  )]
+)
+
+AC_ARG_WITH(user,
+  [  --with-user=USERNAME    Lower root privileges by switching to user USERNAME])
+AC_MSG_CHECKING([whether to lower root privileges by default])
+if test -z "$with_user" -o "$try_drop_priv" = "no"; then
+       AC_MSG_RESULT(no)
+else
+       AC_DEFINE_UNQUOTED(NMAP_USER, "$withval", [Define user to switch during lowering privileges])
+       AC_MSG_RESULT(to \"$withval\")
+fi
+
+AC_ARG_WITH(chroot-empty,
+  [  --with-chroot-empty=DIRECTORY When lowering privileges and -n option is given, chroot to empty DIRECTORY])
+AC_MSG_CHECKING([whether to chroot when -n option is given])
+if test -z "$with_chroot_empty" -o "$try_drop_priv" = "no" -o "$ac_cv_func_chroot" = no; then
+       AC_MSG_RESULT(no)
+else
+       AC_DEFINE_UNQUOTED(NMAP_CHROOT_EMPTY, "$withval", [Define directory to chroot during lowering privileges if -n option is given])
+       AC_MSG_RESULT(to \"$withval\")
+fi
+
+AC_ARG_WITH(chroot-resolv,
+  [  --with-chroot-resolv=DIRECTORY When lowering privileges and -n option is not given, chroot to resolver DIRECTORY])
+AC_MSG_CHECKING([whether to chroot when -n option is not given])
+if test -z "$with_chroot_resolv" -o "$try_drop_priv" = "no" -o "$ac_cv_func_chroot" = no; then
+       AC_MSG_RESULT(no)
+else
+       AC_DEFINE_UNQUOTED(NMAP_CHROOT_RESOLV, "$withval", [Define directory to chroot during lowering privileges if -n option is not given])
+       AC_MSG_RESULT(to \"$withval\")
+fi
+
 dnl Checks for library functions.
 AC_CHECK_FUNCS(strerror)
 RECVFROM_ARG6_TYPE

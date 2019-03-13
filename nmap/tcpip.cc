@@ -68,6 +68,7 @@
 #include "nbase.h"
 #include <dnet.h>
 #include "tcpip.h"
+#include "droppriv.h"
 #include "NmapOps.h"
 #include "Target.h"
 #include "utils.h"
