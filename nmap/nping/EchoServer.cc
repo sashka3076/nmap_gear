@@ -1479,6 +1479,7 @@ int EchoServer::start() {
 
   /* Get a socket suitable for an accept() call */
   listen_sd=this->nep_listen_socket();
+  drop_priv();
 
   while(1){
     /* If --once is enabled, just allow the first client */

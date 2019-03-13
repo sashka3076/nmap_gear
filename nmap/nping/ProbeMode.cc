@@ -261,6 +261,7 @@ int ProbeMode::start(){
   /** TCP CONNECT MODE                                                      **/
   /***************************************************************************/
   case TCP_CONNECT:
+    drop_priv();
     o.stats.startClocks();
     for( c=0; c < o.getPacketCount(); c++){ /* Do requested times */
         o.targets.rewind();
@@ -305,6 +306,7 @@ int ProbeMode::start(){
   /** UDP UNPRIVILEGED MODE                                                 **/
   /***************************************************************************/
   case UDP_UNPRIV:
+    drop_priv();
     o.stats.startClocks();
     for( c=0; c < o.getPacketCount(); c++){ /* Do requested times */
         o.targets.rewind();
@@ -403,6 +405,7 @@ int ProbeMode::start(){
             nping_fatal(QT_3, "Error opening capture device %s\n", o.getDevice());
         nping_print(DBG_2,"Pcap device %s open successfully", o.getDevice());
     }
+    drop_priv();
 
     /* Ready? Go! */
     o.stats.startClocks();
