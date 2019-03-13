@@ -1,8 +1,8 @@
 [Desktop Entry]
 Name=Zenmap (as root)
 GenericName=GUI Port Scanner
-TryExec=su-to-zenmap.sh
-Exec=su-to-zenmap.sh %F
+TryExec=zenmap-root
+Exec=zenmap-root %F
 Terminal=false
 Icon=zenmap
 Type=Application
