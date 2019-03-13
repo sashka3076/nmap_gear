@@ -109,6 +109,7 @@ AC_PATH_TOOL([STRIP], [strip], [/bin/true])
 needs_cpp_precomp=no
 
 LUA_CFLAGS="-DLUA_USE_POSIX -DLUA_USE_DLOPEN"
+NSE_LDFLAGS=""
 
 AH_TEMPLATE(SOLARIS, [Sun/Oracle Solaris])
 AH_TEMPLATE(STUPID_SOLARIS_CHECKSUM_BUG, [],
@@ -119,15 +120,15 @@ case "$host" in
     ;;
   *-netbsd* | *-knetbsd*-gnu)
     AC_DEFINE(NETBSD, 1, [NetBSD])
-    LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
+    NSE_LDFLAGS="-Wl,-E"
     ;;
   *-openbsd*)
     AC_DEFINE(OPENBSD, 1, [OpenBSD])
-    LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
+    NSE_LDFLAGS="-Wl,-E"
     ;;
   *-freebsd* | *-kfreebsd*-gnu | *-dragonfly*)
     AC_DEFINE(FREEBSD, 1, [FreeBSD])
-    LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
+    NSE_LDFLAGS="-Wl,-E"
     ;;
   *-bsdi*)
     AC_DEFINE(BSDI, 1, [BSD/OS])
@@ -189,7 +190,7 @@ case "$host" in
     ;;
   *-linux*)
     AC_DEFINE(LINUX, 1, [Linux])
-    LDFLAGS="-Wl,-E $LDFLAGS" # needed for nse-C-module support
+    NSE_LDFLAGS="-Wl,-E"
     ;;
   *-apple-darwin*)
     AC_DEFINE(MACOSX, 1, [Apple OS X])
@@ -871,6 +872,7 @@ else
 
   INSTALLNSE="install-nse"
   NSE_CHECK="check-nse"
+  LDFLAGS="$NSE_LDFLAGS $LDFLAGS"
 fi
 
 AC_SUBST(NOLUA)
