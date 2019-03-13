@@ -414,28 +414,14 @@ void set_lf_mode(void)
 }
 
 #ifdef HAVE_OPENSSL
-
-#define NCAT_CA_CERTS_PATH (NCAT_DATADIR "/" NCAT_CA_CERTS_FILE)
-
 int ssl_load_default_ca_certs(SSL_CTX *ctx)
 {
-    int rc;
-
     if (o.debug)
-        logdebug("Using system default trusted CA certificates and those in %s.\n", NCAT_CA_CERTS_PATH);
+        logdebug("Using system default trusted CA certificates\n");
 
     /* Load distribution-provided defaults, if any. */
-    rc = SSL_CTX_set_default_verify_paths(ctx);
+    int rc = SSL_CTX_set_default_verify_paths(ctx);
     ncat_assert(rc > 0);
-
-    /* Also load the trusted certificates we ship. */
-    rc = SSL_CTX_load_verify_locations(ctx, NCAT_CA_CERTS_PATH, NULL);
-    if (rc != 1) {
-        if (o.debug)
-            logdebug("Unable to load trusted CA certificates from %s: %s\n",
-                NCAT_CA_CERTS_PATH, ERR_error_string(ERR_get_error(), NULL));
-        return -1;
-    }
 
     return 0;
 }
