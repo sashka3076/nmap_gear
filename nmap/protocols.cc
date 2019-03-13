@@ -131,6 +131,7 @@
 /* $Id: protocols.cc 37126 2018-01-28 21:18:17Z fyodor $ */
 
 #include "protocols.h"
+#include "droppriv.h"
 #include "NmapOps.h"
 #include "services.h"
 #include "charpool.h"
@@ -142,7 +143,7 @@ static int numipprots = 0;
 static struct protocol_list *protocol_table[PROTOCOL_TABLE_SIZE];
 static int protocols_initialized = 0;
 
-static int nmap_protocols_init() {
+int nmap_protocols_init() {
   if (protocols_initialized) return 0;
 
   char filename[512];
