@@ -746,10 +746,13 @@ int file_is_readable(const char *pathname) {
 
 #endif
 
-  if (stat(pathname_buf, &st) == -1)
-    status = 0;
-  else if (access(pathname_buf, R_OK) != -1)
-    status = S_ISDIR(st.st_mode) ? 2 : 1;
+  if (access(pathname_buf, R_OK) == 0 && stat(pathname_buf, &st) == 0) {
+    if (S_ISREG(st.st_mode)) {
+        status = 1;
+    } else if (S_ISDIR(st.st_mode)) {
+      status = 2;
+    }
+  }
 
   free(pathname_buf);
   return status;
