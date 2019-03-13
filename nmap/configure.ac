@@ -745,6 +745,9 @@ AC_HELP_STRING([--with-libdnet=included], [Use the libdnet version included with
     ;;
   included)
     ;;
+  /usr)
+    have_dnet=yes
+    ;;
   *)
     CPPFLAGS="-I$with_libdnet/include $CPPFLAGS"
     LDFLAGS="-L$with_libdnet/lib $LDFLAGS"
