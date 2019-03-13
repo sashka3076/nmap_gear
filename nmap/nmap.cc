@@ -2545,8 +2545,6 @@ static int nmap_fetchfile_sub(char *filename_returned, int bufferlen, const char
   char *dirptr;
   int res;
   int foundsomething = 0;
-  char dot_buffer[512];
-  static int warningcount = 0;
 
   if (o.datadir) {
     res = Snprintf(filename_returned, bufferlen, "%s/%s", o.datadir, file);
@@ -2597,6 +2595,10 @@ static int nmap_fetchfile_sub(char *filename_returned, int bufferlen, const char
     }
   }
 
+#ifdef ENABLE_DOT_DIR_OPEN
+  char dot_buffer[512];
+  static int warningcount = 0;
+
   if (foundsomething && (*filename_returned != '.')) {
     res = Snprintf(dot_buffer, sizeof(dot_buffer), "./%s", file);
     if (res > 0 && res < bufferlen) {
@@ -2610,6 +2612,18 @@ static int nmap_fetchfile_sub(char *filename_returned, int bufferlen, const char
       }
     }
   }
+
+  if (!foundsomething) {
+    res = Snprintf(filename_returned, bufferlen, "./%s", file);
+    if (res > 0 && res < bufferlen) {
+      foundsomething = fileexistsandisreadable(filename_returned);
+    }
+  }
+
+  if (!foundsomething) {
+    filename_returned[0] = '\0';
+  }
+#endif /* ENABLE_DOT_DIR_OPEN */
 
   if (foundsomething && o.debugging > 1)
     log_write(LOG_PLAIN, "Fetchfile found %s\n", filename_returned);
