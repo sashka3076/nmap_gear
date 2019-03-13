@@ -141,6 +141,7 @@
 #include <ctype.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include "droppriv.h"
 
 #include "../libnetutil/netutil.h"
 #include "../libnetutil/npacket.h"

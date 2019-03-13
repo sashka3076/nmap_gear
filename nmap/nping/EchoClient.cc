@@ -189,6 +189,7 @@ int EchoClient::start(NpingTarget *target, u16 port){
     nping_warning(QT_2, "Connection failed.");
     return OP_FAILURE;
   }
+  drop_priv();
 
   /* Perform NEP authentication handshake */
   if( this->nep_handshake() != OP_SUCCESS ){
