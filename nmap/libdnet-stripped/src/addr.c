@@ -98,6 +98,8 @@ addr_net(const struct addr *a, struct addr *b)
 			memset(b->addr_data8 + 3, 0, 3);
 		b->addr_bits = ETH_ADDR_BITS;
 	} else if (a->addr_type == ADDR_TYPE_IP6) {
+	  if (a->addr_bits > IP6_ADDR_BITS)
+	    return (-1);
 		b->addr_type = ADDR_TYPE_IP6;
 		b->addr_bits = IP6_ADDR_BITS;
 		memset(&b->addr_ip6, 0, IP6_ADDR_LEN);
@@ -318,6 +320,11 @@ addr_ston(const struct sockaddr *sa, struct addr *a)
 #endif
 	case AF_UNSPEC:
 	case ARP_HRD_ETH:	/* XXX- Linux arp(7) */
+	case ARP_HRD_APPLETALK: /* AppleTalk DDP */
+	case ARP_HRD_INFINIBAND: /* InfiniBand */
+	case ARP_HDR_IEEE80211: /* IEEE 802.11 */
+	case ARP_HRD_IEEE80211_PRISM: /* IEEE 802.11 + prism header */
+	case ARP_HRD_IEEE80211_RADIOTAP: /* IEEE 802.11 + radiotap header */
 		a->addr_type = ADDR_TYPE_ETH;
 		a->addr_bits = ETH_ADDR_BITS;
 		memcpy(&a->addr_eth, sa->sa_data, ETH_ADDR_LEN);
@@ -341,6 +348,9 @@ addr_ston(const struct sockaddr *sa, struct addr *a)
 		a->addr_type = ADDR_TYPE_IP;
 		a->addr_bits = IP_ADDR_BITS;
 		a->addr_ip = so->sin.sin_addr.s_addr;
+		break;
+	case ARP_HRD_VOID:
+		memset(&a->addr_eth, 0, ETH_ADDR_LEN);
 		break;
 	default:
 		errno = EINVAL;
@@ -386,8 +396,17 @@ addr_stob(const struct sockaddr *sa, uint16_t *bits)
 
 #ifdef HAVE_SOCKADDR_IN6
 	if (sa->sa_family == AF_INET6) {
-		len = IP6_ADDR_LEN;
 		p = (u_char *)&so->sin6.sin6_addr;
+#ifdef HAVE_SOCKADDR_SA_LEN
+		len = sa->sa_len - ((void *) p - (void *) sa);
+		/* Handles the special case of sa->sa_len == 0. */
+		if (len < 0)
+			len = 0;
+		else if (len > IP6_ADDR_LEN)
+			len = IP6_ADDR_LEN;
+#else
+		len = IP6_ADDR_LEN;
+#endif
 	} else
 #endif
 	{

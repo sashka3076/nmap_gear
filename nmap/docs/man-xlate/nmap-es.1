@@ -1,13 +1,22 @@
 '\" t
 .\"     Title: nmap
-.\"    Author: [FIXME: author] [see http://docbook.sf.net/el/author]
-.\" Generator: DocBook XSL Stylesheets v1.75.2 <http://docbook.sf.net/>
-.\"      Date: 01/21/2011
+.\"    Author: [see the "Autor" section]
+.\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
+.\"      Date: 15/03/2018
 .\"    Manual: [FIXME: manual]
 .\"    Source: [FIXME: source]
-.\"  Language: English
+.\"  Language: Spanish
 .\"
-.TH "NMAP" "1" "01/21/2011" "[FIXME: source]" "[FIXME: manual]"
+.TH "NMAP" "1" "15/03/2018" "[FIXME: source]" "[FIXME: manual]"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
 .\" -----------------------------------------------------------------
 .\" * set default formatting
 .\" -----------------------------------------------------------------
@@ -18,14 +27,14 @@
 .\" -----------------------------------------------------------------
 .\" * MAIN CONTENT STARTS HERE *
 .\" -----------------------------------------------------------------
-.SH "NAME"
+.SH "NOMBRE"
 nmap \- Herramienta de exploración de redes y de sondeo de seguridad / puertos
-.SH "SYNOPSIS"
+.SH "SINOPSIS"
 .HP \w'\fBnmap\fR\ 'u
 \fBnmap\fR [\fITipo\ de\ sondeo\fR...] [\fIOpciones\fR] {\fIespecificación\ de\ objetivo\fR}
-.SH "DESCRIPCIóN"
+.SH "DESCRIPCIÓN"
 .PP
-Nmap (\(lqmapeador de redes\(rq) es una herramienta de código abierto para exploración de red y auditoría de seguridad\&. Se diseñó para analizar rápidamente grandes redes, aunque funciona muy bien contra equipos individuales\&. Nmap utiliza paquetes IP "crudos" (\(Foraw\(Fc, N\&. del T\&.) en formas originales para determinar qué equipos se encuentran disponibles en una red, qué servicios (nombre y versión de la aplicación) ofrecen, qué sistemas operativos (y sus versiones) ejecutan, qué tipo de filtros de paquetes o cortafuegos se están utilizando así como docenas de otras características\&. Aunque generalmente se utiliza Nmap en auditorías de seguridad, muchos administradores de redes y sistemas lo encuentran útil para realizar tareas rutinarias, como puede ser el inventariado de la red, la planificación de actualización de servicios y la monitorización del tiempo que los equipos o servicios se mantiene activos\&.
+Nmap (\(lqmapeador de redes\(rq) es una herramienta de código abierto para exploración de red y auditoría de seguridad\&. Se diseñó para analizar rápidamente grandes redes, aunque funciona muy bien contra equipos individuales\&. Nmap utiliza paquetes IP "crudos" («raw», N\&. del T\&.) en formas originales para determinar qué equipos se encuentran disponibles en una red, qué servicios (nombre y versión de la aplicación) ofrecen, qué sistemas operativos (y sus versiones) ejecutan, qué tipo de filtros de paquetes o cortafuegos se están utilizando así como docenas de otras características\&. Aunque generalmente se utiliza Nmap en auditorías de seguridad, muchos administradores de redes y sistemas lo encuentran útil para realizar tareas rutinarias, como puede ser el inventariado de la red, la planificación de actualización de servicios y la monitorización del tiempo que los equipos o servicios se mantiene activos\&.
 .PP
 La salida de Nmap es un listado de objetivos analizados, con información adicional para cada uno dependiente de las opciones utilizadas\&. La información primordial es la
 \(lqtabla de puertos interesantes\(rq\&. Dicha tabla lista el número de puerto y protocolo, el nombre más común del servicio, y su estado\&. El estado puede ser
@@ -54,12 +63,12 @@ cuando no puede determinar en cual de los dos estados está un puerto\&. La tabl
 Además de la tabla de puertos interesantes, Nmap puede dar información adicional sobre los objetivos, incluyendo el nombre de DNS según la resolución inversa de la IP, un listado de sistemas operativos posibles, los tipos de dispositivo, y direcciones MAC\&.
 .PP
 Puede ver un análisis típico con Nmap en
-Example\ \&1, \(lqEjemplo típico de análisis con Nmap\(rq\&. Los únicos parámetros de Nmap que se utilizan en este ejemplo son la opción
+Ejemplo 1, \(lqEjemplo típico de análisis con Nmap\(rq\&. Los únicos parámetros de Nmap que se utilizan en este ejemplo son la opción
 \fB\-A\fR, que habilita la detección de sistema operativo y versión, y la opción
 \fB\-T4\fR
 que acelerar el proceso, y después el nombre de los dos objetivos\&.
 .PP
-\fBExample\ \&1.\ \&Ejemplo típico de análisis con Nmap\fR
+\fBEjemplo 1. Ejemplo típico de análisis con Nmap\fR
 .sp
 .if n \{\
 .RS 4
@@ -108,35 +117,35 @@ Nmap finished: 2 IP addresses (2 hosts up) scanned in 88\&.392 seconds
 Puede obtener la versión más reciente de Nmap en
 \m[blue]\fB\%http://www.insecure.org/nmap/\fR\m[]\&. La versión más reciente de la página de manual está disponible en
 \m[blue]\fB\%http://www.insecure.org/nmap/man/\fR\m[]\&.
-.SH "NOTAS DE LA TRADUCCIóN"
+.SH "NOTAS DE LA TRADUCCIÓN"
 .PP
 Esta edición de la Guía de referencia de Nmap ha sido traducida de la versión 3137 de la
 \m[blue]\fBversión original en inglés\fR\m[]\&\s-2\u[1]\d\s+2
 por Arturo Busleiman
-buanzo_AT_buanzo\&.com\&.ar, Pablo Fernández
-pablo_AT_littleQ\&.net
+<buanzo_AT_buanzo\&.com\&.ar>, Pablo Fernández
+<pablo_AT_littleQ\&.net>
 y Javier Fernández\-Sanguino
-jfs_AT_computer\&.org\&. Aunque nuestra intención es hacer Nmap más accesible a los lectores españoles en todo el mundo no podemos garantizar que esta traducción está tan actualizada o completa como la versión oficial en inglés\&. Este trabajo puede ser modificado y redistribuido bajo los términos de la
+<jfs_AT_computer\&.org>\&. Aunque nuestra intención es hacer Nmap más accesible a los lectores españoles en todo el mundo no podemos garantizar que esta traducción está tan actualizada o completa como la versión oficial en inglés\&. Este trabajo puede ser modificado y redistribuido bajo los términos de la
 \m[blue]\fBLicencia Creative Commons Atribución\fR\m[]\&\s-2\u[2]\d\s+2\&.
 .PP
-Esta traducción ha sido adaptada al español como se habla en España (localización \(Foes_ES\(Fc) por Javier Fernández\-Sanguino\&. Cualquier comentario o errata sobre esta traducción debe enviarse a Javier Fernández\-Sanguino a la dirección arriba indicada\&. El coordinador de la traducción quiere agradecer el esfuerzo de revisión realizado por Jesús Escoredo\&.
+Esta traducción ha sido adaptada al español como se habla en España (localización «es_ES») por Javier Fernández\-Sanguino\&. Cualquier comentario o errata sobre esta traducción debe enviarse a Javier Fernández\-Sanguino a la dirección arriba indicada\&. El coordinador de la traducción quiere agradecer el esfuerzo de revisión realizado por Jesús Escoredo\&.
 .SS "Glosario de traducción"
 .PP
 A continuación se listan las traducciones utilizadas a los términos originales en inglés en este documento, es decir, el glosario utilizado en este documento:
 .PP
 \fIDecoy\fR
 .RS 4
-Traducido con el término \(Foseñuelo\(Fc\&.
+Traducido con el término «señuelo»\&.
 .RE
 .PP
 \fIFingerprinting\fR
 .RS 4
-\(FoIdentificación por huellas\(Fc (se entiende digitales), se utilizado conjuntamente con la detección de sistema operativo por lo que a veces se utiliza éste o se reduce a \(Foidentificación\(Fc\&.
+«Identificación por huellas» (se entiende digitales), se utilizado conjuntamente con la detección de sistema operativo por lo que a veces se utiliza éste o se reduce a «identificación»\&.
 .RE
 .PP
 \fIHost\fR
 .RS 4
-Traducido habitualmente como \(Foequipo\(Fc o \(Fosistema\(Fc\&.
+Traducido habitualmente como «equipo» o «sistema»\&.
 .RE
 .PP
 \fIPort scan\fR
@@ -146,21 +155,21 @@ Barrido de puertos\&.
 .PP
 \fI(to) Probe\fR
 .RS 4
-Traducido con el término \(Fosondear\(Fc (o \(Fosonda\(Fc)\&.
+Traducido con el término «sondear» (o «sonda»)\&.
 .RE
 .PP
 \fI(to) Scan\fR
 .RS 4
-Traducido como \(Fosondear\(Fc (o \(Fosondeo\(Fc) o \(Foanálizar\(Fc (o \(Foanálisis\(Fc), no se utiliza \(Foescanear\(Fc (o \(Foescaneo\(Fc) ya que éste término es, literalmente
+Traducido como «sondear» (o «sondeo») o «análizar» (o «análisis»), no se utiliza «escanear» (o «escaneo») ya que éste término es, literalmente
 \(lqpasar por el escáner\(rq\&.
 .RE
 .PP
 \fI(To) Spoof\fR
 .RS 4
-Traducido por \(Fofalsificar\(Fc\&.
+Traducido por «falsificar»\&.
 .RE
 .PP
-Existen otros términos que puedan aparecer en el documento traducidos pero cuya traducción es ambigua\&. En este caso las traducciones se introducen en el texto acompañadas de notas de traducción (mostradas como \(FoN\&. del T\&.\(Fc) indicando el término original la primera vez que éste aparezca en el texto\&.
+Existen otros términos que puedan aparecer en el documento traducidos pero cuya traducción es ambigua\&. En este caso las traducciones se introducen en el texto acompañadas de notas de traducción (mostradas como «N\&. del T\&.») indicando el término original la primera vez que éste aparezca en el texto\&.
 .PP
 Nótese que éste glosario difiere en algunos términos del utilizado para otras traducciones, como la traducción realizada por Marbo Babosa del artículo
 \m[blue]\fBDeteccion Remota de SO via Reconocimiento de Pila TCP/IP\fR\m[]\&\s-2\u[3]\d\s+2
@@ -170,8 +179,6 @@ Nótese que éste glosario difiere en algunos términos del utilizado para otras
 Cuando se ejecuta Nmap sin parámetros se muestra este resumen de opciones\&. Puede encontrar siempre la última versión en
 \m[blue]\fB\%http://www.insecure.org/nmap/data/nmap.usage.txt\fR\m[]\&. Aunque ayuda a recordar las opciones más habituales no es un sustituto de la documentación en detalle que acompaña al resto de este manual\&. Algunas de las opciones menos conocidas no se incluyen aquí\&.
 .PP
-
-.sp
 .if n \{\
 .RS 4
 .\}
@@ -197,7 +204,7 @@ TÉCNICAS DE ANÁLISIS:
   \-sS/sT/sA/sW/sM: Análisis TCP SYN/Connect()/ACK/Window/Maimon 
   \-sN/sF/sX: Análisis TCP Null, FIN, y Xmas 
   \-\-scanflags <indicador>: Personalizar los indicadores TCP a utilizar
-  \-sI <sistema zombi[:puerto_sonda]>: Análisis pasivo (\(FoIdle\(Fc, N\&. del T\&.)
+  \-sI <sistema zombi[:puerto_sonda]>: Análisis pasivo («Idle», N\&. del T\&.)
   \-sO: Análisis de protocolo IP 
   \-b <servidor ftp rebote>: Análisis por rebote FTP 
 ESPECIFICACIÓN DE PUERTOS Y ORDEN DE ANÁLISIS: 
@@ -228,7 +235,7 @@ TEMPORIZADO Y RENDIMIENTO:
 EVASIÓN Y FALSIFICACIÓN PARA CORTAFUEGOS/IDS:
   \-f; \-\-mtu <valor>: fragmentar paquetes (opc\&. con el MTU indicado) 
   \-D <señuelo1,señuelo2[,ME],\&.\&.\&.>: Disimular el análisis con señuelos 
-     N\&. del T\&.: \(FoME\(Fc es \(FoYO\(Fc mismo\&.
+     N\&. del T\&.: «ME» es «YO» mismo\&.
   \-S <Dirección_IP>: Falsificar la dirección IP origen 
   \-e <interfaz>: Utilizar la interfaz indicada 
   \-g/\-\-source\-port <numpuerto>: Utilizar el número de puerto dado 
@@ -250,7 +257,7 @@ SALIDA:
   \-\-stylesheet <ruta/URL>: Convertir la salida XML a HTML según la hoja de estilo
       XSL indicada
   \-\-webxml: Referenciar a la hoja de estilo de Insecure\&.Org para tener un XML más portable
-  \-\-no_stylesheet: No asociar la salida XML con ninguna hoja de estilos XSL
+  \-\-no\-stylesheet: No asociar la salida XML con ninguna hoja de estilos XSL
 MISCELÁNEO:
    \-6: Habilitar análisis IPv6 
    \-A: Habilita la detección de SO y de versión 
@@ -270,7 +277,7 @@ EJEMPLOS:
 .RE
 .\}
 .sp
-.SH "ESPECIFICACIóN DE OBJETIVOS"
+.SH "ESPECIFICACIÓN DE OBJETIVOS"
 .PP
 Todo lo que se escriba en la línea de parámetros de Nmap que no sea una opción se considera una especificación de sistema objetivo\&. El caso más sencillo es la indicación de sólo una IP, o nombre de sistema, para que sea analizado\&.
 .PP
@@ -305,7 +312,7 @@ esas mismas direcciones, para así localizar sistemas que estén utilizando dire
 Cuando se quieren realizar encuestas que cubran toda Internet uno puede querer elegir objetivos al azar\&. La opción
 \fIcant\&. sistemas\fR
 indica a Nmap cuántas direcciones IP debe generar aleatoriamente\&. Se filtran de forma automática las direcciones no deseables, incluyendo las direcciones privadas, de multicast o direccionamiento no asignado\&. Si se utiliza el valor
-0, Nmap realizará un análisis que no acabará nunca\&. Hay que tener en cuenta que a algunos administradores de red puede no gustarle que les analicen sus redes, y pueden llegar a quejarse \(r!Utilice esta opción bajo su propia responsabilidad! Si está realmente aburrido un día de tarde lluviosa, puede intentar la orden
+0, Nmap realizará un análisis que no acabará nunca\&. Hay que tener en cuenta que a algunos administradores de red puede no gustarle que les analicen sus redes, y pueden llegar a quejarse ¡Utilice esta opción bajo su propia responsabilidad! Si está realmente aburrido un día de tarde lluviosa, puede intentar la orden
 \fBnmap \-sS \-PS80 \-iR 0 \-p 80\fR
 para encontrar servidores web al azar para navegar\&.
 .RE
@@ -326,7 +333,7 @@ Al igual que
 .PP
 Uno de los primeros pasos en cualquier misión de reconocimiento de red es el de reducir un (muchas veces enorme) conjunto de rangos de direcciones IP en una lista de equipos activos o interesantes\&. Analizar cada puerto de cada una de las direcciones IP es lento, y usualmente innecesario\&. Por supuesto, lo que hace a un sistema interesante depende ampliamente del propósito del análisis\&. Los administradores de red pueden interesarse sólo en equipos que estén ejecutando un cierto servicio, mientras que los auditores de seguridad pueden interesarse en todos y cada uno de los dispositivos que tengan una dirección IP\&. Un administrador puede sentirse cómodo con obtener un listado de equipos en su red interna mediante un ping ICMP, mientras que un consultor en seguridad realizando un ataque externo puede llegar a utilizar un conjunto de docenas de sondas en su intento de saltarse las restricciones de los cortafuegos\&.
 .PP
-Siendo tan diversas las necesidades de descubrimiento de sistemas, Nmap ofrece una gran variedad de opciones para personalizar las técnicas utilizadas\&. Al descubrimiento de sistemas (\(FoHost Discovery\(Fc) se lo suele llamar sondeo ping, pero va más allá de la simple solicitud ICMP echo\-request de los paquetes asociados al querido y nunca bien ponderado
+Siendo tan diversas las necesidades de descubrimiento de sistemas, Nmap ofrece una gran variedad de opciones para personalizar las técnicas utilizadas\&. Al descubrimiento de sistemas («Host Discovery») se lo suele llamar sondeo ping, pero va más allá de la simple solicitud ICMP echo\-request de los paquetes asociados al querido y nunca bien ponderado
 ping\&. Los usuarios pueden evitar el paso de ping utilizando un sondeo de lista (\fB\-sL\fR) o deshabilitando el ping (\fB\-P0\fR), o enviando combinaciones arbitrarias de sondas TCP SYN/ACK, UDP e ICMP a múltiples puertos de la red remota\&. El propósito de estas sondas es el de solicitar respuestas que demuestren que una dirección IP se encuentra activa (está siendo utilizada por un equipo o dispositivo de red)\&. En varias redes solo un pequeño porcentaje de direcciones IP se encuentran activos en cierto momento\&. Esto es particularmente común en las redes basadas en direccionamiento privado RFC1918, como la 10\&.0\&.0\&.0/8\&. Dicha red tiene más de 16 millones de direcciones IP, pero la he visto siendo utilizada por empresas con menos de mil máquinas\&. El descubrimiento de sistemas puede encontrar dichas maquinas en un rango tan grande como el indicado\&.
 .PP
 Si no se proveen opciones de descurbrimiento de sistemas, Nmap envía un paquete TCP ACK al puerto 80 y un ICMP Echo Request a cada máquina objetivo\&. Una excepción a este comportamiento es cuando se utiliza un análisis ARP, para los objetivos que se encuentren en la red Ethernet local\&. Para usuarios de shell UNIX que no posean privilegios, un paquete SYN es enviado en vez del ACK, utilizando la llamada al sistema
@@ -373,7 +380,7 @@ puede combinarse con cualquiera de las opciones de sondas de descubrimiento (las
 .PP
 \fB\-P0\fR (No realizar ping)
 .RS 4
-Con esta opción, Nmap no realiza la etapa de descubrimiento\&. Bajo circunstancias normales, Nmap utiliza dicha etapa para determinar qué máquinas se encuentran activas para hacer un análisis más agresivo\&. Por omisión, Nmap sólo realiza ese tipo de sondeos, como análisis de puertos, detección de versión o de sistema operativo contra los equipos que se están \(Fovivos\(Fc\&. Si se deshabilita el descubrimiento de sistemas con la opción
+Con esta opción, Nmap no realiza la etapa de descubrimiento\&. Bajo circunstancias normales, Nmap utiliza dicha etapa para determinar qué máquinas se encuentran activas para hacer un análisis más agresivo\&. Por omisión, Nmap sólo realiza ese tipo de sondeos, como análisis de puertos, detección de versión o de sistema operativo contra los equipos que se están «vivos»\&. Si se deshabilita el descubrimiento de sistemas con la opción
 \fB\-P0\fR
 entonces Nmap utilizará las funciones de análisis solicitadas contra
 \fItodas\fR
@@ -388,13 +395,13 @@ Esta opción envía un paquete TCP vacío con la bandera SYN puesta\&. El puerto
 nmap\&.h), pero se puede añadir un puerto alternativo como parámetro\&. También se puede especificar una lista de puertos separados por comas (p\&.ej\&.
 \fB\-PS22,23,25,80,113,1050,35000\fR)\&. Si hace esto se enviarán sondas en paralelo a cada uno de los puertos\&.
 .sp
-La bandera SYN indica al sistema remoto que quiere establecer una conexión\&. Normalmente, si el puerto destino está cerrado se recibirá un paquete RST (de \(Foreset\(Fc)\&. Si el puerto está abierto entonces el objetivo responderá con el segundo paso del saludo en tres pasos TCP respondiendo con un paquete TCP SYN/ACK\&. El sistema donde se ejecuta Nmap romperá la conexión que se está estableciendo enviando un paquete RST en lugar de enviar el paquete ACK que completaría el saludo TCP\&. Nmap no envía este paquete, sino que lo envía el núcleo del sistema donde se ejecuta Nmap respondiendo al paquete SYN/ACK que no esperaba\&.
+La bandera SYN indica al sistema remoto que quiere establecer una conexión\&. Normalmente, si el puerto destino está cerrado se recibirá un paquete RST (de «reset»)\&. Si el puerto está abierto entonces el objetivo responderá con el segundo paso del saludo en tres pasos TCP respondiendo con un paquete TCP SYN/ACK\&. El sistema donde se ejecuta Nmap romperá la conexión que se está estableciendo enviando un paquete RST en lugar de enviar el paquete ACK que completaría el saludo TCP\&. Nmap no envía este paquete, sino que lo envía el núcleo del sistema donde se ejecuta Nmap respondiendo al paquete SYN/ACK que no esperaba\&.
 .sp
 A Nmap no le importa si el puerto está abierto o cerrado\&. Si, tal y como se acaba de describir, llega una respuesta RST ó SYN/ACK entonces Nmap sabrá que el sistema está disponible y responde\&.
 .sp
 En sistemas UNIX, generalmente sólo el usuario privilegiado
 root
-puede enviar paquetes TCP crudos\&. Los usuarios no privilegiados tienen una forma de evitar esta restricción utilizando la llamada al sistema \(Foconnect()\(Fc contra el puerto destino\&. Esto hace que se envíe el paquete SYN al sistema, para establecer la conexión\&. Si la llamada \(Foconnect()\(Fc devuelve un resultado de éxito rápidamente o un fallo ECONNREFUSED entonces se puede deducir que la pila TCP que tiene bajo ésta ha recibido un SYN/ACK o un RST y que puede marcar el sistema como disponible\&. El sistema se puede marcar como no disponible si el intento de conexión se mantiene parado hasta que vence un temporizador\&. Esta es también la forma en la que se gestiona esto en conexiones IPv6 ya que Nmap aún no puede crear paquetes IPv6 crudos\&.
+puede enviar paquetes TCP crudos\&. Los usuarios no privilegiados tienen una forma de evitar esta restricción utilizando la llamada al sistema «connect()» contra el puerto destino\&. Esto hace que se envíe el paquete SYN al sistema, para establecer la conexión\&. Si la llamada «connect()» devuelve un resultado de éxito rápidamente o un fallo ECONNREFUSED entonces se puede deducir que la pila TCP que tiene bajo ésta ha recibido un SYN/ACK o un RST y que puede marcar el sistema como disponible\&. El sistema se puede marcar como no disponible si el intento de conexión se mantiene parado hasta que vence un temporizador\&. Esta es también la forma en la que se gestiona esto en conexiones IPv6 ya que Nmap aún no puede crear paquetes IPv6 crudos\&.
 .RE
 .PP
 \fB\-PA [lista de puertos]\fR (Ping TCP ACK)
@@ -403,7 +410,7 @@ El ping TCP ACK es muy parecido al ping SYN que se acaba de tratar\&. La diferen
 .sp
 La opción
 \fB\-PA\fR
-utiliza el mismo puerto por omisión que la sonda SYN (el puerto 80) y también puede tomar una lista de puertos destino en el mismo formato\&. Si un usuario sin privilegios intenta hacer esto, o se especifica un objetivo IPv6, se utiliza el procedimiento descrito anteriormente\&. Aunque en este caso el procedimiento no es perfecto porque la llamada \(Foconnect()\(Fc enviará un paquete SYN en lugar de un ACK\&.
+utiliza el mismo puerto por omisión que la sonda SYN (el puerto 80) y también puede tomar una lista de puertos destino en el mismo formato\&. Si un usuario sin privilegios intenta hacer esto, o se especifica un objetivo IPv6, se utiliza el procedimiento descrito anteriormente\&. Aunque en este caso el procedimiento no es perfecto porque la llamada «connect()» enviará un paquete SYN en lugar de un ACK\&.
 .sp
 Se ofrecen tanto mecanismos de sondeo con ping SYN y ACK para maximizar las posibilidades de atravesar cortafuegos\&. Muchos administradores configuran los enrutadores y algunos cortafuegos sencillos para que se bloqueen los paquetes SYN salvo para aquellos destinados a los servicios públicos, como pudieran ser el servidor web o el servidor de correo de la organización\&. Esto evita que se realicen otras conexiones entrantes al mismo tiempo que permite a los usuarios realizar conexiones salientes a Internet\&. Este acercamiento de filtrado sin estados toma pocos recursos de los cortafuegos/enrutadores y está ampliamente soportado por filtros hardware y software\&. El programa de cortafuegos Netfilter/iptables de Linux ofrece la opción
 \fB\-\-syn\fR
@@ -435,7 +442,7 @@ La principal ventaja de este tipo de sondeos es que atraviesan cortafuegos y fil
 .RS 4
 Nmap puede enviar los paquetes estándar que envía el programa
 ping
-además de los tipos de descubrimiento de equipos con TCP y UDP\&. Nmap envía paquetes ICMP tipo 7 (\(Foecho request\(Fc) a las direcciones IP objetivos y espera recibir un tipo 0 (\(FoEcho Reply\(Fc) de los sistemas que estén disponibles\&. Lamentablemente para los exploradores de redes, muchos sistemas y cortafuegos ahora bloquean esos paquetes en lugar de responder como requiere el estándar
+además de los tipos de descubrimiento de equipos con TCP y UDP\&. Nmap envía paquetes ICMP tipo 7 («echo request») a las direcciones IP objetivos y espera recibir un tipo 0 («Echo Reply») de los sistemas que estén disponibles\&. Lamentablemente para los exploradores de redes, muchos sistemas y cortafuegos ahora bloquean esos paquetes en lugar de responder como requiere el estándar
 \m[blue]\fBRFC 1122\fR\m[]\&\s-2\u[4]\d\s+2\&. Por ésta razón los sondeos que sólo utilizan el protocolo ICMP no son muy fiables para analizar sistemas desconocidos en Internet\&. Aunque pueda ser una forma eficiente y práctica de hacerlo para administradores que tengan que monitorizar una red interna\&. Utilice la opción
 \fB\-PE\fR
 para activar este comportamiento de solicitud de eco\&.
@@ -483,7 +490,7 @@ Nmap generalmente determina los servidores DNS de su archivo resolv\&.conf (UNIX
 \fB\-\-system\-dns\fR
 o está realizando un sondeo IPv6\&. La resolución a través de más de un servidor de DNS es generalmente más rápida que la consulta a uno solo\&.
 .RE
-.SH "INTRODUCCIóN AL ANáLISIS DE PUERTOS"
+.SH "INTRODUCCIÓN AL ANÁLISIS DE PUERTOS"
 .PP
 Nmap comenzó como un analizador de puertos eficiente, aunque ha aumentado su funcionalidad a través de los años, aquella sigue siendo su función primaria\&. La sencilla orden
 \fBnmap \fR\fB\fIobjetivo\fR\fR
@@ -531,7 +538,7 @@ cerrado|filtrado
 .RS 4
 Este estado se utiliza cuando Nmap no puede determinar si un puerto se encuentra cerrado o filtrado, y puede aparecer aparecer sólo durante un sondeo IPID pasivo\&.
 .RE
-.SH "TéCNICAS DE SONDEO DE PUERTOS"
+.SH "TÉCNICAS DE SONDEO DE PUERTOS"
 .PP
 Cuando intento realizar un arreglo de mi coche, siendo novato, puedo pasarme horas intentando utilizar mis herramientas rudimentarias (martillo, cinta aislante, llave inglesa, etc\&.)\&. Cuando fallo miserablemente y llevo mi coche antiguo en grúa al taller a un mecánico de verdad siempre pasa lo mismo: busca en su gran cajón de herramientas hasta que saca una herramienta que hace que la tarea se haga sin esfuerzo\&. El arte de sondear puertos es parecido\&. Los expertos conocen docenas de técnicas de sondeo y eligen la más apropiada (o una combinación de éstas) para la tarea que están realizando\&. Los usuarios sin experiencia y los "script kiddies", sin embargo, intentan resolver cada problema con el sondeo SYN por omisión\&. Dado que Nmap es libre, la única barrera que existe para ser un experto en el sondeo de puertos es el conocimiento\&. Esto es mucho mejor que el mundo del automóvil, donde puedes llegar a saber que necesitas un compresor de tuerca, pero tendrás que pagar mil dolares por él\&.
 .PP
@@ -620,7 +627,7 @@ Fija los bits de FIN, PSH, y URG flags, iluminando el paquete como si fuera un �
 .sp
 Estos tres tipos de sondeos son exactamente los mismos en comportamiento salvo por las banderas TCP que se fijen en los paquetes sonda\&. Si se recibe un paquete RST entonces se considera que el puerto está
 cerrado\&. Si no se recibe ninguna respuesta el puerto se marca como
-cerrado|filtrado\&. El puerto se marca
+abierto|filtrado\&. El puerto se marca
 filtrado
 si se recibe un error ICMP no alcanzable (tipo 3, código 1, 2, 3, 9, 10, o 13)\&.
 .sp
@@ -654,7 +661,7 @@ filtrados\&.
 .PP
 \fB\-sW\fR (sondeo de ventana TCP)
 .RS 4
-El sondeo de ventana (\(Fowindow\(Fc, N\&. del T\&.) es exactamente igual al sondeo ACK que se aprovecha de un detalle de implementación de algunos sistemas que permite diferenciar puertos abiertos de los cerrados, en lugar de imprimir
+El sondeo de ventana («window», N\&. del T\&.) es exactamente igual al sondeo ACK que se aprovecha de un detalle de implementación de algunos sistemas que permite diferenciar puertos abiertos de los cerrados, en lugar de imprimir
 no filtrado
 cuando se devuelve un RST\&. Hace esto examinando el campo de ventana TCP del paquete RST devuelto\&. Algunos sistemas fijan un tamaño de ventana positivo para puertos abiertos (incluso para paquetes RST) mientras que se utiliza una ventana de tamaño cero para los cerrados\&. Así, en lugar de listar el puerto como
 no filtrado
@@ -706,7 +713,7 @@ abierto|filtrado\&. Nmap se comportará igual que para el sondeo tipo base, con 
 \fB\-sI <sistema zombi [:puerto_sonda]>\fR (Sondeo ocioso)
 .RS 4
 Este es un método de sondeo avanzado que le permite hacer un sondeo de puertos TCP a ciegas de verdad (lo que significa que no se envía ningún paquete al sistema objetivo desde su dirección IP real)\&. En lugar de ésto se utiliza un ataque con un canal alternativo que se aprovecha de la generación de la secuencia de los identificadores de fragmentación IP del sistema zombi para obtener información de los puertos abiertos en el objetivo\&. Los sistemas IDS mostrarán que el sondeo lo está realizando el sistema zombi que especifique (que debe estar vivo y cumplir algunos requisitos)\&. Este tipo de sondeo tan fascinante es demasiado complejo como para describirlo por completo en esta guía de referencia por lo que escribí y publiqué un documento informal que contiene todos los detalles, el documento está disponible en
-\m[blue]\fB\%http://nmap.org/book/idlescan.html\fR\m[]\&.
+\m[blue]\fB\%https://nmap.org/book/idlescan.html\fR\m[]\&.
 .sp
 Además de ser extraordinariamente sigiloso (debido a su funcionamiento a ciegas), este tipo de sondeo permite determinar las relaciones basadas en IP entre distintos sistemas\&. El listado de puertos muestra los puertos abiertos
 \fIdesde la perspectiva del sistema zombi\&.\fR
@@ -721,7 +728,7 @@ El sondeo de protocolo IP le permite determinar qué protocolos (TCP, ICMP, IGMP
 \fB\-p\fR
 para seleccionar los números de protocolo a analizar, los resultados se muestran en el formato de tabla utilizado para los puertos e incluso utiliza el mismo motor de sondeo que los métodos de sondeo de puertos reales\&. Es tan parecido a un sondeo de puertos que debe tratarse aquí\&.
 .sp
-El sondeo de protocolos, además de ser útil en sí mismo, demuestra el poder del software de fuentes abiertas (\(Foopensource\(Fc, N\&. del T\&.)\&. Aunque la idea fundamental era bastante sencilla, no había pensado añadirla ni tampoco había habido personas que solicitaran esta funcionalidad\&. Entonces, en el verano de 2000, se le ocurrió la idea a Gerhard Rieger y la implementó escribiendo un parche excelente, enviándolo posteriormente a la lista de correo de nmap\-hackers\&. Incorporé ese parche en el árbol de código de Nmap y publiqué una nueva versión ese mismo día\&. \(r!Pocas piezas de programas comerciales tienen usuarios tan entusiastas que diseñan y contribuyen sus propias mejoras!
+El sondeo de protocolos, además de ser útil en sí mismo, demuestra el poder del software de fuentes abiertas («opensource», N\&. del T\&.)\&. Aunque la idea fundamental era bastante sencilla, no había pensado añadirla ni tampoco había habido personas que solicitaran esta funcionalidad\&. Entonces, en el verano de 2000, se le ocurrió la idea a Gerhard Rieger y la implementó escribiendo un parche excelente, enviándolo posteriormente a la lista de correo de nmap\-hackers\&. Incorporé ese parche en el árbol de código de Nmap y publiqué una nueva versión ese mismo día\&. ¡Pocas piezas de programas comerciales tienen usuarios tan entusiastas que diseñan y contribuyen sus propias mejoras!
 .sp
 El sondeo de protocolos utiliza mecanismos parecidos al sondeo UDP\&. Envía cabeceras de paquetes IP iterando por el campo de 8 bits que indica el protocolo IP, en lugar de iterar por el campo de número de puerto de un paquete UDP\&. Las cabeceras generalmente están vacías y no contienen datos\&. De hecho, ni siquiera tienen una cabecera apropiada para el protocolo que se indica\&. Las tres excepciones son TCP, UDP e ICMP\&. Se incluye una cabecera de protocolo válida para éstos porque algunos sistemas no los enviarán sin ellas y porque Nmap ya tiene funciones para crearlas\&. El sondeo de protocolos espera la recepción de mensajes de ICMP
 \fIprotocolo\fR
@@ -751,7 +758,7 @@ contraseña:wwwuser@) También se puede omitir el número de puerto (y los dos p
 .sp
 Esta vulnerabilidad era muy habitual en 1997, el año que se publicó Nmap, pero ya ha sido arreglada en muchos sitios\&. Aún siguen existiendo servidores vulnerables así que merece la pena probar este sondeo si lo demás falla\&. Si su objetivo es atravesar un cortafuegos, analice la red objetivo en busca del puerto 21 (o incluso cualquier servicio FTP, si sondea todos los puertos y activa la detección de versiones)\&. Después intente un sondeo de rebote utilizando cada uno\&. Nmap le indicará si el sistema es o no vulnerable\&. Si está intentado ocultar sus huellas no tiene que (y de hecho no debería) limitarse a servidores en la red objetivo\&. En cualquier caso, antes de empezar a sondear Internet al azar para buscar servidores de FTP vulnerables, tenga en cuenta que pocos administradores de sistemas apreciarán el que abuse de sus servidores de esta forma\&.
 .RE
-.SH "ESPECIFICACIóN DE PUERTOS Y ORDEN DE SONDEO"
+.SH "ESPECIFICACIÓN DE PUERTOS Y ORDEN DE SONDEO"
 .PP
 Nmap ofrece distintas opciones para especificar los puertos que se van a sondear y si el orden de los sondeos es aleatorio o secuencial\&. Estas opciones se añaden a los métodos de sondeos que se han discutido previamente\&. Nmap, por omisión, sondea todos los puertos hasta el 1024 además de algunos puertos con números altos listados en el fichero
 nmap\-services
@@ -793,11 +800,11 @@ Nmap ordena de forma aleatoria los puertos a sondear por omisión (aunque alguno
 \fB\-r\fR
 para analizar de forma secuencial los puertos\&.
 .RE
-.SH "DETECCIóN DE SERVICIOS Y DE VERSIONES"
+.SH "DETECCIÓN DE SERVICIOS Y DE VERSIONES"
 .PP
 Si le indica a Nmap que mire un sistema remoto le podrá decir que tiene abiertos los puertos 25/tcp, 80/tcp y 53/udp\&. Informará que esos puertos se corresponden habitualmente con un servidor de correo (SMTP), servidor de web (HTTP) o servidor de nombres (DNS), respectivamente, si utilizas su base de datos
 nmap\-services
-con más de 2\&.200 puertos conocidos\&. Generalmente este informe es correo dado que la gran mayoría de demonios que escuchan en el puerto 25 TCP son, en realidad, servidores de correo\&. \(r!Pero no debe confiar su seguridad en este hecho! La gente ejecuta a veces servicios distintos en puertos inesperados
+con más de 2\&.200 puertos conocidos\&. Generalmente este informe es correo dado que la gran mayoría de demonios que escuchan en el puerto 25 TCP son, en realidad, servidores de correo\&. ¡Pero no debe confiar su seguridad en este hecho! La gente ejecuta a veces servicios distintos en puertos inesperados
 .PP
 Aún en el caso de que Nmap tenga razón y el servidor de ejemplo indicado arriba está ejecutando servidores de SMTP, HTTP y DNS ésto no dice mucho\&. Cuando haga un análisis de vulnerabilidades (o tan sólo un inventario de red) en su propia empresa o en su cliente lo que habitualmente también quiere saber es qué versión se está utilizando del servidor de correcto y de DNS\&. Puede ayudar mucho a la hora de determinar qué ataques pueden afectar a un servidor el saber el número de versión exacto de éste\&. La detección de versiones le ayuda a obtener esta información\&.
 .PP
@@ -805,7 +812,7 @@ La detección de versiones pregunta para obtener más información de lo que rea
 nmap\-service\-probes
 contiene sondas para consultar distintos servicios y reconocer y tratar distintas respuestas en base a una serie de expresiones\&. Nmap intenta determinar el protocolo del servicio (p\&. ej\&. ftp, ssh, telnet ó http), el nombre de la aplicación (p\&. ej\&. Bind de ISC, http de Apache, telnetd de Solaris), un número de versión, un tipo de dispositivo (p\&. ej\&. impresora o router), la familia de sistema operativo (p\&. ej\&. Windows o Linux) y algunas veces algunos detalles misceláneos como, por ejemplo, si un servidor X acepta cualquier conexión externa, la versión de protocolo SSH o el nombre de usuario Kazaa)\&. Por supuesto, la mayoría de los servicios no ofrecen toda esta información\&. Si se ha compilado Nmap con soporte OpenSSL se conectará también a servidores SSL para determinar qué servicio escucha detrás de la capa de cifrado\&. Se utiliza la herramienta de pruebas RPC de Nmap (\fB\-sR\fR) de forma automática para determinar el programa RPC y el número de versión si se descubren servicios RPC\&. Algunos puertos UDP se quedan en estado
 open|filtered
-(N\&. del T\&., \'abierto|filtrado\') si un barrido de puertos UDP no puede determinar si el puerto está abierto o filtrado\&. La detección de versiones intentará obtener una respuesta de estos puertos (igual que hace con puertos abiertos) y cambiará el estado a abierto si lo consigue\&. Los puertos TCP en estado
+(N\&. del T\&., \*(Aqabierto|filtrado\*(Aq) si un barrido de puertos UDP no puede determinar si el puerto está abierto o filtrado\&. La detección de versiones intentará obtener una respuesta de estos puertos (igual que hace con puertos abiertos) y cambiará el estado a abierto si lo consigue\&. Los puertos TCP en estado
 open|filtered
 se tratan de forma similar\&. Tenga en cuenta que la opción
 \fB\-A\fR
@@ -863,11 +870,11 @@ Esta opción hace que Nmap imprima información de depuración detallada explica
 .RS 4
 Este método funciona conjuntamente con los distintos métodos de sondeo de puertos de Nmap\&. Toma todos los puertos TCP/UDP que se han encontrado y los inunda con órdenes de programa NULL SunRPC con el objetivo de determinar si son puertos RPC y, si es así, los programas y número de versión que están detrás\&. Así, puede obtener de una forma efectiva la misma información que
 \fBrpcinfo \-p\fR
-aunque el mapeador de puertos (\(Foportmapper\(Fc, N\&. del T\&.) está detrás de un cortafuegos (o protegido por TCP wrappers)\&. Los señuelos no funcionan con el sondeo RPC actualmente\&. Esta opción se activa automáticamente como parte de la detección de versiones (\fB\-sV\fR) si la ha seleccionado\&. Rara vez se utiliza la opción
+aunque el mapeador de puertos («portmapper», N\&. del T\&.) está detrás de un cortafuegos (o protegido por TCP wrappers)\&. Los señuelos no funcionan con el sondeo RPC actualmente\&. Esta opción se activa automáticamente como parte de la detección de versiones (\fB\-sV\fR) si la ha seleccionado\&. Rara vez se utiliza la opción
 \fB\-sR\fR
 dado que la detección de versiones lo incluye y es más completa\&.
 .RE
-.SH "DETECCIóN DE SISTEMA OPERATIVO"
+.SH "DETECCIÓN DE SISTEMA OPERATIVO"
 .PP
 Uno de los aspectos más conocidos de Nmap es la detección del sistema operativo (SO) en base a la comprobación de huellas TCP/IP\&. Nmap envía una serie de paquetes TCP y UDP al sistema remoto y analiza prácticamente todos los bits de las respuestas\&. Nmap compara los resultados de una docena de pruebas como puedan ser el análisis de ISN de TCP, el soporte de opciones TCP y su orden, el análisis de IPID y las comprobaciones de tamaño inicial de ventana, con su base de datos
 nmap\-os\-fingerprints\&. Esta base de datos consta de más de 1500 huellas de sistema operativo y cuando existe una coincidencia se presentan los detalles del sistema operativo\&. Cada huella contiene una descripción en texto libre del sistema operativo, una clasificación que indica el nombre del proveedor (por ejemplo, Sun), el sistema operativo subyacente (por ejemplo, Solaris), la versión del SO (por ejemplo, 10) y el tipo de dispositivo (propósito general, encaminador, conmutador, consola de videojuegos, etc\&.)\&.
@@ -876,9 +883,9 @@ Nmap le indicará una URL donde puede enviar las huellas si conoce (con segurida
 .PP
 La detección de sistema operativo activa, en cualquier caso, una serie de pruebas que hacen uso de la información que ésta recoge\&. Una de estas pruebas es la medición de tiempo de actividad, que utiliza la opción de marca de tiempo TCP (RFC 1323) para adivinar cuánto hace que un equipo fue reiniciado\&. Esta prueba sólo funciona en sistemas que ofrecen esta información\&. Otra prueba que se realiza es la clasificación de predicción de número de secuencia TCP\&. Esta prueba mide de forma aproximada cuánto de difícil es crear una conexión TCP falsa contra el sistema remoto\&. Se utiliza cuando se quiere hacer uso de relaciones de confianza basadas en la dirección IP origen (como es el caso de rlogin, filtros de cortafuegos, etc\&.) para ocultar la fuente de un ataque\&. Ya no se hace habitualmente este tipo de malversación pero aún existen muchos equipos que son vulnerables a ésta\&. Generalmente es mejor utilizar la clasificación en inglés como:
 \(lqworthy challenge\(rq
-(\(Fodesafío difícil\(Fc, N\&. del T\&.) o
+(«desafío difícil», N\&. del T\&.) o
 \(lqtrivial joke\(rq
-(\(Fobroma fácil\(Fc, N\&. del T\&.)\&. Esta información sólo se ofrece en la salida normal en el modo detallado (\fB\-v\fR)\&. También se informa de la generación de números de secuencia IPID cuando se activa el modo detallado conjuntamente con la opción
+(«broma fácil», N\&. del T\&.)\&. Esta información sólo se ofrece en la salida normal en el modo detallado (\fB\-v\fR)\&. También se informa de la generación de números de secuencia IPID cuando se activa el modo detallado conjuntamente con la opción
 \fB\-O\fR\&. La mayoría de los equipos estarán en la clase
 \(lqincremental\(rq, lo que significa que incrementan el campo ID en la cabecera IP para cada paquete que envían\&. Esto hace que sean vulnerables a algunos ataques avanzados de obtención de información y de falseo de dirección\&.
 .PP
@@ -1006,7 +1013,7 @@ para
 hará que Nmap se mantenga a esa velocidad reducida\&. Nmap intenta detectar limitaciones de tasa y ajustar la demora del sondeo como considere necesario, pero a veces viene bien especificarlo de forma explícita si ya sabe qué valor es mejor\&.
 .sp
 El sondeo se ralentiza de forma drástica cuando Nmap incrementa el valor del tiempo de espera para poder tratar las limitaciones de tasa\&. Puede utilizar la opción
-\fB\-\-max_scan\-delay\fR
+\fB\-\-max\-scan\-delay\fR
 para indicar el tiempo máximo de espera que permitirá Nmap\&. Si especifica un valor muy pequeño tendrá retransmisiones inútiles de paquetes y posiblemente no detecte puertos para los que el objetivo implemente tasas de tráfico estrictas\&.
 .sp
 También se puede usar
@@ -1065,13 +1072,13 @@ hace lo mismo que
 \fB\-\-max\-rtt\-timeout 300 \-\-min\-rtt\-timeout 50 \-\-initial\-rtt\-timeout 250 \-\-max\-retries 2 \-\-host\-timeout 15m\fR
 así como definir el valor máximo para las demoras de sondeos TCP a 5ms\&.
 .RE
-.SH "EVASIóN DE CORTAFUEGOS/IDS Y FALSIFICACIóN"
+.SH "EVASIÓN DE CORTAFUEGOS/IDS Y FALSIFICACIÓN"
 .PP
-Muchos pioneros de Internet habían previsto una red global abierta con un espacio de direcciones IP universal que permitiese conexiones virtuales entre dos nodos cualquiera\&. Esto permitiría a los equipos actuar como verdaderos iguales, sirviendo y recuperando información el uno del otro\&. La gente podría acceder a todos los sistemas de su casa desde el trabajo, cambiando las propiedades del control del clima o desbloqueando puertas\&. Esta visión de una conectividad universal fue sofocada por la escasez del espacio de direcciones y los problemas de seguridad\&. Al comienzo de la década de los años 90, las organizaciones empezaron a replegar cortafuegos con el propósito de reducir la conectividad\&. Se acordonaron redes enormes para protegerlas de la Internet no filtrada con pasarelas (\(Foproxies\(Fc, N\&. del T\&.) de aplicación, sistemas de traducción de direcciones de red y filtros de paquetes\&. Del flujo sin restricciones de la información se pasó a una regulación estricta de los canales de comunicación aprobados y del contenido que pasa por ellos\&.
+Muchos pioneros de Internet habían previsto una red global abierta con un espacio de direcciones IP universal que permitiese conexiones virtuales entre dos nodos cualquiera\&. Esto permitiría a los equipos actuar como verdaderos iguales, sirviendo y recuperando información el uno del otro\&. La gente podría acceder a todos los sistemas de su casa desde el trabajo, cambiando las propiedades del control del clima o desbloqueando puertas\&. Esta visión de una conectividad universal fue sofocada por la escasez del espacio de direcciones y los problemas de seguridad\&. Al comienzo de la década de los años 90, las organizaciones empezaron a replegar cortafuegos con el propósito de reducir la conectividad\&. Se acordonaron redes enormes para protegerlas de la Internet no filtrada con pasarelas («proxies», N\&. del T\&.) de aplicación, sistemas de traducción de direcciones de red y filtros de paquetes\&. Del flujo sin restricciones de la información se pasó a una regulación estricta de los canales de comunicación aprobados y del contenido que pasa por ellos\&.
 .PP
 Los filtros de red como los cortafuegos pueden hacer muy difícil el análisis de una red\&. Esto no va a ser más fácil en el futuro, ya que uno de los objetivos de estos dispositivos es generalmente limitar el reconocimiento casual de la red\&. En cualquier caso, Nmap ofrece varias funcionalidades para ayudar a entender estas redes complejas, y que también sirven para verificar que los filtros funcionan como se espera de ellos\&. Incluso tiene mecanismos para saltarse las defensas que no hayan sido implementadas del todo correctamente\&. Uno de los mejores métodos de entender la posición de la seguridad de su red es intentar comprometerla\&. Empiece a pensar como un atacante, e intenta utilizar las técnicas de esta sección contra sus propias redes\&. Lance un sondeo de rebote FTP, un sondeo pasivo, un ataque de fragmentación, o intente realizar un túnel desde una de sus propias pasarelas\&.
 .PP
-Las compañías, además de restringir la actividad de red, están monitorizando cada vez más el tráfico con sistemas de detección de intrusos (IDS, \(FoIntrusion Detection Systems\(Fc, N\&. del T\&.)\&. Todos los IDS principales vienen preinstalados con reglas diseñadas para detectar sondeos de Nmap porque, a veces, se realizan sondeos previos a un ataque\&. Muchos de estos productos han mutado recientemente para convertirse en sistemas de
+Las compañías, además de restringir la actividad de red, están monitorizando cada vez más el tráfico con sistemas de detección de intrusos (IDS, «Intrusion Detection Systems», N\&. del T\&.)\&. Todos los IDS principales vienen preinstalados con reglas diseñadas para detectar sondeos de Nmap porque, a veces, se realizan sondeos previos a un ataque\&. Muchos de estos productos han mutado recientemente para convertirse en sistemas de
 \fIprevención\fR
 de intrusiones (IPS) que bloquean activamente el tráfico reconocido como maligno\&. Desafortunadamente para los administradores de redes y para los fabricantes de IDS es muy difícil detectar las malas intenciones analizando los datos de los paquetes\&. Los atacantes con paciencia, habilidad y con la ayuda de ciertas opciones de Nmap pueden, generalmente, esquivar el análisis de los IDS sin ser detectados\&. Mientras tanto, los administradores deben lidiar con un alto número de falsos positivos debido a que algunas actividades inocentes se diagnostican erróneamente y generan alarmas o se bloquean\&.
 .PP
@@ -1083,7 +1090,7 @@ No hay ninguna herramienta mágica (u opción de Nmap) que permita detectar y ev
 .RS 4
 La opción
 \fB\-f\fR
-hace que el sondeo solicitado (incluyendo los sondeos ping) utilicen paquetes IP fragmentados pequeños\&. La idea es dividir la cabecera del paquete TCP entre varios paquetes para hacer más difícil que los filtros de paquetes, sistemas de detección de intrusos y otras molestias detecten lo que se está haciendo\&. \(r!Tenga cuidado con esta opción! Algunos programas tienen problemas para manejar estos paquetes tan pequeños\&. El viejo sniffer llamado Sniffit da un fallo de segmentación inmediatamente después de recibir el primero de estos pequeños fragmentos\&. Especifica esta opción una sola vez y Nmap dividirá los paquetes en ocho bytes o menos después de la cabecera de IP\&. De esta forma, una cabecera TCP de veinte bytes se dividiría en 3 paquetes\&. Dos con ocho bytes de cabecera TCP y uno con los últimos ocho\&. Obviamente, cada fragmento tiene su propia cabecera IP\&. Especifica la opción
+hace que el sondeo solicitado (incluyendo los sondeos ping) utilicen paquetes IP fragmentados pequeños\&. La idea es dividir la cabecera del paquete TCP entre varios paquetes para hacer más difícil que los filtros de paquetes, sistemas de detección de intrusos y otras molestias detecten lo que se está haciendo\&. ¡Tenga cuidado con esta opción! Algunos programas tienen problemas para manejar estos paquetes tan pequeños\&. El viejo sniffer llamado Sniffit da un fallo de segmentación inmediatamente después de recibir el primero de estos pequeños fragmentos\&. Especifica esta opción una sola vez y Nmap dividirá los paquetes en ocho bytes o menos después de la cabecera de IP\&. De esta forma, una cabecera TCP de veinte bytes se dividiría en 3 paquetes\&. Dos con ocho bytes de cabecera TCP y uno con los últimos ocho\&. Obviamente, cada fragmento tiene su propia cabecera IP\&. Especifica la opción
 \fB\-f\fR
 otra vez para utilizar fragmentos de dieciséis bytes (reduciendo la cantidad de fragmentos)\&. O puedes especificar tu propio tamaño con la opción
 \fB\-\-mtu\fR\&. No utilice la opción
@@ -1095,11 +1102,11 @@ si utiliza
 .PP
 \fB\-D <señuelo1 [,señuelo2][,ME],\&.\&.\&.>\fR (Esconde un sondeo con señuelos)
 .RS 4
-Realiza un sondeo con señuelos\&. Esto hace creer que el/los equipo/s que utilice como señuelos están también haciendo un sondeo de la red\&. De esta manera sus IDS pueden llegar a informar de que se están realizando de 5 a 10 sondeos de puertos desde distintas direcciones IP, pero no sabrán qué dirección IP está realizando el análisis y cuáles son señuelos inocentes\&. Aunque esta técnica puede vencerse mediante el seguimiento del camino de los encaminadores, descarte de respuesta (\(Foresponse\-dropping\(Fc, N\&. del T\&.), y otros mecanismos activos, generalmente es una técnica efectiva para esconder su dirección IP\&.
+Realiza un sondeo con señuelos\&. Esto hace creer que el/los equipo/s que utilice como señuelos están también haciendo un sondeo de la red\&. De esta manera sus IDS pueden llegar a informar de que se están realizando de 5 a 10 sondeos de puertos desde distintas direcciones IP, pero no sabrán qué dirección IP está realizando el análisis y cuáles son señuelos inocentes\&. Aunque esta técnica puede vencerse mediante el seguimiento del camino de los encaminadores, descarte de respuesta («response\-dropping», N\&. del T\&.), y otros mecanismos activos, generalmente es una técnica efectiva para esconder su dirección IP\&.
 .sp
 Se debe separar cada equipo de distracción mediante comas, y puede utilizar
 ME
-(\(FoYO\(Fc, N\&. del T\&.) como uno de los señuelos para representar la posición de su verdadera dirección IP\&. Si pone
+(«YO», N\&. del T\&.) como uno de los señuelos para representar la posición de su verdadera dirección IP\&. Si pone
 ME
 en la sexta posición o superior es probable que algunos detectores de sondeos de puertos habituales (como el excelente scanlogd de Solar Designer) ni siquiera muestren su dirección IP\&. Si no utiliza
 ME, Nmap le pondrá en una posición aleatoria\&.
@@ -1119,7 +1126,7 @@ con la dirección IP de la interfaz a través de la cual quieres enviar los paqu
 .sp
 Otro uso alternativo de esta opción es la de falsificar la dirección para que los objetivos del análisis piensen que
 \fIalgún otro\fR
-los está sondeando\&. \(r!Imagine una compañía a los que les sondea repetidamente la competencia! Generalmente es necesaria la opción
+los está sondeando\&. ¡Imagine una compañía a los que les sondea repetidamente la competencia! Generalmente es necesaria la opción
 \fB\-e\fR
 si lo quiere utilizar así, y también sería recomendable la opción
 \fB\-P0\fR\&.
@@ -1154,7 +1161,7 @@ Normalmente Nmap envía paquetes mínimos que contienen sólo la cabecera\&. As�
 .PP
 \fB\-\-ttl <valor>\fR (Indica el valor del campo tiempo\-de\-vida de la cabecera IP)
 .RS 4
-Establece el campo tiempo\-de\-vida (\(Fotime\-to\-live\(Fc, N\&. del T\&.) en la cabecera de los paquetes IPv4 al valor especificado\&.
+Establece el campo tiempo\-de\-vida («time\-to\-live», N\&. del T\&.) en la cabecera de los paquetes IPv4 al valor especificado\&.
 .RE
 .PP
 \fB\-\-randomize\-hosts\fR (Mezclar aleatoriamente la lista de equipos a sondear)
@@ -1186,7 +1193,7 @@ Cisco\&.
 \fB\-\-badsum\fR (Envía paquetes con sumas de comprobación TCP/UDP erróneas)
 .RS 4
 Esta opción le indica a Nmap que debe generar sumas de comprobación inválidas para los paquetes que se envíen a los equipos objetivos\&. Cualquier respuesta que se reciba vendrá de un cortafuegos o un IDS que no comprobó la suma, dado que la mayoría de las pilas IP descartan estos paquetes\&. Para obtener más información de esta técnica puede consultar
-\m[blue]\fB\%http://nmap.org/p60-12.txt\fR\m[]
+\m[blue]\fB\%https://nmap.org/p60-12.txt\fR\m[]
 .RE
 .SH "SALIDA"
 .PP
@@ -1195,7 +1202,7 @@ La utilidad de una herramienta de seguridad está limitada por la salida que gen
 Además de ofrecer distintos formatos de salida, Nmap ofrece opciones adicionales para controlar cuanta información de más se muestra en la salida, así como opciones para controlar los mensajes de depuración que se muestran\&. Los tipos de salida pueden enviarse a la salida estándar o a algún archivo especificando su nombre\&. Nmap puede añadir información al archivo o sobreescribirlo\&. Los formatos de salida pueden utilizarse también para retomar un sondeo que se haya interrumpido\&.
 .PP
 Nmap puede generar la salida en cinco formatos distintos\&. El formato por omisión es el llamado
-salida interactiva, y se envía a la salida estándar (\(Fostdout\(Fc)\&. También está la
+salida interactiva, y se envía a la salida estándar («stdout»)\&. También está la
 salida normal, que es similar a la salida
 interactiva
 salvo que muestra menos información de ejecución y menos advertencias, ya que se espera que se analice una vez que el sondeo haya terminado en lugar de ser analizada interactivamente\&.
@@ -1204,7 +1211,7 @@ La salida XML es uno de los formatos de salida más importantes, ya que puede co
 .PP
 Los dos tipos de salida restantes son la sencilla
 salida para grep
-(o \(Fogrepeable\(Fc) que incluye la mayoría de la información de un sistema analizado en una sola línea, y la
+(o «grepeable») que incluye la mayoría de la información de un sistema analizado en una sola línea, y la
 s4L1d4 sCRiPt KiDDi3
 para usuarios que se consideran a sí mismos |<\-r4d\&.
 .PP
@@ -1213,14 +1220,14 @@ Aunque se utiliza la salida interactiva por omisión y no tiene ninguna opción 
 misondeo\&.xml
 por razones de brevedad\&. Los nombres elegidos son una cuestión de preferencia personal\&. Yo utilizo nombres largos que incluyen la fecha del análisis y una palabra o dos describiendo el sondeo, dentro de un directorio con el nombre de la empresa que estoy analizando\&.
 .PP
-Nmap seguirá imprimiendo la salida interactiva en \(Fostdout\(Fc como lo hace habitualmente aunque se guarden en archivos la salida con estas opciones\&. Por ejemplo, la orden
+Nmap seguirá imprimiendo la salida interactiva en «stdout» como lo hace habitualmente aunque se guarden en archivos la salida con estas opciones\&. Por ejemplo, la orden
 \fBnmap \-oX misondeo\&.xml destino\fR
 imprime XML en
 misondeo\&.xml
 y llena la salida estándar con los mismos resultados interactivos que habría impreso si no se hubiese especificado la opción
 \fB\-oX\fR\&. Puedes cambiar este comportamiento dando un guión como argumento a una de las opciones de salida\&. Esto hace que Nmap desactive la salida interactiva y que imprima en su lugar los resultados en el formato especificado en la salida estándar\&. Con lo que la orden
 \fBnmap \-oX \- destino\fR
-enviará únicamente la salida XML a la salida estándar (\(Fostdout\(Fc)\&. Los errores graves seguirán presentándose, posiblemente, en la salida normal de error, \(Fostderr\(Fc\&.
+enviará únicamente la salida XML a la salida estándar («stdout»)\&. Los errores graves seguirán presentándose, posiblemente, en la salida normal de error, «stderr»\&.
 .PP
 A diferencia de algunos argumentos de Nmap, es obligatorio separar con un espacio la opción de salida (como
 \fB\-oX\fR) y el nombre del archivo o el guión\&. Si los omite y pone el argumento como
@@ -1270,17 +1277,17 @@ para crear un XML portable que pueda mostrarse como HTML en cualquier ordenador 
 .PP
 \fB\-oS <filespec>\fR (SaLiDa ScRipT KIdd|3)
 .RS 4
-La salida \(Foscript kiddie\(Fc es como la salida interactiva, excepto que se post\-procesa para que la vean mejor los \(Fol33t HaXXorZ\(Fc a los que antes no les gustaba Nmap por su uso consistente de mayúsculas y minúsculas\&. Aquellos que no tengan sentido del humor deberían tomar nota de que esta opción es una broma sobre los \(Foscript kiddies\(Fc antes de criticarme por
+La salida «script kiddie» es como la salida interactiva, excepto que se post\-procesa para que la vean mejor los «l33t HaXXorZ» a los que antes no les gustaba Nmap por su uso consistente de mayúsculas y minúsculas\&. Aquellos que no tengan sentido del humor deberían tomar nota de que esta opción es una broma sobre los «script kiddies» antes de criticarme por
 \(lqayudarlos\(rq\&.
 .RE
 .PP
-\fB\-oG <filespec>\fR (Salida \(Fogrepeable\(Fc)
+\fB\-oG <filespec>\fR (Salida «grepeable»)
 .RS 4
-Este formato de salida se trata el último porque está obsoleto\&. La salida en formato XML es mucho más poderosa, y es igual de conveniente para los usuarios experimentados\&. XML es un estándar para el que se dispone de docenas de intérpretes, mientras que la salida para grep es un \(Fohack\(Fc propio\&. XML puede extenderse para soportar nuevas funcionalidades de Nmap tan pronto como se liberen, mientras que en general tengo que omitir estas funcionalidades de la salida para grep por no tener un lugar donde ponerlas\&.
+Este formato de salida se trata el último porque está obsoleto\&. La salida en formato XML es mucho más poderosa, y es igual de conveniente para los usuarios experimentados\&. XML es un estándar para el que se dispone de docenas de intérpretes, mientras que la salida para grep es un «hack» propio\&. XML puede extenderse para soportar nuevas funcionalidades de Nmap tan pronto como se liberen, mientras que en general tengo que omitir estas funcionalidades de la salida para grep por no tener un lugar donde ponerlas\&.
 .sp
 Sin embargo, la salida para grep es todavía bastante popular\&. Es simplemente un formato que lista cada sistema en una línea y que puede ser fácilmente tratado con herramientas estándar de UNIX como grep, awk, cut, sed, diff y Perl\&. Incluso yo la utilizo para pruebas rápidas que hago desde la línea de órdenes\&. Sólo hace falta un grep para identificar todos los sistemas con el puerto de ssh abierto o que ejecuten Solaris, enviando la salida a través de un conector a awk o cut para mostrar los campos deseados\&.
 .sp
-La salida para grep consiste en comentarios (líneas que empiezan por una almohadilla, \(Fo#\(Fc) y líneas de objetivo\&. Una línea de objetivo incluye una combinación de seis campos marcados, separados por tabulaciones y seguidos de dos puntos\&. Los campos (en inglés) son
+La salida para grep consiste en comentarios (líneas que empiezan por una almohadilla, «#») y líneas de objetivo\&. Una línea de objetivo incluye una combinación de seis campos marcados, separados por tabulaciones y seguidos de dos puntos\&. Los campos (en inglés) son
 Host
 (Sistema),
 Ports
@@ -1298,7 +1305,7 @@ Status
 (Estado)\&.
 .sp
 El campo más importante de todos habitualmente es
-Ports, que es el que da los detalles de cada puerto interesante encontrado\&. Consiste en una lista separada por comas de entradas de puerto\&. Cada entrada de puerto representa uno de los puertos de interés y se muestra con siete subcampos separados por una barra (\(Fo/\(Fc)\&. Los subcampos son:
+Ports, que es el que da los detalles de cada puerto interesante encontrado\&. Consiste en una lista separada por comas de entradas de puerto\&. Cada entrada de puerto representa uno de los puertos de interés y se muestra con siete subcampos separados por una barra («/»)\&. Los subcampos son:
 Port number
 (Número de puerto),
 State
@@ -1338,12 +1345,12 @@ en Windows\&.
 .RS 4
 Hace que Nmap imprima más información sobre el sondeo que está realizando incrementando el nivel de detalle\&. Los puertos abiertos se muestran en cuanto se encuentran y se muestra una estimación del tiempo que Nmap espera que dure la tarea de sondeo si piensa que va a durar más de un par de minutos\&. Puede utilizarlo dos veces para obtener aún más detalle\&. No tiene ningún efecto el utilizarlo más de dos veces\&.
 .sp
-La mayoría de los cambios sólo afectan a la salida interactiva, y algunos también afectan a la salida \(Foscript kiddie\(Fc\&. Dado que los demás formatos van a ser tratados por programas, Nmap da información detallada en estos formatos por omisión sin fatigar a un usuario humano\&. Sin embargo, hay algunos cambios en los otros modos que hacen que el tamaño de la salida resultante se reduzca sustancialmente al omitir información detallada\&. Por ejemplo, sólo se imprime una línea de comentario con todos los puertos sondeados en el formato de salida para grep si se activa el modo de detalle, porque puede ser demasiada información\&.
+La mayoría de los cambios sólo afectan a la salida interactiva, y algunos también afectan a la salida «script kiddie»\&. Dado que los demás formatos van a ser tratados por programas, Nmap da información detallada en estos formatos por omisión sin fatigar a un usuario humano\&. Sin embargo, hay algunos cambios en los otros modos que hacen que el tamaño de la salida resultante se reduzca sustancialmente al omitir información detallada\&. Por ejemplo, sólo se imprime una línea de comentario con todos los puertos sondeados en el formato de salida para grep si se activa el modo de detalle, porque puede ser demasiada información\&.
 .RE
 .PP
 \fB\-d [level]\fR (Incrementar o fijar el nivel de depuración)
 .RS 4
-Cuando no obtiene suficientes datos ni siquiera con el modo de detalle, \(r!puede utilizar el modo de depuración para inundarse de detalles! Al igual que con la opción de detalle (\fB\-v\fR), puede activar la depuración con una opción en la línea de órdenes (\fB\-d\fR)\&. Puede incrementar el nivel de depuración si la especifica múltiples veces\&. También puede fijar directamente el nivel de depuración si da un argumento a la opción
+Cuando no obtiene suficientes datos ni siquiera con el modo de detalle, ¡puede utilizar el modo de depuración para inundarse de detalles! Al igual que con la opción de detalle (\fB\-v\fR), puede activar la depuración con una opción en la línea de órdenes (\fB\-d\fR)\&. Puede incrementar el nivel de depuración si la especifica múltiples veces\&. También puede fijar directamente el nivel de depuración si da un argumento a la opción
 \fB\-d\fR\&. Por ejemplo, si utiliza
 \fB\-d9\fR
 se fijaría el nivel de depuración en el nueve\&. Ese es el nivel más alto de depuración y provocará que se impriman miles de líneas a no ser que haga sondeos muy sencillos con pocos puertos y objetivos\&.
@@ -1381,7 +1388,7 @@ se sobreescribe por omisión\&. Si prefiere mantener el contenido existente y a�
 Algunas ejecuciones de Nmap tardan mucho tiempo, del orden de días\&. Esos sondeos no siempre se ejecutan hasta el final\&. Es posible que haya restricciones que impidan los sondeos de Nmap durante la jornada laboral, se puede caer la red o el sistema donde se está ejecutando Nmap puede sufrir un reinicio esperado o uno no planificado, o incluso es posible que Nmap aborte\&. El administrador que está ejecutando Nmap podría cancelarlo también por cualquier otra razón, simplemente pulsando
 ctrl\-C\&. En estos casos puede no desearse empezar el sondeo completo desde el principio\&. Afortunadamente, si se ha guardado una salida normal (\fB\-oN\fR) o para tratarla con grep (\fB\-oG\fR), el usuarios puede pedir a Nmap que continúe el sondeo con el objetivo en el que estaba trabajando cuando se detuvo la ejecución\&. Simplemente se tiene que especificar la opción
 \fB\-\-resume\fR
-y dar un archivo de salida normal o \(Fogrepeable\(Fc como argumento\&. No se puede dar ningún otro argumento, ya que Nmap trata el archivo para utilizar las mismas opciones que se especificaron entonces\&. Sólo se debe llamar a Nmap con
+y dar un archivo de salida normal o «grepeable» como argumento\&. No se puede dar ningún otro argumento, ya que Nmap trata el archivo para utilizar las mismas opciones que se especificaron entonces\&. Sólo se debe llamar a Nmap con
 \fBnmap \-\-resume \fR\fB\fIarchivo_de_registro\fR\fR\&. Nmap añadirá cualquier resultado nuevo a los ficheros de datos especificados en la ejecución previa\&. No se soporta la capacidad de reanudar un sondeo con el formato de salida XML porque combinar dos salidas en un sólo fichero XML válido sería difícil\&.
 .RE
 .PP
@@ -1409,13 +1416,13 @@ Esta opción es simplemente un alias para
 \fB\-\-stylesheet http://www\&.insecure\&.org/nmap/data/nmap\&.xsl\fR\&.
 .RE
 .PP
-\fB\-\-no_stylesheet\fR (Omite la declaración de hoja de estilo XSL del XML)
+\fB\-\-no\-stylesheet\fR (Omite la declaración de hoja de estilo XSL del XML)
 .RS 4
 Puede utilizar esta opción para evitar que Nmap asocie una hoja de estilo XSL a su salida XML\&. En este caso, se omite la directiva
 xml\-stylesheet
 de la salida\&.
 .RE
-.SH "OPCIONES MISCELáNEAS"
+.SH "OPCIONES MISCELÁNEAS"
 .PP
 Esta sección describe algunas opciones importantes (y no tan importantes) que no encajan realmente en ningún otro sitio\&.
 .PP
@@ -1428,7 +1435,7 @@ Por supuesto, debe utilizarse la sintaxis IPv6 si se indica una dirección en lu
 \(lqpuertos de interés\(rq\&.
 .sp
 Aunque IPv6 no se está utilizando en todo el mundo, sí que se utiliza mucho en algunos países (generalmente asiáticos) y muchos sistemas operativos modernos lo soportan\&. Tanto el origen como el objetivo de su sondeo deben estar configurados para utilizar IPv6 si desea utilizar Nmap con IPv6\&. Si su ISP (como sucede con la mayoría) no le da direcciones IPv6, puede encontrar gestores de túneles gratuitos en muchos sitios y funciona bien con Nmap\&. Una lista de gestores está
-\m[blue]\fBen Wikipedia\fR\m[]\&\s-2\u[11]\d\s+2\&. Los túneles IPv6 a IPv4 (\(Fo6to4\(Fc) son también otro método muy popular y gratuito\&.
+\m[blue]\fBen Wikipedia\fR\m[]\&\s-2\u[11]\d\s+2\&. Los túneles IPv6 a IPv4 («6to4») son también otro método muy popular y gratuito\&.
 .RE
 .PP
 \fB\-A\fR (Opciones de sondeos agresivos)
@@ -1476,15 +1483,6 @@ es útil con las capacidades del núcleo Linux y sistemas similares que pueden c
 es fijar la variable de entorno NMAP_PRIVILEGED\&.
 .RE
 .PP
-\fB\-\-interactive\fR (Comienza en modo interactivo)
-.RS 4
-Comienza Nmap en modo interactivo\&. En este modo, Nmap ofrece un indicador interactivo que facilita el lanzamiento de múltiples sondeos (tanto síncronos como en segundo plano)\&. Es útil para aquellas personas que tienen que sondear desde sistemas multi\-usuario, ya que generalmente quieren hacer un análisis de seguridad sin que los demás usuarios sepan exactamente qué sistemas se están analizando\&. Puede utilizar la opción
-\fB\-\-interactive\fR
-para activar este modo y después utilizar
-h
-para obtener la ayuda\&. Esta opción se utiliza muy poco porque los intérpretes de línea de órdenes habituales son mucho más cómodos y tienen más funciones\&. Esta opción incluye un operador de exclamación (\(Fo!\(Fc) para ejecutar órdenes de la shell, que es una de las muchas razones por las que Nmap no se debe instalar con el bit \(Fosetuid\(Fc de root\&.
-.RE
-.PP
 \fB\-V\fR; \fB\-\-version\fR (Mostrar el número de versión)
 .RS 4
 Imprime el número de versión de Nmap y aborta\&.
@@ -1494,7 +1492,7 @@ Imprime el número de versión de Nmap y aborta\&.
 .RS 4
 Imprime una pequeña pantalla de ayuda con las opciones de órdenes más habituales\&. Pasa lo mismo si ejecuta Nmap sin argumentos\&.
 .RE
-.SH "EJECUCIóN INTERACTIVA"
+.SH "EJECUCIÓN INTERACTIVA"
 .PP
 Todas las pulsaciones de teclado se capturan durante la ejecución de Nmap\&. Esto le permite interactuar con el programa sin abortarlo ni reiniciarlo\&. Algunas teclas especiales cambiarán las opciones mientras que otras teclas imprimirán un mensaje de estado informándole del estado del sondeo\&. La convención es que las
 \fIletras en minúsculas incrementan\fR
@@ -1542,7 +1540,6 @@ Failed to resolve given hostname/IP: scanme\&.nmap\&.org
 analizame2\&.nmap\&.org,
 analizame3\&.nmap\&.org, y así sucesivamente, aunque esos servidores actualmente no existen\&.
 .PP
-
 \fBnmap \-v scanme\&.nmap\&.org\fR
 .PP
 Esta opción sondea todos los puertos TCP reservados en el servidor
@@ -1550,26 +1547,22 @@ scanme\&.nmap\&.org\&. La opción
 \fB\-v\fR
 activa el modo detallado (también llamado verboso)\&.
 .PP
-
 \fBnmap \-sS \-O scanme\&.nmap\&.org/24\fR
 .PP
 Lanza un sondeo de tipo SYN sigiloso contra cada una de las 255 máquinas en la
 \(lqclase C\(rq
 de la red donde está el sistema "analizame"\&. También intenta determinar cual es el sistema operativo que se ejecuta en cada máquina que esté encendida\&. Esto requiere permisos de root por la opción de sondeo SYN y por la de detección de sistema operativo\&.
 .PP
-
 \fBnmap \-sV \-p 22,53,110,143,4564 198\&.116\&.0\-255\&.1\-127\fR
 .PP
 Lanza una enumeración de equipos y un sondeo TCP a cada uno de la primera mitad de las 255 posibles subredes de 8 bit en la red de clase B 198\&.116\&. Esto probará si los sistemas están ejecutando sshd, DNS, pop3d, imapd o tienen un servidor en el puerto 4564\&. Para cualquier puerto que se encuentre abierto, se realizará una detección de versión para determinar qué aplicación se está ejecutando\&.
 .PP
-
 \fBnmap \-v \-iR 100000 \-P0 \-p 80\fR
 .PP
 Solicita a Nmap que elija 100\&.000 sistemas aleatoriamente y los sondee buscando servidores web (puerto 80)\&. La enumeración de sistemas se deshabilita con
 \fB\-P0\fR
 ya que es un desperdicio enviar un par de pruebas para determinar si el sistema debe ser analizado cuando de todas maneras sólo se va a analizar un puerto\&.
 .PP
-
 \fBnmap \-P0 \-p80 \-oX logs/pb\-port80scan\&.xml \-oG logs/pb\-port80scan\&.gnmap 216\&.163\&.128\&.20/20\fR
 .PP
 Esto sondea 4096 IPs para buscar cualquier servidor web (sin enviar sondas ICMP) y guarda la salida en formato para grep y en XML\&.
@@ -1578,14 +1571,14 @@ Esto sondea 4096 IPs para buscar cualquier servidor web (sin enviar sondas ICMP)
 Al igual que su autor, Nmap no es perfecto\&. Pero tu puedes ayudar a hacerlo mejor enviando informes de fallo o incluso escribiendo parches\&. Si Nmap no se comporta como tú esperas, primero actualiza a la última versión disponible en
 \m[blue]\fB\%http://www.insecure.org/nmap/\fR\m[]\&. Si el problema persiste, investiga para determinar si la causa ya ha sido descubierta y solucionada\&. Busca en Google el mensaje de error o navega en los archivos de Nmap\-dev en
 \m[blue]\fB\%http://seclists.org/\fR\m[]\&. También deberías leer este manual completo\&. Si esto no te ayuda, envía un informe de error en inglés a
-nmap\-dev@insecure\&.org\&. Por favor, incluya todo lo que haya visto del problema, así como qué versión de Nmap está utilizando y sobre qué versión del sistema operativo está trabajando\&. Hay muchas más probabilidades de que un informe de fallo o una pregunta sobre el uso de Nmap se contesten si se envían a nmap\-dev@insecure\&.org que si se envían directamente a Fyodor\&.
+<dev@nmap\&.org>\&. Por favor, incluya todo lo que haya visto del problema, así como qué versión de Nmap está utilizando y sobre qué versión del sistema operativo está trabajando\&. Hay muchas más probabilidades de que un informe de fallo o una pregunta sobre el uso de Nmap se contesten si se envían a dev@nmap\&.org que si se envían directamente a Fyodor\&.
 .PP
 Es mejor enviar parches para arreglar el código que un informe de error\&. Puedes encontrar las instrucciones básicas para crear parches con sus cambios en
 \m[blue]\fB\%http://www.insecure.org/nmap/data/HACKING\fR\m[]\&. Puede enviar los parches a nmap\-dev (recomendado) o directamente a Fyodor\&.
 .SH "AUTOR"
 .PP
 Fyodor
-fyodor@insecure\&.org
+<fyodor@nmap\&.org>
 (\m[blue]\fB\%http://www.insecure.org\fR\m[])
 .PP
 Cientos de personas han realizado valiosas contribuciones a Nmap a lo largo de los años\&. Sus nombres se detallan en el archivo
@@ -1605,11 +1598,11 @@ al español\&. Esta traducción no ha sido escrita por Insecure\&.Com LLC por lo
 .SS "Licencia y copyright de Nmap"
 .PP
 The Nmap Security Scanner is (C) 1996\-2005 Insecure\&.Com LLC\&. Nmap is also a registered trademark of Insecure\&.Com LLC\&. This program is free software; you may redistribute and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; Version 2\&. This guarantees your right to use, modify, and redistribute this software under certain conditions\&. If you wish to embed Nmap technology into proprietary software, we may be willing to sell alternative licenses (contact
-sales@insecure\&.com)\&. Many security scanner vendors already license Nmap technology such as host discovery, port scanning, OS detection, and service/version detection\&.
+<sales@insecure\&.com>)\&. Many security scanner vendors already license Nmap technology such as host discovery, port scanning, OS detection, and service/version detection\&.
 .PP
 \fITraducción no autorizada:\fR
 La herramienta de sondeos de seguridad Nmap es (C) 1996\-2005 Insecure\&.Com LLC\&. Nmap también es una marca registrada por Insecure\&.Com LLC\&. Este programa es software libre\&. Puede redistribuirlo y/o modificarlo bajo los términos de la Licencia Pública General de GNU según es publicada por la Free Software Foundation, versión 2\&. Esto garantiza su derecho a utilizarla, modificarla y redistribuirla bajo ciertas condiciones\&. Si desea introducir la tecnología de Nmap en programas propietarios podemos vender licencias alternativas (póngase en contacto con
-sales@insecure\&.com)\&. Hay muchos fabricantes de herramientas de análisis de seguridad que licencian la tecnología de Nmap como es el descubrimiento de equipos, sondeos de puertos, detección de sistema operativo y detección de servicios y versiones\&.
+<sales@insecure\&.com>)\&. Hay muchos fabricantes de herramientas de análisis de seguridad que licencian la tecnología de Nmap como es el descubrimiento de equipos, sondeos de puertos, detección de sistema operativo y detección de servicios y versiones\&.
 .PP
 Tenga en cuenta que la GPL impone restricciones importantes en los
 \(lqtrabajos derivados\(rq, pero no ofrece una definición precisa de ese término\&. Para evitar malentendidos, a continuación se definen, para los propósitos de esta licencia, las condiciones bajo las que una aplicación constituye un
@@ -1686,7 +1679,7 @@ y su aplicación al producto Nmap licenciado GPL\&. Esto es parecido a la interp
 y su aplicación a los módulos del núcleo de Linux\&. Nuestra interpretación sólo aplica a Nmap, no hablamos en nombre de otros productos GPL\&.
 .PP
 Estaremos encantados de ayudarle si tiene alguna pregunta de cómo aplican las restricciones de licenciamiento GPL al uso de Nmap en trabajos que no son GPL\&. Tal y como se menciona más arriba, ofrecemos licencias alternativas para integrar Nmap en aplicaciones propietarias así como en dispositivos hardware\&. Ya se han vendido este tipo de contratos a fabricantes de dispositivos de seguridad y habitualmente incluye una licencia perpetua, al tiempo que se da soporte prioritario y actualizaciones\&. Estos contratos financian el desarrollo continuo de la tecnología Nmap\&. Por favor, contacte con
-sales@insecure\&.com
+<sales@insecure\&.com>
 si desea más información\&.
 .PP
 Insecure\&.Com LLC da permiso para enlazar el código de este programa con cualquier librería de OpenSSL que se distribuya bajo una licencia idéntica a la indicada en el fichero Copying\&.OpenSSL adjunto, así como a la distribución de la combinación enlazada que incluye a ambos\&. Ésta es una excepción especial a los términos de la GPL\&. Debe obedecer los demás términos de la GPL de GNU en cualquier otro aspecto en relación al código que utilice que no sea OpenSSL\&. Si modifica este fichero puede extender esta excepción a su versión del fichero, aunque no está obligado a hacerlo\&.
@@ -1701,7 +1694,7 @@ Esta guía de referencia de Nmap Reference Guide es (C) 2005 Insecure\&.Com LLC\
 Se da el código fuente de este programa porque creemos que los usuarios tienen el derecho a saber cómo funciona un programa con exactitud antes de ejecutarlo\&. También le permite auditar el programa en búsqueda de agujeros de seguridad (no se ha encontrado ninguno aún)\&.
 .PP
 El código fuente le permite migrar Nmap a otras plataformas, arreglar erratas y añadir nuevas funciones\&. Le pedimos encarecidamente que envíe sus cambios a
-fyodor@insecure\&.org
+<fyodor@nmap\&.org>
 para que puedan incorporarse en la distribución principal\&. Al enviar estos cambios a Fyodor o cualquiera de las listas de correo de desarrollo en Insecure\&.Org se asume que está ofreciendo a Fyodor y a Insecure\&.Com LLC derechos ilimitados y no exclusivos para reutilizar, modificar y relicenciar el código\&. Nmap siempre estará disponible como software libre, pero esto es importante porque la incapacidad de relicenciar el código ha dado muchos problemas a otros proyectos de software libre (como es el caso de KDE y NASM)\&. También relicenciamos el código de forma ocasional a terceros, como se ha descrito previamente\&. Puede especificar condiciones especiales de licencia para sus contribuciones, sólo tiene que indicarlas cuando las envíe\&.
 .SS "Sin garantía"
 .PP
@@ -1734,7 +1727,7 @@ para poder hacer un análisis de versiones SSL\&. Todos los programas de tercero
 .PP
 Control de exportación de los EEUU: Insecure\&.Com LLC cree que Nmap se encuentra dentro del capítulo US ECCN (número de clasificación de control de exportación) 5D992\&. Esta categoría se denomina
 \(lqProgramas de seguridad de la información no controlados en 5D002\(rq\&. La única restricción a esta clasificación es AT (anti\-terrorismo), que se aplica a casi todos los bienes y deniega la exportación a un número reducido de naciones rebeldes como Irán o Corea del Norte\&. Así, la exportación de Nmap no requiere de una licencia especial, permiso o cualquier otra autorización del gobierno\&.
-.SH "NOTES"
+.SH "NOTAS"
 .IP " 1." 4
 versión original en inglés
 .RS 4

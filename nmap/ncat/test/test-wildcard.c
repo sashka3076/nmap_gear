@@ -7,14 +7,15 @@ dNSNames, then checks that matching names are accepted and non-matching names
 are rejected. The SSL transactions happen over OpenSSL BIO pairs.
 */
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #include <openssl/bio.h>
+#include <openssl/bn.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <openssl/rsa.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 
@@ -68,28 +69,28 @@ static int test(const struct lstr commonNames[], const struct lstr dNSNames[],
 
     tests_run++;
 
-    assert(gen_cert(&cert, &key, commonNames, dNSNames) == 1);
+    ncat_assert(gen_cert(&cert, &key, commonNames, dNSNames) == 1);
 
-    assert(BIO_new_bio_pair(&server_bio, 0, &client_bio, 0) == 1);
+    ncat_assert(BIO_new_bio_pair(&server_bio, 0, &client_bio, 0) == 1);
 
     server_ctx = SSL_CTX_new(SSLv23_server_method());
-    assert(server_ctx != NULL);
+    ncat_assert(server_ctx != NULL);
 
     client_ctx = SSL_CTX_new(SSLv23_client_method());
-    assert(client_ctx != NULL);
+    ncat_assert(client_ctx != NULL);
     SSL_CTX_set_verify(client_ctx, SSL_VERIFY_PEER, NULL);
     SSL_CTX_set_verify_depth(client_ctx, 1);
     ssl_ctx_trust_cert(client_ctx, cert);
 
     server_ssl = SSL_new(server_ctx);
-    assert(server_ssl != NULL);
+    ncat_assert(server_ssl != NULL);
     SSL_set_accept_state(server_ssl);
     SSL_set_bio(server_ssl, server_bio, server_bio);
-    assert(SSL_use_certificate(server_ssl, cert) == 1);
-    assert(SSL_use_PrivateKey(server_ssl, key) == 1);
+    ncat_assert(SSL_use_certificate(server_ssl, cert) == 1);
+    ncat_assert(SSL_use_PrivateKey(server_ssl, key) == 1);
 
     client_ssl = SSL_new(client_ctx);
-    assert(client_ssl != NULL);
+    ncat_assert(client_ssl != NULL);
     SSL_set_connect_state(client_ssl);
     SSL_set_bio(client_ssl, client_bio, client_bio);
 
@@ -156,7 +157,7 @@ end:
     X509_free(cert);
     EVP_PKEY_free(key);
 
-    BIO_destroy_bio_pair(server_bio);
+    (void) BIO_destroy_bio_pair(server_bio);
 
     SSL_CTX_free(server_ctx);
     SSL_CTX_free(client_ctx);
@@ -182,20 +183,18 @@ static struct lstr *check(SSL *ssl, const struct lstr names[])
         if (ssl_post_connect_check(ssl, name->s)) {
             if (size >= capacity) {
                 capacity = (size + 1) * 2;
-                results = realloc(results, (capacity + 1) * sizeof(results[0]));
-                assert(results != NULL);
+                results = safe_realloc(results, (capacity + 1) * sizeof(results[0]));
             }
             results[size++] = *name;
         }
     }
-    results = realloc(results, (size + 1) * sizeof(results[0]));
-    assert(results != NULL);
+    results = safe_realloc(results, (size + 1) * sizeof(results[0]));
     results[size] = lstr_sentinel;
 
     return results;
 }
 
-/* Make a certificate object trusted by an SSL_CTX. I coulnd't find a way to do
+/* Make a certificate object trusted by an SSL_CTX. I couldn't find a way to do
    this directly, so the certificate is written in PEM format to a temporary
    file and then loaded with SSL_CTX_load_verify_locations. Returns 1 on success
    and 0 on failure. */
@@ -256,7 +255,11 @@ static int set_dNSNames(X509 *cert, const struct lstr dNSNames[])
         if (gen_name == NULL)
             goto stack_err;
         gen_name->type = GEN_DNS;
+#if (OPENSSL_VERSION_NUMBER >= 0x10100000L) && !defined LIBRESSL_VERSION_NUMBER
+        gen_name->d.dNSName = ASN1_IA5STRING_new();
+#else
         gen_name->d.dNSName = M_ASN1_IA5STRING_new();
+#endif
         if (gen_name->d.dNSName == NULL)
             goto name_err;
         if (ASN1_STRING_set(gen_name->d.dNSName, name->s, name->len) == 0)
@@ -288,8 +291,9 @@ stack_err:
 static int gen_cert(X509 **cert, EVP_PKEY **key,
     const struct lstr commonNames[], const struct lstr dNSNames[])
 {
-    RSA *rsa;
-    int rc;
+    RSA *rsa = NULL;
+    BIGNUM *bne = NULL;
+    int rc, ret=0;
 
     *cert = NULL;
     *key = NULL;
@@ -299,9 +303,17 @@ static int gen_cert(X509 **cert, EVP_PKEY **key,
     if (*key == NULL)
         goto err;
     do {
-        rsa = RSA_generate_key(KEY_BITS, RSA_F4, NULL, NULL);
-        if (rsa == NULL)
+        /* Generate RSA key. */
+        bne = BN_new();
+        ret = BN_set_word(bne, RSA_F4);
+        if (ret != 1)
             goto err;
+
+        rsa = RSA_new();
+        ret = RSA_generate_key_ex(rsa, KEY_BITS, bne, NULL);
+        if (ret != 1)
+            goto err;
+        /* Check RSA key. */
         rc = RSA_check_key(rsa);
     } while (rc == 0);
     if (rc == -1)
@@ -337,12 +349,35 @@ static int gen_cert(X509 **cert, EVP_PKEY **key,
     if (set_dNSNames(*cert, dNSNames) == 0)
         goto err;
 
+#if (OPENSSL_VERSION_NUMBER >= 0x10100000L) && !defined LIBRESSL_VERSION_NUMBER
+    {
+        ASN1_TIME *tb, *ta;
+        tb = NULL;
+        ta = NULL;
+
+        if (X509_set_issuer_name(*cert, X509_get_subject_name(*cert)) == 0
+            || (tb = ASN1_STRING_dup(X509_get0_notBefore(*cert))) == 0
+            || X509_gmtime_adj(tb, 0) == 0
+            || X509_set1_notBefore(*cert, tb) == 0
+            || (ta = ASN1_STRING_dup(X509_get0_notAfter(*cert))) == 0
+            || X509_gmtime_adj(ta, 60) == 0
+            || X509_set1_notAfter(*cert, ta) == 0
+            || X509_set_pubkey(*cert, *key) == 0) {
+            ASN1_STRING_free(tb);
+            ASN1_STRING_free(ta);
+            goto err;
+        }
+        ASN1_STRING_free(tb);
+        ASN1_STRING_free(ta);
+    }
+#else
     if (X509_set_issuer_name(*cert, X509_get_subject_name(*cert)) == 0
         || X509_gmtime_adj(X509_get_notBefore(*cert), 0) == 0
         || X509_gmtime_adj(X509_get_notAfter(*cert), 60) == 0
         || X509_set_pubkey(*cert, *key) == 0) {
         goto err;
     }
+#endif
 
     /* Sign it. */
     if (X509_sign(*cert, *key, EVP_sha1()) == 0)
@@ -532,7 +567,7 @@ void test_specificity(const struct lstr patterns[],
 
     for (i = 0; i < ARR_LEN && !is_sentinel(&patterns[i]); i++)
         scratch[i] = patterns[i];
-    assert(i < ARR_LEN);
+    ncat_assert(i < ARR_LEN);
     scratch[i] = lstr_sentinel;
 
     test(scratch, NULL, test_names, expected_forward);
@@ -546,9 +581,11 @@ int main(void)
 {
     unsigned int i;
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined LIBRESSL_VERSION_NUMBER
     SSL_library_init();
     ERR_load_crypto_strings();
     SSL_load_error_strings();
+#endif
 
     /* Test single pattens in both the commonName and dNSName positions. */
     for (i = 0; i < NELEMS(single_tests); i++)

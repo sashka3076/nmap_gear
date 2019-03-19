@@ -9,21 +9,33 @@ AC_PREREQ(2.13)
 dnl Process this file with autoconf to produce a configure script.
 AC_INIT(nsock_core.c)
 
+dnl Find the Nmap source for nbase, etc.
+if test "${top_nmap_srcdir+set}" != set; then
+  top_nmap_srcdir=../..
+  export top_nmap_srcdir
+fi
+
+dnl Generate these files
+AC_CONFIG_FILES([Makefile ../tests/Makefile])
+
 dnl use nsock_config.h instad of -D macros
 AC_CONFIG_HEADER(../include/nsock_config.h)
 
 dnl Host specific hacks
 AC_CANONICAL_HOST
 
+AH_TEMPLATE(SOLARIS, [Sun/Oracle Solaris])
+AH_TEMPLATE(IRIX, [IRIX])
+
 case "$host" in
   *alpha-dec-osf*)
-    AC_DEFINE(DEC)
+    AC_DEFINE(DEC, 1, [DEC Alpha])
     ;;
   *-netbsd* | *-knetbsd*-gnu)
-    AC_DEFINE(NETBSD)
+    AC_DEFINE(NETBSD, 1, [NetBSD])
     ;;
   *-openbsd*)
-    AC_DEFINE(OPENBSD)
+    AC_DEFINE(OPENBSD, 1, [OpenBSD])
     ;;
   *-sgi-irix5*)
     AC_DEFINE(IRIX)
@@ -32,9 +44,14 @@ case "$host" in
     AC_DEFINE(IRIX)
     ;;
   *-hpux*)
-    AC_DEFINE(HPUX)
+    AC_DEFINE(HPUX, 1, [HP-UX])
     ;;
-  *-solaris2.0*)  
+  *-solaris2.1[[1-9]]*)
+    AC_DEFINE(SOLARIS)
+    # Solaris 11 and later use BPF packet capture rather than DLPI.
+    AC_DEFINE(SOLARIS_BPF_PCAP_CAPTURE, 1, [BPF packet capture on Solaris])
+    ;;
+  *-solaris2.0*)
     AC_DEFINE(SOLARIS)
     ;;
   *-solaris2.[[1-9]][[0-9]]*)
@@ -59,19 +76,19 @@ case "$host" in
     AC_DEFINE(SOLARIS)
     ;;
   *-sunos4*)
-    AC_DEFINE(SUNOS)
+    AC_DEFINE(SUNOS, 1, [SunOS 4])
     ;;
   *-linux*)
-    AC_DEFINE(LINUX)
+    AC_DEFINE(LINUX, 1, [Linux])
     ;;
   *-freebsd* | *-kfreebsd*-gnu | *-dragonfly*)
-    AC_DEFINE(FREEBSD)
+    AC_DEFINE(FREEBSD, 1, [FreeBSD])
     ;;
   *-bsdi*)
-    AC_DEFINE(BSDI)
+    AC_DEFINE(BSDI, 1, [BSD/OS])
     ;;
   *-apple-darwin*)
-    AC_DEFINE(MACOSX)
+    AC_DEFINE(MACOSX, 1, [Apple OS X])
     ;;
 esac
 
@@ -98,14 +115,67 @@ if test "$user_localdirs" = 1; then
    fi
 fi
 
-pcap_enabled=yes
-AC_ARG_WITH(pcap,
-  AC_HELP_STRING([--disable-pcap], [Disable pcap functions.]),
-  [ pcap_enabled="$withval" ])
+dnl Check whether libpcap is already available
+have_libpcap=no
 
-if test "$pcap_enabled" != "no"; then
-  AC_DEFINE(HAVE_PCAP)
+# By default, search for pcap library
+test "${with_libpcap+set}" != "set" && with_libpcap=yes
+
+AC_ARG_WITH(libpcap,
+AC_HELP_STRING([--with-libpcap=DIR], [Look for pcap headers in DIR/include.])
+AC_HELP_STRING([--with-libpcap=included], [Always use version included with Nmap])
+AC_HELP_STRING([--without-libpcap], [Disable pcap functions.]),
+[  case "$with_libpcap" in
+  yes)
+    AC_CHECK_HEADER(pcap.h,[
+      have_libpcap=yes
+      LIBPCAP_LIBS=-lpcap ])
+    ;;
+  included)
+    have_libpcap=no
+   ;;
+  no)
+    ;;
+  *)
+    _cppflags=$CPPFLAGS
+    _ldflags=$LDFLAGS
+
+    CPPFLAGS="-I$with_libpcap/include $CPPFLAGS"
+    LDFLAGS="-L$with_libpcap/lib $LDFLAGS"
+
+    AC_CHECK_HEADER(pcap.h,[
+      AC_CHECK_LIB(pcap, pcap_datalink,
+        [have_libpcap=yes
+        LIBPCAP_LIBS=-lpcap
+        LIBPCAP_INC=$with_libpcap/include
+        LIBPCAP_LIB=$with_libpcap/lib])])
+
+    LDFLAGS=$_ldflags
+    CPPFLAGS=$_cppflags
+    ;;
+  esac]
+)
+
+if test "$with_libpcap" != "no" -a "$have_libpcap" = "no"; then
+  LIBPCAP_INC=${top_nmap_srcdir}/libpcap
+  LIBPCAP_LIB=${top_nmap_srcdir}/libpcap
+  LIBPCAP_LIBS=${LIBPCAP_LIB}/libpcap.a
+  have_libpcap=yes
 fi
+if test "$have_libpcap" != "no"; then
+  AC_DEFINE(HAVE_PCAP, 1, [libpcap is available])
+  if test "${LIBPCAP_INC+set}" = "set"; then
+    CPPFLAGS="-I$LIBPCAP_INC $CPPFLAGS"
+    LDFLAGS="-L$LIBPCAP_LIB $LDFLAGS"
+  fi
+fi
+AC_SUBST(LIBPCAP_LIBS)
+
+PCAP_DEFINE_NETMASK_UNKNOWN
+
+AX_HAVE_EPOLL([AC_DEFINE(HAVE_EPOLL, 1, [epoll is available])], )
+AX_HAVE_POLL([AC_DEFINE(HAVE_POLL, 1, [poll is available])], )
+AC_CHECK_FUNCS(kqueue kevent, [AC_DEFINE(HAVE_KQUEUE)], )
 
 dnl Checks for programs.
 AC_PROG_CC
@@ -115,9 +185,6 @@ AC_PROG_CC
 AC_PROG_RANLIB
 dnl AC_PROG_INSTALL
 dnl AC_PATH_PROG(MAKEDEPEND, makedepend)
-
-AC_SUBST(COMPAT_OBJS)
-AC_SUBST(COMPAT_SRCS)
 
 dnl Checks for libraries.
 dnl AC_CHECK_LIB(m, pow)
@@ -131,7 +198,7 @@ AC_CHECK_FUNC(nanosleep, , AC_CHECK_LIB(posix4, nanosleep))
 
 dnl Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS(net/bpf.h sys/ioctl.h)
+AC_CHECK_HEADERS(net/bpf.h sys/ioctl.h sys/un.h netdb.h)
 
 # We test whether they specified openssl desires explicitly
 use_openssl="yes"
@@ -191,17 +258,27 @@ AC_SEARCH_LIBS(dlopen, dl)
 
 OPENSSL_LIBS=
 if test "$use_openssl" = "yes"; then
-  AC_DEFINE(HAVE_OPENSSL)
+  AC_DEFINE(HAVE_OPENSSL, 1, [openssl is available])
   OPENSSL_LIBS="-lssl -lcrypto"
-  LIBS="$LIBS $OPENSSL_LIBS"
+  LIBS_TMP="$LIBS"
+  LIBS="$OPENSSL_LIBS $LIBS"
+  AC_MSG_CHECKING([for SSL_set_tlsext_host_name])
+  AC_TRY_LINK([#include <openssl/ssl.h>], [SSL_set_tlsext_host_name(NULL, NULL)],
+    [AC_MSG_RESULT([yes]); AC_DEFINE(HAVE_SSL_SET_TLSEXT_HOST_NAME, 1, [SSL_set_tlsext_host_name available])],
+    [AC_MSG_RESULT([no])])
+  AC_MSG_CHECKING([for DTLS_client_method])
+  AC_TRY_LINK([#include <openssl/ssl.h>], [DTLS_client_method()],
+    [AC_MSG_RESULT([yes]); AC_DEFINE(HAVE_DTLS_CLIENT_METHOD, 1, [DTLS_client_method available])],
+    [AC_MSG_RESULT([no])])
+  AC_MSG_CHECKING([for SSL_set_alpn_protos])
+  AC_TRY_LINK([#include <openssl/ssl.h>], [SSL_set_alpn_protos(NULL, NULL, 0)],
+    [AC_MSG_RESULT([yes]); AC_DEFINE(HAVE_ALPN_SUPPORT, 1, [SSL ALPN protos support])],
+    [AC_MSG_RESULT([no])])
+  LIBS="$LIBS_TMP"
+
 fi
 
 AC_SUBST(OPENSSL_LIBS)
-
-AC_MSG_CHECKING([for SSL_set_tlsext_host_name])
-AC_TRY_LINK([#include <openssl/ssl.h>], [SSL_set_tlsext_host_name(NULL, NULL)],
-  [AC_MSG_RESULT([yes]); AC_DEFINE(HAVE_SSL_SET_TLSEXT_HOST_NAME)],
-  [AC_MSG_RESULT([no])])
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 
@@ -214,8 +291,10 @@ AC_ARG_WITH(libnbase,
     NBASEDIR="$with_libnbase"
     ;;
   esac],
-NBASEDIR="../../nbase"
+NBASEDIR="${top_nmap_srcdir}/nbase"
 )
+
+NSOCKTESTDIR="../tests"
 
 LDFLAGS="$LDFLAGS -L$NBASEDIR"
 CPPFLAGS="$CPPFLAGS -I$NBASEDIR"
@@ -223,7 +302,8 @@ LIBNBASE_LIBS="$LIBS -lnbase"
 
 AC_SUBST(LIBNBASE_LIBS)
 AC_SUBST(NBASEDIR)
+AC_SUBST(NSOCKTESTDIR)
 
 AC_SUBST(CFLAGS)
 
-AC_OUTPUT(Makefile)
+AC_OUTPUT()

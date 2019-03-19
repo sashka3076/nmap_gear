@@ -4,90 +4,130 @@
  *                                                                         *
  ***********************IMPORTANT NMAP LICENSE TERMS************************
  *                                                                         *
- * The Nmap Security Scanner is (C) 1996-2011 Insecure.Com LLC. Nmap is    *
- * also a registered trademark of Insecure.Com LLC.  This program is free  *
- * software; you may redistribute and/or modify it under the terms of the  *
- * GNU General Public License as published by the Free Software            *
- * Foundation; Version 2 with the clarifications and exceptions described  *
- * below.  This guarantees your right to use, modify, and redistribute     *
- * this software under certain conditions.  If you wish to embed Nmap      *
- * technology into proprietary software, we sell alternative licenses      *
- * (contact sales@insecure.com).  Dozens of software vendors already       *
- * license Nmap technology such as host discovery, port scanning, OS       *
- * detection, and version detection.                                       *
+ * The Nmap Security Scanner is (C) 1996-2018 Insecure.Com LLC ("The Nmap  *
+ * Project"). Nmap is also a registered trademark of the Nmap Project.     *
+ * This program is free software; you may redistribute and/or modify it    *
+ * under the terms of the GNU General Public License as published by the   *
+ * Free Software Foundation; Version 2 ("GPL"), BUT ONLY WITH ALL OF THE   *
+ * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
+ * right to use, modify, and redistribute this software under certain      *
+ * conditions.  If you wish to embed Nmap technology into proprietary      *
+ * software, we sell alternative licenses (contact sales@nmap.com).        *
+ * Dozens of software vendors already license Nmap technology such as      *
+ * host discovery, port scanning, OS detection, version detection, and     *
+ * the Nmap Scripting Engine.                                              *
  *                                                                         *
- * Note that the GPL places important restrictions on "derived works", yet *
- * it does not provide a detailed definition of that term.  To avoid       *
- * misunderstandings, we consider an application to constitute a           *
- * "derivative work" for the purpose of this license if it does any of the *
- * following:                                                              *
- * o Integrates source code from Nmap                                      *
- * o Reads or includes Nmap copyrighted data files, such as                *
- *   nmap-os-db or nmap-service-probes.                                    *
- * o Executes Nmap and parses the results (as opposed to typical shell or  *
- *   execution-menu apps, which simply display raw Nmap output and so are  *
- *   not derivative works.)                                                *
- * o Integrates/includes/aggregates Nmap into a proprietary executable     *
- *   installer, such as those produced by InstallShield.                   *
- * o Links to a library or executes a program that does any of the above   *
+ * Note that the GPL places important restrictions on "derivative works",  *
+ * yet it does not provide a detailed definition of that term.  To avoid   *
+ * misunderstandings, we interpret that term as broadly as copyright law   *
+ * allows.  For example, we consider an application to constitute a        *
+ * derivative work for the purpose of this license if it does any of the   *
+ * following with any software or content covered by this license          *
+ * ("Covered Software"):                                                   *
  *                                                                         *
- * The term "Nmap" should be taken to also include any portions or derived *
- * works of Nmap.  This list is not exclusive, but is meant to clarify our *
- * interpretation of derived works with some common examples.  Our         *
- * interpretation applies only to Nmap--we don't speak for other people's  *
- * GPL works.                                                              *
+ * o Integrates source code from Covered Software.                         *
  *                                                                         *
- * If you have any questions about the GPL licensing restrictions on using *
- * Nmap in non-GPL works, we would be happy to help.  As mentioned above,  *
- * we also offer alternative license to integrate Nmap into proprietary    *
- * applications and appliances.  These contracts have been sold to dozens  *
- * of software vendors, and generally include a perpetual license as well  *
- * as providing for priority support and updates as well as helping to     *
- * fund the continued development of Nmap technology.  Please email        *
- * sales@insecure.com for further information.                             *
+ * o Reads or includes copyrighted data files, such as Nmap's nmap-os-db   *
+ * or nmap-service-probes.                                                 *
  *                                                                         *
- * As a special exception to the GPL terms, Insecure.Com LLC grants        *
+ * o Is designed specifically to execute Covered Software and parse the    *
+ * results (as opposed to typical shell or execution-menu apps, which will *
+ * execute anything you tell them to).                                     *
+ *                                                                         *
+ * o Includes Covered Software in a proprietary executable installer.  The *
+ * installers produced by InstallShield are an example of this.  Including *
+ * Nmap with other software in compressed or archival form does not        *
+ * trigger this provision, provided appropriate open source decompression  *
+ * or de-archiving software is widely available for no charge.  For the    *
+ * purposes of this license, an installer is considered to include Covered *
+ * Software even if it actually retrieves a copy of Covered Software from  *
+ * another source during runtime (such as by downloading it from the       *
+ * Internet).                                                              *
+ *                                                                         *
+ * o Links (statically or dynamically) to a library which does any of the  *
+ * above.                                                                  *
+ *                                                                         *
+ * o Executes a helper program, module, or script to do any of the above.  *
+ *                                                                         *
+ * This list is not exclusive, but is meant to clarify our interpretation  *
+ * of derived works with some common examples.  Other people may interpret *
+ * the plain GPL differently, so we consider this a special exception to   *
+ * the GPL that we apply to Covered Software.  Works which meet any of     *
+ * these conditions must conform to all of the terms of this license,      *
+ * particularly including the GPL Section 3 requirements of providing      *
+ * source code and allowing free redistribution of the work as a whole.    *
+ *                                                                         *
+ * As another special exception to the GPL terms, the Nmap Project grants  *
  * permission to link the code of this program with any version of the     *
  * OpenSSL library which is distributed under a license identical to that  *
  * listed in the included docs/licenses/OpenSSL.txt file, and distribute   *
- * linked combinations including the two. You must obey the GNU GPL in all *
- * respects for all of the code used other than OpenSSL.  If you modify    *
- * this file, you may extend this exception to your version of the file,   *
- * but you are not obligated to do so.                                     *
+ * linked combinations including the two.                                  *
  *                                                                         *
- * If you received these files with a written license agreement or         *
- * contract stating terms other than the terms above, then that            *
- * alternative license agreement takes precedence over these comments.     *
+ * The Nmap Project has permission to redistribute Npcap, a packet         *
+ * capturing driver and library for the Microsoft Windows platform.        *
+ * Npcap is a separate work with it's own license rather than this Nmap    *
+ * license.  Since the Npcap license does not permit redistribution        *
+ * without special permission, our Nmap Windows binary packages which      *
+ * contain Npcap may not be redistributed without special permission.      *
+ *                                                                         *
+ * Any redistribution of Covered Software, including any derived works,    *
+ * must obey and carry forward all of the terms of this license, including *
+ * obeying all GPL rules and restrictions.  For example, source code of    *
+ * the whole work must be provided and free redistribution must be         *
+ * allowed.  All GPL references to "this License", are to be treated as    *
+ * including the terms and conditions of this license text as well.        *
+ *                                                                         *
+ * Because this license imposes special exceptions to the GPL, Covered     *
+ * Work may not be combined (even as part of a larger work) with plain GPL *
+ * software.  The terms, conditions, and exceptions of this license must   *
+ * be included as well.  This license is incompatible with some other open *
+ * source licenses as well.  In some cases we can relicense portions of    *
+ * Nmap or grant special permissions to use it in other open source        *
+ * software.  Please contact fyodor@nmap.org with any such requests.       *
+ * Similarly, we don't incorporate incompatible open source software into  *
+ * Covered Software without special permission from the copyright holders. *
+ *                                                                         *
+ * If you have any questions about the licensing restrictions on using     *
+ * Nmap in other works, we are happy to help.  As mentioned above, we also *
+ * offer an alternative license to integrate Nmap into proprietary         *
+ * applications and appliances.  These contracts have been sold to dozens  *
+ * of software vendors, and generally include a perpetual license as well  *
+ * as providing support and updates.  They also fund the continued         *
+ * development of Nmap.  Please email sales@nmap.com for further           *
+ * information.                                                            *
+ *                                                                         *
+ * If you have received a written license agreement or contract for        *
+ * Covered Software stating terms other than these, you may choose to use  *
+ * and redistribute Covered Software under those terms instead of these.   *
  *                                                                         *
  * Source is provided to this software because we believe users have a     *
  * right to know exactly what a program is going to do before they run it. *
- * This also allows you to audit the software for security holes (none     *
- * have been found so far).                                                *
+ * This also allows you to audit the software for security holes.          *
  *                                                                         *
  * Source code also allows you to port Nmap to new platforms, fix bugs,    *
  * and add new features.  You are highly encouraged to send your changes   *
- * to nmap-dev@insecure.org for possible incorporation into the main       *
- * distribution.  By sending these changes to Fyodor or one of the         *
- * Insecure.Org development mailing lists, it is assumed that you are      *
- * offering the Nmap Project (Insecure.Com LLC) the unlimited,             *
+ * to the dev@nmap.org mailing list for possible incorporation into the    *
+ * main distribution.  By sending these changes to Fyodor or one of the    *
+ * Insecure.Org development mailing lists, or checking them into the Nmap  *
+ * source code repository, it is understood (unless you specify            *
+ * otherwise) that you are offering the Nmap Project the unlimited,        *
  * non-exclusive right to reuse, modify, and relicense the code.  Nmap     *
- * will always be available Open Source, but this is important because the *
- * inability to relicense code has caused devastating problems for other   *
- * Free Software projects (such as KDE and NASM).  We also occasionally    *
- * relicense the code to third parties as discussed above.  If you wish to *
- * specify special license conditions of your contributions, just say so   *
- * when you send them.                                                     *
+ * will always be available Open Source, but this is important because     *
+ * the inability to relicense code has caused devastating problems for     *
+ * other Free Software projects (such as KDE and NASM).  We also           *
+ * occasionally relicense the code to third parties as discussed above.    *
+ * If you wish to specify special license conditions of your               *
+ * contributions, just say so when you send them.                          *
  *                                                                         *
  * This program is distributed in the hope that it will be useful, but     *
  * WITHOUT ANY WARRANTY; without even the implied warranty of              *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU       *
- * General Public License v2.0 for more details at                         *
- * http://www.gnu.org/licenses/gpl-2.0.html , or in the COPYING file       *
- * included with Nmap.                                                     *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the Nmap      *
+ * license file for more details (it's in a COPYING file included with     *
+ * Nmap, and also available from https://svn.nmap.org/nmap/COPYING)        *
  *                                                                         *
  ***************************************************************************/
 
-/* $Id: portlist.cc 21904 2011-01-21 00:04:16Z fyodor $ */
+/* $Id: portlist.cc 37126 2018-01-28 21:18:17Z fyodor $ */
 
 
 #include "nmap.h"
@@ -96,11 +136,8 @@
 #include "NmapOps.h"
 #include "services.h"
 #include "protocols.h"
-#include "nmap_rpc.h"
 #include "tcpip.h"
 #include "libnetutil/netutil.h"
-
-using namespace std;
 
 #if HAVE_STRINGS_H
 #include <strings.h>
@@ -115,8 +152,10 @@ Port::Port() {
   state_reason_init(&reason);
 }
 
-void Port::freeService() {
+void Port::freeService(bool del_service) {
   if (service != NULL) {
+    std::vector<char *>::iterator it;
+
     if (service->name)
       free(service->name);
     if (service->product)
@@ -133,8 +172,23 @@ void Port::freeService() {
       free(service->devicetype);
     if (service->service_fp)
       free(service->service_fp);
-    delete service;
+    for (it = service->cpe.begin(); it != service->cpe.end(); it++)
+      free(*it);
+    service->cpe.clear();
+
+    if (del_service)
+      delete service;
   }
+}
+
+void Port::freeScriptResults(void)
+{
+#ifndef NOLUA
+  while (!scriptResults.empty()) {
+    scriptResults.front().clear();
+    scriptResults.pop_front();
+  }
+#endif
 }
 
 /* Fills in namebuf (as long as there is space in buflen) with the
@@ -156,7 +210,7 @@ void Port::getNmapServiceName(char *namebuf, int buflen) const {
   } else {
     struct servent *service;
 
-    service = nmap_getservbyport(htons(portno), IPPROTO2STR(proto));
+    service = nmap_getservbyport(portno, IPPROTO2STR(proto));
     if (service != NULL)
       service_name = service->s_name;
     else
@@ -172,8 +226,11 @@ void Port::getNmapServiceName(char *namebuf, int buflen) const {
   } else {
     len = Snprintf(namebuf, buflen, "%sunknown", tunnel_prefix);
   }
-  if (len >= buflen || len < 0)
+  if (len >= buflen || len < 0) {
     namebuf[0] = '\0';
+    return;
+  }
+
 }
 
 serviceDeductions::serviceDeductions() {
@@ -188,10 +245,6 @@ serviceDeductions::serviceDeductions() {
   service_tunnel = SERVICE_TUNNEL_NONE;
   service_fp = NULL;
   dtype = SERVICE_DETECTION_TABLE;
-  rpc_status = RPC_STATUS_UNTESTED;
-  rpc_program = 0;
-  rpc_lowver = 0;
-  rpc_highver = 0;
 }
 
 // Uses the sd->{product,version,extrainfo} if available to fill
@@ -228,7 +281,7 @@ void serviceDeductions::populateFullVersionString(char *buf, size_t n) const {
       strncat(dst, " ", spaceleft);
       spaceleft--;
     }
-    
+
     if (spaceleft < strlen(version)) {
       strncat(dst, version, spaceleft - 3);
       strncat(dst, "...", spaceleft);
@@ -246,7 +299,7 @@ void serviceDeductions::populateFullVersionString(char *buf, size_t n) const {
       strncat(dst, " ", spaceleft);
       spaceleft--;
     }
-    // This time we need to trucate inside of the () so we have spaceleft - 2
+    // This time we need to truncate inside of the () so we have spaceleft - 2
     strncat(dst, "(", spaceleft);
     if (spaceleft - 2 < strlen(extrainfo)) {
       strncat(dst, extrainfo, spaceleft - 5);
@@ -268,7 +321,7 @@ void serviceDeductions::populateFullVersionString(char *buf, size_t n) const {
 // initializing, and you don't have to free any internal ptrs.  See the
 // serviceDeductions definition for the fields that are populated.
 // Returns 0 if at least a name is available.
-const void PortList::getServiceDeductions(u16 portno, int protocol, struct serviceDeductions *sd) const {
+void PortList::getServiceDeductions(u16 portno, int protocol, struct serviceDeductions *sd) const {
   const Port *port;
 
   port = lookupPort(portno, protocol);
@@ -277,7 +330,7 @@ const void PortList::getServiceDeductions(u16 portno, int protocol, struct servi
 
     /* Look up the service name. */
     *sd = serviceDeductions();
-    service = nmap_getservbyport(htons(portno), IPPROTO2STR(protocol));
+    service = nmap_getservbyport(portno, IPPROTO2STR(protocol));
     if (service != NULL)
       sd->name = service->s_name;
     else
@@ -305,14 +358,14 @@ static char *cstringSanityCheck(const char* string, int len) {
   int slen;
 
   if(!string)
-	  return NULL;
+          return NULL;
 
   slen = strlen(string);
   if (slen > len) slen = len;
   result = (char *) safe_malloc(slen + 1);
   memcpy(result, string, slen);
   result[slen] = '\0';
-  replacenonprintable(result, slen, '.'); 
+  replacenonprintable(result, slen, '.');
   return result;
 }
 
@@ -320,8 +373,11 @@ void PortList::setServiceProbeResults(u16 portno, int protocol,
   enum serviceprobestate sres, const char *sname,
   enum service_tunnel_type tunnel, const char *product, const char *version,
   const char *extrainfo, const char *hostname, const char *ostype,
-  const char *devicetype, const char *fingerprint) {
+  const char *devicetype, const std::vector<const char *> *cpe,
+  const char *fingerprint) {
+  std::vector<char *>::iterator it;
   Port *port;
+  char *p;
 
   port = createPort(portno, protocol);
   if (port->service == NULL)
@@ -341,7 +397,7 @@ void PortList::setServiceProbeResults(u16 portno, int protocol,
        Just look up the service name if none is provided. */
     if (sname == NULL) {
       struct servent *service;
-      service = nmap_getservbyport(htons(portno), IPPROTO2STR(protocol));
+      service = nmap_getservbyport(portno, IPPROTO2STR(protocol));
       if (service != NULL)
         sname = service->s_name;
     }
@@ -352,14 +408,16 @@ void PortList::setServiceProbeResults(u16 portno, int protocol,
   // port->serviceprobe_results = sres;
   port->service->service_tunnel = tunnel;
 
-  if (sname) 
+  port->freeService(false);
+
+  if (sname)
     port->service->name = strdup(sname);
   else
     port->service->name = NULL;
 
-  if (fingerprint) 
+  if (fingerprint)
     port->service->service_fp = strdup(fingerprint);
-  else 
+  else
     port->service->service_fp = NULL;
 
   port->service->product = cstringSanityCheck(product, 80);
@@ -368,49 +426,15 @@ void PortList::setServiceProbeResults(u16 portno, int protocol,
   port->service->hostname = cstringSanityCheck(hostname, 80);
   port->service->ostype = cstringSanityCheck(ostype, 32);
   port->service->devicetype = cstringSanityCheck(devicetype, 32);
-}
 
-/* Sets the results of an RPC scan.  if rpc_status is not
-   RPC_STATUS_GOOD_PROGRAM, pass 0 for the other args.  This function
-   takes care of setting the port's service and version appropriately. */
-void PortList::setRPCProbeResults(u16 portno, int proto, int rpcs, unsigned long rpcp, 
-			unsigned int rpcl, unsigned int rpch) {
-  Port *port;
-  const char *newsvc;
-  char verbuf[128];
+  if (cpe) {
+    std::vector<const char *>::const_iterator cit;
 
-  port = createPort(portno, proto);
-  if (port->service == NULL)
-    port->service = new serviceDeductions;
-
-  port->service->rpc_status = rpcs;
-  if (port->service->rpc_status == RPC_STATUS_GOOD_PROG) {
-    port->service->rpc_program = rpcp;
-    port->service->rpc_lowver = rpcl;
-    port->service->rpc_highver = rpch;
-
-    // Now set the service/version info
-    newsvc = nmap_getrpcnamebynum(rpcp);
-    if (!newsvc) newsvc = "rpc.unknownprog"; // should never happen
-    if (port->service->name)
-      free(port->service->name);
-    port->service->name = strdup(newsvc);
-    if (port->service->rpc_lowver == port->service->rpc_highver)
-      Snprintf(verbuf, sizeof(verbuf), "%i", port->service->rpc_lowver);
-    else
-      Snprintf(verbuf, sizeof(verbuf), "%i-%i", port->service->rpc_lowver, port->service->rpc_highver);
-    port->service->version = strdup(verbuf);
-    Snprintf(verbuf, sizeof(verbuf), "rpc #%li", port->service->rpc_program);
-    port->service->extrainfo = strdup(verbuf);
-    port->service->name_confidence = 10;
-    port->service->dtype = SERVICE_DETECTION_PROBED;
-  } else if (port->service->rpc_status == RPC_STATUS_UNKNOWN) {
-    if (port->service->name)
-      free(port->service->name);
-    
-    port->service->name = strdup("rpc.unknown");
-    port->service->name_confidence = 8;
-    port->service->dtype = SERVICE_DETECTION_PROBED;
+    for (cit = cpe->begin(); cit != cpe->end(); cit++) {
+      p = cstringSanityCheck(*cit, 80);
+      if (p != NULL)
+        port->service->cpe.push_back(p);
+    }
   }
 }
 
@@ -461,16 +485,17 @@ PortList::PortList() {
 PortList::~PortList() {
   int proto, i;
 
-  if (idstr) { 
+  if (idstr) {
     free(idstr);
     idstr = NULL;
   }
 
   for(proto=0; proto < PORTLIST_PROTO_MAX; proto++) { // for every protocol
     if(port_list[proto]) {
-      for(i=0; i < port_list_count[proto]; i++) { // free every Port 
+      for(i=0; i < port_list_count[proto]; i++) { // free every Port
         if(port_list[proto][i]) {
-          port_list[proto][i]->freeService();
+          port_list[proto][i]->freeService(true);
+          port_list[proto][i]->freeScriptResults();
           delete port_list[proto][i];
         }
       }
@@ -502,15 +527,15 @@ void PortList::setPortState(u16 portno, u8 protocol, int state) {
 
   if ((state == PORT_OPEN && o.verbose) || (o.debugging > 1)) {
     log_write(LOG_STDOUT, "Discovered %s port %hu/%s%s\n",
-	      statenum2str(state), portno, 
-	      proto2ascii_lowercase(protocol), idstr? idstr : "");
+              statenum2str(state), portno,
+              proto2ascii_lowercase(protocol), idstr? idstr : "");
     log_flush(LOG_STDOUT);
   }
 
 
   /* Make sure state is OK */
   if (state != PORT_OPEN && state != PORT_CLOSED && state != PORT_FILTERED &&
-      state != PORT_UNFILTERED && state != PORT_OPENFILTERED && 
+      state != PORT_UNFILTERED && state != PORT_OPENFILTERED &&
       state != PORT_CLOSEDFILTERED)
     fatal("%s: attempt to add port number %d with illegal state %d\n", __func__, portno, state);
 
@@ -522,18 +547,18 @@ void PortList::setPortState(u16 portno, u8 protocol, int state) {
        if a complete duplicate */
     if (o.debugging && oldport->state == state) {
       error("Duplicate port (%hu/%s)", portno, proto2ascii_lowercase(protocol));
-    } 
+    }
     state_counts_proto[proto][oldport->state]--;
   } else {
     state_counts_proto[proto][default_port_state[proto].state]--;
   }
   current = createPort(portno, protocol);
-  
+
   current->state = state;
   state_counts_proto[proto][state]++;
- 
+
   if(state == PORT_FILTERED || state == PORT_OPENFILTERED)
-  	setStateReason(portno, protocol, ER_NORESPONSE, 0, 0); 
+    setStateReason(portno, protocol, ER_NORESPONSE, 0, NULL);
   return;
 }
 
@@ -548,7 +573,7 @@ int PortList::getPortState(u16 portno, u8 protocol) {
 }
 
 /* Return true if nothing special is known about this port; i.e., it's in the
-   default state as defiend by setDefaultPortState and every other data field is
+   default state as defined by setDefaultPortState and every other data field is
    unset. */
 bool PortList::portIsDefault(u16 portno, u8 protocol) {
   return lookupPort(portno, protocol) == NULL;
@@ -591,14 +616,14 @@ int PortList::getStateCounts(int state) const {
    except that if you ask for both TCP, UDP & SCTP, every TCP port
    will be returned before we start returning UDP and SCTP ports */
 Port *PortList::nextPort(const Port *cur, Port *next,
-			 int allowed_protocol, int allowed_state) {
+                         int allowed_protocol, int allowed_state) {
   int proto;
   int mapped_pno;
   Port *port;
-  
+
   if (cur) {
     proto = INPROTO2PORTLISTPROTO(cur->proto);
-    assert(port_map[proto]!=NULL); // Hmm, it's not posible to handle port that doesn't have anything in map
+    assert(port_map[proto]!=NULL); // Hmm, it's not possible to handle port that doesn't have anything in map
     assert(cur->proto!=IPPROTO_IP || cur->portno<256);
     mapped_pno = port_map[proto][cur->portno];
     mapped_pno++; //  we're interested in next port after current
@@ -611,7 +636,7 @@ Port *PortList::nextPort(const Port *cur, Port *next,
       proto = INPROTO2PORTLISTPROTO(allowed_protocol);
     mapped_pno = 0;
   }
-  
+
   if(port_list[proto] != NULL) {
     for(;mapped_pno < port_list_count[proto]; mapped_pno++) {
       port = port_list[proto][mapped_pno];
@@ -626,7 +651,7 @@ Port *PortList::nextPort(const Port *cur, Port *next,
       }
     }
   }
-  
+
   /* if all protocols, than after TCP search UDP & SCTP */
   if((!cur && allowed_protocol == TCPANDUDPANDSCTP) ||
       (cur && proto == INPROTO2PORTLISTPROTO(IPPROTO_TCP)))
@@ -636,13 +661,13 @@ Port *PortList::nextPort(const Port *cur, Port *next,
   if((!cur && allowed_protocol == UDPANDSCTP) ||
       (cur && proto == INPROTO2PORTLISTPROTO(IPPROTO_UDP)))
     return(nextPort(NULL, next, IPPROTO_SCTP, allowed_state));
-  
-  return(NULL); 
+
+  return(NULL);
 }
 
 /* Convert portno and protocol into the internal indices used to index
-   port_list. Returns false on error, true otherwise. */
-bool PortList::mapPort(u16 *portno, u8 *protocol) const {
+   port_list. */
+void PortList::mapPort(u16 *portno, u8 *protocol) const {
   int mapped_portno, mapped_protocol;
 
   mapped_protocol = INPROTO2PORTLISTPROTO(*protocol);
@@ -650,24 +675,19 @@ bool PortList::mapPort(u16 *portno, u8 *protocol) const {
   if (*protocol == IPPROTO_IP)
     assert(*portno < 256);
   if(port_map[mapped_protocol]==NULL || port_list[mapped_protocol]==NULL) {
-    assert(0);
     fatal("%s(%i,%i): you're trying to access uninitialized protocol", __func__, *portno, *protocol);
   }
   mapped_portno = port_map[mapped_protocol][*portno];
 
   assert(mapped_portno < port_list_count[mapped_protocol]);
   assert(mapped_portno >= 0);
-  
+
   *portno = mapped_portno;
   *protocol = mapped_protocol;
-
-  return true;
 }
 
 const Port *PortList::lookupPort(u16 portno, u8 protocol) const {
-  if (!mapPort(&portno, &protocol))
-    return NULL;
-
+  mapPort(&portno, &protocol);
   return port_list[protocol][portno];
 }
 
@@ -679,8 +699,7 @@ Port *PortList::createPort(u16 portno, u8 protocol) {
 
   mapped_portno = portno;
   mapped_protocol = protocol;
-  if (!mapPort(&mapped_portno, &mapped_protocol))
-    return NULL;
+  mapPort(&mapped_portno, &mapped_protocol);
 
   p = port_list[mapped_protocol][mapped_portno];
   if (p == NULL) {
@@ -700,8 +719,7 @@ int PortList::forgetPort(u16 portno, u8 protocol) {
 
   log_write(LOG_PLAIN, "Removed %d\n", portno);
 
-  if (!mapPort(&portno, &protocol))
-    return -1;
+  mapPort(&portno, &protocol);
 
   answer = port_list[protocol][portno];
   if (answer == NULL)
@@ -709,22 +727,21 @@ int PortList::forgetPort(u16 portno, u8 protocol) {
 
   state_counts_proto[protocol][answer->state]--;
   state_counts_proto[protocol][default_port_state[protocol].state]++;
-    
-  delete answer;
 
   port_list[protocol][portno] = NULL;
 
-  if (o.verbose) {  
+  if (o.verbose) {
     log_write(LOG_STDOUT, "Deleting port %hu/%s, which we thought was %s\n",
-	      portno, proto2ascii_lowercase(answer->proto),
-	      statenum2str(answer->state));
+              portno, proto2ascii_lowercase(answer->proto),
+              statenum2str(answer->state));
     log_flush(LOG_STDOUT);
-  }    
+  }
 
+  delete answer;
   return 0;
 }
 
-/* Just free memory used by PortList::port_map[]. Should be done somewhere 
+/* Just free memory used by PortList::port_map[]. Should be done somewhere
  * before closing nmap. */
 void PortList::freePortMap() {
   int proto;
@@ -741,31 +758,31 @@ void PortList::freePortMap() {
     port_list_count[proto] = 0;
   }
 }
-  
+
 
 u16 *PortList::port_map[PORTLIST_PROTO_MAX];
 u16 *PortList::port_map_rev[PORTLIST_PROTO_MAX];
 int PortList::port_list_count[PORTLIST_PROTO_MAX];
 
-/* This function must be runned before any PortList object is created.
- * It must be runned for every used protocol. The data in "ports" 
+/* This function must be run before any PortList object is created.
+ * It must be run for every used protocol. The data in "ports"
  * should be sorted. */
 void PortList::initializePortMap(int protocol, u16 *ports, int portcount) {
   int i;
   int ports_max = (protocol == IPPROTO_IP) ? 256 : 65536;
   int proto = INPROTO2PORTLISTPROTO(protocol);
-  
+
   if (port_map[proto] != NULL || port_map_rev[proto] != NULL)
     fatal("%s: portmap for protocol %i already initialized", __func__, protocol);
 
   assert(port_list_count[proto]==0);
-  
+
   /* this memory will never be freed, but this is the way it has to be. */
   port_map[proto] = (u16 *) safe_zalloc(sizeof(u16) * ports_max);
   port_map_rev[proto] = (u16 *) safe_zalloc(sizeof(u16) * portcount);
 
   port_list_count[proto] = portcount;
-  
+
   for(i=0; i < portcount; i++) {
     port_map[proto][ports[i]] = i;
     port_map_rev[proto][i] = ports[i];
@@ -777,7 +794,7 @@ void PortList::initializePortMap(int protocol, u16 *ports, int portcount) {
 
   /* Cycles through the 0 or more "ignored" ports which should be
    consolidated for Nmap output.  They are returned sorted by the
-   number of prots in the state, starting with the most common.  It
+   number of ports in the state, starting with the most common.  It
    should first be called with PORT_UNKNOWN to obtain the most popular
    ignored state (if any).  Then call with that state to get the next
    most popular one.  Returns the state if there is one, but returns
@@ -786,10 +803,10 @@ void PortList::initializePortMap(int protocol, u16 *ports, int portcount) {
 int PortList::nextIgnoredState(int prevstate) {
 
   int beststate = PORT_UNKNOWN;
-  
+
   for(int state=0; state < PORT_HIGHEST_STATE; state++) {
     /* The state must be ignored */
-    if (!isIgnoredState(state)) 
+    if (!isIgnoredState(state))
       continue;
 
     /* We can't give the same state again ... */
@@ -797,9 +814,9 @@ int PortList::nextIgnoredState(int prevstate) {
 
     /* If a previous state was given, we must have fewer ports than
        that one, or be tied but be a larger state number */
-    if (prevstate != PORT_UNKNOWN && 
-	(getStateCounts(state) > getStateCounts(prevstate) ||
-	 (getStateCounts(state) == getStateCounts(prevstate) && state <= prevstate)))
+    if (prevstate != PORT_UNKNOWN &&
+        (getStateCounts(state) > getStateCounts(prevstate) ||
+         (getStateCounts(state) == getStateCounts(prevstate) && state <= prevstate)))
       continue;
 
     /* We only qualify if we have more ports than the current best */
@@ -828,7 +845,7 @@ bool PortList::isIgnoredState(int state) {
 
   /* If openonly, we always ignore states that don't at least have open
      as a possibility. */
-  if (o.openOnly() && state != PORT_OPENFILTERED && state != PORT_UNFILTERED 
+  if (o.openOnly() && state != PORT_OPENFILTERED && state != PORT_UNFILTERED
       && getStateCounts(state) > 0)
     return true;
 
@@ -882,17 +899,48 @@ bool PortList::hasOpenPorts() const {
     getStateCounts(PORT_UNFILTERED) != 0;
 }
 
-int PortList::setStateReason(u16 portno, u8 proto, reason_t reason, u8 ttl, u32 ip_addr) {
+/* Returns true if service scan is done and portno is found to be tcpwrapped, false otherwise */
+bool PortList::isTCPwrapped(u16 portno) const {
+  const Port *port = lookupPort(portno, IPPROTO_TCP);
+  if (port == NULL) {
+    if (o.debugging > 1) {
+      log_write(LOG_STDOUT, "PortList::isTCPwrapped(%d) requested but port not in list\n", portno);
+    }
+    return false;
+  } else if (!o.servicescan) {
+    if (o.debugging > 1) {
+      log_write(LOG_STDOUT, "PortList::isTCPwrapped(%d) requested but service scan was never asked to be done\n", portno);
+    }
+    return false;
+  } else if (port->service == NULL) {
+    if (o.debugging > 1) {
+      log_write(LOG_STDOUT, "PortList::isTCPwrapped(%d) requested but port has not been service scanned yet\n", portno);
+    }
+    return false;
+  } else if (port->service->name == NULL) {
+    // no service match and port not listed in services file
+    if (o.debugging > 1) {
+      log_write(LOG_STDOUT, "PortList::isTCPwrapped(%d) requested but service has no name\n", portno);
+    }
+    return false;
+  } else {
+    return (strcmp(port->service->name,"tcpwrapped")==0);
+  }
+}
+
+int PortList::setStateReason(u16 portno, u8 proto, reason_t reason, u8 ttl,
+  const struct sockaddr_storage *ip_addr) {
     Port *answer = NULL;
 
-    if(reason > ER_MAX)
-        return -1;
     answer = createPort(portno, proto);
 
     /* set new reason and increment its count */
     answer->reason.reason_id = reason;
-    answer->reason.ip_addr.s_addr = ip_addr;
-	answer->reason.ttl = ttl;
+    if (ip_addr == NULL)
+      answer->reason.ip_addr.sockaddr.sa_family = AF_UNSPEC;
+    else
+      answer->reason.set_ip_addr(ip_addr);
+    answer->reason.ttl = ttl;
     return 0;
 }
 
@@ -918,15 +966,42 @@ void random_port_cheat(u16 *ports, int portcount) {
     // see if the currentport is a popular port
     for(popportidx = 0; popportidx < num_pop_ports; popportidx++) {
       if (ports[allportidx] == pop_ports[popportidx]) {
-	// This one is popular!  Swap it near to the beginning.
-	if (allportidx != earlyreplidx) {
-	  ports[allportidx] = ports[earlyreplidx];
-	  ports[earlyreplidx] = pop_ports[popportidx];
-	}
-	earlyreplidx++;
-	break;
+        // This one is popular!  Swap it near to the beginning.
+        if (allportidx != earlyreplidx) {
+          ports[allportidx] = ports[earlyreplidx];
+          ports[earlyreplidx] = pop_ports[popportidx];
+        }
+        earlyreplidx++;
+        break;
       }
     }
   }
+}
+
+const char *statenum2str(int state) {
+  switch (state) {
+  case PORT_OPEN:
+    return "open";
+    break;
+  case PORT_FILTERED:
+    return "filtered";
+    break;
+  case PORT_UNFILTERED:
+    return "unfiltered";
+    break;
+  case PORT_CLOSED:
+    return "closed";
+    break;
+  case PORT_OPENFILTERED:
+    return "open|filtered";
+    break;
+  case PORT_CLOSEDFILTERED:
+    return "closed|filtered";
+    break;
+  default:
+    return "unknown";
+    break;
+  }
+  return "unknown";
 }
 

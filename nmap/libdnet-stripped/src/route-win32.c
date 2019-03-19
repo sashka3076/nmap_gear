@@ -21,14 +21,25 @@
 
 #include "dnet.h"
 
+typedef DWORD (WINAPI *GETIPFORWARDTABLE2)(ADDRESS_FAMILY, PMIB_IPFORWARD_TABLE2 *);
+
 struct route_handle {
+	HINSTANCE iphlpapi;
 	MIB_IPFORWARDTABLE *ipftable;
+	MIB_IPFORWARD_TABLE2 *ipftable2;
 };
 
 route_t *
 route_open(void)
 {
-	return (calloc(1, sizeof(route_t)));
+	route_t *r;
+
+	r = calloc(1, sizeof(route_t));
+	if (r == NULL)
+		return NULL;
+	r->iphlpapi = GetModuleHandle("iphlpapi.dll");
+
+	return r;
 }
 
 int
@@ -90,6 +101,8 @@ route_get(route_t *route, struct route_entry *entry)
 {
 	MIB_IPFORWARDROW ipfrow;
 	DWORD mask;
+	intf_t *intf;
+	struct intf_entry intf_entry;
 
 	if (entry->route_dst.addr_type != ADDR_TYPE_IP ||
 	    GetBestRoute(entry->route_dst.addr_ip,
@@ -109,52 +122,159 @@ route_get(route_t *route, struct route_entry *entry)
 	entry->route_gw.addr_type = ADDR_TYPE_IP;
 	entry->route_gw.addr_bits = IP_ADDR_BITS;
 	entry->route_gw.addr_ip = ipfrow.dwForwardNextHop;
+	entry->metric = ipfrow.dwForwardMetric1;
+
+	entry->intf_name[0] = '\0';
+	intf = intf_open();
+	if (intf_get_index(intf, &intf_entry,
+	    AF_INET, ipfrow.dwForwardIfIndex) == 0) {
+		strlcpy(entry->intf_name, intf_entry.intf_name, sizeof(entry->intf_name));
+	}
+	intf_close(intf);
 	
 	return (0);
 }
 
-int
-route_loop(route_t *r, route_handler callback, void *arg)
+static int
+route_loop_getipforwardtable(route_t *r, route_handler callback, void *arg)
 {
-	struct route_entry entry;
+ 	struct route_entry entry;
+	intf_t *intf;
 	ULONG len;
 	int i, ret;
-	
+ 	
 	for (len = sizeof(r->ipftable[0]); ; ) {
 		if (r->ipftable)
 			free(r->ipftable);
 		r->ipftable = malloc(len);
+		if (r->ipftable == NULL)
+			return (-1);
 		ret = GetIpForwardTable(r->ipftable, &len, FALSE);
 		if (ret == NO_ERROR)
 			break;
 		else if (ret != ERROR_INSUFFICIENT_BUFFER)
 			return (-1);
 	}
-	entry.route_dst.addr_type = ADDR_TYPE_IP;
-	entry.route_dst.addr_bits = IP_ADDR_BITS;
+
+	intf = intf_open();
 	
-	entry.route_gw.addr_type = ADDR_TYPE_IP;
-	entry.route_gw.addr_bits = IP_ADDR_BITS;
-	
+	ret = 0;
 	for (i = 0; i < (int)r->ipftable->dwNumEntries; i++) {
+		struct intf_entry intf_entry;
+
+		entry.route_dst.addr_type = ADDR_TYPE_IP;
+		entry.route_dst.addr_bits = IP_ADDR_BITS;
+
+		entry.route_gw.addr_type = ADDR_TYPE_IP;
+		entry.route_gw.addr_bits = IP_ADDR_BITS;
+
 		entry.route_dst.addr_ip = r->ipftable->table[i].dwForwardDest;
 		addr_mtob(&r->ipftable->table[i].dwForwardMask, IP_ADDR_LEN,
 		    &entry.route_dst.addr_bits);
 		entry.route_gw.addr_ip =
 		    r->ipftable->table[i].dwForwardNextHop;
+		entry.metric = r->ipftable->table[i].dwForwardMetric1;
+
+		/* Look up the interface name. */
+		entry.intf_name[0] = '\0';
+		intf_entry.intf_len = sizeof(intf_entry);
+		if (intf_get_index(intf, &intf_entry,
+		    AF_INET, r->ipftable->table[i].dwForwardIfIndex) == 0) {
+			strlcpy(entry.intf_name, intf_entry.intf_name, sizeof(entry.intf_name));
+		}
 		
 		if ((ret = (*callback)(&entry, arg)) != 0)
-			return (ret);
+			break;
 	}
-	return (0);
+
+	intf_close(intf);
+
+	return ret;
+}
+
+static int
+route_loop_getipforwardtable2(GETIPFORWARDTABLE2 GetIpForwardTable2,
+	route_t *r, route_handler callback, void *arg)
+{
+	struct route_entry entry;
+	intf_t *intf;
+	ULONG i;
+	int ret;
+	
+	ret = GetIpForwardTable2(AF_UNSPEC, &r->ipftable2);
+	if (ret != NO_ERROR)
+		return (-1);
+
+	intf = intf_open();
+
+	ret = 0;
+	for (i = 0; i < r->ipftable2->NumEntries; i++) {
+		struct intf_entry intf_entry;
+		MIB_IPFORWARD_ROW2 *row;
+		MIB_IPINTERFACE_ROW ifrow;
+		ULONG metric;
+
+		row = &r->ipftable2->Table[i];
+		addr_ston((struct sockaddr *) &row->DestinationPrefix.Prefix, &entry.route_dst);
+		entry.route_dst.addr_bits = row->DestinationPrefix.PrefixLength;
+		addr_ston((struct sockaddr *) &row->NextHop, &entry.route_gw);
+
+		/* Look up the interface name. */
+		entry.intf_name[0] = '\0';
+		intf_entry.intf_len = sizeof(intf_entry);
+		if (intf_get_index(intf, &intf_entry,
+		    row->DestinationPrefix.Prefix.si_family,
+		    row->InterfaceIndex) == 0) {
+			strlcpy(entry.intf_name, intf_entry.intf_name, sizeof(entry.intf_name));
+		}
+
+		ifrow.Family = row->DestinationPrefix.Prefix.si_family;
+		ifrow.InterfaceLuid = row->InterfaceLuid;
+		ifrow.InterfaceIndex = row->InterfaceIndex;
+		if (GetIpInterfaceEntry(&ifrow) != NO_ERROR) {
+			return (-1);
+		}
+		metric = ifrow.Metric + row->Metric;
+		if (metric < INT_MAX)
+			entry.metric = metric;
+		else
+			entry.metric = INT_MAX;
+		
+		if ((ret = (*callback)(&entry, arg)) != 0)
+			break;
+	}
+
+	intf_close(intf);
+
+	return ret;
+}
+
+int
+route_loop(route_t *r, route_handler callback, void *arg)
+{
+	GETIPFORWARDTABLE2 GetIpForwardTable2;
+
+	/* GetIpForwardTable2 is only available on Vista and later, dynamic load. */
+	GetIpForwardTable2 = NULL;
+	if (r->iphlpapi != NULL)
+		GetIpForwardTable2 = (GETIPFORWARDTABLE2) GetProcAddress(r->iphlpapi, "GetIpForwardTable2");
+
+	if (GetIpForwardTable2 == NULL)
+		return route_loop_getipforwardtable(r, callback, arg);
+	else
+		return route_loop_getipforwardtable2(GetIpForwardTable2, r, callback, arg);
 }
 
 route_t *
 route_close(route_t *r)
 {
 	if (r != NULL) {
+		if (r->iphlpapi != NULL)
+			FreeLibrary(r->iphlpapi);
 		if (r->ipftable != NULL)
 			free(r->ipftable);
+		if (r->ipftable2 != NULL)
+			FreeMibTable(r->ipftable2);
 		free(r);
 	}
 	return (NULL);
