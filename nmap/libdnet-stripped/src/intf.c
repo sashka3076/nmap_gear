@@ -685,17 +685,6 @@ _intf_get_aliases(intf_t *intf, struct intf_entry *entry)
 	return (0);
 }
 #else
-# ifdef HAVE_LINUX_PROCFS
-#  define PROC_INET6_FILE	"/proc/net/if_inet6"
-
-static FILE *proc_net_if_inet6_fp = NULL;
-
-void proc_net_if_inet6_init()
-{
-	if (proc_net_if_inet6_fp == NULL)
-		proc_net_if_inet6_fp = fopen(PROC_INET6_FILE, "r");
-}
-# endif
 static int
 _intf_get_aliases(intf_t *intf, struct intf_entry *entry)
 {
@@ -778,14 +767,15 @@ _intf_get_aliases(intf_t *intf, struct intf_entry *entry)
 		ap++, entry->intf_alias_num++;
 	}
 #ifdef HAVE_LINUX_PROCFS
+#define PROC_INET6_FILE	"/proc/net/if_inet6"
 	{
+		FILE *f;
 		char buf[256], s[8][5], name[INTF_NAME_LEN];
 		u_int idx, bits, scope, flags;
 		
-		proc_net_if_inet6_init();
-		if (proc_net_if_inet6_fp != NULL) {
+		if ((f = fopen(PROC_INET6_FILE, "r")) != NULL) {
 			while (ap < lap &&
-			       fgets(buf, sizeof(buf), proc_net_if_inet6_fp) != NULL) {
+			       fgets(buf, sizeof(buf), f) != NULL) {
 				/* scan up to INTF_NAME_LEN-1 bytes to reserve space for null terminator */
 				sscanf(buf, "%04s%04s%04s%04s%04s%04s%04s%04s %x %02x %02x %02x %15s\n",
 				    s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7],
@@ -797,7 +787,7 @@ _intf_get_aliases(intf_t *intf, struct intf_entry *entry)
 					ap++, entry->intf_alias_num++;
 				}
 			}
-			fclose(proc_net_if_inet6_fp);
+			fclose(f);
 		}
 	}
 #endif
@@ -908,37 +898,29 @@ intf_get_dst(intf_t *intf, struct intf_entry *entry, struct addr *dst)
 #ifdef HAVE_LINUX_PROCFS
 #define PROC_DEV_FILE	"/proc/net/dev"
 
-static FILE *proc_net_dev_fp = NULL;
-
-void proc_net_dev_init()
-{
-	if (proc_net_dev_fp == NULL)
-		proc_net_dev_fp = fopen(PROC_DEV_FILE, "r");
-}
-
 int
 intf_loop(intf_t *intf, intf_handler callback, void *arg)
 {
+	FILE *fp;
 	struct intf_entry *entry;
 	char *p, buf[BUFSIZ], ebuf[BUFSIZ];
 	int ret;
 
 	entry = (struct intf_entry *)ebuf;
 	
-	proc_net_dev_init();
-	if (proc_net_dev_fp == NULL)
+	if ((fp = fopen(PROC_DEV_FILE, "r")) == NULL)
 		return (-1);
 	
 	intf->ifc.ifc_buf = (caddr_t)intf->ifcbuf;
 	intf->ifc.ifc_len = sizeof(intf->ifcbuf);
 	
 	if (ioctl(intf->fd, SIOCGIFCONF, &intf->ifc) < 0) {
-		fclose(proc_net_dev_fp);
+		fclose(fp);
 		return (-1);
 	}
 
 	ret = 0;
-	while (fgets(buf, sizeof(buf), proc_net_dev_fp) != NULL) {
+	while (fgets(buf, sizeof(buf), fp) != NULL) {
 		if ((p = strchr(buf, ':')) == NULL)
 			continue;
 		*p = '\0';
@@ -960,10 +942,10 @@ intf_loop(intf_t *intf, intf_handler callback, void *arg)
 		if ((ret = (*callback)(entry, arg)) != 0)
 			break;
 	}
-	if (ferror(proc_net_dev_fp))
+	if (ferror(fp))
 		ret = -1;
 	
-	fclose(proc_net_dev_fp);
+	fclose(fp);
 	
 	return (ret);
 }

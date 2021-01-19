@@ -375,16 +375,15 @@ fi
 #dnl check endedness
 AC_C_BIGENDIAN
 
-AH_TEMPLATE([__func__], [])
 AC_MSG_CHECKING([if struct in_addr is a wacky huge structure (some Sun boxes)])
 AH_TEMPLATE(IN_ADDR_DEEPSTRUCT, [], [struct in_addr is a wacky huge structure (some Sun boxes)])
 
 AC_TRY_COMPILE([#include <netinet/in.h>], struct in_addr i; i._S_un._S_addr;, \
-             AC_DEFINE(IN_ADDR_DEEPSTRUCT, 1, [Define to 1 for IN_ADDR_DEEPSTRUCT]) \
+             AC_DEFINE(IN_ADDR_DEEPSTRUCT) \
              AC_MSG_RESULT(yes) , \
              AC_TRY_COMPILE([#include <sys/types.h>
 #include <netinet/in.h>], struct in_addr i; i.S_un.S_addr;, \
-                             AC_DEFINE(IN_ADDR_DEEPSTRUCT, 1, [Define to 1 for IN_ADDR_DEEPSTRUCT]) \
+                             AC_DEFINE(IN_ADDR_DEEPSTRUCT) \
                              AC_MSG_RESULT(yes) , \
                              AC_MSG_RESULT(no);))
 
@@ -440,51 +439,6 @@ AC_CACHE_CHECK(if struct ip has ip_sum member, ac_cv_ip_has_ip_sum,
 if test $ac_cv_ip_has_ip_sum = yes ; then
         AC_DEFINE(HAVE_IP_IP_SUM, 1, [struct ip has ip_sum member])
 fi
-
-try_drop_priv=no
-AC_CHECK_HEADERS(grp.h sys/capability.h sys/prctl.h)
-AC_CHECK_FUNC(chroot)
-AC_CHECK_FUNC(prctl,
-  [AC_CHECK_FUNC(setgid,
-    [AC_CHECK_FUNC(setgroups,
-      [AC_CHECK_FUNC(setreuid,
-        [try_drop_priv=yes
-       AC_CHECK_LIB(cap, cap_from_text, , [try_drop_priv=no])]
-      )]
-    )]
-  )]
-)
-
-AC_ARG_WITH(user,
-  [  --with-user=USERNAME    Lower root privileges by switching to user USERNAME])
-AC_MSG_CHECKING([whether to lower root privileges by default])
-if test -z "$with_user" -o "$try_drop_priv" = "no"; then
-       AC_MSG_RESULT(no)
-else
-       AC_DEFINE_UNQUOTED(NMAP_USER, "$withval", [Define user to switch during lowering privileges])
-       AC_MSG_RESULT(to \"$withval\")
-fi
-
-AC_ARG_WITH(chroot-empty,
-  [  --with-chroot-empty=DIRECTORY When lowering privileges and -n option is given, chroot to empty DIRECTORY])
-AC_MSG_CHECKING([whether to chroot when -n option is given])
-if test -z "$with_chroot_empty" -o "$try_drop_priv" = "no" -o "$ac_cv_func_chroot" = no; then
-       AC_MSG_RESULT(no)
-else
-       AC_DEFINE_UNQUOTED(NMAP_CHROOT_EMPTY, "$withval", [Define directory to chroot during lowering privileges if -n option is given])
-       AC_MSG_RESULT(to \"$withval\")
-fi
-AC_ARG_WITH(chroot-resolv,
-  [  --with-chroot-resolv=DIRECTORY When lowering privileges and -n option is not given, chroot to resolver DIRECTORY])
-AC_MSG_CHECKING([whether to chroot when -n option is not given])
-if test -z "$with_chroot_resolv" -o "$try_drop_priv" = "no" -o "$ac_cv_func_chroot" = no; then
-       AC_MSG_RESULT(no)
-else
-       AC_DEFINE_UNQUOTED(NMAP_CHROOT_RESOLV, "$withval", [Define directory to chroot during lowering privileges if -n option is not given])
-       AC_MSG_RESULT(to \"$withval\")
-fi
-
-
 
 AC_CACHE_CHECK(if function signal is accessible, ac_cv_have_signal,
         AC_TRY_COMPILE(
@@ -545,34 +499,34 @@ case "$host" in
     AC_CHECK_LIB(crypt, crypt_r)
     ;;
   *-solaris2.0*)  
-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG, 1, [Define to 1 for Solaris checksum bug])
-    AC_DEFINE(SOLARIS, 1, [Define to 1 for SolariS])
+    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+    AC_DEFINE(SOLARIS)
     ;;
   *-solaris2.[[1-9]][[0-9]]*)
-    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+    AC_DEFINE(SOLARIS)
     ;;
   *-solaris2.1*)
-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG, 1, [Define to 1 for Solaris checksum bug])
-    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+    AC_DEFINE(SOLARIS)
     ;;
   *-solaris2.2*)
-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG, 1, [Define to 1 for Solaris checksum bug])
-    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+    AC_DEFINE(SOLARIS)
     ;;
   *-solaris2.3*)
-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG, 1, [Define to 1 for Solaris checksum bug])
-    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+    AC_DEFINE(SOLARIS)
     ;;
   *-solaris2.4*)
-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG, 1, [Define to 1 for Solaris checksum bug])
-    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+    AC_DEFINE(SOLARIS)
     ;;
   *-solaris2.5.1)
-    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG, 1, [Define to 1 for Solaris checksum bug])
-    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+    AC_DEFINE(STUPID_SOLARIS_CHECKSUM_BUG)
+    AC_DEFINE(SOLARIS)
     ;;
   *-solaris*)
-    AC_DEFINE(SOLARIS, 1, [Define to 1 for Solaris])
+    AC_DEFINE(SOLARIS)
     ;;
   *-sunos4*)
     AC_DEFINE(SUNOS, 1, [SunOS 4])
