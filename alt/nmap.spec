@@ -1,14 +1,14 @@
-Name: nmap
-Version: 7.80
+Name: nmap-npsl
+Version: 7.91
 Release: alt1
 Epoch: 20020501
 
 Summary: Network exploration tool and security scanner
-License: GPLv2
+License: ALT-NPSL-0.92
 Group: Monitoring
 Url: http://nmap.org/
 
-%define srcname nmap-%version-%release
+%define srcname nmap-npsl-%version-%release
 # http://git.altlinux.org/gears/n/nmap.git
 Source: %srcname.tar
 Source1: zenmap.pamd
@@ -114,7 +114,7 @@ rm %buildroot%_datadir/zenmap/su-to-zenmap.sh
 %_bindir/nping
 %_man1dir/nping.*
 %endif
-%doc COPYING* CHANGELOG.bz2 docs/{README,nmap*.txt}
+%doc LICENSE CHANGELOG.bz2 docs/{README,nmap*.txt}
 
 %if_with zenmap
 %files -n zenmap -f zenmap.lang
@@ -129,6 +129,14 @@ rm %buildroot%_datadir/zenmap/su-to-zenmap.sh
 %endif
 
 %changelog
+* Mon Feb 01 2021 Dmitriy Voropaev <voropaevdmtr@altlinux.org> 20020501:7.91-alt1
+- Updated to 7.91.
+- Change license.
+- Change package name.
+
+* Tue Jan 19 2021 Dmitriy Voropaev <voropaevdmtr@altlinux.org> 20020501:7.91-alt1
+- Updated to 7.91.
+
 * Fri Aug 16 2019 Gleb F-Malinovskiy <glebfm@altlinux.org> 20020501:7.80-alt1
 - Updated to 7.80.
 
